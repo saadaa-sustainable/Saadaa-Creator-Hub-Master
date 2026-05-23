@@ -2,8 +2,6 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicEnv } from "./lib/env";
 
-export const runtime = "edge";
-
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req });
 

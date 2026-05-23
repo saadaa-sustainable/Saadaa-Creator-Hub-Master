@@ -2,8 +2,8 @@ import type { NextConfig } from "next";
 
 const config: NextConfig = {
   reactStrictMode: true,
+  typedRoutes: true,
   experimental: {
-    typedRoutes: true,
     optimizePackageImports: ["lucide-react"],
   },
   images: {
