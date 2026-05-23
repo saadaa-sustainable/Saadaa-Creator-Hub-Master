@@ -1,0 +1,580 @@
+"use client";
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
+import { useRouter } from "next/navigation";
+import {
+  AlertTriangle,
+  Banknote,
+  CalendarCheck,
+  CheckCircle2,
+  ClipboardPaste,
+  Hash,
+  Link2,
+  Loader2,
+  Plus,
+  Send,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Avatar } from "@/components/ui";
+import { cn } from "@/lib/cn";
+import { formatRupees } from "@/lib/formatters";
+import { todayIstIso } from "@/lib/payable-cycle";
+import { submitPayments } from "./actions";
+
+interface EligiblePost {
+  post_id: string;
+  post_id_short: string | null;
+  inf_name: string | null;
+  username: string | null;
+  profile_pic: string | null;
+  commercial_amount: number | null;
+  campaign_id: string | null;
+  workflow_status: string;
+  ads_usage_rights: string | null;
+  partnership_id: string | null;
+  ad_partnership_valid: boolean | null;
+}
+
+interface FormRow {
+  key: string;
+  postId: string;
+  utr: string;
+  paymentDate: string;
+  amount: string;
+}
+
+/**
+ * Convert a paste-cell date string to ISO yyyy-MM-dd. Accepts:
+ *   - yyyy-MM-dd  (already ISO)
+ *   - dd/MM/yyyy or dd-MM-yyyy
+ *   - MM/dd/yyyy (best-effort when day > 12)
+ *   - Excel serial date (number of days since 1899-12-30)
+ * Returns "" if unparseable so the caller can fall back to today.
+ */
+function normalizePastedDate(raw: string): string {
+  if (!raw) return "";
+  const s = raw.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (/^\d{4,6}$/.test(s)) {
+    const serial = Number(s);
+    if (serial > 30000 && serial < 60000) {
+      const utc = Date.UTC(1899, 11, 30) + serial * 86400000;
+      const d = new Date(utc);
+      return d.toISOString().slice(0, 10);
+    }
+  }
+  const parts = s.split(/[/\-.]/);
+  if (parts.length === 3) {
+    let [a, b, c] = parts;
+    let day: string, mo: string, year: string;
+    if (c.length === 4) {
+      year = c;
+      day = a;
+      mo = b;
+    } else if (a.length === 4) {
+      year = a;
+      mo = b;
+      day = c;
+    } else {
+      return "";
+    }
+    const yNum = Number(year);
+    const mNum = Number(mo);
+    const dNum = Number(day);
+    if (
+      Number.isFinite(yNum) &&
+      Number.isFinite(mNum) &&
+      Number.isFinite(dNum) &&
+      mNum >= 1 &&
+      mNum <= 12 &&
+      dNum >= 1 &&
+      dNum <= 31
+    ) {
+      const mm = String(mNum).padStart(2, "0");
+      const dd = String(dNum).padStart(2, "0");
+      return `${year}-${mm}-${dd}`;
+    }
+  }
+  return "";
+}
+
+// Counter-based row key generator — deterministic across SSR / hydration so
+// `htmlFor` attributes don't mismatch on first paint. Module-level state is
+// fine here because each row is unique within a single client session.
+let __rowKeyCounter = 0;
+function newRow(): FormRow {
+  __rowKeyCounter += 1;
+  return {
+    key: `r${__rowKeyCounter}`,
+    postId: "",
+    utr: "",
+    paymentDate: todayIstIso(),
+    amount: "",
+  };
+}
+
+/**
+ * Inline Accounts Hub payment entry panel — mirrors legacy
+ * `payment-entry-table` (Index.html:6627-6676). Always visible at the top of
+ * the page. Operator can:
+ *   - add N rows (Post ID / UTR / Date / Amount each)
+ *   - import from Excel/CSV paste (auto-detect header + Excel serial dates)
+ *   - submit all rows in one transaction (3 stage gates + dedup + match)
+ */
+export function PaymentEntryPanel() {
+  const router = useRouter();
+  // Render skeleton during SSR + initial paint. Form state is created only
+  // after mount, which permanently kills the SSR/hydration mismatch caused
+  // by per-row dynamic IDs and a today-date that depends on client locale.
+  const [mounted, setMounted] = useState(false);
+  const [rows, setRows] = useState<FormRow[]>([]);
+  const [eligible, setEligible] = useState<EligiblePost[]>([]);
+  const [loadingEligible, setLoadingEligible] = useState(false);
+  const [submitting, startSubmit] = useTransition();
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
+
+  // Seed the first row + flip mounted after hydration. Same code on every
+  // render path, no SSR involvement → no mismatch possible.
+  useEffect(() => {
+    setRows([newRow()]);
+    setMounted(true);
+  }, []);
+
+  // Load eligible-posts once on mount.
+  useEffect(() => {
+    if (!mounted) return;
+    setLoadingEligible(true);
+    fetch("/api/accounts/eligible-posts")
+      .then(async (res) => {
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error ?? "Unable to load posts");
+        return payload.rows as EligiblePost[];
+      })
+      .then(setEligible)
+      .catch((err: Error) => toast.error(err.message))
+      .finally(() => setLoadingEligible(false));
+  }, [mounted]);
+
+  const eligibleById = useMemo(() => {
+    const map = new Map<string, EligiblePost>();
+    for (const p of eligible) map.set(p.post_id, p);
+    return map;
+  }, [eligible]);
+
+  const addRow = useCallback(() => {
+    setRows((cur) => [...cur, newRow()]);
+  }, []);
+
+  const removeRow = useCallback((key: string) => {
+    setRows((cur) =>
+      cur.length <= 1 ? cur : cur.filter((r) => r.key !== key),
+    );
+  }, []);
+
+  const patchRow = useCallback((key: string, patch: Partial<FormRow>) => {
+    setRows((cur) => cur.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }, []);
+
+  const importFromPaste = useCallback(() => {
+    const text = pasteText.trim();
+    if (!text) {
+      toast.error("Paste some rows first.");
+      return;
+    }
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length === 0) {
+      toast.error("No rows detected.");
+      return;
+    }
+
+    const splitRow = (line: string): string[] => {
+      if (line.includes("\t")) return line.split("\t");
+      return line.split(",");
+    };
+
+    const first = splitRow(lines[0]).map((c) => c.trim().toLowerCase());
+    const hasHeader = first.some(
+      (c) =>
+        c === "post id" ||
+        c === "post_id" ||
+        c === "utr" ||
+        c === "amount" ||
+        c === "date" ||
+        c === "payment date",
+    );
+    const headers = hasHeader ? first : ["post id", "utr", "date", "amount"];
+    const idxOf = (...keys: string[]) =>
+      headers.findIndex((h) => keys.includes(h));
+    const postIdx = idxOf("post id", "post_id", "postid");
+    const utrIdx = idxOf("utr", "reference", "ref", "utr / reference no.");
+    const dateIdx = idxOf("date", "payment date", "payment_date");
+    const amountIdx = idxOf("amount", "amount (₹)", "amount inr", "₹");
+
+    const startAt = hasHeader ? 1 : 0;
+    const parsed: FormRow[] = [];
+    for (let i = startAt; i < lines.length; i++) {
+      const cells = splitRow(lines[i]).map((c) => c.trim());
+      const postId = cells[postIdx >= 0 ? postIdx : 0] ?? "";
+      const utr = cells[utrIdx >= 0 ? utrIdx : 1] ?? "";
+      const rawDate = cells[dateIdx >= 0 ? dateIdx : 2] ?? "";
+      const amount = cells[amountIdx >= 0 ? amountIdx : 3] ?? "";
+      if (!postId && !utr && !amount) continue;
+      parsed.push({
+        key: Math.random().toString(36).slice(2),
+        postId: postId.trim(),
+        utr: utr.trim(),
+        paymentDate: normalizePastedDate(rawDate.trim()) || todayIstIso(),
+        amount: amount.replace(/[^\d.\-]/g, ""),
+      });
+    }
+
+    if (parsed.length === 0) {
+      toast.error("Couldn't parse any rows.");
+      return;
+    }
+
+    setRows(parsed);
+    setPasteOpen(false);
+    setPasteText("");
+    toast.success(
+      `Imported ${parsed.length} row${parsed.length === 1 ? "" : "s"}.`,
+    );
+  }, [pasteText]);
+
+  const onSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const payload = rows.map((r) => ({
+      postId: r.postId.trim(),
+      utr: r.utr.trim(),
+      paymentDate: r.paymentDate,
+      amount: Number(r.amount),
+    }));
+    const invalid = payload.find(
+      (r) =>
+        !r.postId ||
+        !r.paymentDate ||
+        Number.isNaN(r.amount) ||
+        r.amount <= 0,
+    );
+    if (invalid) {
+      toast.error("Each row needs a post, payment date and positive amount.");
+      return;
+    }
+    startSubmit(async () => {
+      const res = await submitPayments({ rows: payload });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      const blocks: string[] = [];
+      if (res.blockedByStage.length)
+        blocks.push(`${res.blockedByStage.length} not Posted`);
+      if (res.blockedByReelRule.length)
+        blocks.push(`${res.blockedByReelRule.length} reel-rule`);
+      if (res.blockedByAdPartnership.length)
+        blocks.push(`${res.blockedByAdPartnership.length} ad-partnership`);
+      if (res.duplicates.length)
+        blocks.push(`${res.duplicates.length} duplicate`);
+      const summary = `${res.saved} saved (${res.paid} paid · ${res.due} due)`;
+      const note = blocks.length ? ` · skipped: ${blocks.join(", ")}` : "";
+      toast.success(`${summary}${note}`);
+      setRows([newRow()]);
+      router.refresh();
+    });
+  };
+
+  if (!mounted) {
+    return (
+      <section
+        className="acc-entry-panel acc-entry-panel--open"
+        suppressHydrationWarning
+      >
+        <header className="acc-entry-panel__head">
+          <div className="acc-entry-panel__title-wrap">
+            <span className="acc-entry-panel__title">
+              <Banknote size={15} aria-hidden />
+              Log Payments
+            </span>
+            <span className="acc-entry-panel__sub">
+              One row per payment · UTR required
+            </span>
+          </div>
+        </header>
+        <div className="acc-entry-panel__body">
+          <div className="acc-entry-skeleton" aria-hidden />
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="acc-entry-panel acc-entry-panel--open">
+      <header className="acc-entry-panel__head">
+        <div className="acc-entry-panel__title-wrap">
+          <span className="acc-entry-panel__title">
+            <Banknote size={15} aria-hidden />
+            Log Payments
+          </span>
+          <span className="acc-entry-panel__sub">
+            One row per payment · UTR required
+          </span>
+        </div>
+        <span className="acc-entry-panel__count tabular">
+          {rows.length} row{rows.length === 1 ? "" : "s"}
+        </span>
+      </header>
+
+      <form onSubmit={onSubmit} className="acc-entry-panel__body">
+        <div className="acc-entry-rows">
+          {rows.map((row, idx) => {
+            const linked = eligibleById.get(row.postId);
+            const postFieldId = `pay_post_${row.key}`;
+            const utrFieldId = `pay_utr_${row.key}`;
+            const dateFieldId = `pay_date_${row.key}`;
+            const amountFieldId = `pay_amount_${row.key}`;
+            return (
+              <div key={row.key} className="acc-entry-row">
+                <div className="acc-entry-row__index" aria-hidden>
+                  {linked ? (
+                    <Avatar
+                      src={linked.profile_pic}
+                      username={linked.username}
+                      name={linked.inf_name}
+                      size={36}
+                      className="acc-entry-row__avatar"
+                    />
+                  ) : (
+                    <span className="acc-entry-row__idx-num">#{idx + 1}</span>
+                  )}
+                </div>
+
+                <div className="acc-entry-row__fields">
+                  <div className="acc-field acc-field--post">
+                    <label
+                      htmlFor={postFieldId}
+                      className="acc-field__label"
+                    >
+                      <User size={11} aria-hidden /> Post
+                      <span className="req">*</span>
+                    </label>
+                    <select
+                      id={postFieldId}
+                      className="acc-field__input acc-field__input--select"
+                      value={row.postId}
+                      onChange={(e) =>
+                        patchRow(row.key, {
+                          postId: e.target.value,
+                          amount:
+                            eligibleById.get(e.target.value)
+                              ?.commercial_amount?.toString() ?? row.amount,
+                        })
+                      }
+                    >
+                      <option value="">
+                        {loadingEligible
+                          ? "Loading posts…"
+                          : "Pick a posted creator"}
+                      </option>
+                      {eligible.map((p) => (
+                        <option key={p.post_id} value={p.post_id}>
+                          {p.post_id_short ?? p.post_id} ·{" "}
+                          {p.inf_name ?? p.username ?? "—"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="acc-field">
+                    <label htmlFor={utrFieldId} className="acc-field__label">
+                      <Hash size={11} aria-hidden /> UTR / Reference
+                      <span className="req">*</span>
+                    </label>
+                    <input
+                      id={utrFieldId}
+                      type="text"
+                      className="acc-field__input"
+                      placeholder="Bank reference"
+                      value={row.utr}
+                      onChange={(e) =>
+                        patchRow(row.key, { utr: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="acc-field">
+                    <label htmlFor={dateFieldId} className="acc-field__label">
+                      <CalendarCheck size={11} aria-hidden /> Payment Date
+                      <span className="req">*</span>
+                    </label>
+                    <input
+                      id={dateFieldId}
+                      type="date"
+                      className="acc-field__input"
+                      value={row.paymentDate}
+                      onChange={(e) =>
+                        patchRow(row.key, { paymentDate: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="acc-field">
+                    <label
+                      htmlFor={amountFieldId}
+                      className="acc-field__label"
+                    >
+                      <Link2 size={11} aria-hidden /> Amount ₹
+                      <span className="req">*</span>
+                    </label>
+                    <input
+                      id={amountFieldId}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      className="acc-field__input tabular"
+                      placeholder="0"
+                      value={row.amount}
+                      onChange={(e) =>
+                        patchRow(row.key, { amount: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {rows.length > 1 && (
+                  <button
+                    type="button"
+                    className="acc-entry-row__remove"
+                    onClick={() => removeRow(row.key)}
+                    aria-label="Remove row"
+                  >
+                    <Trash2 size={13} aria-hidden />
+                  </button>
+                )}
+
+                {linked && row.amount && (
+                  <div className="acc-entry-row__badge">
+                    <MatchBadge
+                      entered={Number(row.amount)}
+                      commercial={Number(linked.commercial_amount ?? 0)}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+          <div className="acc-entry-toolbar">
+            <button
+              type="button"
+              className="acc-entry-add"
+              onClick={addRow}
+              disabled={submitting}
+            >
+              <Plus size={13} aria-hidden />
+              Add another row
+            </button>
+            <button
+              type="button"
+              className="acc-entry-add"
+              onClick={() => setPasteOpen((s) => !s)}
+              disabled={submitting}
+            >
+              <ClipboardPaste size={13} aria-hidden />
+              {pasteOpen ? "Hide paste import" : "Paste from Excel"}
+            </button>
+            <div className="acc-entry-toolbar__spacer" />
+            <button
+              type="submit"
+              className={cn("btn-primary-cta", submitting && "is-loading")}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span className="hidden sm:inline">Saving…</span>
+                </>
+              ) : (
+                <>
+                  <Send size={14} aria-hidden />
+                  <span className="hidden sm:inline">Submit </span>
+                  {rows.length > 1 ? `${rows.length} Rows` : "Payment"}
+                </>
+              )}
+            </button>
+          </div>
+
+          {pasteOpen && (
+            <div className="acc-entry-paste">
+              <p className="text-xs text-text-secondary">
+                Paste rows from Excel / Sheets. First line can be a header
+                (Post ID, UTR, Date, Amount) or values directly. Tabs and
+                commas both work.
+              </p>
+              <textarea
+                className="form-control acc-entry-paste__area"
+                rows={6}
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                placeholder={"SIF-1-P1\tUTRREF123\t2026-05-15\t10000\nSIF-1-P2\t\t2026-05-22\t8500"}
+              />
+              <div className="acc-entry-paste__actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setPasteText("");
+                    setPasteOpen(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary-cta"
+                  onClick={importFromPaste}
+                >
+                  Import
+                </button>
+              </div>
+            </div>
+          )}
+      </form>
+    </section>
+  );
+}
+
+function MatchBadge({
+  entered,
+  commercial,
+}: {
+  entered: number;
+  commercial: number;
+}) {
+  if (!entered || !commercial) return null;
+  const diff = entered - commercial;
+  if (diff === 0) {
+    return (
+      <div className="acc-entry-match acc-entry-match--ok">
+        <CheckCircle2 size={11} aria-hidden />
+        Matched · {formatRupees(commercial)}
+      </div>
+    );
+  }
+  return (
+    <div className="acc-entry-match acc-entry-match--off">
+      <AlertTriangle size={11} aria-hidden />
+      Off by {formatRupees(Math.abs(diff))} · Agreed {formatRupees(commercial)}
+    </div>
+  );
+}

@@ -1,0 +1,534 @@
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ExternalLink,
+  FileText,
+  Loader2,
+  Mail,
+  Plus,
+  Send,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  getCollabEmailPreview,
+  sendCollabEmail,
+  skipCollabEmail,
+  type CollabEmailPreviewResult,
+} from "./actions";
+
+interface CollabEmailModalProps {
+  postId: string;
+  open: boolean;
+  onClose: () => void;
+  draft?: CollabEmailDraft;
+}
+
+type Preview = Extract<CollabEmailPreviewResult, { ok: true }>;
+type Attachment = Preview["attachments"][number];
+
+export interface CollabEmailDraft {
+  creatorName?: string;
+  emailTo?: string;
+  deliverables?: string[];
+  agreedAmount?: string;
+  barterAmount?: string;
+  collabType?: string;
+  adsUsageRights?: string;
+}
+
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function buildPreviewHtml(opts: {
+  collabId: string;
+  creatorName: string;
+  agreedAmount: string;
+  barterAmount: string;
+  deliverables: string[];
+  adsUsageRights: string;
+  collabType: string;
+}): string {
+  const isPureBarter = opts.collabType.toLowerCase() === "barter";
+  const delivLines =
+    opts.deliverables.map((d) => `<li>${esc(d)}</li>`).join("") +
+    (opts.adsUsageRights
+      ? `<li>Ads usage rights: <strong>${esc(opts.adsUsageRights)}</strong></li>`
+      : `<li>Ads usage rights</li>`);
+  const commercialsHtml = isPureBarter
+    ? `<li>Barter: product worth <strong>INR ${esc(opts.barterAmount)}</strong></li>`
+    : `<li>Agreed amount: <strong>INR ${esc(opts.agreedAmount)}</strong></li>${Number(opts.barterAmount) > 0 ? `<li>Barter value: <strong>INR ${esc(opts.barterAmount)}</strong></li>` : ""}`;
+
+  return `<div style="background:#2C2420;margin:-18px -18px 18px;padding:18px 20px;border-radius:10px 10px 0 0;">
+<div style="color:#F0C61E;font-weight:800;font-size:1rem;line-height:1.2;">Collaboration Confirmation</div>
+<div style="color:rgba(255,255,255,0.64);font-size:0.72rem;margin-top:4px;letter-spacing:0.04em;text-transform:uppercase;">Collab ID: <strong style="color:#FFFCF8;">${esc(opts.collabId)}</strong></div>
+</div>
+<p style="margin:0 0 10px;">Hi <strong>${esc(opts.creatorName || "creator")}</strong>,</p>
+<p style="margin:0 0 14px;">We're excited to move forward with a collaboration with you.</p>
+<p style="margin:0 0 16px;"><span style="display:inline-block;background:#F0EAD6;color:#2C2420;font-size:0.74rem;font-weight:800;padding:5px 10px;border-radius:999px;">COLLAB ID: ${esc(opts.collabId)}</span></p>
+<p style="font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;">Agreed Deliverables</p>
+<ul style="margin:0 0 14px;padding-left:18px;">${delivLines}</ul>
+<p style="font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;">Commercials</p>
+<ul style="margin:0 0 14px;padding-left:18px;">${commercialsHtml}</ul>
+<p style="font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;">Important Guidelines</p>
+<p style="margin-bottom:4px;"><strong>Hashtags &amp; Tags:</strong></p>
+<ul style="margin-top:0;padding-left:18px;"><li><strong>#RAHOSAADAA #PEHNOSAADAA #SAADAA #saadaa_women #saadaa_men</strong></li><li>Tag <strong>@saadaadesigns</strong> and <strong>@saadaa_women</strong> or <strong>@saadaa_men</strong></li></ul>
+<p style="margin-bottom:4px;"><strong>Timelines:</strong></p>
+<ul style="margin-top:0;padding-left:18px;">
+<li>Script: <strong>Day 3</strong></li>
+<li>First draft: <strong>Day 7</strong></li>
+<li>Go live: <strong>Day 10</strong></li>
+</ul>
+<div style="background:#F0EAD6;border:1px solid #E8C87A;border-radius:10px;padding:12px 14px;margin:16px 0;">
+<p style="margin:0 0 6px;font-size:0.82rem;"><strong>Payment:</strong> Processed one month after content goes live, either on the <strong>10th or 25th</strong> of the following month.</p>
+<p style="margin:0;font-size:0.82rem;"><strong>Reply to this email with your invoice/bill</strong> mentioning Collab ID <strong>${esc(opts.collabId)}</strong> to receive payment.</p>
+</div>
+<p>Kindly confirm from your side so we can proceed. We're looking forward to creating something impactful together.</p>
+<p style="margin-top:16px;margin-bottom:0;">Thanks and Regards,</p>
+<p style="margin-top:4px;font-weight:800;color:#2C2420;font-size:1rem;letter-spacing:0.5px;">Saadaa</p>`;
+}
+
+export function CollabEmailModal({
+  postId,
+  open,
+  onClose,
+  draft,
+}: CollabEmailModalProps) {
+  const [mounted, setMounted] = useState(false);
+  const [loading, startLoad] = useTransition();
+  const [skipping, startSkip] = useTransition();
+
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+
+  const [emailTo, setEmailTo] = useState("");
+  const [creatorName, setCreatorName] = useState("");
+  const [agreedAmount, setAgreedAmount] = useState("0");
+  const [barterAmount, setBarterAmount] = useState("0");
+  const [deliverables, setDeliverables] = useState<string[]>([]);
+  const [newDeliv, setNewDeliv] = useState("");
+
+  useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!open || !postId) return;
+    setPreview(null);
+    setLoadErr(null);
+    setEmailTo("");
+    setCreatorName("");
+    setAgreedAmount("0");
+    setBarterAmount("0");
+    setDeliverables([]);
+    setNewDeliv("");
+    startLoad(async () => {
+      const res = await getCollabEmailPreview(postId);
+      if (!res.ok) {
+        setLoadErr(res.error);
+        return;
+      }
+      setPreview(res);
+      setEmailTo(draft?.emailTo ?? res.emailTo);
+      setCreatorName(draft?.creatorName ?? res.creatorName);
+      setAgreedAmount(draft?.agreedAmount ?? res.agreedAmount);
+      setBarterAmount(draft?.barterAmount ?? res.barterAmount);
+      setDeliverables(draft?.deliverables ?? res.deliverables);
+    });
+  }, [draft, open, postId]);
+
+  const addDeliverable = () => {
+    const val = newDeliv.trim();
+    if (!val) return;
+    setDeliverables((d) => [...d, val]);
+    setNewDeliv("");
+  };
+
+  const handleSend = () => {
+    if (!preview) return;
+    const to = emailTo.trim();
+    if (!to || !to.includes("@")) {
+      toast.error("Enter a valid email address");
+      return;
+    }
+    // Close immediately — server action + GAS runs in background.
+    onClose();
+    toast.promise(
+      sendCollabEmail({
+        postId,
+        collabId: preview.collabId,
+        emailTo: to,
+        creatorName,
+        agreedAmount,
+        barterAmount,
+        deliverables,
+        adsUsageRights: draft?.adsUsageRights ?? preview.adsUsageRights,
+        collabType: draft?.collabType ?? preview.collabType,
+        attachmentDriveIds,
+      }).then((res) => {
+        if (!res.ok) throw new Error(res.error ?? "Failed to send email");
+        return res;
+      }),
+      {
+        loading: `Sending to ${to}…`,
+        success: () => `Email sent to ${to}`,
+        error: (err: Error) => err.message,
+      },
+    );
+  };
+
+  const handleSkip = () => {
+    startSkip(async () => {
+      const res = await skipCollabEmail(postId);
+      if (res.ok) {
+        toast.success("Marked as skipped");
+        onClose();
+      } else {
+        toast.error(res.error ?? "Failed to skip");
+      }
+    });
+  };
+
+  const isBusy = loading || skipping;
+  const canSend = !!preview && !isBusy && emailTo.trim().includes("@");
+
+  const previewHtml = preview
+    ? buildPreviewHtml({
+        collabId: preview.collabId,
+        creatorName,
+        agreedAmount,
+        barterAmount,
+        deliverables,
+        adsUsageRights: draft?.adsUsageRights ?? preview.adsUsageRights,
+        collabType: draft?.collabType ?? preview.collabType,
+      })
+    : "";
+
+  const attachmentDriveIds =
+    preview?.attachments
+      .map((attachment) => attachment.driveId)
+      .filter((driveId): driveId is string => Boolean(driveId)) ?? [];
+
+  if (!open || !mounted) return null;
+
+  return createPortal(
+    <div className="modal-backdrop modal-backdrop--onboarding">
+      <div className="modal-panel modal-panel--lg modal-panel--onboarding collab-email-modal">
+        {/* Header */}
+        <header className="modal-head">
+          <div className="flex items-center gap-2 min-w-0">
+            <Mail size={16} aria-hidden />
+            <h2 className="font-semibold">Collaboration Email</h2>
+            {preview && (
+              <span className="chip text-[10px] tabular">
+                {preview.collabId}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            disabled={isBusy}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+
+        {/* Body */}
+        <div className="modal-body collab-email-body">
+          {/* Loading */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-text-secondary">
+              <Loader2 size={28} className="animate-spin" aria-hidden />
+              <span className="text-sm">Building email preview…</span>
+            </div>
+          )}
+
+          {/* Error */}
+          {!loading && loadErr && (
+            <div className="ob-form-error-banner">
+              <AlertTriangle size={14} aria-hidden />
+              {loadErr}
+            </div>
+          )}
+
+          {/* Form content */}
+          {!loading && preview && (
+            <>
+              <section
+                className="collab-email-overview"
+                aria-label="Email overview"
+              >
+                <div className="collab-email-overview__header">
+                  <span>Overview</span>
+                  <span className="chip chip--info">
+                    {draft?.collabType ?? preview.collabType}
+                  </span>
+                </div>
+
+                {/* TO */}
+                <div className="collab-email-field collab-email-field--full">
+                  <label className="ob-form-label">
+                    TO (Influencer Email){" "}
+                    <span style={{ color: "var(--color-danger-text)" }}>*</span>
+                  </label>
+                  <input
+                    type="email"
+                    className="ob-input"
+                    placeholder="influencer@email.com"
+                    value={emailTo}
+                    onChange={(e) => setEmailTo(e.target.value)}
+                  />
+                  {!emailTo && (
+                    <p
+                      className="flex items-center gap-1 mt-1 text-xs"
+                      style={{ color: "var(--color-danger-text)" }}
+                    >
+                      <AlertTriangle size={11} aria-hidden />
+                      No email on file, enter manually.
+                    </p>
+                  )}
+                </div>
+
+                {/* Subject */}
+                <div className="collab-email-field collab-email-field--full">
+                  <label className="ob-form-label">SUBJECT</label>
+                  <input
+                    type="text"
+                    className="ob-input"
+                    value={`Collaboration Confirmation - ${preview.collabId}`}
+                    readOnly
+                  />
+                </div>
+
+                {/* Creator name + Amounts */}
+                <div className="collab-email-field">
+                  <div>
+                    <label className="ob-form-label">CREATOR NAME</label>
+                    <input
+                      type="text"
+                      className="ob-input"
+                      value={creatorName}
+                      onChange={(e) => setCreatorName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="collab-email-field">
+                  <div>
+                    <label className="ob-form-label">AGREED AMOUNT (₹)</label>
+                    <input
+                      type="text"
+                      className="ob-input"
+                      value={agreedAmount}
+                      onChange={(e) => setAgreedAmount(e.target.value)}
+                      disabled={
+                        (
+                          draft?.collabType ?? preview.collabType
+                        ).toLowerCase() === "barter"
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="collab-email-field">
+                  <div>
+                    <label className="ob-form-label">BARTER VALUE (₹)</label>
+                    <input
+                      type="text"
+                      className="ob-input"
+                      value={barterAmount}
+                      onChange={(e) => setBarterAmount(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* Deliverables */}
+              <section
+                className="collab-email-overview collab-email-deliverables"
+                aria-label="Deliverables"
+              >
+                <div className="collab-email-overview__header">
+                  <span>Deliverables</span>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {deliverables.map((d, i) => (
+                    <span
+                      key={i}
+                      className="pill"
+                      style={{
+                        background: "var(--color-bg-ecru)",
+                        color: "var(--color-text-primary)",
+                        border: "1px solid var(--color-border)",
+                        fontWeight: 600,
+                        fontSize: "0.75rem",
+                        padding: "5px 10px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      {d}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDeliverables((prev) =>
+                            prev.filter((_, idx) => idx !== i),
+                          )
+                        }
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: "0 0 0 2px",
+                          cursor: "pointer",
+                          color: "var(--color-text-secondary)",
+                          fontSize: "0.85rem",
+                          lineHeight: 1,
+                        }}
+                        aria-label={`Remove ${d}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="ob-input"
+                    placeholder="e.g. 2 Reels"
+                    value={newDeliv}
+                    onChange={(e) => setNewDeliv(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addDeliverable();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="action-btn"
+                    onClick={addDeliverable}
+                  >
+                    <Plus size={11} aria-hidden />
+                    Add
+                  </button>
+                </div>
+              </section>
+
+              {/* Attachments */}
+              <section
+                className="collab-email-overview collab-email-attachments"
+                aria-label="Email attachments"
+              >
+                <div className="collab-email-overview__header">
+                  <span>Attachments</span>
+                </div>
+                <div className="collab-email-attachment-list">
+                  {preview.attachments.map((attachment) => (
+                    <AttachmentRow
+                      key={attachment.kind}
+                      attachment={attachment}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              {/* Email preview pane */}
+              <section
+                className="collab-email-template"
+                aria-label="Email template preview"
+              >
+                <label className="ob-form-label">EMAIL PREVIEW</label>
+                <div
+                  className="collab-email-preview"
+                  // eslint-disable-next-line react/no-danger
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              </section>
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <footer className="modal-foot collab-email-footer">
+          {preview && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ color: "var(--color-text-secondary)" }}
+              onClick={handleSkip}
+              disabled={isBusy}
+            >
+              {skipping && (
+                <Loader2 size={11} className="animate-spin" aria-hidden />
+              )}
+              Mark as Skipped
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            disabled={isBusy}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-primary-cta"
+            onClick={handleSend}
+            disabled={!canSend}
+          >
+            <Send size={13} aria-hidden />
+            Send Email
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function AttachmentRow({ attachment }: { attachment: Attachment }) {
+  const isAttached = attachment.status === "attached";
+
+  return (
+    <div className="collab-email-attachment" data-status={attachment.status}>
+      <span className="collab-email-attachment__icon">
+        {isAttached ? (
+          <CheckCircle2 size={14} aria-hidden />
+        ) : (
+          <AlertTriangle size={14} aria-hidden />
+        )}
+      </span>
+      <div className="collab-email-attachment__copy">
+        <span>{attachment.label}</span>
+        <strong>{attachment.fileName}</strong>
+        {attachment.note && <small>{attachment.note}</small>}
+      </div>
+      {attachment.url && (
+        <a
+          className="collab-email-attachment__link"
+          href={attachment.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open ${attachment.label}`}
+        >
+          <FileText size={13} aria-hidden />
+          <ExternalLink size={11} aria-hidden />
+        </a>
+      )}
+    </div>
+  );
+}
