@@ -302,10 +302,20 @@ export const fetchAccountsFilterOptions = unstable_cache(
   { revalidate: 300, tags: ["payments", "posts", "campaigns"] },
 );
 
+const ADS_YES = (raw: string | null | undefined): boolean => {
+  if (!raw) return false;
+  return !["", "no", "n/a", "none", "0", "false"].includes(
+    raw.trim().toLowerCase(),
+  );
+};
+
 /**
- * Posts eligible for a new payment submit — Posted/Delivered + post_link set.
- * Mirrors legacy `getPayableEligiblePosts`. Used by the inline submit form
- * dropdown to keep operators from accidentally paying On Board rows.
+ * Posts eligible for a new payment submit. Enforces collab-level readiness:
+ *   1. Every deliverable in the collab must have a post_link (posting form submitted).
+ *   2. If ANY deliverable has ads_usage_rights, ALL must have a partnership_id.
+ *
+ * Fetches all Posted/Delivered deliverables (parents + children), groups by
+ * collab (inf_id + collab_number), and returns only parent rows from ready collabs.
  */
 export async function fetchPayableEligiblePosts(): Promise<
   Array<{
@@ -323,34 +333,65 @@ export async function fetchPayableEligiblePosts(): Promise<
   }>
 > {
   const supabase = createServiceClient();
+  // Fetch ALL deliverables (parents + children) so we can gate per-collab.
   const { data, error } = await (supabase as any)
     .from("posts")
     .select(
       `
       post_id, post_id_short, commercial_amount, campaign_id, workflow_status,
       ads_usage_rights, partnership_id, ad_partnership_valid, deliverable_index,
-      post_link,
+      post_link, inf_id, collab_number,
       creator:creators ( username, inf_name, profile_pic )
     `,
     )
     .in("workflow_status", ["Posted", "Delivered"])
-    .or("deliverable_index.is.null,deliverable_index.eq.1")
-    .not("post_link", "is", null)
     .order("post_date", { ascending: false, nullsFirst: false })
     .limit(2000);
 
   if (error) throw error;
-  return ((data ?? []) as any[]).map((r) => ({
-    post_id: r.post_id,
-    post_id_short: r.post_id_short ?? null,
-    commercial_amount: r.commercial_amount ?? null,
-    campaign_id: r.campaign_id ?? null,
-    workflow_status: r.workflow_status,
-    ads_usage_rights: r.ads_usage_rights ?? null,
-    partnership_id: r.partnership_id ?? null,
-    ad_partnership_valid: r.ad_partnership_valid ?? null,
-    inf_name: r.creator?.inf_name ?? null,
-    username: r.creator?.username ?? null,
-    profile_pic: r.creator?.profile_pic ?? null,
-  }));
+  const rows = (data ?? []) as any[];
+
+  // Group deliverables by collab (inf_id + collab_number).
+  const collabMap = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const key = `${r.inf_id ?? ""}|${r.collab_number ?? 0}`;
+    if (!collabMap.has(key)) collabMap.set(key, []);
+    collabMap.get(key)!.push(r);
+  }
+
+  // Collab is payment-ready when every deliverable has post_link AND (if ads) partnership.
+  const readyKeys = new Set<string>();
+  for (const [key, deliverables] of collabMap) {
+    const allPosted = deliverables.every((d) => (d.post_link ?? "").trim().length > 0);
+    const adsRequired = deliverables.some((d) => ADS_YES(d.ads_usage_rights));
+    const allPartnershipped =
+      !adsRequired ||
+      deliverables.every(
+        (d) =>
+          d.ad_partnership_valid === true ||
+          (d.partnership_id ?? "").trim().length > 0,
+      );
+    if (allPosted && allPartnershipped) readyKeys.add(key);
+  }
+
+  // Return only parent rows from ready collabs.
+  return rows
+    .filter((r) => {
+      const key = `${r.inf_id ?? ""}|${r.collab_number ?? 0}`;
+      const isParent = r.deliverable_index === null || r.deliverable_index === 1;
+      return isParent && readyKeys.has(key);
+    })
+    .map((r) => ({
+      post_id: r.post_id,
+      post_id_short: r.post_id_short ?? null,
+      commercial_amount: r.commercial_amount ?? null,
+      campaign_id: r.campaign_id ?? null,
+      workflow_status: r.workflow_status,
+      ads_usage_rights: r.ads_usage_rights ?? null,
+      partnership_id: r.partnership_id ?? null,
+      ad_partnership_valid: r.ad_partnership_valid ?? null,
+      inf_name: r.creator?.inf_name ?? null,
+      username: r.creator?.username ?? null,
+      profile_pic: r.creator?.profile_pic ?? null,
+    }));
 }

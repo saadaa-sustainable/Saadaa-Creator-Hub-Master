@@ -11,6 +11,7 @@ import {
   Eye,
   Handshake,
   Info,
+  Lock,
   ShieldCheck,
   X,
 } from "lucide-react";
@@ -129,6 +130,25 @@ export function AccountsOverviewModal({
 
   const stage = data?.parent.workflow_status ?? "";
   const isPostedStage = stage === "Posted" || stage === "Delivered";
+
+  // Collab-level payment gate — computed from all sibling deliverables.
+  const allPosted =
+    !data ||
+    data.deliverables.every(
+      (d) =>
+        (d.post_link ?? "").trim().length > 0 &&
+        (d.workflow_status === "Posted" || d.workflow_status === "Delivered"),
+    );
+  const adsRequired = data?.summary.hasAdsRights ?? false;
+  const allPartnershipped =
+    !adsRequired ||
+    !data ||
+    data.deliverables.every(
+      (d) =>
+        d.ad_partnership_valid === true ||
+        (d.partnership_id ?? "").trim().length > 0,
+    );
+  const collabBlocked = isPostedStage && (!allPosted || !allPartnershipped);
 
   return createPortal(
     <div
@@ -262,8 +282,22 @@ export function AccountsOverviewModal({
                 </section>
               )}
 
-              {/* Verification tooltip — always visible on Posted */}
-              {isPostedStage && (
+              {/* Payment gate banner — shown when collab isn't ready */}
+              {isPostedStage && collabBlocked && (
+                <div className="acc-overview-gate">
+                  <Lock size={14} aria-hidden />
+                  <div>
+                    <strong>Payment locked for this collab.</strong>{" "}
+                    {!allPosted && "Some deliverables haven't been posted yet. "}
+                    {!allPartnershipped &&
+                      "Some deliverables are missing a partnership key. "}
+                    Complete all deliverables before logging payment.
+                  </div>
+                </div>
+              )}
+
+              {/* Verification tooltip — shown only when collab is ready */}
+              {isPostedStage && !collabBlocked && (
                 <div className="acc-overview-tip">
                   <Info size={14} aria-hidden />
                   <div>
@@ -287,6 +321,7 @@ export function AccountsOverviewModal({
                         key={d.post_id}
                         deliverable={d}
                         adsRights={data.parent.ads_usage_rights}
+                        collabBlocked={collabBlocked}
                       />
                     ))}
                   </div>
@@ -310,9 +345,11 @@ export function AccountsOverviewModal({
 function DeliverableCard({
   deliverable: d,
   adsRights,
+  collabBlocked = false,
 }: {
   deliverable: DeliverableRow;
   adsRights: string | null;
+  collabBlocked?: boolean;
 }) {
   const paymentStatus = (d.payment?.status as string | undefined) ?? null;
   const paid = paymentStatus === "Done";
@@ -418,7 +455,7 @@ function DeliverableCard({
           </span>
         )}
 
-        {!paid && !blockedByPartnership && (
+        {!paid && !blockedByPartnership && !collabBlocked && (
           <span
             className="acc-overview-deliverable__verify"
             title="Open the Instagram link and confirm the creator posted. Then add UTR via the Log Payments form above."
