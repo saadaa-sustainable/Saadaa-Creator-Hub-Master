@@ -115,7 +115,9 @@ export default async function LoginPage() {
             </p>
           </div>
 
-          <GoogleSignIn />
+          <Suspense fallback={<div className="h-12 rounded-md bg-bg-muted animate-pulse" />}>
+            <GoogleSignIn />
+          </Suspense>
 
           <div className="pt-4 border-t border-border-soft flex items-center justify-between text-[0.72rem] text-text-tertiary">
             <span>SSO via Google Workspace</span>
