@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { publicEnv } from "@/lib/env";
+import { createServiceClient } from "@/lib/supabase/server";
 
 /**
  * OAuth callback — Supabase redirects here with `?code=…` after the user
@@ -67,11 +68,13 @@ export async function GET(request: NextRequest) {
 
   // Sanity check: only allow team members through. If the email isn't on
   // user_access OR is marked inactive, sign them out and bounce to /login.
+  // Use service client to bypass RLS — anon key can't read user_access.
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (user?.email) {
-    const { data: row } = await supabase
+    const serviceClient = createServiceClient();
+    const { data: row } = await serviceClient
       .from("user_access")
       .select("active")
       .eq("email", user.email.toLowerCase())
