@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (user?.email) {
     const serviceClient = createServiceClient();
-    const { data: row } = await serviceClient
+    const { data: row } = await (serviceClient as any)
       .from("user_access")
       .select("active")
       .eq("email", user.email.toLowerCase())
