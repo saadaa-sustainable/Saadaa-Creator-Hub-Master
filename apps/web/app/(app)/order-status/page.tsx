@@ -30,13 +30,13 @@ export default async function OrderStatusPage({
   return (
     <div className="onboarding-stage">
       <PageHeader icon={Truck} title="Order Status" knowMore="order-status" />
+      <OrderStatusFiltersBar initial={params} options={options} />
       <Suspense
         key={JSON.stringify(params)}
         fallback={<TableSkeleton rows={6} />}
       >
         <OrderStatusBody params={params} />
       </Suspense>
-      <OrderStatusFiltersBar initial={params} options={options} />
     </div>
   );
 }
