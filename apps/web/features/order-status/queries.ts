@@ -14,6 +14,8 @@ import {
  * in-memory and accumulates KPIs over the full scope (filter is client-side
  * for the list, server-side for campaign + collab to keep the payload sane).
  */
+// Note: posts.delivery_date doesn't exist on prod even though types.gen.ts
+// lists it. Use est_delivery from posts + delivery_date from shopify_orders.
 const POSTS_COLS = [
   "post_id",
   "inf_id",
@@ -29,7 +31,6 @@ const POSTS_COLS = [
   "order_status",
   "tracking_id",
   "est_delivery",
-  "delivery_date",
 ].join(",");
 
 // Confirmed-safe base columns (every other shopify_orders consumer uses these).
@@ -225,9 +226,7 @@ export async function fetchOrderStatusData(
       estDelivery: estDelivery ? estDelivery.toISOString().slice(0, 10) : null,
       deliveryDate: sRow.delivery_date
         ? String(sRow.delivery_date).slice(0, 10)
-        : p.delivery_date
-          ? String(p.delivery_date).slice(0, 10)
-          : null,
+        : null,
       orderPlaced: sRow.order_date ? String(sRow.order_date).slice(0, 10) : null,
       isOverdue,
       reels: Number(p.reels ?? 0),
