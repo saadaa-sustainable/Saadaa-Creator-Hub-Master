@@ -5,25 +5,39 @@ export default function AccountsHubKM() {
     <>
       <KMHeader
         title="Accounts Hub"
-        subtitle="Per-collab payment ledger. Inline log form, kanban + list, CSV exports, 15th/30th payable cycle."
+        subtitle="Per-collab payment ledger. Inline log form, kanban + list, Excel paste import, CSV exports, 15th/30th payable cycle."
       />
 
-      <KMSection tag="Purpose">
-        <p>
-          Single surface for tracking every payment from{" "}
-          <KMCode>Not Due</KMCode> through <KMCode>Due</KMCode> to{" "}
-          <KMCode>Done</KMCode>. Drafts are auto-created when a collab becomes
-          payment-eligible; the operator&apos;s job is to verify the IG post
-          is live, add UTR + payment date, and submit.
-        </p>
-      </KMSection>
-
-      <KMSection tag="Fields written (payments)">
+      <KMSection tag="Page layout (top → bottom)">
         <KMList>
           <li>
-            <strong>post_id · deliverable_post_id</strong> · parent links the
-            ledger row to the collab; the deliverable id captures which
-            episode the UTR settles.
+            <strong>1. Log Payments panel</strong> — always-open inline form
+            with multi-row entry + Paste from Excel + Submit button.
+          </li>
+          <li>
+            <strong>2. Filter strip</strong> — search, campaign, payment
+            status, ads rights.
+          </li>
+          <li>
+            <strong>3. KPI strip</strong> — Posts Done · Not Due · Due · Done
+            (4 cards with rupee totals).
+          </li>
+          <li>
+            <strong>4. Toolbar</strong> — Downloads (Due CSV · Paid CSV ·
+            All) on the left, Kanban / List view toggle on the right.
+          </li>
+          <li>
+            <strong>5. Board</strong> — Kanban (3 columns: Reach Out · On
+            Board · Posted) or List table.
+          </li>
+        </KMList>
+      </KMSection>
+
+      <KMSection tag="Fields written (payments table)">
+        <KMList>
+          <li>
+            <strong>post_id · deliverable_post_id · inf_id · username</strong>{" "}
+            · denormalised so the ledger row is self-contained.
           </li>
           <li>
             <strong>status</strong> · <KMCode>Not Due</KMCode> →{" "}
@@ -32,64 +46,66 @@ export default function AccountsHubKM() {
           </li>
           <li>
             <strong>amount · utr · payment_date</strong> · what was paid and
-            when. UTR doubles as the cross-post dedup key.
+            when. UTR is the cross-post dedup key.
           </li>
           <li>
             <strong>due_date · estimated_payable_date</strong> · due_date =
-            post_date + 30; est_payable = next 15th or 30th of the month
-            (Saadaa&apos;s settlement cycle).
+            post_date + 30; est_payable = next 15th or 30th of the month.
           </li>
           <li>
-            <strong>collab_number · deliverable_index</strong> · denormalised
-            so the row makes sense without joining back to posts.
+            <strong>collab_number · deliverable_index · bank_name ·
+            bank_number · ifsc</strong> · pulled from posts at submit time.
           </li>
         </KMList>
       </KMSection>
 
-      <KMSection tag="3 gates at submit">
+      <KMSection tag="3 gates at submit (collab-level)">
         <KMList>
           <li>
-            <strong>Stage</strong> — post must be <KMCode>Posted</KMCode> or{" "}
-            <KMCode>Delivered</KMCode>.
+            <strong>Stage</strong> — post must be in{" "}
+            <KMCode>Posted</KMCode> or <KMCode>Delivered</KMCode>.
           </li>
           <li>
-            <strong>Collab readiness</strong> — every sibling deliverable must
-            have post_link AND post_date. One missing sibling locks the whole
-            collab.
+            <strong>Collab readiness</strong> — EVERY sibling deliverable
+            must have post_link AND post_date. One missing sibling locks
+            the whole collab.
           </li>
           <li>
-            <strong>Partnership</strong> — when ads_usage_rights = Yes on any
-            sibling, every sibling needs a partnership_id before any payment
-            can settle.
+            <strong>Partnership</strong> — when ads_usage_rights = Yes on
+            any sibling, every sibling needs a partnership_id before any
+            payment can settle.
           </li>
         </KMList>
-      </KMSection>
-
-      <KMSection tag="Kanban vs List">
-        <KMList>
-          <li>
-            <strong>Kanban</strong> — 3 columns (Reach Out · On Board ·
-            Posted). Posted column shows only parents with a{" "}
-            <KMCode>Parent · N delivs</KMCode> chip + split amount line.
-            Click any card → stage-wise overview modal.
-          </li>
-          <li>
-            <strong>List</strong> — flat table for batch scanning; respects
-            the same filter strip (campaign / status / ads rights).
-          </li>
-        </KMList>
+        <p>
+          Blocked rows surface in the toast with the exact reason per post
+          (e.g. <KMCode>siblings not posted yet: SIF-1-P2, SIF-1-P3</KMCode>
+          or <KMCode>partnership key missing on: SIF-1-P2</KMCode>).
+        </p>
       </KMSection>
 
       <KMSection tag="Excel paste import">
         <p>
-          The <KMCode>Paste from Excel</KMCode> button accepts tab- or
-          comma-separated rows. Headers (<KMCode>Post ID</KMCode>,{" "}
-          <KMCode>UTR</KMCode>, <KMCode>Date</KMCode>,{" "}
-          <KMCode>Amount</KMCode>) are auto-detected. Excel serial dates +
+          <KMCode>Paste from Excel</KMCode> accepts tab- or comma-separated
+          rows up to a <strong>200-row batch limit</strong>. Headers (Post ID,
+          UTR, Date, Amount) are auto-detected. Excel serial dates +
           dd/mm/yyyy + yyyy-mm-dd all parse. Every parsed row runs the same
-          three gates above — invalid rows surface in the toast with the
-          exact reason per post.
+          three gates above.
         </p>
+      </KMSection>
+
+      <KMSection tag="Kanban vs List + click-through">
+        <KMList>
+          <li>
+            <strong>Kanban</strong> — Posted column shows only parents with a{" "}
+            <KMCode>Parent · N delivs</KMCode> chip + split-amount line. Click
+            any card → stage-wise overview modal listing every sibling
+            deliverable with IG verification button + partnership status.
+          </li>
+          <li>
+            <strong>List</strong> — flat table for batch scanning; same
+            filter strip applies.
+          </li>
+        </KMList>
       </KMSection>
 
       <KMSection tag="Exports + cron">
@@ -99,19 +115,28 @@ export default function AccountsHubKM() {
             <KMCode>Due</KMCode> for the next disbursement run.
           </li>
           <li>
-            <strong>Paid CSV</strong> · history of <KMCode>Done</KMCode> rows
-            with UTR + payment_date for finance reconciliation.
+            <strong>Paid CSV</strong> · history of <KMCode>Done</KMCode>{" "}
+            rows for finance reconciliation.
+          </li>
+          <li>
+            <strong>All CSV</strong> · full export including drafts.
           </li>
           <li>
             <strong>recomputePaymentStates</strong> runs inside the 3-hr cron
-            and flips Not Due → Due when due_date has passed. Idempotent.
+            and flips Not Due → Due when due_date has passed + heals NULL
+            est_payable values. Idempotent.
+          </li>
+          <li>
+            <strong>Backfill suppression</strong> — page-load no longer
+            creates ghost UTR-less drafts for collabs that aren&apos;t
+            payment-eligible yet.
           </li>
         </KMList>
       </KMSection>
 
       <KMCallout tone="danger">
-        Payments cannot be reversed. Always verify the live IG post via the
-        overview-modal link before logging UTR.
+        Payments cannot be reversed. Always open the IG link in the overview
+        modal and verify the post is live before logging UTR.
       </KMCallout>
     </>
   );

@@ -5,19 +5,23 @@ export default function CampaignsKM() {
     <>
       <KMHeader
         title="Campaigns"
-        subtitle="Server-generated IFC IDs. Two budget lines (Barter + Paid) seed automatically. Re-used across every downstream stage."
+        subtitle="Server-generated IFC IDs. Two budget lines (Barter + Paid) seed automatically. Tabs for Create + Existing in one switcher."
       />
 
-      <KMSection tag="Purpose">
-        <p>
-          A campaign is the unit every collab attaches to. The ID lives on
-          posts, payments, ad-status rows, and dashboards. Once created you can
-          generate reach-outs against it, route inbound creators to it, and
-          watch budget burn in real time.
-        </p>
+      <KMSection tag="Page layout">
+        <KMList>
+          <li>
+            <strong>Create Campaign</strong> tab — form for campaign details
+            and budget rows.
+          </li>
+          <li>
+            <strong>Existing Campaigns</strong> tab — list of all campaigns
+            with quick links back into the form for editing.
+          </li>
+        </KMList>
       </KMSection>
 
-      <KMSection tag="Fields written (campaigns + campaign_budget)">
+      <KMSection tag="Fields written (campaigns table)">
         <KMList>
           <li>
             <strong>campaign_id</strong> · auto <KMCode>IFC###</KMCode> — server
@@ -25,46 +29,40 @@ export default function CampaignsKM() {
           </li>
           <li>
             <strong>campaign_name</strong> · operator-facing label shown in
-            every dropdown and chip across the app.
+            every dropdown across reach-out, onboarding, accounts hub.
           </li>
           <li>
-            <strong>key_message</strong> · single line summarising the
-            creative angle. Surfaces inside the collab email template.
+            <strong>key_message</strong> · single line summarising the angle.
+            Surfaces inside the collab brief email.
           </li>
           <li>
-            <strong>start_date · end_date</strong> · optional planning window.
-            Drives dashboard "active campaigns" badge and budget burn rate.
+            <strong>start_date · end_date</strong> · planning window. Drives
+            dashboard active-campaign badge and burn-rate charts.
           </li>
           <li>
-            <strong>creator_target · brief_link</strong> · target headcount
-            and brief URL. Brief link appears as a button on the campaign
-            card.
-          </li>
-          <li>
-            <strong>campaign_budget</strong> rows · always seeded with one
-            <KMCode>Barter</KMCode> and one <KMCode>Paid</KMCode> line. Edit
-            or delete to make a campaign purely one type.
+            <strong>creator_target · brief_link · internal_brief</strong> ·
+            target headcount + external/internal brief URLs.
           </li>
         </KMList>
       </KMSection>
 
-      <KMSection tag="Where the campaign flows">
+      <KMSection tag="Budget rows (campaign_budget)">
+        <p>
+          On Add the form auto-appends two rows: one{" "}
+          <KMCode>collab_type=Barter</KMCode> and one{" "}
+          <KMCode>collab_type=Paid</KMCode>. Adjust or delete to make the
+          campaign fully one type.
+        </p>
         <KMList>
           <li>
-            <strong>Reach Out</strong> — campaign selector required before
-            submit. Outbound + inbound both write <KMCode>posts.campaign_id</KMCode>.
+            <strong>Barter</strong> rows lock <KMCode>avg_compensation</KMCode>{" "}
+            + commercials to 0 (read-only field) — Saadaa never pays cash on
+            barter.
           </li>
           <li>
-            <strong>Onboarding</strong> — campaign chip on every row + filter
-            by campaign.
-          </li>
-          <li>
-            <strong>Accounts Hub</strong> — budget burn = sum of payment
-            amounts grouped by campaign vs. the budget rows.
-          </li>
-          <li>
-            <strong>Ad Status</strong> — only ads tied to a campaign get
-            ROAS / impressions overlays from the Meta Ads warehouse.
+            <strong>Paid</strong> rows accept any positive avg compensation;
+            roll up into <KMCode>campaign_budget_monthly</KMCode> view for
+            trend charts (auto-regenerated, don&apos;t edit directly).
           </li>
         </KMList>
       </KMSection>
@@ -72,25 +70,23 @@ export default function CampaignsKM() {
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>
-            Campaign ID is immutable once created. You can rename / archive
-            the campaign but the IFC number stays so historical posts keep
-            their link.
+            Campaign ID is immutable once created. Rename / archive freely;
+            historical posts keep their link.
           </li>
           <li>
-            Deleting a campaign row is blocked while any posts reference it
-            (FK constraint). Archive instead.
+            Deleting a campaign is blocked while any posts reference it (FK
+            constraint). Archive instead.
           </li>
           <li>
-            Budget lines roll up across <KMCode>campaign_budget_monthly</KMCode>
-            for trend charts; don&apos;t edit those — they regenerate from the
-            base rows.
+            Editing an existing campaign re-uses the same form via the
+            switcher tab — the create button text flips to &quot;Update&quot;.
           </li>
         </KMList>
       </KMSection>
 
       <KMCallout tone="info">
-        Campaign create needs the <KMCode>campaign_create</KMCode> permission.
-        Operators without it see Existing Campaigns only.
+        Create requires the <KMCode>campaign_create</KMCode> permission.
+        Without it, only the Existing tab is visible.
       </KMCallout>
     </>
   );
