@@ -32,12 +32,23 @@ const POSTS_COLS = [
   "delivery_date",
 ].join(",");
 
-const SHOPIFY_COLS = [
+// Confirmed-safe base columns (every other shopify_orders consumer uses these).
+const SHOPIFY_COLS_BASE = [
   "order_id",
   "tracking_id",
   "tracking_status",
   "delivery_date",
   "order_date",
+  "line_skus",
+].join(",");
+
+// Extended Commerce Intel columns added by
+// supabase/migrations/2026_05_16_shopify_orders_expanded.sql. If that
+// migration hasn't been applied to the live DB, the query 400s with
+// PostgREST code 42703 — we detect that and fall back to base cols so
+// the volume KPIs + table still render (commerce intel KPIs just go to 0).
+const SHOPIFY_COLS_EXTENDED = [
+  SHOPIFY_COLS_BASE,
   "subtotal_price",
   "total_price",
   "discount_total",
@@ -51,7 +62,6 @@ const SHOPIFY_COLS = [
   "refund_reason",
   "refunded_at",
   "refund_amount",
-  "line_skus",
   "fulfillment_events",
 ].join(",");
 
@@ -62,6 +72,28 @@ export async function fetchOrderStatusData(
 ): Promise<{ rows: OrderStatusRow[]; kpi: OrderStatusKpi }> {
   const supabase = createServiceClient();
 
+  // Try the extended columns first; if PostgREST 42703s the missing column,
+  // retry with the base column set so the page still renders.
+  const fetchShopify = async () => {
+    const ext = await (supabase as any)
+      .from("shopify_orders")
+      .select(SHOPIFY_COLS_EXTENDED)
+      .limit(10000);
+    if (!ext.error) return ext;
+    const code = String((ext.error as { code?: string }).code ?? "");
+    if (code === "42703" || /column .* does not exist/i.test(ext.error.message ?? "")) {
+      console.warn(
+        "[order-status] shopify_orders expanded cols missing, falling back to base set. " +
+          "Apply supabase/migrations/2026_05_16_shopify_orders_expanded.sql to enable Commerce Intel KPIs.",
+      );
+      return await (supabase as any)
+        .from("shopify_orders")
+        .select(SHOPIFY_COLS_BASE)
+        .limit(10000);
+    }
+    return ext;
+  };
+
   // Parallel fetch — posts with order_id, shopify enrichments, creators,
   // instagram_cache for avatar fallback.
   const [postsRes, shopifyRes, creatorsRes, igCacheRes] = await Promise.all([
@@ -70,12 +102,19 @@ export async function fetchOrderStatusData(
       .select(POSTS_COLS)
       .not("order_id", "is", null)
       .limit(5000),
-    (supabase as any).from("shopify_orders").select(SHOPIFY_COLS).limit(10000),
+    fetchShopify(),
     (supabase as any).from("creators").select(CREATOR_COLS).limit(5000),
     (supabase as any).from("instagram_cache").select("username, profile_pic").limit(5000),
   ]);
 
-  if (postsRes.error) throw postsRes.error;
+  if (postsRes.error) {
+    console.error("[order-status] posts query failed:", postsRes.error);
+    throw postsRes.error;
+  }
+  if (shopifyRes.error) {
+    console.error("[order-status] shopify_orders query failed:", shopifyRes.error);
+    throw shopifyRes.error;
+  }
 
   const posts = (postsRes.data ?? []) as Array<Record<string, unknown>>;
   const shopifyRows = (shopifyRes.data ?? []) as Array<Record<string, unknown>>;
