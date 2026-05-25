@@ -45,21 +45,9 @@ async function OrderStatusBody({ params }: { params: OrderStatusFilters }) {
   const { rows, kpi } = await fetchOrderStatusData(params);
   const activeBucket: OrderStatusBucket =
     (params.status as OrderStatusBucket) || "all";
-
-  const buildHref = (b: OrderStatusBucket) => {
-    const sp = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-      if (v) sp.set(k, String(v));
-    }
-    if (b === "all") sp.delete("status");
-    else sp.set("status", b);
-    const q = sp.toString();
-    return q ? `/order-status?${q}` : `/order-status`;
-  };
-
   return (
     <>
-      <OrderVolumeStrip kpi={kpi} activeBucket={activeBucket} buildHref={buildHref} />
+      <OrderVolumeStrip kpi={kpi} activeBucket={activeBucket} currentParams={params} />
       <CommerceIntelStrip kpi={kpi} />
       <OrderStatusBoard rows={rows} filters={params} />
     </>

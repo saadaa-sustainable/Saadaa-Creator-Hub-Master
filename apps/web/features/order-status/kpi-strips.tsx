@@ -4,19 +4,38 @@ import { Box, IndianRupee } from "lucide-react";
 import Link from "next/link";
 import { formatRupees } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
-import type { OrderStatusBucket, OrderStatusKpi } from "./types";
+import type {
+  OrderStatusBucket,
+  OrderStatusFilters,
+  OrderStatusKpi,
+} from "./types";
 
 interface VolumeProps {
   kpi: OrderStatusKpi;
   activeBucket: OrderStatusBucket;
-  buildHref: (bucket: OrderStatusBucket) => string;
+  /** Plain object — functions can't cross the RSC boundary. */
+  currentParams: OrderStatusFilters;
+}
+
+function buildBucketHref(
+  bucket: OrderStatusBucket,
+  params: OrderStatusFilters,
+): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) sp.set(k, String(v));
+  }
+  if (bucket === "all") sp.delete("status");
+  else sp.set("status", bucket);
+  const q = sp.toString();
+  return q ? `/order-status?${q}` : `/order-status`;
 }
 
 /**
  * Top KPI strip — 6 clickable status buckets. Click any tile to filter the
  * table to that bucket. Mirrors legacy `.os-kpi-strip`.
  */
-export function OrderVolumeStrip({ kpi, activeBucket, buildHref }: VolumeProps) {
+export function OrderVolumeStrip({ kpi, activeBucket, currentParams }: VolumeProps) {
   const tiles: Array<{
     key: OrderStatusBucket;
     label: string;
@@ -71,7 +90,7 @@ export function OrderVolumeStrip({ kpi, activeBucket, buildHref }: VolumeProps) 
           <Link
             key={t.key}
             // typedRoutes can't infer dynamic query strings — cast to bypass.
-            href={buildHref(t.key) as never}
+            href={buildBucketHref(t.key, currentParams) as never}
             className={cn(
               "os-kpi",
               activeBucket === t.key && "os-kpi--active",
