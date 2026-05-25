@@ -16,12 +16,58 @@ export default function PostingKM() {
           </li>
           <li>
             <strong>List / Cards toggle</strong> — both surfaces share the
-            same filter strip and per-row Submit / Overview action.
+            same filter strip + per-row action.
           </li>
           <li>
-            <strong>Submit Posting modal</strong> — opens per row. Form has a
-            Verify Strip at the top (date pill + URL pill + ownership
-            tickmark), then download / raw-dump / partnership rows below.
+            <strong>Per-row action</strong> — <KMCode>Submit</KMCode> button
+            on unposted rows (opens Submit Posting modal); switches to{" "}
+            <KMCode>Overview</KMCode> (eye icon) once posted, opening a
+            read-only summary of every field that was submitted.
+          </li>
+        </KMList>
+      </KMSection>
+
+      <KMSection tag="Submit Posting modal layout">
+        <KMList>
+          <li>
+            <strong>Context strip (pt-context-strip)</strong> — pinned to the
+            top: avatar, creator name, campaign chip, post_id chip,
+            deliverable label so you always know what you&apos;re submitting.
+          </li>
+          <li>
+            <strong>Verify Strip</strong> — date pill + URL pill + ownership
+            tickmark (details below).
+          </li>
+          <li>
+            <strong>Inline alerts</strong> — red alert if the pasted URL
+            host isn&apos;t instagram.com; amber warning if the URL is a
+            bare <KMCode>/p/</KMCode> shortcode with no username to verify
+            against; amber if ads_usage_rights=Yes but partnership_id is
+            blank.
+          </li>
+          <li>
+            <strong>Field rows</strong> — Post Link, Post Date, Download
+            Link, Raw Footage Dump (with a Drive info popover explaining
+            folder structure), Partnership Key.
+          </li>
+        </KMList>
+      </KMSection>
+
+      <KMSection tag="Posting Overview modal (read-only)">
+        <KMList>
+          <li>
+            Opens when you click the eye icon on a posted row.
+          </li>
+          <li>
+            <strong>Identity card</strong> — avatar, creator name, handle,
+            workflow status chip, parent/child pill, campaign chip,
+            content_type pill.
+          </li>
+          <li>
+            <strong>Fields grid</strong> — every field captured at submit
+            (post_link, post_date, download_link, raw_dump, partnership_id,
+            ads_usage_rights). Links render as &quot;Open&quot; buttons; empty
+            slots render <KMCode>NA</KMCode> badges.
           </li>
         </KMList>
       </KMSection>
