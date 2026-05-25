@@ -14,6 +14,12 @@ import {
   type PaymentSubmitInput,
 } from "./schema";
 
+export interface BlockedDetail {
+  postId: string;
+  unpostedSiblings: string[];
+  partnershipMissingSiblings: string[];
+}
+
 export type SubmitPaymentResult =
   | {
       ok: true;
@@ -26,6 +32,8 @@ export type SubmitPaymentResult =
       blockedByReelRule: string[];
       blockedByAdPartnership: string[];
       duplicates: string[];
+      /** Per-blocked-post detail so the UI can show the exact siblings to fix. */
+      blockedDetails: BlockedDetail[];
     }
   | {
       ok: false;
@@ -176,10 +184,16 @@ export async function submitPayments(
     }
   }
 
-  // Helper — does this collab have ANY reel deliverable at all (not yet posted
-  // counts as "must wait" rather than "exempt"). Static-only collabs are
-  // exempt entirely.
-  const collabHasReelExpected = new Set<string>();
+  // Combined sibling scan — collab-level eligibility tracking. We track:
+  //   (a) `collabUnpostedByKey` — siblings that are missing post_link or
+  //       post_date. Any single unposted sibling locks the entire collab.
+  //   (b) `collabPartnershipMissingByKey` — siblings with ads_usage_rights=Yes
+  //       but no partnership_id. Same collab-wide lock.
+  // Both maps store the offending sibling post_id_short so the toast can call
+  // them out by name. Saadaa pays per-collab, not per-deliverable, so any
+  // sibling deficiency blocks every payment in the collab.
+  const collabUnpostedByKey = new Map<string, string[]>();
+  const collabPartnershipMissingByKey = new Map<string, string[]>();
   if (collabKeys.size > 0) {
     const infIds = [
       ...new Set(
@@ -189,17 +203,37 @@ export async function submitPayments(
     if (infIds.length > 0) {
       const { data: collabRows } = await (supabase as any)
         .from("posts")
-        .select("inf_id, collab_number, reels, deliverable_type")
+        .select(
+          "post_id, post_id_short, inf_id, collab_number, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
+        )
         .in("inf_id", infIds);
       for (const cr of (collabRows ?? []) as Array<{
+        post_id: string | null;
+        post_id_short: string | null;
         inf_id: string | null;
         collab_number: number | null;
-        reels: number | null;
-        deliverable_type: string | null;
+        post_link: string | null;
+        post_date: string | null;
+        ads_usage_rights: string | null;
+        partnership_id: string | null;
+        ad_partnership_valid: boolean | null;
       }>) {
         const key = `${cr.inf_id ?? ""}|${Number(cr.collab_number ?? 1)}`;
-        if (Number(cr.reels ?? 0) > 0 || cr.deliverable_type === "reel") {
-          collabHasReelExpected.add(key);
+        const sibLabel = cr.post_id_short ?? cr.post_id ?? "?";
+        if (!cr.post_link || !cr.post_date) {
+          const arr = collabUnpostedByKey.get(key) ?? [];
+          arr.push(sibLabel);
+          collabUnpostedByKey.set(key, arr);
+        }
+        if (ADS_YES(cr.ads_usage_rights)) {
+          const hasKey =
+            cr.ad_partnership_valid === true ||
+            (cr.partnership_id ?? "").trim().length > 0;
+          if (!hasKey) {
+            const arr = collabPartnershipMissingByKey.get(key) ?? [];
+            arr.push(sibLabel);
+            collabPartnershipMissingByKey.set(key, arr);
+          }
         }
       }
     }
@@ -209,41 +243,72 @@ export async function submitPayments(
   const blockedByReelRule: string[] = [];
   const blockedByAdPartnership: string[] = [];
   const duplicates: string[] = [];
+  const blockedDetails: BlockedDetail[] = [];
   const accepted: PaymentSubmitInput[] = [];
 
   for (const r of rows) {
     const p = postById.get(r.postId);
     if (!p) {
       blockedByStage.push(r.postId);
+      blockedDetails.push({
+        postId: r.postId,
+        unpostedSiblings: [],
+        partnershipMissingSiblings: [],
+      });
       continue;
     }
     if (!POSTED_STATES.has(p.workflow_status)) {
       blockedByStage.push(r.postId);
+      blockedDetails.push({
+        postId: r.postId,
+        unpostedSiblings: [],
+        partnershipMissingSiblings: [],
+      });
       continue;
     }
 
-    // §7.2 — if this collab is expected to have a reel deliverable, that reel
-    // must be posted (link + date) before any payment row goes through.
-    if (p.inf_id) {
-      const key = `${p.inf_id}|${Number(p.collab_number ?? 1)}`;
-      if (
-        collabHasReelExpected.has(key) &&
-        !collabsWithReel.has(key)
-      ) {
-        blockedByReelRule.push(r.postId);
-        continue;
-      }
+    const hasUtr = (r.utr ?? "").trim().length > 0;
+    const collabKey = p.inf_id
+      ? `${p.inf_id}|${Number(p.collab_number ?? 1)}`
+      : null;
+    const unposted = collabKey
+      ? (collabUnpostedByKey.get(collabKey) ?? [])
+      : [];
+    const partnershipMissing = collabKey
+      ? (collabPartnershipMissingByKey.get(collabKey) ?? [])
+      : [];
+
+    // §7.2 — collab-level posting completeness. ANY sibling without
+    // post_link OR post_date locks payment for the whole collab. Stricter
+    // than legacy "at least one reel posted" because Saadaa pays per-collab.
+    if (unposted.length > 0) {
+      blockedByReelRule.push(r.postId);
+      blockedDetails.push({
+        postId: r.postId,
+        unpostedSiblings: unposted,
+        partnershipMissingSiblings: partnershipMissing,
+      });
+      continue;
     }
 
-    // §8.2 — ads_usage_rights=yes attempts with a UTR must have a valid
-    // partnership. Draft (no UTR) writes are allowed.
-    const hasUtr = (r.utr ?? "").trim().length > 0;
-    if (hasUtr && ADS_YES(p.ads_usage_rights)) {
-      const hasPartnership =
+    // §8.2 — collab-level partnership gate. ANY sibling with ads_usage_rights
+    // =Yes but no partnership_id blocks all payments in the collab. Only fires
+    // for Done attempts (UTR provided); draft writes still pass.
+    if (hasUtr) {
+      const ownAdsRequired = ADS_YES(p.ads_usage_rights);
+      const ownHasPartnership =
         p.ad_partnership_valid === true ||
         (p.partnership_id ?? "").trim().length > 0;
-      if (!hasPartnership) {
+      if (
+        (ownAdsRequired && !ownHasPartnership) ||
+        partnershipMissing.length > 0
+      ) {
         blockedByAdPartnership.push(r.postId);
+        blockedDetails.push({
+          postId: r.postId,
+          unpostedSiblings: unposted,
+          partnershipMissingSiblings: partnershipMissing,
+        });
         continue;
       }
     }
@@ -253,6 +318,11 @@ export async function submitPayments(
     const existingForPost = existingByPostId.get(r.postId);
     if (existingForPost?.status === "Done") {
       duplicates.push(r.postId);
+      blockedDetails.push({
+        postId: r.postId,
+        unpostedSiblings: [],
+        partnershipMissingSiblings: [],
+      });
       continue;
     }
     const utrNonEmpty = (r.utr ?? "").trim().length > 0;
@@ -261,6 +331,11 @@ export async function submitPayments(
     const dedupKey = `${r.postId}|${(r.utr ?? "").trim().toLowerCase()}`;
     if (utrNonEmpty && existingKeys.has(dedupKey) && existingForPost?.utr !== (r.utr ?? "").trim()) {
       duplicates.push(r.postId);
+      blockedDetails.push({
+        postId: r.postId,
+        unpostedSiblings: [],
+        partnershipMissingSiblings: [],
+      });
       continue;
     }
 
@@ -292,8 +367,6 @@ export async function submitPayments(
       due_date: dueDate,
       estimated_payable_date: estPayable,
       payment_advice_sent: false,
-      logged_by: null,
-      payment_mode: r.paymentMode || null,
       // Bank info: form value takes priority, fall back to what's stored on the post.
       bank_name: r.bankName || post.bank_name || null,
       bank_number: r.bankNumber || post.bank_number || null,
@@ -324,6 +397,11 @@ export async function submitPayments(
 
     if (writeErr) {
       duplicates.push(r.postId);
+      blockedDetails.push({
+        postId: r.postId,
+        unpostedSiblings: [],
+        partnershipMissingSiblings: [],
+      });
       continue;
     }
 
@@ -371,6 +449,7 @@ export async function submitPayments(
     blockedByReelRule,
     blockedByAdPartnership,
     duplicates,
+    blockedDetails,
   };
 }
 

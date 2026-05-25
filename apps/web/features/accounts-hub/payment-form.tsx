@@ -122,6 +122,11 @@ function newRow(): FormRow {
   };
 }
 
+/** Strip "-C1" collab suffix for shorter operator-facing post labels. */
+function shortenPostId(id: string): string {
+  return id.replace(/-C\d+$/i, "");
+}
+
 /**
  * Inline Accounts Hub payment entry panel — mirrors legacy
  * `payment-entry-table` (Index.html:6627-6676). Always visible at the top of
@@ -276,18 +281,89 @@ export function PaymentEntryPanel() {
         toast.error(res.error);
         return;
       }
-      const blocks: string[] = [];
-      if (res.blockedByStage.length)
-        blocks.push(`${res.blockedByStage.length} not Posted`);
-      if (res.blockedByReelRule.length)
-        blocks.push(`${res.blockedByReelRule.length} reel-rule`);
-      if (res.blockedByAdPartnership.length)
-        blocks.push(`${res.blockedByAdPartnership.length} ad-partnership`);
-      if (res.duplicates.length)
-        blocks.push(`${res.duplicates.length} duplicate`);
-      const summary = `${res.saved} saved (${res.paid} paid · ${res.due} due)`;
-      const note = blocks.length ? ` · skipped: ${blocks.join(", ")}` : "";
-      toast.success(`${summary}${note}`);
+
+      // Build a multi-line reason string per blocked post so the operator can
+      // see exactly which sibling deliverables need work — not just a category
+      // count. Covers both the inline single-row form AND Excel-paste imports
+      // (every row in the batch is gated through the same per-row checks).
+      const stageBlocked = new Set(res.blockedByStage);
+      const reelBlocked = new Set(res.blockedByReelRule);
+      const adBlocked = new Set(res.blockedByAdPartnership);
+      const dupBlocked = new Set(res.duplicates);
+      const detailByPost = new Map(
+        res.blockedDetails.map((d) => [d.postId, d]),
+      );
+
+      const renderReason = (pid: string): string => {
+        const reasons: string[] = [];
+        if (stageBlocked.has(pid))
+          reasons.push("post is not in Posted stage yet");
+        const d = detailByPost.get(pid);
+        if (reelBlocked.has(pid) && d && d.unpostedSiblings.length > 0) {
+          reasons.push(
+            `siblings not posted yet: ${d.unpostedSiblings.join(", ")}`,
+          );
+        }
+        if (adBlocked.has(pid)) {
+          if (d && d.partnershipMissingSiblings.length > 0) {
+            reasons.push(
+              `partnership key missing on: ${d.partnershipMissingSiblings.join(
+                ", ",
+              )}`,
+            );
+          } else {
+            reasons.push(
+              "partnership key missing (required when Ads Usage Rights = Yes)",
+            );
+          }
+        }
+        if (dupBlocked.has(pid))
+          reasons.push("already paid (Done) or duplicate UTR");
+        return reasons.length > 0 ? reasons.join(" · ") : "blocked";
+      };
+
+      // Preserve submit order so the toast lists rows top-to-bottom as entered.
+      const blockedOrdered = payload
+        .map((r) => r.postId)
+        .filter(
+          (id) =>
+            stageBlocked.has(id) ||
+            reelBlocked.has(id) ||
+            adBlocked.has(id) ||
+            dupBlocked.has(id),
+        );
+
+      const allBlocked = res.saved === 0 && blockedOrdered.length > 0;
+      const someBlocked = res.saved > 0 && blockedOrdered.length > 0;
+
+      if (allBlocked) {
+        const lines = blockedOrdered.map(
+          (pid) => `${shortenPostId(pid)} — ${renderReason(pid)}`,
+        );
+        toast.error(
+          lines.length === 1
+            ? `Payment blocked. ${lines[0]}`
+            : `${lines.length} payments blocked`,
+          {
+            description:
+              lines.length === 1 ? undefined : lines.join("\n"),
+            duration: 10000,
+          },
+        );
+      } else if (someBlocked) {
+        const lines = blockedOrdered.map(
+          (pid) => `${shortenPostId(pid)} — ${renderReason(pid)}`,
+        );
+        toast.warning(
+          `${res.saved} saved (${res.paid} paid · ${res.due} due), ${blockedOrdered.length} blocked`,
+          { description: lines.join("\n"), duration: 10000 },
+        );
+      } else {
+        toast.success(
+          `${res.saved} saved (${res.paid} paid · ${res.due} due)`,
+        );
+      }
+
       setRows([newRow()]);
       router.refresh();
     });

@@ -122,7 +122,7 @@ async function autoInitDraftPayment(
   const { data: postRow } = await (supabase as any)
     .from("posts")
     .select(
-      "deliverable_index, commercial_amount, inf_id, ads_usage_rights",
+      "deliverable_index, commercial_amount, inf_id, collab_number, ads_usage_rights",
     )
     .eq("post_id", postId)
     .maybeSingle();
@@ -138,6 +138,40 @@ async function autoInitDraftPayment(
     .neq("status", "Done")
     .limit(1);
   if (existing && existing.length > 0) return;
+
+  // Collab-level eligibility: don't create a draft until the whole collab is
+  // payable. A collab is payable when EVERY sibling has been posted (link +
+  // date) AND no sibling with ads_usage_rights=Yes is missing a partnership_id.
+  // Otherwise we'd leak a phantom UTR-less row that the operator can't act on.
+  if (postRow.inf_id) {
+    const { data: sibs } = await (supabase as any)
+      .from("posts")
+      .select(
+        "post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
+      )
+      .eq("inf_id", postRow.inf_id)
+      .eq("collab_number", Number(postRow.collab_number ?? 1));
+    const adsYes = (raw: string | null | undefined) => {
+      if (!raw) return false;
+      const v = String(raw).trim().toLowerCase();
+      return !["", "no", "n/a", "none", "0", "false"].includes(v);
+    };
+    for (const s of (sibs ?? []) as Array<{
+      post_link: string | null;
+      post_date: string | null;
+      ads_usage_rights: string | null;
+      partnership_id: string | null;
+      ad_partnership_valid: boolean | null;
+    }>) {
+      if (!s.post_link || !s.post_date) return;
+      if (adsYes(s.ads_usage_rights)) {
+        const hasKey =
+          s.ad_partnership_valid === true ||
+          (s.partnership_id ?? "").trim().length > 0;
+        if (!hasKey) return;
+      }
+    }
+  }
 
   const dueDate = paymentDueDateFor(postDate);
   const estPayable = nextPayableCycleDate(dueDate);

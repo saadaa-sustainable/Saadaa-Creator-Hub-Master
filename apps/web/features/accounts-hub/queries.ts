@@ -125,18 +125,78 @@ export async function fetchAccountsHubData(
     }
   }
 
-  // Backfill: Posted/Delivered parent posts that have no payment row yet.
-  // Mirrors legacy backfillDraftPayments. No-op after initial run.
+  // Backfill: Posted/Delivered parent posts that have no payment row yet,
+  // BUT only for collabs that are fully payment-eligible. A collab is
+  // payment-eligible when:
+  //   1. EVERY sibling deliverable is posted (post_link + post_date present), and
+  //   2. NO sibling with ads_usage_rights=Yes is missing a partnership_id.
+  // If either condition fails, we skip the draft so the operator doesn't see
+  // a phantom UTR-less row sitting in payments for a collab that can't be paid
+  // yet. Mirrors the collab-level gate in `submitPayments`.
   const payableStages = new Set(["Posted", "Delivered"]);
-  const needsBackfill = posts.filter(
+  const candidates = posts.filter(
     (p) =>
       p.post_id &&
       p.post_date &&
       payableStages.has(p.workflow_status as string) &&
       !paymentsByPostId.has(p.post_id!),
   );
-  if (needsBackfill.length > 0) {
-    const drafts = needsBackfill.map((p) => {
+
+  let backfillEligible: typeof candidates = [];
+  if (candidates.length > 0) {
+    const adsYes = (raw: string | null | undefined) => {
+      if (!raw) return false;
+      const v = String(raw).trim().toLowerCase();
+      return !["", "no", "n/a", "none", "0", "false"].includes(v);
+    };
+    const candidateInfIds = [
+      ...new Set(
+        candidates
+          .map((p) => (p as Record<string, unknown>).inf_id as string | null)
+          .filter((v): v is string => !!v),
+      ),
+    ];
+    const collabLocked = new Set<string>();
+    if (candidateInfIds.length > 0) {
+      const { data: sibs } = await (supabase as any)
+        .from("posts")
+        .select(
+          "inf_id, collab_number, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
+        )
+        .in("inf_id", candidateInfIds);
+      for (const s of (sibs ?? []) as Array<{
+        inf_id: string | null;
+        collab_number: number | null;
+        post_link: string | null;
+        post_date: string | null;
+        ads_usage_rights: string | null;
+        partnership_id: string | null;
+        ad_partnership_valid: boolean | null;
+      }>) {
+        const key = `${s.inf_id ?? ""}|${Number(s.collab_number ?? 1)}`;
+        if (!s.post_link || !s.post_date) {
+          collabLocked.add(key);
+          continue;
+        }
+        if (adsYes(s.ads_usage_rights)) {
+          const hasKey =
+            s.ad_partnership_valid === true ||
+            (s.partnership_id ?? "").trim().length > 0;
+          if (!hasKey) collabLocked.add(key);
+        }
+      }
+    }
+    backfillEligible = candidates.filter((p) => {
+      const pAny = p as Record<string, unknown>;
+      const key = `${(pAny.inf_id as string | null) ?? ""}|${Number(
+        (pAny.collab_number as number | null) ?? 1,
+      )}`;
+      return !collabLocked.has(key);
+    });
+  }
+
+  if (backfillEligible.length > 0) {
+    const drafts = backfillEligible.map((p) => {
       const due = paymentDueDateFor(p.post_date);
       const pAny = p as Record<string, unknown>;
       return {

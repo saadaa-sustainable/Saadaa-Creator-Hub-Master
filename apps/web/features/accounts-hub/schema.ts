@@ -18,7 +18,6 @@ export const PaymentSubmitSchema = z.object({
   amount: z
     .number({ invalid_type_error: "Amount must be a number" })
     .gt(0, "Amount must be greater than zero"),
-  paymentMode: z.string().trim().optional().default(""),
   bankName: z.string().trim().optional().default(""),
   bankNumber: z.string().trim().optional().default(""),
   ifsc: z.string().trim().optional().default(""),

@@ -163,7 +163,6 @@ export interface PaymentsRow {
   utr: string | null;
   amount: number | null;
   payment_date: string | null;
-  payment_mode: string | null;
   bank_name: string | null;
   bank_number: string | null;
   ifsc: string | null;
