@@ -1,66 +1,96 @@
 "use client";
 
-import { useTransition } from "react";
+import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Filter } from "lucide-react";
+import { Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { OrderStatusFilterOptions, OrderStatusFilters } from "./types";
 
+const FILTER_KEYS = [
+  "search",
+  "campaign",
+  "status",
+  "collab",
+  "financial",
+  "discount",
+  "repeat",
+] as const satisfies readonly (keyof OrderStatusFilters)[];
+
 /**
- * Filter strip — search + 6 selects. Same chrome as other stages
- * (.onboarding-filter-card, .onboarding-filter-grid, .onboarding-filter-field,
- * .onboarding-filter-label, .onboarding-filter-select). URL-driven so links
- * are shareable + the server query re-runs on change.
+ * Filter strip — mirrors Accounts Hub's `AccountsFiltersBar` shell so the
+ * visual language matches every other stage. `.onboarding-filter-card`
+ * wraps `.onboarding-filter-grid.acc-filter-grid` with field labels that
+ * use a plain `<span>` (no `.onboarding-filter-label` class).
  */
 export function OrderStatusFiltersBar({
   initial,
   options,
+  resultCount,
 }: {
   initial: OrderStatusFilters;
   options: OrderStatusFilterOptions;
+  resultCount?: number;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const params = useSearchParams();
   const [pending, startTransition] = useTransition();
 
-  const patch = (key: keyof OrderStatusFilters, value: string) => {
-    const sp = new URLSearchParams(searchParams.toString());
-    if (value) sp.set(key, value);
-    else sp.delete(key);
+  const setParam = useCallback(
+    (key: keyof OrderStatusFilters, value: string | undefined) => {
+      const next = new URLSearchParams(params.toString());
+      if (!value) next.delete(key);
+      else next.set(key, value);
+      startTransition(() =>
+        router.replace(`?${next.toString()}` as never, { scroll: false }),
+      );
+    },
+    [params, router, startTransition],
+  );
+
+  const clearAll = () => {
+    const next = new URLSearchParams(params.toString());
+    FILTER_KEYS.forEach((k) => next.delete(k));
     startTransition(() =>
-      router.replace(`/order-status?${sp.toString()}`, { scroll: false }),
+      router.replace(`?${next.toString()}` as never, { scroll: false }),
     );
   };
 
+  const hasAny = FILTER_KEYS.some((k) => params.get(k));
+
   return (
-    <section className="onboarding-filter-card">
-      <header className="onboarding-filter-card__head">
-        <span className="onboarding-filter-card__title">
-          <Filter size={11} aria-hidden />
-          Filters
-        </span>
-        {pending && (
-          <span className="onboarding-filter-card__pending">updating…</span>
-        )}
-      </header>
-      <div className="onboarding-filter-grid">
-        <label className="onboarding-filter-field onboarding-filter-field--search">
-          <span className="onboarding-filter-label">Search</span>
-          <input
-            type="search"
-            defaultValue={initial.search ?? ""}
-            placeholder="Creator, order ID, tracking, campaign…"
-            onChange={(e) => patch("search", e.target.value)}
-            className="onboarding-filter-select"
-          />
+    <div className="onboarding-filter-card" aria-busy={pending}>
+      <div className="onboarding-filter-grid acc-filter-grid order-status-filter-grid">
+        <label className="onboarding-filter-field acc-filter-search">
+          <span>Search</span>
+          <div className="acc-search-input">
+            <Search size={13} aria-hidden />
+            <input
+              type="search"
+              defaultValue={initial.search ?? ""}
+              placeholder="Creator, order ID, tracking, campaign…"
+              onBlur={(e) => setParam("search", e.target.value || undefined)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  setParam(
+                    "search",
+                    (e.target as HTMLInputElement).value || undefined,
+                  );
+                }
+              }}
+              className="onboarding-filter-select"
+            />
+          </div>
         </label>
+
         <label className="onboarding-filter-field">
-          <span className="onboarding-filter-label">Campaign</span>
+          <span>Campaign</span>
           <select
-            defaultValue={initial.campaign ?? ""}
-            onChange={(e) => patch("campaign", e.target.value)}
+            value={initial.campaign ?? ""}
+            onChange={(e) => setParam("campaign", e.target.value || undefined)}
             className="onboarding-filter-select"
           >
-            <option value="">All</option>
+            <option value="">All campaigns</option>
             {options.campaigns.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.id}
@@ -69,14 +99,15 @@ export function OrderStatusFiltersBar({
             ))}
           </select>
         </label>
+
         <label className="onboarding-filter-field">
-          <span className="onboarding-filter-label">Status</span>
+          <span>Status</span>
           <select
-            defaultValue={initial.status ?? ""}
-            onChange={(e) => patch("status", e.target.value)}
+            value={initial.status ?? ""}
+            onChange={(e) => setParam("status", e.target.value || undefined)}
             className="onboarding-filter-select"
           >
-            <option value="">All</option>
+            <option value="">All statuses</option>
             <option value="pending">Pending Dispatch</option>
             <option value="transit">In Transit</option>
             <option value="delivered">Delivered</option>
@@ -84,11 +115,12 @@ export function OrderStatusFiltersBar({
             <option value="cancelled">Cancelled</option>
           </select>
         </label>
+
         <label className="onboarding-filter-field">
-          <span className="onboarding-filter-label">Collab</span>
+          <span>Collab</span>
           <select
-            defaultValue={initial.collab ?? ""}
-            onChange={(e) => patch("collab", e.target.value)}
+            value={initial.collab ?? ""}
+            onChange={(e) => setParam("collab", e.target.value || undefined)}
             className="onboarding-filter-select"
           >
             <option value="">All</option>
@@ -96,11 +128,12 @@ export function OrderStatusFiltersBar({
             <option value="Barter + Paid">Barter + Paid</option>
           </select>
         </label>
+
         <label className="onboarding-filter-field">
-          <span className="onboarding-filter-label">Financial</span>
+          <span>Financial</span>
           <select
-            defaultValue={initial.financial ?? ""}
-            onChange={(e) => patch("financial", e.target.value)}
+            value={initial.financial ?? ""}
+            onChange={(e) => setParam("financial", e.target.value || undefined)}
             className="onboarding-filter-select"
           >
             <option value="">All</option>
@@ -110,11 +143,12 @@ export function OrderStatusFiltersBar({
             <option value="pending">Pending</option>
           </select>
         </label>
+
         <label className="onboarding-filter-field">
-          <span className="onboarding-filter-label">Discount</span>
+          <span>Discount</span>
           <select
-            defaultValue={initial.discount ?? ""}
-            onChange={(e) => patch("discount", e.target.value)}
+            value={initial.discount ?? ""}
+            onChange={(e) => setParam("discount", e.target.value || undefined)}
             className="onboarding-filter-select"
           >
             <option value="">All</option>
@@ -122,11 +156,12 @@ export function OrderStatusFiltersBar({
             <option value="no">No code</option>
           </select>
         </label>
+
         <label className="onboarding-filter-field">
-          <span className="onboarding-filter-label">Repeat creator</span>
+          <span>Repeat creator</span>
           <select
-            defaultValue={initial.repeat ?? ""}
-            onChange={(e) => patch("repeat", e.target.value)}
+            value={initial.repeat ?? ""}
+            onChange={(e) => setParam("repeat", e.target.value || undefined)}
             className="onboarding-filter-select"
           >
             <option value="">All</option>
@@ -134,7 +169,25 @@ export function OrderStatusFiltersBar({
             <option value="no">First-time</option>
           </select>
         </label>
+
+        <div className="onboarding-filter-actions">
+          {typeof resultCount === "number" && (
+            <span className="acc-result-chip tabular">
+              {resultCount} order{resultCount === 1 ? "" : "s"}
+            </span>
+          )}
+          {hasAny && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAll}
+              className="gap-1.5"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden /> Clear
+            </Button>
+          )}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }

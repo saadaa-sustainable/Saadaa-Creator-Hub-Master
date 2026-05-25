@@ -36,6 +36,8 @@ export interface OrderStatusRow {
   reels: number;
   posts: number;
   stories: number;
+  garmentQty: number | null;
+  garmentsSent: string;
   subtotalPrice: number;
   totalPrice: number;
   discountTotal: number;

@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
@@ -289,27 +290,14 @@ function CreatorOverviewContent({
             />
           </div>
 
-          <div className="creator-overview-grid">
+          <div className="creator-overview-grid creator-overview-grid--primary">
             <OverviewField label="Influencer ID" value={creator?.inf_id} mono />
             <OverviewField label="Email" value={creator?.email} />
             <OverviewField label="Contact" value={creator?.contact} />
             <OverviewField label="State" value={creator?.state} />
-            <OverviewField label="Language" value={creator?.language} />
-            <OverviewField label="Agency" value={creator?.agency_name} />
             <OverviewField
               label="Instagram"
               value={creator?.instagram_link ?? creator?.instagram_url}
-            />
-            <OverviewField label="Bank Name" value={creator?.bank_name} />
-            <OverviewField
-              label="Bank Account"
-              value={creator?.bank_number}
-              mono
-            />
-            <OverviewField label="IFSC" value={creator?.ifsc} mono />
-            <OverviewField
-              label="Verification"
-              value={verificationLabel(creator?.verification)}
             />
             <OverviewField
               label="Updated"
@@ -317,7 +305,7 @@ function CreatorOverviewContent({
             />
           </div>
 
-          <details className="creator-overview-section" open>
+          <details className="creator-overview-section">
             <summary className="creator-overview-section-head">
               <strong>Recent Posts</strong>
               <span>{overview.stats.postCount} loaded</span>
@@ -393,7 +381,8 @@ function OverviewField({
           className={cn("creator-overview-link", mono && "tabular")}
           title={text}
         >
-          {text}
+          <ExternalLink size={11} aria-hidden />
+          Open
         </a>
       ) : (
         <strong className={mono ? "tabular" : undefined}>{text}</strong>

@@ -31,6 +31,9 @@ const POSTS_COLS = [
   "order_status",
   "tracking_id",
   "est_delivery",
+  "deliverable_index",
+  "garment_qty",
+  "garments_sent",
 ].join(",");
 
 // Confirmed-safe base columns (every other shopify_orders consumer uses these).
@@ -102,6 +105,7 @@ export async function fetchOrderStatusData(
       .from("posts")
       .select(POSTS_COLS)
       .not("order_id", "is", null)
+      .or("deliverable_index.is.null,deliverable_index.eq.1")
       .limit(5000),
     fetchShopify(),
     (supabase as any).from("creators").select(CREATOR_COLS).limit(5000),
@@ -169,6 +173,10 @@ export async function fetchOrderStatusData(
   let nonCancelledCount = 0;
 
   for (const p of posts) {
+    if (p.deliverable_index != null && Number(p.deliverable_index) > 1) {
+      continue;
+    }
+
     const orderId = String(p.order_id ?? "").trim();
     if (!orderId) continue;
     const camp = String(p.campaign_id ?? "").trim();
@@ -232,6 +240,11 @@ export async function fetchOrderStatusData(
       reels: Number(p.reels ?? 0),
       posts: Number(p.static_posts ?? 0),
       stories: Number(p.stories ?? 0),
+      garmentQty:
+        p.garment_qty == null || Number.isNaN(Number(p.garment_qty))
+          ? null
+          : Number(p.garment_qty),
+      garmentsSent: String(p.garments_sent ?? "").trim(),
       subtotalPrice: Number(sRow.subtotal_price ?? 0),
       totalPrice: Number(sRow.total_price ?? 0),
       discountTotal: Number(sRow.discount_total ?? 0),

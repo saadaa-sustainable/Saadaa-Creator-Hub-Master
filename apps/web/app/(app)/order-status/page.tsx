@@ -28,7 +28,7 @@ export default async function OrderStatusPage({
   const options = await fetchOrderStatusFilterOptions();
 
   return (
-    <div className="onboarding-stage">
+    <div className="onboarding-stage order-status-stage">
       <PageHeader icon={Truck} title="Order Status" knowMore="order-status" />
       <OrderStatusFiltersBar initial={params} options={options} />
       <Suspense
@@ -47,7 +47,11 @@ async function OrderStatusBody({ params }: { params: OrderStatusFilters }) {
     (params.status as OrderStatusBucket) || "all";
   return (
     <>
-      <OrderVolumeStrip kpi={kpi} activeBucket={activeBucket} currentParams={params} />
+      <OrderVolumeStrip
+        kpi={kpi}
+        activeBucket={activeBucket}
+        currentParams={params}
+      />
       <CommerceIntelStrip kpi={kpi} />
       <OrderStatusBoard rows={rows} filters={params} />
     </>

@@ -6,6 +6,7 @@
 import type { ComponentType } from "react";
 import AccountsHubKM from "./accounts-hub";
 import CampaignsKM from "./campaigns";
+import DashboardKM from "./dashboard";
 import OnboardingKM from "./onboarding";
 import OrderStatusKM from "./order-status";
 import PostingKM from "./posting";
@@ -13,6 +14,7 @@ import ReachOutInboundKM from "./reach-out-inbound";
 import ReachOutOutboundKM from "./reach-out-outbound";
 
 export const KM_REGISTRY: Record<string, ComponentType> = {
+  dashboard: DashboardKM,
   campaigns: CampaignsKM,
   "reach-out-outbound": ReachOutOutboundKM,
   "reach-out-inbound": ReachOutInboundKM,
