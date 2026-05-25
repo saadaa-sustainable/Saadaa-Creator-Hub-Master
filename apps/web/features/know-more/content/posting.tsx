@@ -21,8 +21,9 @@ export default function PostingKM() {
         <KMList>
           <li>
             <strong>posts</strong> · workflow_status <KMCode>Posted</KMCode>,
-            post_link, post_date, raw_dump (Drive link), partnership_id,
-            ad_partnership_valid (derived).
+            post_link, post_date, download_link (raw IG download), raw_dump
+            (Drive footage folder), partnership_id, ad_partnership_valid
+            (derived from partnership_id presence).
           </li>
           <li>
             <strong>payments</strong> · auto-init draft row (status{" "}

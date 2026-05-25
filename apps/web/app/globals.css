@@ -1746,6 +1746,35 @@
       .page-header .btn-know-more > span,
       .page-header .btn-know-more::after { display: none; }
     }
+    /* Mode pill ("We initiate" / "They reached us") is contextual fluff once
+     * the operator's already on the page — drop it below 480px so the header
+     * stays compact and doesn't push the first form section below the fold. */
+    @media (max-width: 480px) {
+      .page-header .mode-pill { display: none; }
+    }
+    /* Step header row: keep title + status chip + info trigger on one line,
+     * baseline-aligned. min-width:0 on the title text lets the chip + icon
+     * sit cleanly at the right edge instead of overflow-wrapping the icon
+     * to its own line. */
+    .reachout-step-card > .section-title {
+      flex-wrap: nowrap;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+    .reachout-step-card > .section-title > svg:not(:first-child) {
+      flex: 0 0 auto;
+    }
+    .reachout-step-card > .section-title > :is(.section-status-chip, .section-info-trigger) {
+      flex: 0 0 auto;
+      align-self: center;
+    }
+    .reachout-step-card > .section-title > :not(svg):not(.section-status-chip):not(.section-info-trigger) {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     .glass-card {
       padding: 1rem 0.85rem;
@@ -9361,15 +9390,22 @@ input[type="date"]::-webkit-clear-button {
 }
 
 .km-callout {
-  display: flex;
-  gap: 0.5rem;
-  align-items: flex-start;
+  display: block;
   padding: 0.7rem 0.85rem;
   border-radius: 10px;
   font-size: 0.82rem;
   line-height: 1.5;
   margin-top: 0.85rem;
   border: 1px solid transparent;
+  /* Inline children (text + KMCode chips) flow naturally on the same line
+   * and wrap as a paragraph instead of stacking as flex items. */
+  text-align: left;
+}
+.km-callout > * { display: inline; }
+.km-callout .km-chip {
+  display: inline-block;
+  vertical-align: 0.05em;
+  margin: 0 0.15em;
 }
 .km-callout--info {
   background: var(--info-bg, #ECF1F9);
