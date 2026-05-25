@@ -22,7 +22,7 @@ export default async function OnboardingPage({
 
   return (
     <div className="onboarding-stage">
-      <PageHeader icon={UserRoundCheck} title="Onboarding" />
+      <PageHeader icon={UserRoundCheck} title="Onboarding" knowMore="onboarding" />
 
       <OnboardingFiltersBar initial={params} options={options} />
 

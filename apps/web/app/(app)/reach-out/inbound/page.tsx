@@ -21,6 +21,7 @@ export default async function Page() {
         icon={ArrowDownLeft}
         title="Reach Out · Inbound"
         modePill={{ label: "They reached us", icon: Inbox }}
+        knowMore="reach-out-inbound"
       />
       <InboundForm campaigns={campaigns} />
     </>

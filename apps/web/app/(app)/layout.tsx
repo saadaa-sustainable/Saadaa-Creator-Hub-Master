@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/nav/sidebar";
 import { SidebarScrim } from "@/components/nav/sidebar-scrim";
 import { MobileTopbar } from "@/components/nav/mobile-topbar";
+import { KnowMoreModal } from "@/features/know-more/know-more-modal";
 
 export default async function AppShell({
   children,
@@ -30,6 +31,7 @@ export default async function AppShell({
         <MobileTopbar />
         <main className="main-content">{children}</main>
       </div>
+      <KnowMoreModal />
     </div>
   );
 }

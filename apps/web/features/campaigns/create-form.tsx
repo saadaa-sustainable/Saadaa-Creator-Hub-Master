@@ -237,10 +237,6 @@ export function CampaignCreateForm() {
           <h1>Create Campaign</h1>
           <p>Campaign details, cap, and tracker budget in one pass.</p>
         </div>
-        <button type="button" className="btn-know-more" disabled>
-          <Lightbulb size={12} />
-          Know More
-        </button>
       </div>
 
       {/* ── Campaign Details ──────────────────────────────────────────── */}

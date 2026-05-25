@@ -12,7 +12,7 @@ export default async function NewCampaignPage() {
 
   return (
     <div className="campaign-create-page space-y-4">
-      <PageHeader icon={Rocket} title="New Campaign" />
+      <PageHeader icon={Rocket} title="New Campaign" knowMore="campaigns" />
       <p className="text-sm text-text-secondary">
         Server generates the IFC{"{NNN}"} ID. Budget rolls up automatically.
       </p>

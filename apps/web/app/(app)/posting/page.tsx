@@ -24,7 +24,7 @@ export default async function PostingPage({
 
   return (
     <div className="onboarding-stage">
-      <PageHeader icon={Send} title="Posting" />
+      <PageHeader icon={Send} title="Posting" knowMore="posting" />
 
       <PostingFiltersBar initial={params} options={options} />
 

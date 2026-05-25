@@ -13,7 +13,7 @@ export default async function CampaignsPage() {
 
   return (
     <div className="campaign-list-page space-y-4">
-      <PageHeader icon={Rocket} title="Campaigns" />
+      <PageHeader icon={Rocket} title="Campaigns" knowMore="campaigns" />
       <div className="campaign-list-subhead">
         <p>
           Server-generated IFC IDs, tracker budget lines, and campaign briefs

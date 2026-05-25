@@ -35,7 +35,7 @@ export default async function AccountsHubPage({
 
   return (
     <div className="onboarding-stage">
-      <PageHeader icon={Wallet} title="Accounts Hub" />
+      <PageHeader icon={Wallet} title="Accounts Hub" knowMore="accounts-hub" />
 
       <PaymentEntryPanel />
 

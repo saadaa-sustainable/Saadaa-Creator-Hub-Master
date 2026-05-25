@@ -31,6 +31,7 @@ export default async function Page({ searchParams }: PageProps) {
         icon={ArrowUpRight}
         title="Reach Out · Outbound"
         modePill={{ label: "We initiate", icon: Send }}
+        knowMore="reach-out-outbound"
       />
       <OutboundForm
         campaigns={campaigns}
