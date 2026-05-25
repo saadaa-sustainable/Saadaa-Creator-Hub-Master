@@ -1,6 +1,8 @@
 import { Suspense } from "react";
+import { LayoutDashboard } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { KpiCard, KpiStrip } from "@/components/ui/kpi-card";
+import { PageHeader } from "@/components/ui/page-header";
 import { KpiStripSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
 import { formatRupees } from "@/lib/formatters";
@@ -23,14 +25,10 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="font-display text-2xl font-bold tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-sm text-text-secondary">
-          Pipeline + commerce + ad performance at a glance.
-        </p>
-      </header>
+      <PageHeader icon={LayoutDashboard} title="Dashboard" />
+      <p className="text-sm text-text-secondary">
+        Pipeline + commerce + ad performance at a glance.
+      </p>
 
       <Suspense key={`kpi-${key}`} fallback={<KpiStripSkeleton count={4} />}>
         <DashboardKpis filters={params} />

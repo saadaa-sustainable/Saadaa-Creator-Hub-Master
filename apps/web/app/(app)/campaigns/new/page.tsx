@@ -1,3 +1,5 @@
+import { Rocket } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 import { CampaignCreateSwitcher } from "@/features/campaigns/create-switcher";
 import { fetchCampaigns } from "@/features/campaigns/queries";
 import { assertPermission } from "@/lib/rbac.server";
@@ -10,14 +12,10 @@ export default async function NewCampaignPage() {
 
   return (
     <div className="campaign-create-page space-y-4">
-      <header>
-        <h1 className="font-display text-2xl font-bold tracking-tight">
-          New Campaign
-        </h1>
-        <p className="text-sm text-text-secondary">
-          Server generates the IFC{"{NNN}"} ID. Budget rolls up automatically.
-        </p>
-      </header>
+      <PageHeader icon={Rocket} title="New Campaign" />
+      <p className="text-sm text-text-secondary">
+        Server generates the IFC{"{NNN}"} ID. Budget rolls up automatically.
+      </p>
       <CampaignCreateSwitcher campaigns={campaigns} />
     </div>
   );

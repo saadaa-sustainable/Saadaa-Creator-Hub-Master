@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Plus, Rocket } from "lucide-react";
+import { PageHeader } from "@/components/ui/page-header";
 import { ExistingCampaigns } from "@/features/campaigns/existing-campaigns";
 import { fetchCampaigns } from "@/features/campaigns/queries";
 import { assertPermission } from "@/lib/rbac.server";
@@ -11,19 +12,13 @@ export default async function CampaignsPage() {
   const campaigns = await fetchCampaigns();
 
   return (
-    <div className="campaign-list-page">
-      <header className="campaign-list-header">
-        <div>
-          <span className="campaign-list-eyebrow">
-            <Rocket size={13} />
-            Campaign Stage
-          </span>
-          <h1>Campaigns</h1>
-          <p>
-            Server-generated IFC IDs, tracker budget lines, and campaign briefs
-            for downstream Reach Out and Onboarding.
-          </p>
-        </div>
+    <div className="campaign-list-page space-y-4">
+      <PageHeader icon={Rocket} title="Campaigns" />
+      <div className="campaign-list-subhead">
+        <p>
+          Server-generated IFC IDs, tracker budget lines, and campaign briefs
+          for downstream Reach Out and Onboarding.
+        </p>
         <Link
           href="/campaigns/new"
           className="btn btn-primary campaign-list-new"
@@ -31,7 +26,7 @@ export default async function CampaignsPage() {
           <Plus size={14} />
           New Campaign
         </Link>
-      </header>
+      </div>
 
       <ExistingCampaigns campaigns={campaigns} showCreateAction />
     </div>

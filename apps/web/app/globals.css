@@ -9102,3 +9102,77 @@
 .acc-overview-modal {
   width: min(96vw, 760px);
 }
+
+/* ============================================================================
+ * iOS-safe <input type="date"> normalization (PROJECT-WIDE)
+ *
+ * Safari iOS renders a `MM/DD/YYYY` placeholder inside empty date inputs that
+ * collides with `.form-floating` labels and squashes adjacent fields. The
+ * native picker also reserves no consistent min-height, so paired dates
+ * (Start / End) overlap on narrow screens.
+ *
+ * Selectors target every class we ship date inputs under:
+ *   - .form-control            (campaigns, posting, onboarding-order forms)
+ *   - .acc-field__input        (accounts-hub payment form)
+ *   - .onboarding-filter-select (posting + onboarding filter bars)
+ *
+ * Plus a bare-selector fallback so any future date input is covered without
+ * having to remember this file. Memory anchor: feedback_ios_date_input_rule.
+ * ============================================================================ */
+input[type="date"],
+input[type="datetime-local"],
+input[type="date"].form-control,
+input[type="date"].acc-field__input,
+input[type="date"].onboarding-filter-select,
+input[type="datetime-local"].form-control {
+  min-height: 44px;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: var(--bg-white, #fff);
+  font-variant-numeric: tabular-nums;
+  /* iOS Safari otherwise renders 0 line-height for empty dates → label overlap. */
+  line-height: 1.25;
+}
+
+/* Force consistent caret colour for typed segments (iOS otherwise greys them). */
+input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field {
+  color: var(--text-primary, #161513);
+}
+
+/* Hide the entire `dd/mm/yyyy` placeholder text on empty (invalid) iOS dates
+ * so floating labels don't collide. Re-appears when the user focuses. */
+input[type="date"]:not(:focus):invalid::-webkit-datetime-edit {
+  color: transparent;
+}
+
+/* Calendar icon: subdued, clickable, breathing space on the right edge. */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.6;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+/* Kill iOS spin/clear chrome so the field reads as a plain text input. */
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button {
+  display: none;
+  -webkit-appearance: none;
+}
+
+/* Paired date rows (Start / End, etc.) — guarantee equal spacing + no overlap
+ * on narrow iOS screens, regardless of which container class is used. */
+@media (max-width: 540px) {
+  .form-floating input[type="date"].form-control {
+    padding-top: 1.4rem;
+    padding-bottom: 0.4rem;
+  }
+  input[type="date"].acc-field__input,
+  input[type="date"].onboarding-filter-select {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+}
