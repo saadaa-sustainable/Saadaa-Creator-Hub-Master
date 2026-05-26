@@ -424,6 +424,54 @@ export async function submitPayments(
 
     if (status === "Done") paid++;
     else due++;
+
+    // When parent post is paid, cascade "Done" to all sibling child deliverables
+    // (same inf_id + collab_number, deliverable_index > 1) on the `posts`
+    // table ONLY. Children do NOT get their own payment rows — the full collab
+    // amount lives on the parent's single payment row. This prevents spend
+    // metrics from triple-counting (one collab of ₹10,000 for 3 deliverables
+    // must total ₹10,000, not ₹30,000).
+    //
+    // We also remove any pre-existing child payment rows that were inserted
+    // before this fix was deployed.
+    const isParent =
+      post.deliverable_index == null || Number(post.deliverable_index) === 1;
+    if (
+      status === "Done" &&
+      isParent &&
+      post.inf_id &&
+      post.collab_number != null
+    ) {
+      const { data: siblings } = await (supabase as any)
+        .from("posts")
+        .select("post_id, deliverable_index")
+        .eq("inf_id", post.inf_id)
+        .eq("collab_number", post.collab_number)
+        .gt("deliverable_index", 1);
+
+      const childIds = ((siblings ?? []) as Array<{ post_id: string }>).map(
+        (c) => c.post_id,
+      );
+
+      if (childIds.length > 0) {
+        // Mirror payment status onto child posts rows so UI shows them paid.
+        await (supabase as any)
+          .from("posts")
+          .update({
+            payment_status: "Done",
+            ...(hasUtr ? { utr: r.utr } : {}),
+            ...(hasUtr ? { payment_date: r.paymentDate } : {}),
+          })
+          .in("post_id", childIds);
+
+        // Backfill safety: remove any orphan child payment rows so spend
+        // sums stay parent-only.
+        await (supabase as any)
+          .from("payments")
+          .delete()
+          .in("post_id", childIds);
+      }
+    }
   }
 
   // Cache invalidation — every Accounts read tag.

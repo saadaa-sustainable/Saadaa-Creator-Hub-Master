@@ -90,12 +90,51 @@ export async function fetchAccountsHubData(
     .limit(2000);
 
   if (postsErr) throw postsErr;
-  const posts = (postsRaw ?? []) as Array<
+  const postsLoaded = (postsRaw ?? []) as Array<
     Omit<AccountsRow, "payment"> & {
       campaign: AccountsRow["campaign"];
       creator: AccountsRow["creator"];
     }
   >;
+
+  // Sibling sum: parent's commercial_amount holds the per-row split value;
+  // the originally-agreed total = sum across all deliverables of the collab.
+  // Fetch every row keyed on (inf_id, collab_number) and overwrite the parent's
+  // commercial_amount before downstream consumers (KPIs, payment drafts, UI).
+  const parentInfIds = Array.from(
+    new Set(
+      postsLoaded
+        .map((p) => (p as Record<string, unknown>).inf_id as string | null)
+        .filter((v): v is string => !!v),
+    ),
+  );
+  const collabTotalMap = new Map<string, number>();
+  if (parentInfIds.length > 0) {
+    const { data: sibRows } = await (supabase as any)
+      .from("posts")
+      .select("inf_id, collab_number, commercial_amount")
+      .in("inf_id", parentInfIds);
+    for (const s of (sibRows ?? []) as Array<{
+      inf_id: string | null;
+      collab_number: number | null;
+      commercial_amount: number | null;
+    }>) {
+      const key = `${s.inf_id ?? ""}|${Number(s.collab_number ?? 1)}`;
+      collabTotalMap.set(
+        key,
+        (collabTotalMap.get(key) ?? 0) + Number(s.commercial_amount ?? 0),
+      );
+    }
+  }
+  const posts = postsLoaded.map((p) => {
+    const pAny = p as Record<string, unknown>;
+    const key = `${(pAny.inf_id as string | null) ?? ""}|${Number(
+      (pAny.collab_number as number | null) ?? 1,
+    )}`;
+    const collabTotal = collabTotalMap.get(key);
+    if (collabTotal == null) return p;
+    return { ...p, commercial_amount: collabTotal };
+  });
 
   // Overlay payments — pull every payment whose post_id is in this batch,
   // then bucket by post_id and pick the latest row per post.
@@ -434,6 +473,17 @@ export async function fetchPayableEligiblePosts(): Promise<
     if (allPosted && allPartnershipped) readyKeys.add(key);
   }
 
+  // Sum commercial_amount across all deliverables per collab — parent's
+  // value is the per-row split, not the original total.
+  const collabTotal = new Map<string, number>();
+  for (const r of rows) {
+    const key = `${r.inf_id ?? ""}|${r.collab_number ?? 0}`;
+    collabTotal.set(
+      key,
+      (collabTotal.get(key) ?? 0) + Number(r.commercial_amount ?? 0),
+    );
+  }
+
   // Return only parent rows from ready collabs.
   return rows
     .filter((r) => {
@@ -444,7 +494,10 @@ export async function fetchPayableEligiblePosts(): Promise<
     .map((r) => ({
       post_id: r.post_id,
       post_id_short: r.post_id_short ?? null,
-      commercial_amount: r.commercial_amount ?? null,
+      commercial_amount:
+        collabTotal.get(`${r.inf_id ?? ""}|${r.collab_number ?? 0}`) ??
+        r.commercial_amount ??
+        null,
       campaign_id: r.campaign_id ?? null,
       workflow_status: r.workflow_status,
       ads_usage_rights: r.ads_usage_rights ?? null,

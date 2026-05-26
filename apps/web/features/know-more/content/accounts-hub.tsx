@@ -83,6 +83,15 @@ export default function AccountsHubKM() {
         </p>
       </KMSection>
 
+      <KMSection tag="Submit validation alert">
+        <KMCallout tone="info">
+          Above the Submit button a red <KMCode>MissingFieldsAlert</KMCode>{" "}
+          lists every empty required column across every row in the batch
+          (Post ID · Payment Date · Amount). The alert refreshes live as
+          fields are filled; banner disappears once zero blockers remain.
+        </KMCallout>
+      </KMSection>
+
       <KMSection tag="Excel paste import">
         <p>
           <KMCode>Paste from Excel</KMCode> accepts tab- or comma-separated
@@ -106,6 +115,20 @@ export default function AccountsHubKM() {
             filter strip applies.
           </li>
         </KMList>
+      </KMSection>
+
+      <KMSection tag="Equal-split + payment cascade">
+        <KMCallout tone="info">
+          After 2026-05-27 the agreed total is equal-split across every
+          deliverable on Onboarding submit ·{" "}
+          <KMCode>per_row = total ÷ deliverable_count</KMCode>. Accounts Hub
+          queries sum siblings per <KMCode>(inf_id, collab_number)</KMCode> so
+          the parent row always renders the originally-agreed total in the KPI
+          strip + Posting Overview modal. <strong>One payment per collab</strong>
+          : when the parent row is marked Paid, every child row&apos;s{" "}
+          <KMCode>posts.payment_status</KMCode> cascades to <KMCode>Done</KMCode>{" "}
+          and no separate child payment rows are inserted.
+        </KMCallout>
       </KMSection>
 
       <KMSection tag="Exports + cron">

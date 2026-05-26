@@ -4161,6 +4161,12 @@
 
   .onboarding-filter-field > span,
   .onboarding-filter-grid label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    align-self: flex-start;
+    text-align: left;
     font-size: 0.72rem;
     font-weight: 800;
     line-height: 1;
@@ -7994,6 +8000,86 @@ body:has(.km-backdrop) {
     margin-inline: -0.4rem;
     padding-inline: 0.4rem;
   }
+
+  /* ── Compliance + Funnel mobile compact (mirrors my-dashboard pattern) ── */
+  .compliance-stage,
+  .funnel-stage {
+    gap: 0.6rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+  .compliance-stage > *,
+  .funnel-stage > *,
+  .compliance-stage section,
+  .funnel-stage section,
+  .compliance-stage article,
+  .funnel-stage article {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .compliance-stage section,
+  .funnel-stage section {
+    border-radius: 12px !important;
+    overflow: hidden;
+  }
+  .compliance-stage .page-header,
+  .funnel-stage .page-header {
+    padding: 0.5rem 0.65rem;
+    border-radius: 12px;
+  }
+  .compliance-stage .page-header .header-icon,
+  .funnel-stage .page-header .header-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+  .compliance-stage .page-header .header-icon svg,
+  .funnel-stage .page-header .header-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+  .compliance-stage .page-header h1,
+  .funnel-stage .page-header h1 {
+    font-size: 1.05rem;
+    letter-spacing: -0.01em;
+  }
+  .compliance-stage select,
+  .funnel-stage select,
+  .compliance-stage input,
+  .funnel-stage input {
+    min-width: 0;
+    font-size: 0.72rem;
+  }
+  .compliance-stage .grid,
+  .funnel-stage .grid {
+    min-width: 0;
+  }
+  .compliance-stage .overflow-x-auto,
+  .funnel-stage .overflow-x-auto {
+    max-width: 100%;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .compliance-stage table,
+  .funnel-stage table {
+    table-layout: fixed;
+  }
+  .compliance-stage th,
+  .funnel-stage th,
+  .compliance-stage td,
+  .funnel-stage td {
+    white-space: nowrap;
+  }
+  .compliance-stage h2,
+  .funnel-stage h2 {
+    font-size: 0.7rem !important;
+    line-height: 1.15;
+  }
+  .compliance-stage article,
+  .funnel-stage article {
+    border-radius: 10px !important;
+  }
 }
 
 /* Filter bar — search input gets a leading icon. */
@@ -8032,6 +8118,53 @@ body:has(.km-backdrop) {
 .acc-search-input .onboarding-filter-select {
   padding-left: 30px;
 }
+
+.funnel-filter-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.compliance-filter-grid {
+  grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
+}
+
+.funnel-kpi-grid,
+.compliance-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.compliance-metric-card {
+  gap: 0.45rem;
+}
+
+.compliance-metric-card header {
+  min-width: 0;
+}
+
+@media (min-width: 1200px) {
+  .funnel-kpi-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .funnel-filter-grid,
+  .compliance-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .funnel-filter-grid .onboarding-filter-actions,
+  .compliance-filter-grid .acc-filter-search {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 480px) {
+  .funnel-kpi-grid,
+  .compliance-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .acc-result-chip {
   display: inline-flex;
   align-items: center;

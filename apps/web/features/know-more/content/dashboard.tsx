@@ -103,6 +103,58 @@ export default function DashboardKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="KPI formulas (Row G + Row J)">
+        <KMList>
+          <li>
+            <strong>Reach Outs</strong> ·{" "}
+            <KMCode>count(posts)</KMCode> where workflow_status contains
+            &quot;reach out&quot; or is blank.
+          </li>
+          <li>
+            <strong>Onboarded</strong> ·{" "}
+            <KMCode>count(posts)</KMCode> with workflow_status &quot;on
+            board&quot;. Conversion % = onboarded ÷ reachOut.
+          </li>
+          <li>
+            <strong>Posted</strong> ·{" "}
+            <KMCode>count(posts)</KMCode> where workflow_status is Posted or
+            Delivered. Post-rate % = posted ÷ onboarded.
+          </li>
+          <li>
+            <strong>Pending Content</strong> · onboarded count minus posted
+            count (= rows On Board but not Posted).
+          </li>
+          <li>
+            <strong>Payment Pending</strong> · count of PARENT rows
+            (deliverable_index null or 1) whose{" "}
+            <KMCode>payment_status</KMCode> is Due or Not Due. Children skip.
+          </li>
+          <li>
+            <strong>Paid Collabs</strong> · count of PARENT rows with{" "}
+            <KMCode>payment_status</KMCode> Done or Paid.
+          </li>
+          <li>
+            <strong>Ad Winners</strong> · count of rows where{" "}
+            <KMCode>ads_status</KMCode> = <KMCode>Winner</KMCode>. Stays at 0
+            on prod schemas where the column hasn&apos;t shipped (graceful
+            42703 fallback to BASE columns).
+          </li>
+          <li>
+            <strong>Total Creators</strong> · unique{" "}
+            <KMCode>inf_id</KMCode> count in the filter scope.
+          </li>
+          <li>
+            <strong>Active Campaigns</strong> · unique campaign_id touched
+            within the date window.
+          </li>
+          <li>
+            <strong>Total Spend</strong> ·{" "}
+            <KMCode>Σ posts.commercial_amount</KMCode> across all rows
+            (parent + children, since each row holds the equal-split share).
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Parent-only payment math">
         <p>
           Payment Pending + Paid Collabs counters skip child deliverables
@@ -141,8 +193,8 @@ export default function DashboardKM() {
           Each card surfaces creator avatar + name + handle, post_id_short,
           campaign_id, the relevant stage date + days-waiting counter, and the
           assignee initials roundel (<KMCode>onboarded_by</KMCode> for
-          Onboarding/Posted/Payment; falls back to Unassigned for Reach Out
-          until <KMCode>posts.logged_by</KMCode> lands on prod).
+          Onboarding/Posted/Payment; Reach Out cards show Unassigned because
+          the logged-by column for reach-out has not been wired yet).
         </p>
       </KMSection>
 
@@ -178,8 +230,16 @@ export default function DashboardKM() {
         <KMList>
           <li>
             <strong>Spotlight 30-day sparkline</strong> · sum of{" "}
-            <KMCode>commercial_amount</KMCode> per day, normalised to a 100×40
-            SVG viewBox with a gold gradient area + WoW % chip.
+            <KMCode>commercial_amount</KMCode> per day (across all rows — the
+            equal-split values sum back to the originally agreed total per
+            collab), normalised to a 100×40 SVG viewBox with a gold gradient
+            area + WoW % chip.
+          </li>
+          <li>
+            <strong>Stage Snapshot amount</strong> · per-card amount uses{" "}
+            <KMCode>Σ commercial_amount per (inf_id, collab_number)</KMCode>{" "}
+            so the parent card surfaces the originally-agreed collab total,
+            not the per-row split share.
           </li>
           <li>
             <strong>Posting Goal radial</strong> · stroke-dasharray trick on a

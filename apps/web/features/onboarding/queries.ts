@@ -54,7 +54,13 @@ export async function fetchOnboardingTable(
       creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic )
     `,
     )
-    .in("workflow_status", ["Reach Out", "On Board", "Order Sent"]);
+    .in("workflow_status", [
+      "Reach Out",
+      "On Board",
+      "Order Sent",
+      "Posted",
+      "Delivered",
+    ]);
 
   if (filters.campaign) q = q.eq("campaign_id", filters.campaign);
   if (filters.statusFilter) q = q.eq("workflow_status", filters.statusFilter);
@@ -166,7 +172,13 @@ export const fetchOnboardingFilterOptions = unstable_cache(
       campaigns: campaigns.data ?? [],
       tiers: [...tiers].sort(),
       regions: [...regions].sort(),
-      statuses: ["Reach Out", "On Board", "Order Sent"] as const,
+      statuses: [
+        "Reach Out",
+        "On Board",
+        "Order Sent",
+        "Posted",
+        "Delivered",
+      ] as const,
     };
   },
   ["onboarding-filter-options"],

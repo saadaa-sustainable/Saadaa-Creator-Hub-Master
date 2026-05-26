@@ -92,19 +92,46 @@ export async function GET(
   }
 
   // Annotate each deliverable with its payment row + computed split amount.
+  // commercialTotal sums every sibling's commercial_amount — after the
+  // equal-split rule, each row stores 1/N of the agreed total, so the
+  // parent alone no longer represents the full collab compensation.
   const totalCount = deliverables.length;
-  const commercialTotal = Number(parent.commercial_amount ?? 0);
+  const commercialTotal = deliverables.reduce(
+    (acc, d) => acc + Number((d as Record<string, unknown>).commercial_amount ?? 0),
+    0,
+  );
   const perDeliverableAmount =
     totalCount > 0 ? commercialTotal / totalCount : commercialTotal;
 
-  const enriched = deliverables.map((d, idx) => ({
-    ...d,
-    is_parent:
+  // Saadaa pays per collab, not per deliverable — the parent's payment row
+  // settles the entire collab. Children inherit the parent's payment record
+  // so the UI shows them as Paid (status + UTR + paid_on) once the parent's
+  // payment is logged.
+  const parentRow = deliverables.find(
+    (d) =>
       d.deliverable_index == null || Number(d.deliverable_index) === 1,
-    deliverable_label: deliverableLabel(d, idx),
-    split_amount: perDeliverableAmount,
-    payment: paymentsByPostId.get(String(d.post_id)) ?? null,
-  }));
+  );
+  const parentPayment = parentRow
+    ? (paymentsByPostId.get(String(parentRow.post_id)) ?? null)
+    : null;
+
+  const enriched = deliverables.map((d, idx) => {
+    const isParent =
+      d.deliverable_index == null || Number(d.deliverable_index) === 1;
+    const ownPayment = paymentsByPostId.get(String(d.post_id)) ?? null;
+    const effectivePayment = ownPayment ?? (isParent ? null : parentPayment);
+    return {
+      ...d,
+      is_parent: isParent,
+      deliverable_label: deliverableLabel(d, idx),
+      split_amount: perDeliverableAmount,
+      payment: effectivePayment,
+      // Surface row-level posts.payment_status as a soft fallback so the UI
+      // can still show "Done" when the child row was cascaded but the parent
+      // payment lookup misses (e.g. data lag).
+      payment_status_fallback: d.payment_status ?? null,
+    };
+  });
 
   return NextResponse.json({
     parent,

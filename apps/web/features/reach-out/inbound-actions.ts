@@ -3,7 +3,11 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { InboundBatchSchema, inboundUsernameFromUrl } from "./inbound-schema";
+import {
+  InboundBatchSchema,
+  applyInboundBarterLock,
+  inboundUsernameFromUrl,
+} from "./inbound-schema";
 import { findContentCode } from "./content-codes";
 
 interface RowFailure {
@@ -66,7 +70,7 @@ export async function submitInboundBatch(
   const failures: RowFailure[] = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const r = rows[i];
+    const r = applyInboundBarterLock(rows[i]);
     const username = inboundUsernameFromUrl(r.instagramLink);
     if (!username) {
       failures.push({
@@ -95,11 +99,8 @@ export async function submitInboundBatch(
         p_static_posts: 0,
         p_stories: 0,
         p_ads_usage_rights: null,
-        p_collab_type: null,
-        p_commercial_amount: null,
-        p_commercial_reel_rate: r.reelRate ?? null,
-        p_commercial_post_rate: r.postRate ?? null,
-        p_commercial_story_rate: null,
+        p_collab_type: r.collabType,
+        p_commercial_amount: r.collabType === "Barter" ? 0 : r.commercials ?? 0,
         p_raw_dump: null,
         p_logged_by_email: actor.name || actor.email,
       })

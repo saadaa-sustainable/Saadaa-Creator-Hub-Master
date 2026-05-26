@@ -163,6 +163,17 @@ export default function OrderStatusKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Commercial amount on rows">
+        <KMCallout tone="info">
+          The per-row <KMCode>commercials</KMCode> field is computed at query
+          time as{" "}
+          <KMCode>Σ posts.commercial_amount per (inf_id, collab_number)</KMCode>
+          {" "}— the originally-agreed collab total. The equal-split per-row
+          value never surfaces here because each Order Status row represents a
+          whole order, not a single deliverable.
+        </KMCallout>
+      </KMSection>
+
       <KMSection tag="Commerce intel math">
         <KMList>
           <li>

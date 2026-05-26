@@ -99,18 +99,36 @@ export async function fetchOrderStatusData(
   };
 
   // Parallel fetch — posts with order_id, shopify enrichments, creators,
-  // instagram_cache for avatar fallback.
-  const [postsRes, shopifyRes, creatorsRes, igCacheRes] = await Promise.all([
-    (supabase as any)
-      .from("posts")
-      .select(POSTS_COLS)
-      .not("order_id", "is", null)
-      .or("deliverable_index.is.null,deliverable_index.eq.1")
-      .limit(5000),
-    fetchShopify(),
-    (supabase as any).from("creators").select(CREATOR_COLS).limit(5000),
-    (supabase as any).from("instagram_cache").select("username, profile_pic").limit(5000),
-  ]);
+  // instagram_cache for avatar fallback. Sibling sum is fetched separately
+  // (all rows) so per-collab `commercial_amount` totals are correct after
+  // the equal-split rule landed.
+  const [postsRes, siblingRes, shopifyRes, creatorsRes, igCacheRes] =
+    await Promise.all([
+      (supabase as any)
+        .from("posts")
+        .select(POSTS_COLS)
+        .not("order_id", "is", null)
+        .or("deliverable_index.is.null,deliverable_index.eq.1")
+        .limit(5000),
+      (supabase as any)
+        .from("posts")
+        .select("inf_id, collab_number, commercial_amount")
+        .not("inf_id", "is", null)
+        .not("collab_number", "is", null)
+        .limit(20000),
+      fetchShopify(),
+      (supabase as any).from("creators").select(CREATOR_COLS).limit(5000),
+      (supabase as any).from("instagram_cache").select("username, profile_pic").limit(5000),
+    ]);
+
+  const siblingSumMap = new Map<string, number>();
+  for (const s of (siblingRes.data ?? []) as Array<Record<string, unknown>>) {
+    const key = `${s.inf_id}::${s.collab_number}`;
+    siblingSumMap.set(
+      key,
+      (siblingSumMap.get(key) ?? 0) + Number(s.commercial_amount ?? 0),
+    );
+  }
 
   if (postsRes.error) {
     console.error("[order-status] posts query failed:", postsRes.error);
@@ -225,7 +243,9 @@ export async function fetchOrderStatusData(
       category: (cRow.category as string | null) ?? null,
       followers: Number(cRow.followers ?? 0) || null,
       collabType: (p.collab_type as string | null) ?? null,
-      commercials: Number(p.commercial_amount ?? 0),
+      commercials:
+        siblingSumMap.get(`${p.inf_id}::${p.collab_number}`) ??
+        Number(p.commercial_amount ?? 0),
       orderId,
       trackingId: String(sRow.tracking_id ?? p.tracking_id ?? "").trim(),
       shippingStatus: liveShippingStatus,

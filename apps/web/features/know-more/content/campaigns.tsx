@@ -81,6 +81,12 @@ export default function CampaignsKM() {
             Editing an existing campaign re-uses the same form via the
             switcher tab — the create button text flips to &quot;Update&quot;.
           </li>
+          <li>
+            Red <KMCode>MissingFieldsAlert</KMCode> sits above the submit
+            button listing every missing required column (Campaign Name, Key
+            Message, Brief Link, Budget Rows etc.) using live Zod{" "}
+            <KMCode>safeParse(watch())</KMCode> validation.
+          </li>
         </KMList>
       </KMSection>
 

@@ -21,6 +21,7 @@ import {
   Gauge,
   Users,
   ShieldAlert,
+  Sheet,
   LogOut,
   X,
   type LucideIcon,
@@ -114,6 +115,7 @@ const NAV: NavSection[] = [
       { label: "Cost Analytics", href: "/cost-analytics", icon: IndianRupee },
       { label: "Funnel View", href: "/funnel", icon: Filter },
       { label: "Internal Dashboard", href: "/internal-dashboard", icon: Gauge },
+      { label: "Sheet View", href: "/sheets", icon: Sheet },
       {
         label: "User Panel",
         href: "/admin/users",

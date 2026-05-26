@@ -13,6 +13,8 @@ export { GlassCard } from "./glass-card";
 export { Input } from "./input";
 export { KpiCard, KpiStrip } from "./kpi-card";
 export { Label } from "./label";
+export { MissingFieldsAlert } from "./missing-fields-alert";
+export type { MissingFieldsAlertProps } from "./missing-fields-alert";
 export { PageHeader } from "./page-header";
 export {
   Skeleton,

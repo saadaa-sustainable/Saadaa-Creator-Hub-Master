@@ -70,8 +70,10 @@ export default function FunnelKM() {
       <KMSection tag="Data sources">
         <KMList>
           <li>
-            <strong>posts</strong> · reach_out_date, onboard_date, posted_on_date,
-            workflow_status, campaign_id.
+            <strong>posts</strong> · reach_out_date, onboard_date,{" "}
+            <KMCode>post_date</KMCode>, workflow_status, campaign_id,
+            deliverable_index (parent-only counts so multi-deliverable collabs
+            don&apos;t inflate the cohort).
           </li>
         </KMList>
       </KMSection>

@@ -7,6 +7,7 @@ import {
   ChartNoAxesColumnIncreasing,
   CheckCircle2,
   Crown,
+  Eye,
   Instagram,
   Loader2,
   Send,
@@ -20,6 +21,7 @@ import { cn } from "@/lib/cn";
 import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
 import { todayIstIso } from "@/lib/payable-cycle";
 import { submitPayments } from "@/features/accounts-hub/actions";
+import { AccountsOverviewModal } from "@/features/accounts-hub/accounts-overview-modal";
 import { OrderCreationModal } from "@/features/onboarding/order-form";
 import { PostingModal } from "@/features/posting/posting-form";
 import type { MyPost, TeamLeaderboardEntry } from "./types";
@@ -75,21 +77,18 @@ const STAGES: StageDef[] = [
   },
 ];
 
-function stageForPost(post: MyPost): StageKey | null {
+function stagesForPost(post: MyPost): StageKey[] {
   const status = post.workflow_status ?? "";
-  if (status === "Reach Out") return "reach-out";
-  if (status === "On Board" || status === "Order Sent") return "on-board";
-  const isParent =
-    post.deliverable_index === null || post.deliverable_index === 1;
-  if (
-    (status === "Posted" || status === "Delivered") &&
-    post.payment_status !== "Done" &&
-    isParent
-  ) {
-    return "payment";
+  if (status === "Reach Out") return ["reach-out"];
+  if (status === "On Board" || status === "Order Sent") return ["on-board"];
+  if (status === "Posted" || status === "Delivered") {
+    const isParent =
+      post.deliverable_index === null || post.deliverable_index === 1;
+    // Posted column: all deliverables (parent + child).
+    // Payment column: parent only (paid or pending) — read-only overview.
+    return isParent ? ["posted", "payment"] : ["posted"];
   }
-  if (status === "Posted" || status === "Delivered") return "posted";
-  return null;
+  return [];
 }
 
 function paymentPending(post: MyPost): boolean {
@@ -180,8 +179,8 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
         </p>
         <div className="space-y-2.5 sm:space-y-3">
           {STAGES.map((stage) => {
-            const count = posts.filter(
-              (post) => stageForPost(post) === stage.key,
+            const count = posts.filter((post) =>
+              stagesForPost(post).includes(stage.key),
             ).length;
             const pct = stats.total
               ? Math.round((count / stats.total) * 100)
@@ -303,15 +302,20 @@ function WorkloadCard({
   onSubmit: (post: MyPost, stage: StageDef) => void;
 }) {
   const Icon = stage.icon;
+  // Payment column is read-only here — submissions belong to Accounts Hub.
+  // Clicking opens the AccountsOverviewModal for the parent + its siblings.
+  const isPayment = stage.key === "payment";
   const canSubmit =
     stage.key === "reach-out" ||
-    stage.key === "payment" ||
+    isPayment ||
     (stage.key === "on-board" && !postingComplete(post));
-  const actionText =
-    stage.key === "posted" ||
-    (stage.key === "on-board" && postingComplete(post))
+  const actionText = isPayment
+    ? "Overview"
+    : stage.key === "posted" ||
+        (stage.key === "on-board" && postingComplete(post))
       ? "Completed"
       : "Submit";
+  const ButtonIcon = isPayment ? Eye : CheckCircle2;
   return (
     <article className="rounded-xl bg-bg-white border border-border p-2 sm:p-2.5 flex flex-col gap-1.5 sm:gap-2 shadow-[0_1px_3px_rgba(22,21,19,0.05)] min-w-0">
       <div className="flex items-center justify-between gap-2">
@@ -392,7 +396,7 @@ function WorkloadCard({
         }}
         disabled={!canSubmit}
       >
-        <CheckCircle2 size={12} aria-hidden />
+        <ButtonIcon size={12} aria-hidden />
         {actionText}
       </button>
     </article>
@@ -513,6 +517,7 @@ export function MyDashboardWorkloadBoard({
   posts: MyPost[];
   leaderboard: TeamLeaderboardEntry[];
 }) {
+  const router = useRouter();
   const [onboardingPost, setOnboardingPost] = useState<MyPost | null>(null);
   const [postingPost, setPostingPost] = useState<MyPost | null>(null);
   const [paymentPost, setPaymentPost] = useState<MyPost | null>(null);
@@ -521,9 +526,9 @@ export function MyDashboardWorkloadBoard({
     const map = new Map<StageKey, MyPost[]>();
     for (const stage of STAGES) map.set(stage.key, []);
     for (const post of posts) {
-      const key = stageForPost(post);
-      if (!key) continue;
-      map.get(key)?.push(post);
+      for (const key of stagesForPost(post)) {
+        map.get(key)?.push(post);
+      }
     }
     return map;
   }, [posts]);
@@ -679,9 +684,9 @@ export function MyDashboardWorkloadBoard({
         />
       )}
       {paymentPost?.post_id && (
-        <PaymentQuickModal
-          post={paymentPost}
-          onClose={() => setPaymentPost(null)}
+        <AccountsOverviewModal
+          postId={paymentPost.post_id}
+          onClose={() => { setPaymentPost(null); router.refresh(); }}
         />
       )}
     </>

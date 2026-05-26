@@ -53,9 +53,6 @@ export interface PostsRow {
   posting_dispatch_date: string | null;
   collab_type: CollabType | null;
   commercial_amount: number | null;
-  commercial_reel_rate: number | null;
-  commercial_post_rate: number | null;
-  commercial_story_rate: number | null;
   creator_brief_link: string | null;
   shopify_order_id: string | null;
   order_id: string | null;

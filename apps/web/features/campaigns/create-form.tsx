@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useTransition,
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
+import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
 import { submitCampaign } from "./actions";
 import {
   CampaignCreateSchema,
@@ -67,6 +69,7 @@ export function CampaignCreateForm() {
   const router = useRouter();
   const [submitting, startSubmit] = useTransition();
   const [lastCampNameForSegment, setLastCampNameForSegment] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const seededRef = useRef(false);
 
   const {
@@ -81,6 +84,9 @@ export function CampaignCreateForm() {
     resolver: zodResolver(CampaignCreateSchema),
     defaultValues: CAMPAIGN_DEFAULTS,
     mode: "onBlur",
+    criteriaMode: "all",
+    reValidateMode: "onChange",
+    shouldFocusError: true,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -212,6 +218,30 @@ export function CampaignCreateForm() {
     );
   })();
 
+  const CAMPAIGN_FIELD_LABELS: Record<string, string> = {
+    campaignName: "Campaign Name",
+    keyMessage: "Key Message",
+    startDate: "Start Date",
+    endDate: "End Date",
+    numCreators: "Number of Creators",
+    briefLink: "Brief Link",
+    budgetRows: "Budget Rows",
+  };
+  const allCampaignValues = watch();
+  const campaignMissingFields = useMemo<string[]>(() => {
+    if (!submitAttempted) return [];
+    const parsed = CampaignCreateSchema.safeParse(allCampaignValues);
+    if (parsed.success) return [];
+    const keys = new Set<string>();
+    for (const issue of parsed.error.issues) {
+      const k = String(issue.path[0] ?? "");
+      if (k) keys.add(k);
+    }
+    return Array.from(keys)
+      .map((k) => CAMPAIGN_FIELD_LABELS[k])
+      .filter((v): v is string => Boolean(v));
+  }, [submitAttempted, allCampaignValues]);
+
   const creatorsHelper = (() => {
     if (capState === "none")
       return "Set a target. Two budget lines (Barter + Paid) seed automatically. Adjust or delete to make the campaign fully one type.";
@@ -225,7 +255,10 @@ export function CampaignCreateForm() {
   return (
     <form
       id="campaignForm"
-      onSubmit={handleSubmit(onSubmit)}
+      onSubmit={(e) => {
+        setSubmitAttempted(true);
+        handleSubmit(onSubmit)(e);
+      }}
       className="campaign-form space-y-4"
     >
       {/* ── Page Header ───────────────────────────────────────────────── */}
@@ -843,6 +876,7 @@ export function CampaignCreateForm() {
       </div>
 
       {/* ── Submit ────────────────────────────────────────────────────── */}
+      <MissingFieldsAlert fields={campaignMissingFields} />
       <div className="submit-bar">
         <button
           type="submit"

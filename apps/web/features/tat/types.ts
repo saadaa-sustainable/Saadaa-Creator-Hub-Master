@@ -31,8 +31,13 @@ export interface TatKpi {
 
 export interface TatFilters {
   campaign?: string;
+  tier?: string;
+  status?: "posted" | "delivered";
+  reachOutFrom?: string; // YYYY-MM-DD
+  reachOutTo?: string; // YYYY-MM-DD
 }
 
 export interface TatFilterOptions {
   campaigns: { id: string; name: string }[];
+  tiers: string[];
 }

@@ -140,6 +140,14 @@ export default function PostingKM() {
             download_link / partnership_id. Audit trail preserved via
             updated_at.
           </li>
+          <li>
+            Red <KMCode>MissingFieldsAlert</KMCode> sits above the submit
+            button — lists every required field still empty (Post Date, Post
+            Link, Download Link if ads usage rights = Yes, Raw Dump,
+            Partnership Key). Uses Zod{" "}
+            <KMCode>safeParse(watch())</KMCode> so all blockers surface in a
+            single pass.
+          </li>
         </KMList>
       </KMSection>
 

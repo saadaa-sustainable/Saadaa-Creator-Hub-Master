@@ -192,7 +192,7 @@ export async function submitOnboarding(
   const { data: parentPost, error: parentErr } = await supabase
     .from("posts")
     .select(
-      "post_id, post_id_short, post_number, collab_number, inf_id, username, campaign_id, content_type, reach_out_date, reachout_direction, creator_brief_link, commercial_reel_rate, commercial_post_rate, commercial_story_rate, nomenclature",
+      "post_id, post_id_short, post_number, collab_number, inf_id, username, campaign_id, content_type, reach_out_date, reachout_direction, creator_brief_link, nomenclature",
     )
     .eq("post_id", v.postId)
     .maybeSingle();
@@ -248,6 +248,12 @@ export async function submitOnboarding(
   const parentReels = firstType === "reel" ? 1 : 0;
   const parentPosts = firstType === "post" ? 1 : 0;
 
+  // Equal-split rule: the agreed collab price (`v.commercials`) is divided
+  // across all deliverables (parent + children) so SUM(commercial_amount)
+  // across the collab equals the originally agreed total.
+  const perDeliverableAmount =
+    total > 0 ? Math.round((v.commercials / total) * 100) / 100 : v.commercials;
+
   // 3. UPDATE parent post
   const postPatch: Record<string, unknown> = {
     agency_name: v.agency || null,
@@ -255,7 +261,7 @@ export async function submitOnboarding(
     onboarded_by: onboardedBy,
     nomenclature: parentNomenclature,
     collab_type: v.collabType,
-    commercial_amount: v.commercials,
+    commercial_amount: perDeliverableAmount,
     barter_amount: 0,
     est_delivery: v.estDelivery,
     notes: v.remarks || null,
@@ -367,11 +373,11 @@ export async function submitOnboarding(
         stories: 0,
         ads_usage_rights: v.adsUsageRights || null,
         collab_type: v.collabType,
-        commercial_amount: v.commercials,
+        // Equal-split rule: agreed total / # of deliverables. SUM across the
+        // collab equals the originally agreed amount (e.g. ₹10,000 ÷ 3 reels
+        // = ₹3,333.33 per row → sum back to ₹10,000).
+        commercial_amount: perDeliverableAmount,
         barter_amount: 0,
-        commercial_reel_rate: parent.commercial_reel_rate ?? null,
-        commercial_post_rate: parent.commercial_post_rate ?? null,
-        commercial_story_rate: parent.commercial_story_rate ?? null,
         est_delivery: v.estDelivery,
         order_id: v.orderId,
         order_status: v.orderStatus,

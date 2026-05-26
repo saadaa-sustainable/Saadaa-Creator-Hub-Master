@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
+import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
 import { postDateFromUrl, usernameFromUrl } from "@/lib/instagram-shortcode";
 import { PostingSchema, type PostingInput } from "./schema";
 import { submitPosting } from "./actions";
@@ -63,6 +64,7 @@ export function PostingModal({
   const driveBtnRef = useRef<HTMLButtonElement>(null);
 
   const requiresDownload = adsUsageRights === "Yes";
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const {
     register,
@@ -72,6 +74,9 @@ export function PostingModal({
     formState: { errors },
   } = useForm<PostingInput>({
     resolver: zodResolver(PostingSchema),
+    criteriaMode: "all",
+    reValidateMode: "onChange",
+    shouldFocusError: true,
     defaultValues: {
       postId,
       postDate: initial?.postDate ?? "",
@@ -86,6 +91,30 @@ export function PostingModal({
 
   const watchedPostLink = watch("postLink");
   const watchedPostDate = watch("postDate");
+
+  const POSTING_FIELD_LABELS: Record<string, string> = {
+    postId: "Post ID",
+    postDate: "Post Date",
+    postLink: "Post Link",
+    downloadLink: "Download Link",
+    rawDump: "Raw Dump",
+    partnershipId: "Partnership Key",
+    adsUsageRights: "Ads Usage Rights",
+  };
+  const allPostingValues = watch();
+  const postingMissingFields = useMemo<string[]>(() => {
+    if (!submitAttempted) return [];
+    const parsed = PostingSchema.safeParse(allPostingValues);
+    if (parsed.success) return [];
+    const keys = new Set<string>();
+    for (const issue of parsed.error.issues) {
+      const k = String(issue.path[0] ?? "");
+      if (k) keys.add(k);
+    }
+    return Array.from(keys)
+      .map((k) => POSTING_FIELD_LABELS[k])
+      .filter((v): v is string => Boolean(v));
+  }, [submitAttempted, allPostingValues]);
 
   // Reset verification flags if URL or date changes — operator must re-confirm.
   useEffect(() => {
@@ -241,7 +270,10 @@ export function PostingModal({
         </header>
 
         <form
-          onSubmit={handleSubmit(onSubmit)}
+          onSubmit={(e) => {
+            setSubmitAttempted(true);
+            handleSubmit(onSubmit)(e);
+          }}
           className="modal-body pt-modal-body"
         >
           <input type="hidden" {...register("adsUsageRights")} />
@@ -473,6 +505,11 @@ export function PostingModal({
               </label>
             </div>
           </div>
+
+          <MissingFieldsAlert
+            className="mx-4 sm:mx-6 mb-2"
+            fields={postingMissingFields}
+          />
 
           <footer className="modal-foot">
             <button type="button" className="btn btn-ghost" onClick={onClose}>

@@ -31,6 +31,37 @@ export default function AdStatusKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="KPI formulas">
+        <KMList>
+          <li>
+            <strong>Total Eligible</strong> ·{" "}
+            <KMCode>count(posts)</KMCode> where{" "}
+            <KMCode>ads_usage_rights</KMCode> is non-empty AND workflow_status
+            ∈ &#123;Posted, Delivered&#125;.
+          </li>
+          <li>
+            <strong>Classified</strong> ·{" "}
+            <KMCode>count(posts)</KMCode> where{" "}
+            <KMCode>ads_status</KMCode> ∈ &#123;Winner, ITE, Discarded&#125;.
+            Stays at 0 on prod schemas without the column (graceful fallback).
+          </li>
+          <li>
+            <strong>In Meta Ads</strong> ·{" "}
+            <KMCode>count(posts)</KMCode> where{" "}
+            <KMCode>partnership_id</KMCode> is non-empty (ad has been wired up
+            in Meta even if classification is still pending).
+          </li>
+          <li>
+            <strong>Pending Classification</strong> ·{" "}
+            <KMCode>Total Eligible − Classified</KMCode>.
+          </li>
+          <li>
+            <strong>Avg ROAS</strong> · placeholder. Will pull from Meta Ads
+            warehouse once the sync is live.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Eligibility criteria">
         <p>
           A post is eligible for ad status tracking when{" "}

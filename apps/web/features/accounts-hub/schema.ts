@@ -3,9 +3,10 @@ import { z } from "zod";
 /**
  * Single payment submit — mirrors legacy `submitPayments` per-row payload.
  *
- * Server resolves `match_status` (Matched / Not Matched / Unverified) based on
- * `amount` vs `posts.commercial_amount`. Optional bank fields are passed
- * through for compliance archival but not enforced here.
+ * Server validates `amount` against `posts.commercial_amount` (no separate
+ * match_status column anymore — diff is derived in the ledger UI). Optional
+ * bank fields are passed through for compliance archival but not enforced
+ * here.
  */
 export const PaymentSubmitSchema = z.object({
   postId: z.string().trim().min(1, "Post ID required"),

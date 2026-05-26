@@ -90,9 +90,6 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
       p_ads_usage_rights: null,
       p_collab_type: null,
       p_commercial_amount: null,
-      p_commercial_reel_rate: v.commercialReelRate ?? null,
-      p_commercial_post_rate: v.commercialPostRate ?? null,
-      p_commercial_story_rate: v.commercialStoryRate ?? null,
       p_raw_dump: null,
       p_logged_by_email: actor.name || actor.email,
     })

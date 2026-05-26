@@ -52,10 +52,10 @@ export default function ReachOutOutboundKM() {
           <li>
             <strong>posts</strong> · post_id <KMCode>SIF-{"{N}"}-P{"{N}"}</KMCode>{" "}
             (auto via submit_reachout RPC), workflow_status{" "}
-            <KMCode>Reach Out</KMCode>, campaign_id, content_type,
-            commercial_reel_rate / post_rate / story_rate, reachout_type{" "}
+            <KMCode>Reach Out</KMCode>, campaign_id, content_type, reachout_type{" "}
             <KMCode>Outbound</KMCode>, reachout_direction{" "}
-            <KMCode>outbound</KMCode>.
+            <KMCode>outbound</KMCode>. Commercial agreed amount + collab_type
+            are captured in onboarding (or inbound roster).
           </li>
           <li>
             <strong>instagram_cache</strong> · pending row upserted on every
@@ -67,19 +67,28 @@ export default function ReachOutOutboundKM() {
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>
-            Campaign + IG link are required. Followers can be blank if the
-            cron hasn&apos;t enriched yet.
+            Campaign + IG link + Full Name + Content Type are required.
+            Followers can be blank if the cron hasn&apos;t enriched yet.
           </li>
           <li>
-            Commercial rates are per-deliverable-type. Leave all at 0 for a
-            pure-barter collab.
+            Commercial figures captured downstream during Onboarding (or
+            already on the post when it came from Inbound). The per-type rate
+            columns (reel/post/story) were retired 2026-05-27 — a single
+            agreed total now equal-splits across deliverables.
           </li>
           <li>
             Re-submitting same username + campaign creates a new collab
             episode (different post_id, shared inf_id).
           </li>
           <li>
-            Logged-by stamps with signed-in user email for audit.
+            <KMCode>onboarded_by</KMCode> stamps with the signed-in user
+            email for audit.
+          </li>
+          <li>
+            Red <KMCode>MissingFieldsAlert</KMCode> renders above the submit
+            button listing every empty required field at once (Zod{" "}
+            <KMCode>safeParse(watch())</KMCode>), so the operator fixes all
+            blockers in one pass.
           </li>
         </KMList>
       </KMSection>

@@ -66,11 +66,6 @@ export const ReachOutSchema = z.object({
   language: z.enum(LANGUAGES),
   er: z.coerce.number().nonnegative().optional(),
   avgLikes: z.coerce.number().nonnegative().optional(),
-
-  // ----- Commercials (optional) -----------------------------------------
-  commercialReelRate: z.coerce.number().nonnegative().optional(),
-  commercialPostRate: z.coerce.number().nonnegative().optional(),
-  commercialStoryRate: z.coerce.number().nonnegative().optional(),
 });
 
 export type ReachOutInput = z.infer<typeof ReachOutSchema>;
@@ -88,7 +83,4 @@ export const REACHOUT_DEFAULTS: ReachOutInput = {
   language: "English",
   er: undefined,
   avgLikes: undefined,
-  commercialReelRate: undefined,
-  commercialPostRate: undefined,
-  commercialStoryRate: undefined,
 };

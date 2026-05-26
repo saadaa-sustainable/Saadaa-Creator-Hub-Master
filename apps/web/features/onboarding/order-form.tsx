@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
+import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
 import {
   OnboardingSchema,
   COLLAB_TYPES,
@@ -77,6 +78,7 @@ export function OrderCreationModal({
   const [preview, setPreview] = useState<ShopifyPreview | null>(null);
   const [lookupErr, setLookupErr] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const {
     register,
@@ -87,6 +89,9 @@ export function OrderCreationModal({
     formState: { errors },
   } = useForm<OnboardingInput>({
     resolver: zodResolver(OnboardingSchema),
+    criteriaMode: "all",
+    reValidateMode: "onChange",
+    shouldFocusError: true,
     defaultValues: {
       postId,
       agency: initial?.agency ?? "",
@@ -114,6 +119,48 @@ export function OrderCreationModal({
   const watchedPosts = watch("posts");
   const isBarter = watchedCollab === "Barter";
   const showBank = watchedCollab === "Barter + Paid";
+  // Lock collabType + commercials when reach-out already set them. For
+  // Barter + Paid we lock once a real positive amount exists; Barter rows
+  // can lock as soon as collabType is set since commercials is forced to 0.
+  const collabLocked = Boolean(initial?.collabType);
+  const commercialsLocked =
+    collabLocked &&
+    (initial?.collabType === "Barter" ||
+      (initial?.commercials != null && initial.commercials > 0));
+
+  const ONBOARDING_FIELD_LABELS: Partial<Record<keyof OnboardingInput, string>> = {
+    postId: "Post ID",
+    agency: "Agency Name",
+    collabType: "Collab Type",
+    commercials: "Commercials",
+    estDelivery: "Est. Content Delivery",
+    reels: "Reels",
+    posts: "Static Posts",
+    stories: "Stories",
+    adsUsageRights: "Ads Usage Rights",
+    orderId: "Shopify Order ID",
+    orderStatus: "Order Status",
+    bankName: "Bank Account Name",
+    bankNumber: "Bank Account Number",
+    ifsc: "IFSC",
+    duration: "Duration",
+    remarks: "Remarks",
+  };
+
+  const allValues = watch();
+  const missingFieldLabels = useMemo<string[]>(() => {
+    if (!submitAttempted) return [];
+    const parsed = OnboardingSchema.safeParse(allValues);
+    if (parsed.success) return [];
+    const keys = new Set<string>();
+    for (const issue of parsed.error.issues) {
+      const k = String(issue.path[0] ?? "");
+      if (k) keys.add(k);
+    }
+    return Array.from(keys)
+      .map((k) => ONBOARDING_FIELD_LABELS[k as keyof OnboardingInput])
+      .filter((v): v is string => Boolean(v));
+  }, [submitAttempted, allValues]);
 
   useEffect(() => {
     setMounted(true);
@@ -236,7 +283,10 @@ export function OrderCreationModal({
         </header>
 
         <form
-          onSubmit={handleSubmit(onSubmit)}
+          onSubmit={(e) => {
+            setSubmitAttempted(true);
+            handleSubmit(onSubmit)(e);
+          }}
           className="modal-body space-y-3"
         >
           <input type="hidden" {...register("orderStatus")} />
@@ -264,10 +314,11 @@ export function OrderCreationModal({
                 <label htmlFor="ob_agency">Agency Name (Optional)</label>
               </div>
 
-              <div className="form-floating">
+              <div className="form-floating relative">
                 <select
-                  className="form-select"
+                  className={cn("form-select", collabLocked && "br-readonly")}
                   id="ob_collab"
+                  disabled={collabLocked}
                   {...register("collabType")}
                 >
                   {COLLAB_TYPES.map((t) => (
@@ -277,6 +328,9 @@ export function OrderCreationModal({
                   ))}
                 </select>
                 <label htmlFor="ob_collab">Collab Type *</label>
+                {collabLocked && (
+                  <span className="autofill-badge">FROM REACH OUT</span>
+                )}
                 {errors.collabType && (
                   <small className="field-error">
                     {errors.collabType.message}
@@ -288,21 +342,26 @@ export function OrderCreationModal({
                 <input
                   type="number"
                   min={0}
-                  className={cn("form-control", isBarter && "br-readonly")}
+                  className={cn(
+                    "form-control",
+                    (isBarter || commercialsLocked) && "br-readonly",
+                  )}
                   id="ob_commercials"
                   placeholder=" "
-                  readOnly={isBarter}
+                  readOnly={isBarter || commercialsLocked}
                   {...register("commercials", {
                     setValueAs: (v) =>
                       v === "" || v == null ? 0 : Number(v) || 0,
                   })}
                 />
                 <label htmlFor="ob_commercials">Commercials ₹</label>
-                {isBarter && (
+                {isBarter ? (
                   <span className="barter-badge">
                     <Gift size={10} /> BARTER ₹0
                   </span>
-                )}
+                ) : commercialsLocked ? (
+                  <span className="autofill-badge">FROM REACH OUT</span>
+                ) : null}
               </div>
 
               <div className="form-floating">
@@ -626,6 +685,11 @@ export function OrderCreationModal({
             </div>
           </section>
 
+          {missingFieldLabels.length > 0 && (
+            <div className="px-4 sm:px-6 pb-2">
+              <MissingFieldsAlert fields={missingFieldLabels} />
+            </div>
+          )}
           <footer className="modal-foot">
             <button type="button" className="btn btn-ghost" onClick={onClose}>
               Cancel

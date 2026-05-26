@@ -16,6 +16,8 @@ const POSTS_COLS_BASE = [
   "order_id",
   "order_status",
   "post_date",
+  "inf_id",
+  "workflow_status",
 ].join(",");
 
 /**
@@ -62,6 +64,15 @@ function daysBetween(a: unknown, b: unknown): number | null {
   if (!_valid(da) || !_valid(db)) return null;
   const diff = Math.floor((db.getTime() - da.getTime()) / 86400000);
   return diff < 0 ? null : diff;
+}
+
+function tierFromFollowers(followers: number | null | undefined): string {
+  if (followers == null) return "";
+  if (followers < 10_000) return "Nano";
+  if (followers < 50_000) return "Micro";
+  if (followers < 300_000) return "Mid tier";
+  if (followers < 1_000_000) return "Macro";
+  return "Mega";
 }
 
 function computeStats(arr: Array<number | null>): TatStats {
@@ -144,10 +155,68 @@ export async function fetchTatData(filters: TatFilters): Promise<{
     if (oid) orderPlacedMap.set(oid, o.order_placed_date);
   }
 
-  // Apply campaign filter if provided.
-  const posts = filters.campaign
-    ? postsRaw.filter((p) => String(p.campaign_id ?? "").trim() === filters.campaign)
-    : postsRaw;
+  // Resolve creator tier per inf_id (creators.category or follower-derived).
+  const infIds = [
+    ...new Set(
+      postsRaw
+        .map((p) => String(p.inf_id ?? "").trim())
+        .filter((id) => id.length > 0),
+    ),
+  ];
+  const tierByInf = new Map<string, string>();
+  if (infIds.length > 0) {
+    const { data: creators } = await (supabase as any)
+      .from("creators")
+      .select("inf_id, category, followers")
+      .in("inf_id", infIds)
+      .limit(2000);
+    for (const c of (creators ?? []) as Array<{
+      inf_id: string | null;
+      category: string | null;
+      followers: number | null;
+    }>) {
+      const id = String(c.inf_id ?? "").trim();
+      if (!id) continue;
+      const tier =
+        (c.category ?? "").trim() || tierFromFollowers(c.followers);
+      tierByInf.set(id, tier);
+    }
+  }
+
+  // Apply filters server-side (still in JS since we already pulled the set).
+  const fromTs = filters.reachOutFrom
+    ? new Date(filters.reachOutFrom).getTime()
+    : null;
+  const toTs = filters.reachOutTo
+    ? new Date(filters.reachOutTo).getTime() + 86_400_000 - 1
+    : null;
+  const posts = postsRaw.filter((p) => {
+    if (
+      filters.campaign &&
+      String(p.campaign_id ?? "").trim() !== filters.campaign
+    )
+      return false;
+    if (filters.tier) {
+      const infId = String(p.inf_id ?? "").trim();
+      const t = tierByInf.get(infId) ?? "";
+      if (t !== filters.tier) return false;
+    }
+    if (filters.status) {
+      const wf = String(p.workflow_status ?? "")
+        .trim()
+        .toLowerCase();
+      if (filters.status === "posted" && wf !== "posted") return false;
+      if (filters.status === "delivered" && wf !== "delivered") return false;
+    }
+    if (fromTs != null || toTs != null) {
+      const ro = _toDate(p.reach_out_date);
+      if (!ro) return false;
+      const ts = ro.getTime();
+      if (fromTs != null && ts < fromTs) return false;
+      if (toTs != null && ts > toTs) return false;
+    }
+    return true;
+  });
 
   // Date pair arrays.
   const arrRoToOnboard: Array<number | null> = [];
@@ -248,14 +317,35 @@ export async function fetchTatData(filters: TatFilters): Promise<{
 
 export async function fetchTatFilterOptions(): Promise<TatFilterOptions> {
   const supabase = createServiceClient();
-  const { data } = await (supabase as any)
-    .from("campaigns")
-    .select("campaign_id, campaign_name")
-    .order("campaign_id", { ascending: false })
-    .limit(500);
+
+  const [{ data: campaigns }, { data: creators }] = await Promise.all([
+    (supabase as any)
+      .from("campaigns")
+      .select("campaign_id, campaign_name")
+      .order("campaign_id", { ascending: false })
+      .limit(500),
+    (supabase as any)
+      .from("creators")
+      .select("category, followers")
+      .limit(2000),
+  ]);
+
+  const tierSet = new Set<string>();
+  for (const c of (creators ?? []) as Array<{
+    category: string | null;
+    followers: number | null;
+  }>) {
+    const t = (c.category ?? "").trim() || tierFromFollowers(c.followers);
+    if (t) tierSet.add(t);
+  }
+  const tierOrder = ["Nano", "Micro", "Mid tier", "Macro", "Mega"];
+  const tiers = [...tierSet].sort(
+    (a, b) => (tierOrder.indexOf(a) + 999) - (tierOrder.indexOf(b) + 999),
+  );
+
   return {
     campaigns: (
-      (data ?? []) as Array<{
+      (campaigns ?? []) as Array<{
         campaign_id: string;
         campaign_name: string | null;
       }>
@@ -263,5 +353,6 @@ export async function fetchTatFilterOptions(): Promise<TatFilterOptions> {
       id: c.campaign_id,
       name: c.campaign_name ?? c.campaign_id,
     })),
+    tiers,
   };
 }

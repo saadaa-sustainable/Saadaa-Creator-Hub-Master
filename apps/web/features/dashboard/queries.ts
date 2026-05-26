@@ -438,12 +438,20 @@ export async function fetchDashboardData(
   // a 3-deliverable collab where the parent is paid shows "Settled" on every
   // child card. Key = `${inf_id}|${collab_number}`.
   const parentPaymentByCollab = new Map<string, string>();
+  // Commercial total per collab — each row holds an equal-split share, so
+  // we sum siblings to recover the originally-agreed amount before display.
+  const commercialTotalByCollab = new Map<string, number>();
   for (const p of posts) {
-    const idx = Number(p.deliverable_index ?? 1);
-    if (idx > 1) continue; // child, skip
     const inf = String(p.inf_id ?? "");
     if (!inf) continue;
     const key = `${inf}|${Number(p.collab_number ?? 1)}`;
+    commercialTotalByCollab.set(
+      key,
+      (commercialTotalByCollab.get(key) ?? 0) +
+        Number(p.commercial_amount ?? 0),
+    );
+    const idx = Number(p.deliverable_index ?? 1);
+    if (idx > 1) continue; // child, skip
     parentPaymentByCollab.set(
       key,
       String(p.payment_status ?? "").toLowerCase(),
@@ -496,7 +504,15 @@ export async function fetchDashboardData(
       profilePic: (c.profile_pic as string | null) ?? null,
       campaign: (p.campaign_id as string | null) ?? null,
       date: stageDate ?? reachOutDate,
-      amount: p.commercial_amount != null ? Number(p.commercial_amount) : null,
+      amount: (() => {
+        const total = collabKey
+          ? commercialTotalByCollab.get(collabKey)
+          : undefined;
+        if (typeof total === "number") return total;
+        return p.commercial_amount != null
+          ? Number(p.commercial_amount)
+          : null;
+      })(),
       // `posts.logged_by` doesn't exist on prod yet — once it does, fall back
       // chain becomes logged_by (for Reach Out) → onboarded_by (for OB+).
       assignee: (p.onboarded_by as string | null) ?? null,

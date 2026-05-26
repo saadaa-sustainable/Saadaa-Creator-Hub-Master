@@ -128,6 +128,14 @@ export function OnboardingTable({
           postIdShort={orderRow.post_id_short ?? undefined}
           creatorName={orderRow.creator?.inf_name}
           username={orderRow.creator?.username}
+          initial={{
+            collabType:
+              orderRow.collab_type === "Barter" ||
+              orderRow.collab_type === "Barter + Paid"
+                ? orderRow.collab_type
+                : undefined,
+            commercials: orderRow.commercial_amount ?? undefined,
+          }}
           onSendEmail={(postId, draft) => setCollabEmail({ postId, draft })}
         />
       )}

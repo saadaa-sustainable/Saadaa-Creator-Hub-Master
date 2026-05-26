@@ -52,7 +52,9 @@ export function isOverdue(r: OnboardingRow): boolean {
 }
 
 export function isOnboarded(r: OnboardingRow): boolean {
-  return r.workflow_status === "On Board" || r.workflow_status === "Order Sent";
+  // Any post past "Reach Out" has had its onboarding form submitted —
+  // includes On Board, Order Sent, Posted, Delivered, RTO, Cancelled.
+  return r.workflow_status != null && r.workflow_status !== "Reach Out";
 }
 
 export function lineageLabel(r: OnboardingRow, rows: OnboardingRow[]): string {

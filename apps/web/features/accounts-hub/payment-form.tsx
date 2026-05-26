@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { Avatar } from "@/components/ui";
+import { Avatar, MissingFieldsAlert } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatRupees } from "@/lib/formatters";
 import { todayIstIso } from "@/lib/payable-cycle";
@@ -141,6 +141,7 @@ export function PaymentEntryPanel() {
   // after mount, which permanently kills the SSR/hydration mismatch caused
   // by per-row dynamic IDs and a today-date that depends on client locale.
   const [mounted, setMounted] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [rows, setRows] = useState<FormRow[]>([]);
   const [eligible, setEligible] = useState<EligiblePost[]>([]);
   const [loadingEligible, setLoadingEligible] = useState(false);
@@ -256,8 +257,22 @@ export function PaymentEntryPanel() {
     );
   }, [pasteText]);
 
+  const missingPaymentFields = useMemo(() => {
+    if (!submitAttempted) return [] as string[];
+    const labels = new Set<string>();
+    rows.forEach((r) => {
+      if (!r.postId.trim()) labels.add("Post ID");
+      if (!r.paymentDate) labels.add("Payment Date");
+      const amt = Number(r.amount);
+      if (!r.amount || Number.isNaN(amt) || amt <= 0)
+        labels.add("Amount");
+    });
+    return Array.from(labels);
+  }, [submitAttempted, rows]);
+
   const onSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    setSubmitAttempted(true);
     const payload = rows.map((r) => ({
       postId: r.postId.trim(),
       utr: r.utr.trim(),
@@ -570,6 +585,7 @@ export function PaymentEntryPanel() {
               {pasteOpen ? "Hide paste import" : "Paste from Excel"}
             </button>
             <div className="acc-entry-toolbar__spacer" />
+            <MissingFieldsAlert fields={missingPaymentFields} className="w-full" />
             <button
               type="submit"
               className={cn("btn-primary-cta", submitting && "is-loading")}

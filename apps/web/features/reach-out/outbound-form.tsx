@@ -1,13 +1,12 @@
 "use client";
 
-import { useTransition, useState, useEffect } from "react";
+import { useTransition, useState, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Megaphone,
   IdCard,
   BarChart3,
-  CircleDollarSign,
   CheckCircle2,
   FileText,
   Search,
@@ -26,6 +25,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { formatFollowers, tierFromFollowers } from "@/lib/formatters";
 import { Avatar } from "@/components/ui/avatar";
+import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
 import {
   REACHOUT_DEFAULTS,
   ReachOutSchema,
@@ -76,6 +76,8 @@ export function OutboundForm({
     campaignId: defaultCampaignId,
   };
 
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -89,6 +91,9 @@ export function OutboundForm({
     resolver: zodResolver(ReachOutSchema),
     defaultValues: formDefaults,
     mode: "onBlur",
+    reValidateMode: "onChange",
+    criteriaMode: "all",
+    shouldFocusError: true,
   });
 
   const selectedCampaignId = watch("campaignId");
@@ -211,24 +216,71 @@ export function OutboundForm({
     });
   };
 
-  const onSubmit = handleSubmit((values) => {
-    startSubmit(async () => {
-      const res = await submitReachOut(values);
-      if (!res.ok) {
-        if (res.fieldErrors)
-          Object.entries(res.fieldErrors).forEach(([, msg]) =>
-            toast.error(msg),
-          );
-        toast.error(res.error);
-        return;
-      }
-      toast.success(`Reach-out created: ${res.postId}`);
-      reset(formDefaults);
-      setHit(null);
-      setLookupState("idle");
-      setVerificationOverridden(false);
-    });
-  });
+  const FIELD_LABELS_OUTBOUND: Record<keyof ReachOutInput, string> = {
+    reachoutDirection: "Reach Out Direction",
+    campaignId: "Campaign ID",
+    instagramLink: "Instagram URL",
+    influencerName: "Full Name",
+    followers: "Followers",
+    gender: "Gender",
+    verification: "Verification Status",
+    contentType: "Content Type",
+    contentName: "Content Name",
+    language: "Primary Language",
+    er: "Engagement Rate",
+    avgLikes: "Avg Likes",
+  };
+
+  // Schema-driven missing-fields scan. Runs ReachOutSchema.safeParse against
+  // the live form snapshot every render — this guarantees EVERY required
+  // field that isn't filled appears in the banner, not just the ones the
+  // user happened to blur. Only renders after the first submit click so the
+  // banner doesn't yell at the user before they've even tried.
+  const allValues = watch();
+  const missingFieldLabels = useMemo<string[]>(() => {
+    if (!submitAttempted) return [];
+    const parsed = ReachOutSchema.safeParse(allValues);
+    if (parsed.success) return [];
+    const keys = new Set<string>();
+    for (const issue of parsed.error.issues) {
+      const k = String(issue.path[0] ?? "");
+      if (k) keys.add(k);
+    }
+    return Array.from(keys)
+      .map((k) => FIELD_LABELS_OUTBOUND[k as keyof ReachOutInput])
+      .filter((v): v is string => Boolean(v));
+  }, [submitAttempted, allValues]);
+
+  const onSubmit = (event: React.FormEvent) => {
+    setSubmitAttempted(true);
+    handleSubmit(
+      (values) => {
+        startSubmit(async () => {
+          const res = await submitReachOut(values);
+          if (!res.ok) {
+            if (res.fieldErrors)
+              Object.entries(res.fieldErrors).forEach(([, msg]) =>
+                toast.error(msg),
+              );
+            toast.error(res.error);
+            return;
+          }
+          toast.success(`Reach-out created: ${res.postId}`);
+          reset(formDefaults);
+          setSubmitAttempted(false);
+          setHit(null);
+          setLookupState("idle");
+          setVerificationOverridden(false);
+        });
+      },
+      (errs) => {
+        const count = Object.keys(errs).length;
+        toast.error(
+          `Fill ${count} required field${count > 1 ? "s" : ""} to submit.`,
+        );
+      },
+    )(event);
+  };
 
   return (
     <form className="reachout-form" onSubmit={onSubmit}>
@@ -803,82 +855,18 @@ export function OutboundForm({
         </div>
       </section>
 
-      {/* ============ STEP 4 — Commercials =================================== */}
-      <section
-        className="glass-card reachout-step-card"
-        style={{ animationDelay: "165ms" }}
-      >
-        <div className="reachout-commercial-head flex items-start justify-between gap-3 flex-wrap mb-3">
-          <div>
-            <h5
-              className="section-title mb-1"
-              style={{ borderBottom: "none", paddingBottom: 0 }}
-            >
-              <CircleDollarSign aria-hidden /> Commercials per Deliverable
-            </h5>
-            <small className="reachout-commercial-copy text-text-tertiary text-[0.72rem]">
-              Optional now. If skipped, the team can fill this during
-              Onboarding. One rate per deliverable type.
-            </small>
-          </div>
-          <span
-            className="text-[0.7rem] font-bold uppercase tracking-[0.06em] rounded-full px-2.5 py-1 border"
-            style={{
-              background: "var(--color-bg-ecru)",
-              color: "var(--color-text-secondary)",
-              borderColor: "var(--color-border)",
-            }}
-          >
-            Skip allowed
-          </span>
+      <div className="space-y-3">
+        <MissingFieldsAlert fields={missingFieldLabels} />
+        <div className="text-end">
+          <button type="submit" className="btn-submit" disabled={submitting}>
+            {submitting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            {submitting ? "Submitting…" : "Create Reach Out"}
+          </button>
         </div>
-
-        <div className="reachout-rate-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
-          <div>
-            <label className="form-label-static">Reel rate (₹)</label>
-            <input
-              {...register("commercialReelRate")}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              className="form-control"
-              placeholder="e.g. 5000"
-            />
-          </div>
-          <div>
-            <label className="form-label-static">Post rate (₹)</label>
-            <input
-              {...register("commercialPostRate")}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              className="form-control"
-              placeholder="e.g. 2500"
-            />
-          </div>
-          <div className="lg:col-span-1">
-            <label className="form-label-static">Story rate (₹)</label>
-            <input
-              {...register("commercialStoryRate")}
-              type="number"
-              inputMode="numeric"
-              min={0}
-              className="form-control"
-              placeholder="e.g. 1000"
-            />
-          </div>
-        </div>
-      </section>
-
-      <div className="text-end">
-        <button type="submit" className="btn-submit" disabled={submitting}>
-          {submitting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <CheckCircle2 className="h-4 w-4" />
-          )}
-          {submitting ? "Submitting…" : "Create Reach Out"}
-        </button>
       </div>
     </form>
   );

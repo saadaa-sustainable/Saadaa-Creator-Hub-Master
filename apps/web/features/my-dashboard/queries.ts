@@ -108,6 +108,31 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
     }
   }
 
+  // Collab total — sum commercial_amount per (inf_id, collab_number). After
+  // the equal-split rule, each row holds a fraction of the agreed amount, so
+  // displaying `commercial_amount` directly under-reports per card.
+  const collabInfIds = Array.from(
+    new Set(basePosts.map((p) => p.inf_id).filter(Boolean) as string[]),
+  );
+  const collabTotalMap = new Map<string, number>();
+  if (collabInfIds.length > 0) {
+    const { data: sibRows } = await (supabase as any)
+      .from("posts")
+      .select("inf_id, collab_number, commercial_amount")
+      .in("inf_id", collabInfIds);
+    for (const s of (sibRows ?? []) as Array<{
+      inf_id: string | null;
+      collab_number: number | null;
+      commercial_amount: number | null;
+    }>) {
+      const key = `${s.inf_id ?? ""}|${Number(s.collab_number ?? 1)}`;
+      collabTotalMap.set(
+        key,
+        (collabTotalMap.get(key) ?? 0) + Number(s.commercial_amount ?? 0),
+      );
+    }
+  }
+
   const posts = basePosts.map((p) => {
     const creator =
       creatorMap.get(
@@ -115,8 +140,11 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
           .trim()
           .toLowerCase(),
       ) ?? null;
+    const key = `${p.inf_id ?? ""}|${Number(p.collab_number ?? 1)}`;
+    const total = collabTotalMap.get(key);
     return {
       ...p,
+      commercial_amount: total ?? p.commercial_amount ?? 0,
       inf_name: creator?.inf_name ?? p.inf_name ?? null,
       creator,
     };

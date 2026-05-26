@@ -58,8 +58,9 @@ export default function ComplianceKM() {
             collabs always count as paid since there is no cash owed).
           </li>
           <li>
-            <strong>Avg TAT (RO → Post)</strong> · median days from reach_out_date to
-            posted_on_date across Posted + Delivered rows.
+            <strong>Avg TAT (RO → Post)</strong> · median days from{" "}
+            <KMCode>reach_out_date</KMCode> to <KMCode>post_date</KMCode>{" "}
+            across Posted + Delivered rows.
           </li>
         </KMList>
       </KMSection>
@@ -75,8 +76,10 @@ export default function ComplianceKM() {
       <KMSection tag="Data sources">
         <KMList>
           <li>
-            <strong>posts</strong> · workflow_status, email, bank_account, payment_status,
-            reach_out_date, posted_on_date, campaign_id.
+            <strong>posts</strong> · workflow_status, email,{" "}
+            <KMCode>bank_name / bank_number / ifsc</KMCode> (for bank
+            coverage), payment_status, reach_out_date, post_date, campaign_id,
+            deliverable_index, collab_number.
           </li>
           <li>
             <strong>shopify_orders</strong> · for RTO rate (order placed count).

@@ -21,7 +21,9 @@ import OrderStatusKM from "./order-status";
 import PostingKM from "./posting";
 import ReachOutInboundKM from "./reach-out-inbound";
 import ReachOutOutboundKM from "./reach-out-outbound";
+import SheetsKM from "./sheets";
 import TatKM from "./tat";
+import UserPanelKM from "./user-panel";
 
 export const KM_REGISTRY: Record<string, ComponentType> = {
   dashboard: DashboardKM,
@@ -42,6 +44,8 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   "cost-analytics": CostAnalyticsKM,
   "internal-dashboard": InternalDashboardKM,
   errors: ErrorsKM,
+  sheets: SheetsKM,
+  "user-panel": UserPanelKM,
 };
 
 export type KMSlug = keyof typeof KM_REGISTRY;
