@@ -14,7 +14,6 @@ import {
   UserSquare,
   Map,
   Timer,
-  BarChart3,
   Megaphone,
   ClipboardCheck,
   IndianRupee,
@@ -37,6 +36,7 @@ interface NavLeaf {
   href: string;
   icon: LucideIcon;
   show?: (actor: UserAccessRow) => boolean;
+  badge?: number;
 }
 interface NavSection {
   label: string;
@@ -104,7 +104,6 @@ const NAV: NavSection[] = [
       { label: "My Dashboard", href: "/my-dashboard", icon: UserSquare },
       { label: "Influencer Journey", href: "/journey", icon: Map },
       { label: "TAT Analytics", href: "/tat", icon: Timer },
-      { label: "Order Dashboard", href: "/orders", icon: BarChart3 },
       {
         label: "Ad Status",
         href: "/performance/ad-run-status",
@@ -253,6 +252,11 @@ function NavLink({
     >
       <Icon aria-hidden />
       <span>{leaf.label}</span>
+      {leaf.badge != null && leaf.badge > 0 && (
+        <span className="ml-auto inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-danger text-white text-[0.6rem] font-bold leading-none">
+          {leaf.badge > 99 ? "99+" : leaf.badge}
+        </span>
+      )}
     </Link>
   );
 }

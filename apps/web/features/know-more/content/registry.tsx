@@ -5,13 +5,23 @@
  */
 import type { ComponentType } from "react";
 import AccountsHubKM from "./accounts-hub";
+import AdStatusKM from "./ad-status";
 import CampaignsKM from "./campaigns";
+import ComplianceKM from "./compliance";
+import CostAnalyticsKM from "./cost-analytics";
 import DashboardKM from "./dashboard";
+import ErrorsKM from "./errors";
+import FunnelKM from "./funnel";
+import InternalDashboardKM from "./internal-dashboard";
+import JourneyKM from "./journey";
+import MyDashboardKM from "./my-dashboard";
 import OnboardingKM from "./onboarding";
+import OrdersKM from "./orders";
 import OrderStatusKM from "./order-status";
 import PostingKM from "./posting";
 import ReachOutInboundKM from "./reach-out-inbound";
 import ReachOutOutboundKM from "./reach-out-outbound";
+import TatKM from "./tat";
 
 export const KM_REGISTRY: Record<string, ComponentType> = {
   dashboard: DashboardKM,
@@ -22,6 +32,16 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   posting: PostingKM,
   "order-status": OrderStatusKM,
   "accounts-hub": AccountsHubKM,
+  orders: OrdersKM,
+  "ad-status": AdStatusKM,
+  tat: TatKM,
+  journey: JourneyKM,
+  "my-dashboard": MyDashboardKM,
+  compliance: ComplianceKM,
+  funnel: FunnelKM,
+  "cost-analytics": CostAnalyticsKM,
+  "internal-dashboard": InternalDashboardKM,
+  errors: ErrorsKM,
 };
 
 export type KMSlug = keyof typeof KM_REGISTRY;
