@@ -10006,23 +10006,24 @@ body:has(.km-backdrop) {
   flex: 1 1 auto;
 }
 .ad-status-stage .ad-status-card-partnership {
-  align-items: flex-end;
-  text-align: right;
+  align-items: flex-start;
+  text-align: left;
 }
 .ad-status-stage .ad-status-card-partnership .ob-card-meta-val {
-  justify-content: flex-end;
+  justify-content: flex-start;
   max-width: 100%;
   overflow: visible;
 }
 .ad-status-stage .ad-status-card-partnership .pk-edit {
-  justify-content: flex-end;
+  justify-content: flex-start;
   position: relative;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
 }
 .ad-status-stage .ad-status-card-partnership .pk-edit__value {
   flex: 0 1 auto;
   max-width: 100%;
-  text-align: right;
+  text-align: left;
 }
 .ad-status-stage .ad-status-card-partnership .pk-edit__trigger {
   position: absolute;

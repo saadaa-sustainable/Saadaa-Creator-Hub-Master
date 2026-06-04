@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, HourglassIcon, Megaphone, Trophy, XCircle } from "lucide-react";
+import { HourglassIcon, Megaphone, Trophy, XCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { AdStatusKpi } from "./types";
@@ -30,22 +30,9 @@ function KpiCard({ tone, icon: Icon, label, primary, secondary }: KpiCardProps) 
   );
 }
 
-export function AdStatusKpiStrip({
-  kpi,
-  warehouseConnected,
-}: {
-  kpi: AdStatusKpi;
-  warehouseConnected: boolean;
-}) {
+export function AdStatusKpiStrip({ kpi }: { kpi: AdStatusKpi }) {
   return (
     <section>
-      {!warehouseConnected && (
-        <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 border border-warning/20 rounded-lg px-3 py-2 mb-3">
-          <AlertTriangle size={13} aria-hidden />
-          Meta Ads warehouse not configured — In Meta Ads count shows 0. Set
-          META_ADS_SUPABASE_URL + META_ADS_SUPABASE_SERVICE_KEY to connect.
-        </div>
-      )}
       <div className="acc-kpi-grid">
         <KpiCard
           tone="accent"

@@ -4,7 +4,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubmissionToggle } from "@/components/ui";
-import { workflowStatusLabel } from "@/lib/formatters";
 import type { OnboardingFilters } from "./types";
 
 interface FilterOptions {
@@ -19,7 +18,6 @@ interface FilterOptions {
 
 const FILTER_KEYS = [
   "campaign",
-  "statusFilter",
   "creatorTier",
   "region",
   "reachoutDateFrom",
@@ -79,18 +77,6 @@ export function OnboardingFiltersBar({
             ...options.campaigns.map((c) => ({
               label: `${c.campaign_id}${c.campaign_name ? ` · ${c.campaign_name}` : ""}`,
               value: c.campaign_id,
-            })),
-          ]}
-        />
-        <FilterSelect
-          label="Status"
-          value={initial.statusFilter ?? ""}
-          onChange={(v) => setParam("statusFilter", v)}
-          options={[
-            { label: "All statuses", value: "" },
-            ...options.statuses.map((s) => ({
-              label: workflowStatusLabel(s),
-              value: s,
             })),
           ]}
         />

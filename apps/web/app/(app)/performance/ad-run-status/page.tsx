@@ -33,10 +33,10 @@ export default async function AdStatusPage({
 }
 
 async function AdStatusBody({ params }: { params: AdStatusFilters }) {
-  const { untested, adRun, kpi, warehouseConnected } = await fetchAdStatusData(params);
+  const { untested, adRun, kpi } = await fetchAdStatusData(params);
   return (
     <>
-      <AdStatusKpiStrip kpi={kpi} warehouseConnected={warehouseConnected} />
+      <AdStatusKpiStrip kpi={kpi} />
       <AdStatusBoard untested={untested} adRun={adRun} filters={params} />
     </>
   );
