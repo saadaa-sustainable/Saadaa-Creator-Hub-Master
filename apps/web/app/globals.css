@@ -8108,6 +8108,7 @@ body:has(.km-backdrop) {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 .acc-search-input svg {
   position: absolute;
@@ -8117,6 +8118,9 @@ body:has(.km-backdrop) {
 }
 .acc-search-input .onboarding-filter-select {
   padding-left: 30px;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
 }
 
 .funnel-filter-grid {
