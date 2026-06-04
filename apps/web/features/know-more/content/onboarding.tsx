@@ -11,6 +11,15 @@ export default function OnboardingKM() {
       <KMSection tag="Page layout">
         <KMList>
           <li>
+            <strong>Submission toggle</strong> · two-state segment at the top
+            of the filter bar. <KMCode>Not Submitted</KMCode> (the default on
+            load) shows the work queue — rows whose onboarding form is not yet
+            filled (workflow_status <KMCode>Reach Out</KMCode>).{" "}
+            <KMCode>Submitted</KMCode> shows already-onboarded rows
+            (<KMCode>On Board</KMCode> onward). The Stage dropdown narrows
+            within the chosen side.
+          </li>
+          <li>
             <strong>List + cards</strong> · default to canonical onboarding
             table. Filter by campaign / stage / tier / email-missing.
           </li>

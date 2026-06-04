@@ -11,6 +11,14 @@ export default function PostingKM() {
       <KMSection tag="Page layout">
         <KMList>
           <li>
+            <strong>Submission toggle</strong> — a two-state segment at the
+            top of the filter bar. <KMCode>Not Submitted</KMCode> (the default
+            on load) shows the posting work queue (workflow_status{" "}
+            <KMCode>On Board / Order Sent</KMCode> — form not yet filled);{" "}
+            <KMCode>Submitted</KMCode> shows posted rows (<KMCode>Posted</KMCode>).
+            The Stage dropdown still narrows within the chosen side.
+          </li>
+          <li>
             <strong>Filter bar</strong> — campaign · stage · tier · ads rights
             · onboarded from/to dates.
           </li>

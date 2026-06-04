@@ -55,5 +55,11 @@ export interface OnboardingFilters {
   region?: string;
   reachoutDateFrom?: string;
   reachoutDateTo?: string;
+  /**
+   * Submission state of the onboarding form. Absent ⇒ "no" (default view =
+   * the not-yet-onboarded work queue). "yes" ⇒ rows whose onboarding form is
+   * already filled. Maps to `workflow_status` sets — see queries.ts.
+   */
+  submitted?: "yes" | "no";
   view?: "list" | "cards";
 }

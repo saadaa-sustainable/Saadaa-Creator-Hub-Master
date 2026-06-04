@@ -52,5 +52,11 @@ export interface PostingFilters {
   adsRights?: string;
   onboardDateFrom?: string;
   onboardDateTo?: string;
+  /**
+   * Submission state of the posting form. Absent ⇒ "no" (default view = rows
+   * not yet Posted, i.e. the posting work queue). "yes" ⇒ rows whose posting
+   * form is filled (Posted). Maps to `workflow_status` sets — see queries.ts.
+   */
+  submitted?: "yes" | "no";
   view?: "list" | "cards";
 }

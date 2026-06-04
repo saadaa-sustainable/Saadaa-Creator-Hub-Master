@@ -3,6 +3,7 @@ import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SubmissionToggle } from "@/components/ui";
 import type { OnboardingFilters } from "./types";
 
 interface FilterOptions {
@@ -22,6 +23,7 @@ const FILTER_KEYS = [
   "region",
   "reachoutDateFrom",
   "reachoutDateTo",
+  "submitted",
 ] as const satisfies readonly (keyof OnboardingFilters)[];
 
 export function OnboardingFiltersBar({
@@ -59,6 +61,13 @@ export function OnboardingFiltersBar({
 
   return (
     <div className="onboarding-filter-card" aria-busy={pending}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-text-secondary">Show</span>
+        <SubmissionToggle
+          submittedYes={initial.submitted === "yes"}
+          onChange={(yes) => setParam("submitted", yes ? "yes" : undefined)}
+        />
+      </div>
       <div className="onboarding-filter-grid">
         <FilterSelect
           label="Campaign"

@@ -17,6 +17,14 @@ export async function fetchPostingTable(
 ): Promise<PostingRow[]> {
   const supabase = createServiceClient();
 
+  // Submission state → workflow_status set. Default (absent) = "no" = posting
+  // work queue (On Board / Order Sent — not yet posted). "yes" = posting form
+  // filled (Posted). The Stage dropdown (statusFilter) intersects via .eq.
+  const submittedYes = filters.submitted === "yes";
+  const POSTING_STATUS_SET = submittedYes
+    ? ["Posted"]
+    : ["On Board", "Order Sent"];
+
   let q = (supabase as any)
     .from("posts")
     .select(
@@ -52,7 +60,7 @@ export async function fetchPostingTable(
       creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic )
     `,
     )
-    .in("workflow_status", ["On Board", "Order Sent", "Posted"]);
+    .in("workflow_status", POSTING_STATUS_SET);
 
   if (filters.campaign) q = q.eq("campaign_id", filters.campaign);
   if (filters.statusFilter) q = q.eq("workflow_status", filters.statusFilter);

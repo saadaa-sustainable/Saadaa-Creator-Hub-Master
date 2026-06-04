@@ -16,6 +16,15 @@ export async function fetchOnboardingTable(
 ): Promise<OnboardingRow[]> {
   const supabase = createServiceClient();
 
+  // Submission state → workflow_status set. Default (absent) = "no" = the
+  // not-yet-onboarded work queue (Reach Out). "yes" = onboarding form filled
+  // (On Board onward). The detailed Status dropdown (statusFilter) still
+  // intersects on top via .eq below.
+  const submittedYes = filters.submitted === "yes";
+  const ONBOARDING_STATUS_SET = submittedYes
+    ? ["On Board", "Order Sent", "Posted", "Delivered"]
+    : ["Reach Out"];
+
   let q = (supabase as any)
     .from("posts")
     .select(
@@ -54,13 +63,7 @@ export async function fetchOnboardingTable(
       creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic )
     `,
     )
-    .in("workflow_status", [
-      "Reach Out",
-      "On Board",
-      "Order Sent",
-      "Posted",
-      "Delivered",
-    ]);
+    .in("workflow_status", ONBOARDING_STATUS_SET);
 
   if (filters.campaign) q = q.eq("campaign_id", filters.campaign);
   if (filters.statusFilter) q = q.eq("workflow_status", filters.statusFilter);
