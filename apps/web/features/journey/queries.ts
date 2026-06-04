@@ -49,7 +49,7 @@ export const JOURNEY_COLUMNS: Omit<JourneyColumn, "cards">[] = [
   },
   {
     id: "on-board",
-    title: "On Board",
+    title: "Onboard",
     accent: "#4F7C4D",
     statuses: ["On Board", "Order Sent"],
   },

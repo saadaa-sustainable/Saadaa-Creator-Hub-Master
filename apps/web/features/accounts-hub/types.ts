@@ -79,7 +79,7 @@ export const KANBAN_COLUMNS = [
   { id: "reach-out", label: "Reach Out", statuses: ["Reach Out"] as const },
   {
     id: "on-board",
-    label: "On Board",
+    label: "Onboard",
     statuses: ["On Board", "Order Sent"] as const,
   },
   {

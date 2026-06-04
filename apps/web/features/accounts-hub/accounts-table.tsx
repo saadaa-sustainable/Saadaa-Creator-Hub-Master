@@ -13,6 +13,7 @@ import {
   MatchStatusPill,
   PaymentDateCell,
   PaymentStatusPill,
+  PostedNotTestedPill,
   UtrCell,
 } from "./columns";
 import type { AccountsRow } from "./types";
@@ -80,6 +81,7 @@ export function AccountsTable({ rows }: { rows: AccountsRow[] }) {
             <PaymentStatusPill status={row.original.payment?.status} />
             <MatchStatusPill row={row.original} />
             <AdsPartnershipPill row={row.original} />
+            <PostedNotTestedPill row={row.original} />
           </span>
         ),
       },
@@ -183,6 +185,7 @@ function AccountsListMobileCard({ row }: { row: AccountsRow }) {
       <div className="flex flex-wrap gap-0.5 mt-0.5">
         <MatchStatusPill row={row} />
         <AdsPartnershipPill row={row} />
+        <PostedNotTestedPill row={row} />
       </div>
       {(row.ads_usage_rights ?? "").trim() && (
         <div className="acc-list-mobile-card__pk">

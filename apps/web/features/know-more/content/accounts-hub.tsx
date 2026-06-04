@@ -56,6 +56,16 @@ export default function AccountsHubKM() {
             <strong>collab_number · deliverable_index · bank_name ·
             bank_number · ifsc</strong> · pulled from posts at submit time.
           </li>
+          <li>
+            <strong>posted_but_not_tested</strong> · stamped{" "}
+            <KMCode>true</KMCode> when the paid post is an ad-eligible
+            deliverable (ads_usage_rights set, or present in the Meta Ads
+            warehouse) that was <strong>not yet tested</strong> as an ad —
+            same tested/untested rule as the Ad Status view. Payment is{" "}
+            <strong>never blocked</strong> by this; it only annotates the
+            ledger with a <KMCode>Not Tested</KMCode> pill and auto-clears once
+            the ad becomes tested (see Exports + cron).
+          </li>
         </KMList>
       </KMSection>
 
@@ -147,7 +157,10 @@ export default function AccountsHubKM() {
           <li>
             <strong>recomputePaymentStates</strong> runs inside the 3-hr cron
             and flips Not Due → Due when due_date has passed + heals NULL
-            est_payable values. Idempotent.
+            est_payable values. The server action also <strong>auto-clears</strong>{" "}
+            <KMCode>posted_but_not_tested</KMCode> once an ad has been tested
+            (the edge cron mirror picks this up after its next deploy).
+            Idempotent.
           </li>
           <li>
             <strong>Backfill suppression</strong> — page-load no longer

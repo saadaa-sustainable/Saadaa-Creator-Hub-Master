@@ -55,7 +55,7 @@ const STAGES: StageDef[] = [
   },
   {
     key: "on-board",
-    title: "On Board",
+    title: "Onboard",
     subtitle: "waiting for post",
     icon: UserCheck,
     dot: "bg-[#7B4FBF]",

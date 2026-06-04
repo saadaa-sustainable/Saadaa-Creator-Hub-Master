@@ -329,7 +329,7 @@ function DataHealthGrid({ health }: { health: ErrorPortalData["health"] }) {
       tone: "text-text-secondary",
     },
     {
-      label: "On Board",
+      label: "Onboard",
       value: String(health.onBoard),
       icon: Users,
       tone: "text-warning",

@@ -13,6 +13,7 @@ import {
   MatchStatusPill,
   PaymentDateCell,
   PaymentStatusPill,
+  PostedNotTestedPill,
   UtrCell,
 } from "./columns";
 import { KANBAN_COLUMNS, type AccountsRow } from "./types";
@@ -187,6 +188,7 @@ function KanbanCard({
           </span>
         )}
         <AdsPartnershipPill row={row} />
+        <PostedNotTestedPill row={row} />
         <MatchStatusPill row={row} />
       </div>
 

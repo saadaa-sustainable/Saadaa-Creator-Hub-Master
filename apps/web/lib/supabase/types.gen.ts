@@ -169,6 +169,7 @@ export interface PaymentsRow {
   estimated_payable_date: string | null;
   payment_advice_sent: boolean | null;
   deliverable_post_id: string | null;
+  posted_but_not_tested: boolean | null;
   created_at: string;
 }
 

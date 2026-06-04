@@ -3,6 +3,8 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { fetchMetaAdsCoveredPostIds } from "@/lib/supabase/meta-ads";
+import { isAdTested, isPostedButNotTested } from "@/lib/ad-tested";
 import {
   nextPayableCycleDate,
   paymentDueDateFor,
@@ -43,6 +45,7 @@ export type SubmitPaymentResult =
 
 interface PostContext {
   post_id: string;
+  post_id_short: string | null;
   workflow_status: string;
   commercial_amount: number | null;
   inf_id: string | null;
@@ -50,11 +53,27 @@ interface PostContext {
   collab_number: number | null;
   deliverable_index: number | null;
   ads_usage_rights: string | null;
+  ads_results: string | null;
   partnership_id: string | null;
   ad_partnership_valid: boolean | null;
   bank_name: string | null;
   bank_number: string | null;
   ifsc: string | null;
+}
+
+/**
+ * Meta Ads warehouse covered set with a 5s timeout fallback — mirrors the
+ * guard in features/ad-status/queries.ts so the warehouse never blocks a
+ * payment submit. Empty Set on timeout/misconfig (degrades to ads_results-only
+ * classification, never blocks).
+ */
+async function coveredPostIdsWithTimeout(): Promise<Set<string>> {
+  return Promise.race([
+    fetchMetaAdsCoveredPostIds(),
+    new Promise<Set<string>>((resolve) =>
+      setTimeout(() => resolve(new Set()), 5000),
+    ),
+  ]);
 }
 
 const ADS_YES = (raw: string | null | undefined): boolean => {
@@ -104,7 +123,7 @@ export async function submitPayments(
   const { data: postRows, error: postsErr } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, workflow_status, commercial_amount, inf_id, username, collab_number, deliverable_index, ads_usage_rights, partnership_id, ad_partnership_valid, bank_name, bank_number, ifsc",
+      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, bank_name, bank_number, ifsc",
     )
     .in("post_id", postIds);
   if (postsErr) return { ok: false, error: postsErr.message };
@@ -353,6 +372,14 @@ export async function submitPayments(
     blockedByAdPartnership.length +
     duplicates.length;
 
+  // Fetch the Meta Ads warehouse covered set once for the whole batch so each
+  // written row can be stamped with `posted_but_not_tested` (ad-eligible but
+  // not yet tested). Never blocks payment — annotation only.
+  const coveredSet =
+    accepted.length > 0
+      ? await coveredPostIdsWithTimeout()
+      : new Set<string>();
+
   for (const r of accepted) {
     const post = postById.get(r.postId)!;
     const hasUtr = (r.utr ?? "").trim().length > 0;
@@ -374,6 +401,15 @@ export async function submitPayments(
       // Collab tracking — always sourced from the post, not the form.
       collab_number: post.collab_number ?? null,
       deliverable_index: post.deliverable_index ?? null,
+      // §ad-tested — flag a payment whose paid post is an ad-eligible
+      // deliverable that has NOT yet been tested as an ad. Mirrors the Ad
+      // Status view; cleared later by recomputePaymentStates once tested.
+      posted_but_not_tested: isPostedButNotTested(
+        post.ads_usage_rights,
+        post.ads_results,
+        post.post_id_short,
+        coveredSet,
+      ),
     };
 
     let writeErr: { message: string } | null = null;
@@ -530,6 +566,7 @@ export async function recomputePaymentStates(): Promise<{
   scanned: number;
   flippedToDue: number;
   estPayableHealed: number;
+  testedCleared: number;
 }> {
   const supabase = createServiceClient();
   const today = todayIstIso();
@@ -589,7 +626,52 @@ export async function recomputePaymentStates(): Promise<{
     if (!uErr) healed++;
   }
 
-  if (flipped > 0 || healed > 0) {
+  // 3. Auto-clear `posted_but_not_tested` once the ad becomes tested. Re-check
+  //    against ads_results + the Meta Ads warehouse (same logic as submit).
+  let testedCleared = 0;
+  const { data: flaggedPayments } = await (supabase as any)
+    .from("payments")
+    .select("id, post_id")
+    .eq("posted_but_not_tested", true);
+  const flagged = (flaggedPayments ?? []) as Array<{
+    id: string;
+    post_id: string;
+  }>;
+  if (flagged.length > 0) {
+    const flaggedPostIds = [...new Set(flagged.map((p) => p.post_id))];
+    const [coveredSet, postsRes] = await Promise.all([
+      coveredPostIdsWithTimeout(),
+      (supabase as any)
+        .from("posts")
+        .select("post_id, post_id_short, ads_results")
+        .in("post_id", flaggedPostIds),
+    ]);
+    const postById = new Map<
+      string,
+      { post_id_short: string | null; ads_results: string | null }
+    >(
+      (
+        (postsRes.data ?? []) as Array<{
+          post_id: string;
+          post_id_short: string | null;
+          ads_results: string | null;
+        }>
+      ).map((p) => [p.post_id, p]),
+    );
+    for (const pay of flagged) {
+      const post = postById.get(pay.post_id);
+      if (!post) continue;
+      if (isAdTested(post.ads_results, post.post_id_short, coveredSet)) {
+        const { error: cErr } = await (supabase as any)
+          .from("payments")
+          .update({ posted_but_not_tested: false })
+          .eq("id", pay.id);
+        if (!cErr) testedCleared++;
+      }
+    }
+  }
+
+  if (flipped > 0 || healed > 0 || testedCleared > 0) {
     revalidateTag("payments");
     revalidatePath("/accounts-hub");
   }
@@ -598,6 +680,7 @@ export async function recomputePaymentStates(): Promise<{
     scanned: dueRows.length + healRows.length,
     flippedToDue: flipped,
     estPayableHealed: healed,
+    testedCleared,
   };
 }
 

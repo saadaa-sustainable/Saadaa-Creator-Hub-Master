@@ -84,6 +84,25 @@ export function AdsPartnershipPill({ row }: { row: AccountsRow }) {
   );
 }
 
+/**
+ * "Not Tested" pill — the payment was logged while the post's ad had not yet
+ * been tested (mirrors the Ad Status view). Stored on
+ * payments.posted_but_not_tested; auto-cleared by recomputePaymentStates once
+ * the ad becomes tested. Annotation only — the payment was still allowed.
+ */
+export function PostedNotTestedPill({ row }: { row: AccountsRow }) {
+  if (row.payment?.posted_but_not_tested !== true) return null;
+  return (
+    <span
+      className="kb-pill kb-pill--due"
+      title="Paid before the ad was tested. Clears automatically once the ad is tested (see Ad Status)."
+    >
+      <AlertTriangle size={10} aria-hidden />
+      Not Tested
+    </span>
+  );
+}
+
 export function CreatorCell({ row }: { row: AccountsRow }) {
   return (
     <div className="ob-creator-cell">
