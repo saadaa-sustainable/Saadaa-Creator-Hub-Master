@@ -131,7 +131,7 @@ export function DashboardFiltersBar({
           >
             <option value="">All status</option>
             <option value="Reach Out">Reach Out</option>
-            <option value="On Board">On Board</option>
+            <option value="On Board">Onboard</option>
             <option value="Posted">Posted</option>
             <option value="Delivered">Delivered</option>
           </select>

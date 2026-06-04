@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubmissionToggle } from "@/components/ui";
+import { workflowStatusLabel } from "@/lib/formatters";
 import type { OnboardingFilters } from "./types";
 
 interface FilterOptions {
@@ -87,7 +88,10 @@ export function OnboardingFiltersBar({
           onChange={(v) => setParam("statusFilter", v)}
           options={[
             { label: "All statuses", value: "" },
-            ...options.statuses.map((s) => ({ label: s, value: s })),
+            ...options.statuses.map((s) => ({
+              label: workflowStatusLabel(s),
+              value: s,
+            })),
           ]}
         />
         <FilterSelect

@@ -115,7 +115,7 @@ export function ComplianceBody({ data }: { data: ComplianceData }) {
             accent="text-text-secondary"
           />
           <Card
-            label="On Board"
+            label="Onboard"
             value={data.pipeline.onBoard}
             hint="Awaiting post"
             icon={User2}

@@ -25,7 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatDate, formatRupees } from "@/lib/formatters";
+import { formatDate, formatRupees, workflowStatusLabel } from "@/lib/formatters";
 import type {
   AuditViolation,
   ErrorPortalData,
@@ -508,7 +508,7 @@ function MissingEmailsCard({ rows }: { rows: MissingEmailRow[] }) {
                 </span>
               )}
               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border border-border bg-bg-white text-text-secondary text-[0.55rem]">
-                {r.workflow_status}
+                {workflowStatusLabel(r.workflow_status)}
               </span>
             </div>
             <div className="text-[0.55rem] text-text-tertiary">

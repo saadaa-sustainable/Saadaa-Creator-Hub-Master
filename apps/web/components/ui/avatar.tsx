@@ -9,6 +9,7 @@ import {
   formatFollowers,
   formatRupees,
   proxyAvatarUrl,
+  workflowStatusLabel,
 } from "@/lib/formatters";
 
 export interface AvatarProps {
@@ -320,7 +321,9 @@ function CreatorOverviewContent({
                     className="creator-overview-post"
                   >
                     <strong>{stringValue(post.post_id) ?? "—"}</strong>
-                    <span>{stringValue(post.workflow_status) ?? "—"}</span>
+                    <span>
+                      {workflowStatusLabel(stringValue(post.workflow_status))}
+                    </span>
                     <span>{stringValue(post.campaign_id) ?? "—"}</span>
                   </div>
                 ))

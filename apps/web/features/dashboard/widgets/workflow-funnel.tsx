@@ -18,7 +18,7 @@ export function DashboardWorkflowFunnel({
   const max = Math.max(reachOut, onboarded, posted, 1);
   const steps = [
     { label: "Reach Out", value: reachOut, color: "bg-[#EAF1FB]", bar: "bg-[#3B6FD4]" },
-    { label: "On Board", value: onboarded, color: "bg-[#F1EAFB]", bar: "bg-[#7B4FBF]" },
+    { label: "Onboard", value: onboarded, color: "bg-[#F1EAFB]", bar: "bg-[#7B4FBF]" },
     { label: "Posted", value: posted, color: "bg-success-bg", bar: "bg-success" },
   ];
   return (

@@ -1,5 +1,5 @@
 import { TriangleAlert } from "lucide-react";
-import { formatDate } from "@/lib/formatters";
+import { formatDate, workflowStatusLabel } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import type { PendingAction } from "./types";
 
@@ -114,7 +114,7 @@ function PendingRow({ action: a }: { action: PendingAction }) {
               : statusChipClass(a.workflow_status),
           )}
         >
-          {a.workflow_status ?? "—"}
+          {workflowStatusLabel(a.workflow_status)}
         </span>
       </td>
       <td className="px-3 py-2">

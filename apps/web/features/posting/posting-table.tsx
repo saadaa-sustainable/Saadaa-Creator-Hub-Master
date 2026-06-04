@@ -11,7 +11,12 @@ import {
 } from "lucide-react";
 import { DataTable } from "@/components/data-table/data-table";
 import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
-import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
+import {
+  formatDate,
+  formatFollowers,
+  formatRupees,
+  workflowStatusLabel,
+} from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import {
   AdsRightsCell,
@@ -232,7 +237,9 @@ function PostingCard({
         <span className="ob-card-stage-pill">
           <WorkflowStatusPill status={r.workflow_status} />
         </span>
-        <span className="ob-card-stage-text">{r.workflow_status}</span>
+        <span className="ob-card-stage-text">
+          {workflowStatusLabel(r.workflow_status)}
+        </span>
         {r.campaign?.campaign_id && (
           <span className="campaign-chip">{r.campaign.campaign_id}</span>
         )}

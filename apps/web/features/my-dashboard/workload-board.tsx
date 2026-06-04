@@ -18,7 +18,12 @@ import {
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
+import {
+  formatDate,
+  formatFollowers,
+  formatRupees,
+  workflowStatusLabel,
+} from "@/lib/formatters";
 import { todayIstIso } from "@/lib/payable-cycle";
 import { submitPayments } from "@/features/accounts-hub/actions";
 import { AccountsOverviewModal } from "@/features/accounts-hub/accounts-overview-modal";
@@ -321,7 +326,9 @@ function WorkloadCard({
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1 text-[0.55rem] font-extrabold uppercase tracking-[0.05em] rounded-full px-1.5 py-0.5 bg-bg-muted text-text-secondary whitespace-nowrap">
           <Icon size={8} aria-hidden />
-          {post.workflow_status ?? stage.title}
+          {post.workflow_status
+            ? workflowStatusLabel(post.workflow_status)
+            : stage.title}
         </span>
         {post.payment_status && (
           <span className="text-[0.55rem] font-extrabold rounded-full px-1.5 py-0.5 bg-warning-bg text-warning">

@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubmissionToggle } from "@/components/ui";
+import { workflowStatusLabel } from "@/lib/formatters";
 import type { PostingFilters } from "./types";
 
 interface FilterOptions {
@@ -87,7 +88,10 @@ export function PostingFiltersBar({
           onChange={(v) => setParam("statusFilter", v)}
           options={[
             { label: "All stages", value: "" },
-            ...options.statuses.map((s) => ({ label: s, value: s })),
+            ...options.statuses.map((s) => ({
+              label: workflowStatusLabel(s),
+              value: s,
+            })),
           ]}
         />
         <FilterSelect

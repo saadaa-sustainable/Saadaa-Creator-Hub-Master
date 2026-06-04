@@ -18,7 +18,7 @@ export function DashboardMonthlyTrend({ data }: { data: MonthlyPoint[] }) {
 
   const series: Array<{ key: keyof MonthlyPoint; color: string; label: string }> = [
     { key: "reachOut", color: "#3B6FD4", label: "Reach Out" },
-    { key: "onboarded", color: "#7B4FBF", label: "On Board" },
+    { key: "onboarded", color: "#7B4FBF", label: "Onboard" },
     { key: "posted", color: "#4F7C4D", label: "Posted" },
   ];
 

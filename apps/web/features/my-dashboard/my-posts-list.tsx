@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Grid3X3, Inbox, List as ListIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
-import { formatDate } from "@/lib/formatters";
+import { formatDate, workflowStatusLabel } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import type { MyPost } from "./types";
 
@@ -28,7 +28,7 @@ function StatusChip({ status }: { status: string | null }) {
         statusChipClass(status),
       )}
     >
-      {status ?? "—"}
+      {workflowStatusLabel(status)}
     </span>
   );
 }

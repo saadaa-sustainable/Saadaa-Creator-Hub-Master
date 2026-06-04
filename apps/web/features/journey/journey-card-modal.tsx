@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Eye, X } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
-import { formatDate, formatFollowers } from "@/lib/formatters";
+import {
+  formatDate,
+  formatFollowers,
+  workflowStatusLabel,
+} from "@/lib/formatters";
 import type { JourneyCard } from "./types";
 
 /**
@@ -87,7 +91,7 @@ export function JourneyCardModal({
                 <span
                   className="inline-flex items-center px-2 py-0.5 rounded-full text-[0.65rem] font-bold bg-[--bg-surface] text-[--text-secondary] whitespace-nowrap"
                 >
-                  {card.workflow_status}
+                  {workflowStatusLabel(card.workflow_status)}
                 </span>
               )}
             </div>
@@ -121,7 +125,7 @@ export function JourneyCardModal({
             <OverviewItem label="Campaign" value={card.campaign_id ?? "—"} />
             <OverviewItem
               label="Workflow Status"
-              value={card.workflow_status ?? "—"}
+              value={workflowStatusLabel(card.workflow_status)}
             />
             <OverviewItem
               label="Reach Out Date"

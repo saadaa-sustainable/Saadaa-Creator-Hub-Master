@@ -13,14 +13,14 @@ export function MyDashboardKpiStrip({ kpi }: { kpi: MyDashboardKpi }) {
         icon={<Users2 size={16} aria-hidden />}
         label="My Active"
         primary={String(kpi.myActive)}
-        secondary="Reach Out · On Board · Order Sent"
+        secondary="Reach Out · Onboard · Order Sent"
       />
       <KpiCard
         tone="warning"
         icon={<Clock size={16} aria-hidden />}
         label="Pending Post"
         primary={String(kpi.pendingPost)}
-        secondary="On Board · Order Sent"
+        secondary="Onboard · Order Sent"
       />
       <KpiCard
         tone="success"

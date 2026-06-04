@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
+import { workflowStatusLabel } from "@/lib/formatters";
 import type {
   WorkflowStatus,
   AdResult,
@@ -56,7 +57,7 @@ const workflowToneMap: Record<WorkflowStatus, PillTone> = {
 export function WorkflowStatusPill({ status }: { status: WorkflowStatus }) {
   return (
     <StatusPill tone={workflowToneMap[status] ?? "neutral"}>
-      {status}
+      {workflowStatusLabel(status)}
     </StatusPill>
   );
 }

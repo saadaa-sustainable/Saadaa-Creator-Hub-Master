@@ -58,6 +58,23 @@ export function pct(value: number | null | undefined, digits = 1): string {
 }
 
 /**
+ * Display-only relabel of workflow_status values. The stored/queried value is
+ * unchanged (DB still holds "On Board"); this maps it to the operator-facing
+ * label. Apply at every render site (pills, chips, dropdown option labels);
+ * NEVER use the stored value when querying.
+ */
+const WORKFLOW_STATUS_LABELS: Record<string, string> = {
+  "On Board": "Onboard",
+};
+
+export function workflowStatusLabel(
+  status: string | null | undefined,
+): string {
+  if (status === null || status === undefined || status === "") return "—";
+  return WORKFLOW_STATUS_LABELS[status] ?? status;
+}
+
+/**
  * Influencer category derivation from followers — matches creators.category GENERATED column.
  */
 export type CreatorTier = "Nano" | "Micro" | "Mid tier" | "Macro" | "Mega";

@@ -25,7 +25,7 @@ import { PartnershipKeyEdit } from "@/components/ui/partnership-key-edit";
 import { DashboardDonut } from "@/features/dashboard/widgets/donut-card";
 import type { BreakdownSlice } from "@/features/dashboard/types";
 import { cn } from "@/lib/cn";
-import { formatDate } from "@/lib/formatters";
+import { formatDate, workflowStatusLabel } from "@/lib/formatters";
 import type { AdStatusFilters, AdStatusRow } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -487,7 +487,10 @@ function AdStatusOverviewModal({
               label="In Meta Ads"
               value={row.isInMetaAds ? "Yes" : "No"}
             />
-            <OverviewItem label="Workflow" value={row.workflowStatus || "—"} />
+            <OverviewItem
+              label="Workflow"
+              value={workflowStatusLabel(row.workflowStatus)}
+            />
           </section>
 
           <section className="pt-overview-links">
