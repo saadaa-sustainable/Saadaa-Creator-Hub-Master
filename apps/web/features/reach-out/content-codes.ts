@@ -13,17 +13,16 @@ export interface ContentCode {
 }
 
 export const CONTENT_CODES: ContentCode[] = [
-  { code: "UGC", name: "UGC", description: "User-generated content" },
-  { code: "VRP", name: "Verified Review Post" },
-  { code: "OFF", name: "Off-Brand Collab" },
-  { code: "BST", name: "Brand Storytelling" },
-  { code: "EDU", name: "Educational", description: "Fabric / care education" },
-  { code: "PRC", name: "Process / Behind-the-Scenes" },
-  {
-    code: "IFAD",
-    name: "Influencer Ad",
-    description: "Performance-creative tagged with IFAD",
-  },
+  { code: "UGC", name: "User Generated Content" },
+  { code: "VRP", name: "Visual Representation" },
+  { code: "OFF", name: "Offers & Pricing" },
+  { code: "BST", name: "Brand Story" },
+  { code: "EDU", name: "Educational" },
+  { code: "PRC", name: "PR & Media Coverage" },
+  { code: "TBG", name: "Team Branding" },
+  { code: "MAR", name: "Marketplaces" },
+  { code: "OST", name: "Offline Store" },
+  { code: "FOU", name: "Founder's video" },
 ];
 
 export function findContentCode(code: string): ContentCode | undefined {
