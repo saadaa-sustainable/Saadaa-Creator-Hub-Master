@@ -121,6 +121,35 @@ export default function JourneyKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Conversion funnel">
+        <p>
+          A conversion-rate strip shows how parent collabs flow stage to stage,
+          computed cumulatively:
+        </p>
+        <KMList>
+          <li>
+            <strong>Reachout → Onboarding</strong> — share of reach-outs that
+            reached On Board.
+          </li>
+          <li>
+            <strong>Onboarding → Posting</strong> — share of onboarded collabs
+            that went Posted.
+          </li>
+          <li>
+            <strong>Posting → Payment</strong> — share of posted collabs that
+            settled payment.
+          </li>
+          <li>
+            <strong>Overall</strong> — end-to-end conversion across the full
+            funnel.
+          </li>
+        </KMList>
+        <p>
+          Rates are computed over parent collabs (one count per collab, not per
+          deliverable).
+        </p>
+      </KMSection>
+
       <KMSection tag="Data sources">
         <KMList>
           <li>

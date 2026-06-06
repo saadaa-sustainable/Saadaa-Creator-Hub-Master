@@ -85,6 +85,18 @@ export default function ReachOutOutboundKM() {
             email for audit.
           </li>
           <li>
+            <strong>Instagram URL validation</strong> — the IG link is checked
+            against the shared Instagram-profile regex in{" "}
+            <KMCode>lib/validators.ts</KMCode>. A malformed link is rejected
+            before submit.
+          </li>
+          <li>
+            <strong>Duplicate-creator guard</strong> — submitting a creator
+            already in the same campaign is blocked with a field error on the
+            Instagram URL, unless the prior collab was{" "}
+            <KMCode>Cancelled</KMCode> (which frees the handle to be re-added).
+          </li>
+          <li>
             Red <KMCode>MissingFieldsAlert</KMCode> renders above the submit
             button listing every empty required field at once (Zod{" "}
             <KMCode>safeParse(watch())</KMCode>), so the operator fixes all

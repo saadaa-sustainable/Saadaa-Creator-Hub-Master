@@ -102,6 +102,14 @@ export default function AccountsHubKM() {
         </KMCallout>
       </KMSection>
 
+      <KMSection tag="Notification emails">
+        <KMCallout tone="info">
+          On a successful payment submit, a submitter confirmation and a
+          payment-processed email both fire. Each send is recorded to{" "}
+          <KMCode>email_logs</KMCode> for audit.
+        </KMCallout>
+      </KMSection>
+
       <KMSection tag="Excel paste import">
         <p>
           <KMCode>Paste from Excel</KMCode> accepts tab- or comma-separated

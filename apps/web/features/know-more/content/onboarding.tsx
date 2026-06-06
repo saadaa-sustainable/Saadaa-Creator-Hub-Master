@@ -61,6 +61,46 @@ export default function OnboardingKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="KPIs">
+        <p>
+          A KPI strip sits above the board. Every count is per-collab (parent
+          row only).
+        </p>
+        <KMList>
+          <li>
+            <strong>Total Onboarded</strong> — collabs that have reached On
+            Board onward.
+          </li>
+          <li>
+            <strong>Pending</strong> — Reach Out collabs whose onboarding form
+            is not yet filled.
+          </li>
+          <li>
+            <strong>Completion Rate</strong> — Total Onboarded ÷ all collabs in
+            scope.
+          </li>
+          <li>
+            <strong>Shopify Validation %</strong> — share of onboarded collabs
+            whose order_id validated against Shopify.
+          </li>
+          <li>
+            <strong>Ad Rights / No Ad Rights</strong> — split by{" "}
+            <KMCode>ads_usage_rights</KMCode>. Any non-empty value (e.g.{" "}
+            <KMCode>12 Months</KMCode>) counts as ad-rights; blank counts as no
+            ad-rights.
+          </li>
+          <li>
+            <strong>Avg Deliverables</strong> — mean deliverable count per
+            collab (reels + static posts + stories).
+          </li>
+          <li>
+            <strong>Pending Email</strong> — onboarded collabs whose collab
+            email is neither sent (<KMCode>collab_email_sent_at</KMCode> null)
+            nor skipped (<KMCode>collab_email_skipped</KMCode> false).
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Form sections">
         <KMList>
           <li>

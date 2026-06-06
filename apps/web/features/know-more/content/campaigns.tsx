@@ -67,6 +67,21 @@ export default function CampaignsKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Edit campaign">
+        <p>
+          Each campaign card and the detail modal carry an <strong>Edit</strong>{" "}
+          button that reopens the form pre-filled. Editing updates the name,
+          start/end dates, briefs (key message, brief links), and the
+          creator-count + budget rows.
+        </p>
+        <KMCallout tone="warning">
+          Changing avg-comp or creator-count does <strong>not</strong>{" "}
+          retroactively change the commercials on existing posts, and{" "}
+          <strong>never</strong> touches paid posts. If reach-outs are already
+          tied to the campaign, a warning surfaces before the update saves.
+        </KMCallout>
+      </KMSection>
+
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>

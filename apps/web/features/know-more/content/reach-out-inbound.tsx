@@ -109,6 +109,18 @@ export default function ReachOutInboundKM() {
             text below).
           </li>
           <li>
+            <strong>Live Instagram URL validation</strong> — each Profile URL
+            is checked against the shared Instagram-profile regex in{" "}
+            <KMCode>lib/validators.ts</KMCode>. An invalid URL flags the row
+            live (red border) on type and on blur, not only at submit.
+          </li>
+          <li>
+            <strong>Duplicate-creator guard</strong> — a row for a creator
+            already in the same campaign fails on submit, while the other rows
+            still commit. The block lifts if the prior collab was{" "}
+            <KMCode>Cancelled</KMCode>.
+          </li>
+          <li>
             Red <KMCode>MissingFieldsAlert</KMCode> renders above the Submit
             All button listing every distinct missing column across the batch
             (Campaign ID, Profile URL, Gender, Content Code, Collab Type,
