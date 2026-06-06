@@ -35,7 +35,10 @@ import {
   type OnboardingInput,
 } from "./schema";
 import { submitOnboarding, lookupShopifyOrder } from "./actions";
-import type { CollabEmailDraft } from "./collab-email-modal";
+import {
+  CollabEmailPane,
+  type CollabEmailDraft,
+} from "./collab-email-modal";
 
 interface OnboardingFormProps {
   postId: string;
@@ -46,7 +49,6 @@ interface OnboardingFormProps {
   initial?: Partial<OnboardingInput>;
   open: boolean;
   onClose: () => void;
-  onSendEmail?: (postId: string, draft?: CollabEmailDraft) => void;
 }
 
 interface ShopifyPreview {
@@ -71,7 +73,6 @@ export function OrderCreationModal({
   initial,
   open,
   onClose,
-  onSendEmail,
 }: OnboardingFormProps) {
   const router = useRouter();
   const [submitting, startSubmit] = useTransition();
@@ -80,6 +81,10 @@ export function OrderCreationModal({
   const [lookupErr, setLookupErr] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  // Two-phase flow: fill the onboarding form, then (on save) review + send the
+  // collab email inline within this same modal. `emailDraft` holds the draft
+  // built from the just-saved values; non-null means we're in the email phase.
+  const [emailDraft, setEmailDraft] = useState<CollabEmailDraft | null>(null);
 
   const {
     register,
@@ -228,9 +233,20 @@ export function OrderCreationModal({
           ? `${postIdShort ?? postId} onboarded. ${res.childrenSpawned} deliverable row(s) spawned.`
           : `${postIdShort ?? postId} onboarded.`;
       toast.success(msg);
-      onClose();
+      // Refresh so the board reflects the new On Board state, then surface the
+      // inline collab-email review pane in this same modal. The onboarding is
+      // already persisted — sending the email is now an optional follow-up.
       router.refresh();
+      setEmailDraft(buildCollabEmailDraft());
     });
+  };
+
+  // Close the whole modal after the email phase resolves (sent / skipped /
+  // dismissed). Onboarding is already saved + refreshed at this point.
+  const finishFlow = () => {
+    setEmailDraft(null);
+    onClose();
+    router.refresh();
   };
 
   const buildCollabEmailDraft = (): CollabEmailDraft => {
@@ -261,6 +277,43 @@ export function OrderCreationModal({
   };
 
   if (!open || !mounted) return null;
+
+  // ── Email phase: onboarding saved, render the inline collab-email review ──
+  if (emailDraft) {
+    return createPortal(
+      <div className="modal-backdrop modal-backdrop--onboarding">
+        <div className="modal-panel modal-panel--lg modal-panel--onboarding collab-email-modal">
+          <header className="modal-head">
+            <div className="flex items-center gap-2 min-w-0">
+              <Mail size={16} />
+              <h2 className="font-semibold">Review Collaboration Email</h2>
+              <span className="chip text-[10px] tabular">
+                {postIdShort ?? postId}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={finishFlow}
+              aria-label="Close"
+            >
+              <X size={14} />
+            </button>
+          </header>
+
+          <CollabEmailPane
+            postId={postId}
+            draft={emailDraft}
+            inline
+            onClose={finishFlow}
+            onSent={finishFlow}
+            onSkipped={finishFlow}
+          />
+        </div>
+      </div>,
+      document.body,
+    );
+  }
 
   return createPortal(
     <div className="modal-backdrop modal-backdrop--onboarding">
@@ -700,17 +753,6 @@ export function OrderCreationModal({
             <button type="button" className="btn btn-ghost" onClick={onClose}>
               Cancel
             </button>
-            {onSendEmail && (
-              <button
-                type="button"
-                className="btn btn-ghost"
-                style={{ border: "1.5px solid var(--color-border)" }}
-                onClick={() => onSendEmail(postId, buildCollabEmailDraft())}
-              >
-                <Mail size={14} />
-                <span className="hidden sm:inline">Send Collab </span>Email
-              </button>
-            )}
             <button
               type="submit"
               className={cn("btn-primary-cta", submitting && "is-loading")}
@@ -724,7 +766,8 @@ export function OrderCreationModal({
               ) : (
                 <>
                   <CheckCircle2 size={14} />
-                  <span className="hidden sm:inline">Save Onboarding &amp; </span>Order
+                  <span className="hidden sm:inline">Save &amp; Review </span>
+                  Email
                 </>
               )}
             </button>

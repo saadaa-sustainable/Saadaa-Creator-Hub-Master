@@ -28,9 +28,13 @@ export default function OnboardingKM() {
             Pencil-to-Send icon swaps once email is queued.
           </li>
           <li>
-            <strong>Collab email modal</strong> · preview the rendered HTML
-            template before send; skip with reason if you can&apos;t email
-            this collab.
+            <strong>Unified Save &amp; Review Email</strong> · the form&apos;s
+            single primary button saves the onboarding, then opens the collab
+            email preview inline in the same modal — edit, then{" "}
+            <KMCode>Send Email</KMCode> or <KMCode>Save &amp; Skip Email</KMCode>.
+            If SMTP fails the pane stays open to retry (the attempt is logged to{" "}
+            <KMCode>email_logs</KMCode>); the saved onboarding is never lost. A
+            standalone send still lives on each onboarded row.
           </li>
         </KMList>
       </KMSection>

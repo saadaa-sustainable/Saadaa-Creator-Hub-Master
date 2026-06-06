@@ -141,7 +141,6 @@ export function OnboardingTable({
                 : undefined,
             commercials: orderRow.commercial_amount ?? undefined,
           }}
-          onSendEmail={(postId, draft) => setCollabEmail({ postId, draft })}
         />
       )}
       {collabEmail && (
