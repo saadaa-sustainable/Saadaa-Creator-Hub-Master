@@ -107,6 +107,9 @@ function normalizePastedDate(raw: string): string {
   return "";
 }
 
+/** REQ #10b: hard cap on the payment entry batch (UI + schema both enforce). */
+const MAX_PAYMENT_ROWS = 10;
+
 // Counter-based row key generator — deterministic across SSR / hydration so
 // `htmlFor` attributes don't mismatch on first paint. Module-level state is
 // fine here because each row is unique within a single client session.
@@ -148,6 +151,8 @@ export function PaymentEntryPanel() {
   const [submitting, startSubmit] = useTransition();
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  // REQ #10a: when on, every row uses the first row's payment date.
+  const [sameDateForAll, setSameDateForAll] = useState(false);
 
   // Seed the first row + flip mounted after hydration. Same code on every
   // render path, no SSR involvement → no mismatch possible.
@@ -178,7 +183,9 @@ export function PaymentEntryPanel() {
   }, [eligible]);
 
   const addRow = useCallback(() => {
-    setRows((cur) => [...cur, newRow()]);
+    setRows((cur) =>
+      cur.length >= MAX_PAYMENT_ROWS ? cur : [...cur, newRow()],
+    );
   }, []);
 
   const removeRow = useCallback((key: string) => {
@@ -190,6 +197,18 @@ export function PaymentEntryPanel() {
   const patchRow = useCallback((key: string, patch: Partial<FormRow>) => {
     setRows((cur) => cur.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   }, []);
+
+  // REQ #10a: keep every row on the first row's date while the toggle is on.
+  // Guard prevents a re-render loop; watching `rows` re-syncs when row 1 edits.
+  useEffect(() => {
+    if (!sameDateForAll) return;
+    setRows((cur) => {
+      if (cur.length === 0) return cur;
+      const d = cur[0].paymentDate;
+      if (cur.every((r) => r.paymentDate === d)) return cur;
+      return cur.map((r) => ({ ...r, paymentDate: d }));
+    });
+  }, [sameDateForAll, rows]);
 
   const importFromPaste = useCallback(() => {
     const text = pasteText.trim();
@@ -249,12 +268,19 @@ export function PaymentEntryPanel() {
       return;
     }
 
-    setRows(parsed);
+    const capped = parsed.slice(0, MAX_PAYMENT_ROWS);
+    setRows(capped);
     setPasteOpen(false);
     setPasteText("");
-    toast.success(
-      `Imported ${parsed.length} row${parsed.length === 1 ? "" : "s"}.`,
-    );
+    if (parsed.length > MAX_PAYMENT_ROWS) {
+      toast.warning(
+        `Imported the first ${MAX_PAYMENT_ROWS} of ${parsed.length} rows (max ${MAX_PAYMENT_ROWS} per batch).`,
+      );
+    } else {
+      toast.success(
+        `Imported ${capped.length} row${capped.length === 1 ? "" : "s"}.`,
+      );
+    }
   }, [pasteText]);
 
   const missingPaymentFields = useMemo(() => {
@@ -426,6 +452,17 @@ export function PaymentEntryPanel() {
       </header>
 
       <form onSubmit={onSubmit} className="acc-entry-panel__body">
+        <label className="flex items-center gap-2 px-1 pb-2 text-[12px] text-text-secondary cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={sameDateForAll}
+            onChange={(e) => setSameDateForAll(e.target.checked)}
+          />
+          Same payment date for all entries
+          <span className="text-text-tertiary">
+            (copies the first row&rsquo;s date)
+          </span>
+        </label>
         <div className="acc-entry-rows">
           {rows.map((row, idx) => {
             const linked = eligibleById.get(row.postId);
@@ -512,6 +549,12 @@ export function PaymentEntryPanel() {
                       type="date"
                       className="acc-field__input"
                       value={row.paymentDate}
+                      disabled={sameDateForAll && idx > 0}
+                      title={
+                        sameDateForAll && idx > 0
+                          ? "Using the first row's date (same-date toggle is on)"
+                          : undefined
+                      }
                       onChange={(e) =>
                         patchRow(row.key, { paymentDate: e.target.value })
                       }
@@ -570,10 +613,12 @@ export function PaymentEntryPanel() {
               type="button"
               className="acc-entry-add"
               onClick={addRow}
-              disabled={submitting}
+              disabled={submitting || rows.length >= MAX_PAYMENT_ROWS}
             >
               <Plus size={13} aria-hidden />
-              Add another row
+              {rows.length >= MAX_PAYMENT_ROWS
+                ? `Max ${MAX_PAYMENT_ROWS} rows`
+                : "Add another row"}
             </button>
             <button
               type="button"

@@ -132,8 +132,11 @@ export default function PostingKM() {
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>
-            Partnership key is required when ads_usage_rights = Yes. Submit
-            blocks until it&apos;s set.
+            Partnership Key is required to submit whenever ad usage rights are
+            granted (any non-empty ads_usage_rights, e.g. &quot;5 Months&quot;)
+            and, when present, must be the numeric Meta partnership code (digits
+            only). Submit blocks until both hold. Non-ad posts are exempt — no
+            Meta code exists for them.
           </li>
           <li>
             Date drift of ±1 day is real (snowflake ≠ publish time). The

@@ -105,10 +105,13 @@ export default function AccountsHubKM() {
       <KMSection tag="Excel paste import">
         <p>
           <KMCode>Paste from Excel</KMCode> accepts tab- or comma-separated
-          rows up to a <strong>200-row batch limit</strong>. Headers (Post ID,
-          UTR, Date, Amount) are auto-detected. Excel serial dates +
+          rows up to a <strong>10-row batch limit</strong> (extra pasted rows
+          are dropped with a toast; the inline form also caps at 10). Headers
+          (Post ID, UTR, Date, Amount) are auto-detected. Excel serial dates +
           dd/mm/yyyy + yyyy-mm-dd all parse. Every parsed row runs the same
-          three gates above.
+          three gates above. A <strong>&quot;Same payment date for all
+          entries&quot;</strong> checkbox copies the first row&apos;s date to
+          every row (later date pickers lock while it&apos;s on).
         </p>
       </KMSection>
 

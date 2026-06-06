@@ -28,11 +28,11 @@ export type PaymentSubmitInput = z.infer<typeof PaymentSubmitSchema>;
 
 /**
  * Bulk batch — operator submits N rows in one go (multi-row inline form OR
- * Excel/CSV paste import). Capped at 200 per submission to keep the lock
- * window reasonable (legacy uses 15s LockService).
+ * Excel/CSV paste import). REQ #10b: capped at 10 rows per submission (the
+ * entry form enforces the same MAX_PAYMENT_ROWS in payment-form.tsx).
  */
 export const PaymentBatchSchema = z.object({
-  rows: z.array(PaymentSubmitSchema).min(1).max(200),
+  rows: z.array(PaymentSubmitSchema).min(1).max(10),
 });
 
 export type PaymentBatchInput = z.infer<typeof PaymentBatchSchema>;

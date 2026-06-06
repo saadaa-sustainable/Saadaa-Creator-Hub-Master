@@ -503,6 +503,10 @@ export function PostingModal({
                 <Handshake size={11} className="inline mr-1" />
                 Partnership Key
               </label>
+              <p className="px-1 pt-1 text-[11px] text-text-tertiary">
+                Numeric Meta partnership code — required when ad usage rights
+                are granted.
+              </p>
             </div>
           </div>
 

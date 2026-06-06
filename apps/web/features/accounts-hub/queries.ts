@@ -76,26 +76,36 @@ export async function fetchAccountsHubData(
   if (filters.campaign) {
     postsQuery = postsQuery.eq("campaign_id", filters.campaign);
   }
-  if (filters.adsRights === "yes") {
-    postsQuery = postsQuery.not("ads_usage_rights", "is", null);
-    postsQuery = postsQuery.not("ads_usage_rights", "in", "(\"\",no,No,NO)");
-  } else if (filters.adsRights === "no") {
-    postsQuery = postsQuery.or(
-      "ads_usage_rights.is.null,ads_usage_rights.in.(\"\",no,No,NO)",
-    );
-  }
+  // Ad-rights filter is applied in JS below (see ADS_YES). supabase-js
+  // `.not(col,"in",'("",no,No,NO)')` mangles the quoted/paren in-list, so the
+  // "Yes" filter silently dropped valid free-text durations like "5 Months".
 
   const { data: postsRaw, error: postsErr } = await postsQuery
     .order("reach_out_date", { ascending: false, nullsFirst: false })
     .limit(2000);
 
   if (postsErr) throw postsErr;
-  const postsLoaded = (postsRaw ?? []) as Array<
+  let postsLoaded = (postsRaw ?? []) as Array<
     Omit<AccountsRow, "payment"> & {
       campaign: AccountsRow["campaign"];
       creator: AccountsRow["creator"];
     }
   >;
+
+  // Ad-rights filter (REQ #8): use the canonical ADS_YES truthiness helper so
+  // free-text durations ("5 Months", "12 Months", …) count as "Yes".
+  if (filters.adsRights === "yes") {
+    postsLoaded = postsLoaded.filter((p) =>
+      ADS_YES((p as Record<string, unknown>).ads_usage_rights as string | null),
+    );
+  } else if (filters.adsRights === "no") {
+    postsLoaded = postsLoaded.filter(
+      (p) =>
+        !ADS_YES(
+          (p as Record<string, unknown>).ads_usage_rights as string | null,
+        ),
+    );
+  }
 
   // Sibling sum: parent's commercial_amount holds the per-row split value;
   // the originally-agreed total = sum across all deliverables of the collab.
