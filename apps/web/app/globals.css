@@ -7993,11 +7993,16 @@ body:has(.km-backdrop) {
   font-variant-numeric: tabular-nums;
 }
 
-/* Dashboard tab bar — thin, unobtrusive horizontal scrollbar so the rail can
-   overflow on mobile without a chunky webkit bar adding visual noise under the
-   tabs. Active/inactive + focus states live on the Tailwind classes in
-   tabs.tsx; both states keep a 2px bottom border so there is no layout shift. */
+/* Dashboard tab bar — SEGMENTED PILL control. The rail itself is a rounded
+   trough on the warm ecru surface (`--bg-surface`); the active tab is a solid
+   white (`--bg-white`) rounded-full pill with a subtle shadow, inactive tabs
+   are plain text with a faint hover wash. No underline indicator. A thin,
+   unobtrusive horizontal scrollbar lets the rail overflow on mobile. */
 .dash-tabbar {
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--color-bg-surface, #f5f1ec);
+  border: 1px solid var(--color-border, #e7e2d2);
   scrollbar-width: thin;
   scrollbar-color: var(--color-border-strong, #c9c2ae) transparent;
 }
@@ -8011,10 +8016,167 @@ body:has(.km-backdrop) {
 .dash-tabbar::-webkit-scrollbar-track {
   background: transparent;
 }
-/* ≥44px touch target for the scrollable tabs on phones. */
+/* Pill states. Inactive = transparent over the ecru trough; hover = faint warm
+   wash; active = solid white pill + subtle shadow + dark text. */
+.dash-tab-pill {
+  background: transparent;
+}
+.dash-tab-pill:hover:not([data-active]) {
+  background: rgba(255, 255, 255, 0.5);
+}
+.dash-tab-pill[data-active] {
+  background: var(--color-bg-white, #ffffff);
+  box-shadow:
+    0 1px 2px rgba(22, 21, 19, 0.08),
+    0 1px 1px rgba(22, 21, 19, 0.04);
+}
+/* ≥40px touch target for the scrollable tabs (≥44px on phones), while the rail
+   stays visually light. A subtle right-edge fade hints there is more to scroll. */
+.dash-tabbar [role="tab"] {
+  min-height: 40px;
+}
 @media (max-width: 640px) {
   .dash-tabbar [role="tab"] {
     min-height: 44px;
+  }
+}
+/* Right-edge scroll-hint fade on the tab rail (mobile + narrow desktop). The
+   fade rides the rail's rounded right edge so it blends into the ecru trough. */
+.dash-tabbar-wrap {
+  position: relative;
+}
+.dash-tabbar-wrap::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 7px;
+  width: 28px;
+  pointer-events: none;
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+  background: linear-gradient(
+    to right,
+    rgba(245, 241, 236, 0),
+    var(--color-bg-surface, #f5f1ec)
+  );
+}
+@media (min-width: 1024px) {
+  /* Desktop usually shows the whole rail — drop the fade to avoid clipping the
+     last tab's hover affordance. */
+  .dash-tabbar-wrap::after {
+    display: none;
+  }
+}
+
+/* ── dash-tab-stack ─────────────────────────────────────────────────────────
+   Reproduces the `.onboarding-stage` grid gap (1.25rem) BETWEEN a tab's filter
+   bar and its KPI+board block, without re-running the stage rise animation or
+   adding a gap inside that block. Used by the TAT + Ad Status tab bodies, which
+   on their standalone routes get that single gap from the page grid while their
+   KPI strip + board sit gap-free inside one Suspense slot. */
+.dash-tab-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Dashboard spacing layer ────────────────────────────────────────────────
+   `.dash-compact` is applied to the Dashboard stage wrapper ONLY (never to the
+   standalone sidebar pages). DESKTOP (≥768px) is SPACIOUS: it gives a tab the
+   same — or slightly more breathing room than — its standalone sidebar page so
+   a tab never reads as more cramped than the page it mirrors. The MOBILE block
+   (≤767px) further below is where this layer actually compacts, by design (the
+   command-centre needs to fit more on a phone). The embedded view's own stage
+   class (`.journey-stage`, `.ad-status-stage`, …) still applies for parity;
+   this layer sits on top only to set the inter-section rhythm.
+
+   The historical name `.dash-compact` is retained so the page wrapper + the
+   mobile rules below need no churn; on desktop it is deliberately NOT compact. */
+
+/* Generous overall vertical rhythm for the dashboard grid (header → rail →
+   filter → panel): a touch MORE air than the standalone 1.25rem
+   `.onboarding-stage` gap, so the rail/filter/panel never collide. */
+.dash-compact.onboarding-stage {
+  gap: 1.4rem;
+}
+/* Tab panel keeps a clear gap from the filter/rail above. The inline `mt-2` on
+   the panel is neutralised so spacing comes from this single source. */
+.dash-compact #dash-tabpanel {
+  margin-top: 0.5rem;
+}
+
+/* KPI grids: comfortable gutters (≥ the standalone 12px) so cards never touch;
+   card padding/radius match the standalone `.acc-kpi` so a tab's KPI strip is
+   at least as roomy as the sidebar page's. */
+.dash-compact .acc-kpi-grid {
+  gap: 14px;
+}
+.dash-compact .acc-kpi {
+  padding: 14px 16px 16px;
+  border-radius: 12px;
+  gap: 4px;
+}
+.dash-compact .acc-kpi__label {
+  font-size: 0.7rem;
+}
+.dash-compact .acc-kpi__primary {
+  font-size: 1.6rem;
+}
+.dash-compact .acc-kpi__secondary {
+  font-size: 0.78rem;
+}
+.dash-compact .acc-kpi-group {
+  font-size: 0.62rem;
+  margin-bottom: 8px;
+}
+
+/* Overview bands + bento: keep a generous gap between the headline strip and
+   the bento so the sections read as distinct (≥ the standalone rhythm). */
+.dash-compact .dash-tab-stack {
+  gap: 1.4rem;
+}
+
+/* ── Dashboard compact — mobile (≤767px) ────────────────────────────────────
+   Two-column bento for KPI strips (never 1×1 stacked), smaller numbers, and a
+   lighter tab rail. Scoped to `.dash-compact` so standalone pages are
+   unaffected. Wins over the shared `@media (max-width:480px) .acc-kpi-grid {
+   grid-template-columns:1fr }` because this selector is more specific. */
+@media (max-width: 767px) {
+  .dash-compact #dash-tabpanel {
+    margin-top: 0.4rem;
+  }
+  .dash-compact .acc-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+  .dash-compact .acc-kpi {
+    padding: 0.55rem 0.62rem 0.6rem;
+    border-radius: 10px;
+  }
+  .dash-compact .acc-kpi__label {
+    font-size: 0.56rem;
+    letter-spacing: 0.04em;
+  }
+  .dash-compact .acc-kpi__primary {
+    font-size: 1.12rem;
+  }
+  .dash-compact .acc-kpi__secondary {
+    font-size: 0.6rem;
+    line-height: 1.15;
+  }
+  .dash-compact .acc-kpi-group {
+    font-size: 0.55rem;
+    margin-bottom: 4px;
+  }
+  .dash-compact .dash-tab-stack {
+    gap: 0.72rem;
+  }
+  /* Lighter tab labels + padding on phones. */
+  .dash-compact .dash-tabbar [role="tab"] {
+    font-size: 0.76rem;
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
   }
 }
 

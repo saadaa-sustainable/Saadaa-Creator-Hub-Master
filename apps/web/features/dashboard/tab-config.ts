@@ -42,3 +42,25 @@ export function resolveTab(raw: string | undefined | null): DashboardTab {
     ? (v as DashboardTab)
     : DEFAULT_TAB;
 }
+
+/**
+ * Per-tab Know More slug. The Dashboard shell owns the single PageHeader, so the
+ * "Know More" button is CONTEXTUAL — it opens the help content for the active
+ * tab's view, identical to that view's standalone sidebar page. Each value is a
+ * key in `features/know-more/content/registry.tsx` (KM_REGISTRY): Overview maps
+ * to the dashboard KM; every mirror tab maps to its feature's own KM slug.
+ */
+export const TAB_KM_SLUGS: Record<DashboardTab, string> = {
+  overview: "dashboard",
+  journey: "journey",
+  tat: "tat",
+  "ad-status": "ad-status",
+  compliance: "compliance",
+  cost: "cost-analytics",
+  funnel: "funnel",
+  internal: "internal-dashboard",
+};
+
+export function tabKnowMoreSlug(tab: DashboardTab): string {
+  return TAB_KM_SLUGS[tab];
+}

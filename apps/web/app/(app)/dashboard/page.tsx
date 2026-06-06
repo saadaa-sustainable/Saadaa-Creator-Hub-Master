@@ -4,7 +4,11 @@ import { PageHeader } from "@/components/ui/page-header";
 import { KpiStripSkeleton } from "@/components/ui/skeleton";
 import { DashboardFiltersBar } from "@/features/dashboard/filters";
 import { DashboardTabs } from "@/features/dashboard/tabs";
-import { resolveTab, type DashboardTab } from "@/features/dashboard/tab-config";
+import {
+  resolveTab,
+  tabKnowMoreSlug,
+  type DashboardTab,
+} from "@/features/dashboard/tab-config";
 import {
   AdStatusTabBody,
   ComplianceTabBody,
@@ -24,7 +28,7 @@ export const metadata = { title: "Dashboard" };
 /**
  * Tabbed command-centre Dashboard.
  *
- * - Underline-active tab bar; first tab "Overview" (cross-system aggregate),
+ * - Segmented pill tab bar; first tab "Overview" (cross-system aggregate),
  *   then one tab per SYSTEM-section view in sidebar order — Influencer Journey
  *   → TAT Analytics → Ad Status → Compliance KPIs → Cost Analytics → Funnel
  *   View → Internal Dashboard. Each view tab REUSES that feature's full
@@ -60,10 +64,16 @@ export default async function DashboardPage({
   };
 
   return (
-    <div className="onboarding-stage dash-stage">
-      <PageHeader icon={LayoutDashboard} title="Dashboard" knowMore="dashboard" />
+    <div className="onboarding-stage dash-stage dash-compact">
+      <PageHeader
+        icon={LayoutDashboard}
+        title="Dashboard"
+        knowMore={tabKnowMoreSlug(tab)}
+      />
 
-      <DashboardTabs active={tab} />
+      <div className="dash-tabbar-wrap">
+        <DashboardTabs active={tab} />
+      </div>
 
       {tab === "overview" && (
         <DashboardFiltersBar initial={overviewFilters} options={options} />

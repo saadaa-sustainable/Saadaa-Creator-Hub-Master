@@ -44,6 +44,26 @@ export default function DashboardKM() {
             (the Dashboard shell already shows one).
           </li>
           <li>
+            <strong>Pixel parity</strong> · each tab body is wrapped in the SAME
+            stage class its standalone route uses (
+            <KMCode>journey-stage</KMCode>, <KMCode>ad-status-stage</KMCode>,
+            <KMCode>compliance-stage</KMCode>, <KMCode>funnel-stage</KMCode>, …),
+            so the filter cards, KPI sizing, board / table layout and
+            mobile-compact rules scoped to those classes apply identically.
+            Clicking a tab is the same as visiting that sidebar page, minus the
+            title.
+          </li>
+          <li>
+            <strong>Compact density</strong> · the Dashboard shell carries a
+            <KMCode>dash-compact</KMCode> class that trims KPI-card padding,
+            number sizes, grid gutters and section rhythm one step versus the
+            standalone pages, so more of each tab fits without scrolling. On
+            phones the KPI strips hold a 2-column bento (never 1×1 stacked) with
+            smaller numbers, and the tab rail scrolls horizontally with a thin
+            scrollbar + right-edge fade hint. Scoped to the Dashboard only — the
+            sidebar pages keep their original sizing.
+          </li>
+          <li>
             <strong>Filters</strong> · the Campaign / Date / Content / Tier /
             Status filter bar applies to the Overview tab only. The Journey,
             TAT, and Ad Status tabs carry their own feature filter bars — their

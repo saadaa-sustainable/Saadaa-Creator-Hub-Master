@@ -6,15 +6,17 @@ import { cn } from "@/lib/cn";
 import { DASHBOARD_TABS, TAB_LABELS, type DashboardTab } from "./tab-config";
 
 /**
- * Underline-active tab bar for the command-centre Dashboard.
+ * Segmented PILL tab bar for the command-centre Dashboard.
  *
  * - Active tab written to the `?tab=` URL search param (linkable +
  *   server-rendered). Other params (filters) are preserved.
  * - Horizontally scrollable on mobile (overflow-x-auto, no wrap).
  * - Keyboard accessible: role=tablist / role=tab / aria-selected, with
  *   ArrowLeft / ArrowRight / Home / End roving navigation.
- * - Design-system fidelity: warm ecru base, accent-gold underline + label on
- *   the active tab, muted secondary text on the rest. No reference palette.
+ * - Design-system fidelity: the rail sits on the warm ecru surface; the ACTIVE
+ *   tab is a solid white (`--bg-white`) rounded-full pill with a subtle shadow
+ *   and dark primary text, inactive tabs are plain secondary text with a faint
+ *   hover wash. White-on-ecru segmented control (NOT accent-gold fill).
  */
 export function DashboardTabs({ active }: { active: DashboardTab }) {
   const router = useRouter();
@@ -58,8 +60,7 @@ export function DashboardTabs({ active }: { active: DashboardTab }) {
       aria-label="Dashboard views"
       aria-busy={pending}
       className={cn(
-        "dash-tabbar flex items-stretch gap-1 overflow-x-auto",
-        "border-b border-border -mx-1 px-1",
+        "dash-tabbar flex items-center gap-1 overflow-x-auto",
         "scrollbar-thin",
       )}
       style={{ scrollbarWidth: "thin" }}
@@ -80,14 +81,15 @@ export function DashboardTabs({ active }: { active: DashboardTab }) {
             tabIndex={isActive ? 0 : -1}
             onClick={() => go(tab)}
             onKeyDown={(e) => onKeyDown(e, i)}
+            data-active={isActive ? "true" : undefined}
             className={cn(
-              "relative shrink-0 whitespace-nowrap px-3.5 pb-2.5 pt-2",
-              "text-[0.82rem] font-semibold transition-colors",
-              "border-b-2 -mb-px focus-visible:outline-none",
-              "focus-visible:ring-2 focus-visible:ring-accent/60 rounded-t-md",
+              "dash-tab-pill shrink-0 whitespace-nowrap rounded-full",
+              "px-3.5 py-2 text-[0.78rem] font-semibold transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2",
+              "focus-visible:ring-accent/60",
               isActive
-                ? "border-accent text-text-primary"
-                : "border-transparent text-text-secondary hover:text-text-primary hover:border-border",
+                ? "text-text-primary"
+                : "text-text-secondary hover:text-text-primary",
             )}
           >
             {TAB_LABELS[tab]}
