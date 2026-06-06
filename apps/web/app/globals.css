@@ -4999,8 +4999,11 @@
   .ob-list-wrap [data-column-id="post_id"] {
     width: 7.3rem;
   }
-  .ob-list-wrap [data-column-id="lineage"] {
-    width: 6.2rem;
+  .ob-list-wrap [data-column-id="collab_id"] {
+    width: 7.6rem;
+  }
+  .ob-list-wrap [data-column-id="inf_id"] {
+    width: 5.6rem;
   }
   .ob-list-wrap [data-column-id="campaign"] {
     width: 5.8rem;
@@ -5018,7 +5021,7 @@
     width: 6.8rem;
   }
   .ob-list-wrap [data-column-id="deliverables"] {
-    width: 6.4rem;
+    width: 10.4rem;
   }
   .ob-list-wrap [data-column-id="nomenclature"] {
     width: 14.2rem;
