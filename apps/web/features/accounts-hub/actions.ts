@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { NOTIFICATION_TYPES, sendNotification } from "@/lib/notifications";
 import { fetchMetaAdsCoveredPostIds } from "@/lib/supabase/meta-ads";
 import { isAdTested, isPostedButNotTested } from "@/lib/ad-tested";
 import {
@@ -380,6 +382,16 @@ export async function submitPayments(
       ? await coveredPostIdsWithTimeout()
       : new Set<string>();
 
+  // Posts that became status 'Done' in this batch — drives the
+  // "payment processed" creator notification (Wave 7) fired after the loop.
+  const paidPosts: Array<{
+    postId: string;
+    infId: string | null;
+    amount: number;
+    utr: string | null;
+    paymentDate: string | null;
+  }> = [];
+
   for (const r of accepted) {
     const post = postById.get(r.postId)!;
     const hasUtr = (r.utr ?? "").trim().length > 0;
@@ -458,8 +470,16 @@ export async function submitPayments(
       );
     }
 
-    if (status === "Done") paid++;
-    else due++;
+    if (status === "Done") {
+      paid++;
+      paidPosts.push({
+        postId: r.postId,
+        infId: post.inf_id || null,
+        amount: r.amount,
+        utr: r.utr || null,
+        paymentDate: r.paymentDate || null,
+      });
+    } else due++;
 
     // When parent post is paid, cascade "Done" to all sibling child deliverables
     // (same inf_id + collab_number, deliverable_index > 1) on the `posts`
@@ -508,6 +528,101 @@ export async function submitPayments(
           .in("post_id", childIds);
       }
     }
+  }
+
+  // ── Notification: Payment Processed (Wave 7) ─────────────────────────────
+  // For each post that became status 'Done', email the influencer (creator) a
+  // "payment processed" confirmation. One email per paid post. Recipient email
+  // is resolved via the post (its own `email`) then the creators table by
+  // inf_id. Fire-and-forget via after(); best-effort, never blocks the submit.
+  if (paidPosts.length > 0) {
+    const paidSnapshot = paidPosts.slice();
+    after(async () => {
+      const sb = createServiceClient();
+
+      // Resolve recipient emails: prefer the post row's own email, fall back to
+      // the creator record by inf_id. One bulk lookup each.
+      const snapPostIds = paidSnapshot.map((p) => p.postId);
+      const { data: postEmailRows } = await (sb as any)
+        .from("posts")
+        .select("post_id, email, username")
+        .in("post_id", snapPostIds);
+      const emailByPost = new Map<string, string | null>();
+      const nameByPost = new Map<string, string | null>();
+      for (const pr of (postEmailRows ?? []) as Array<{
+        post_id: string;
+        email: string | null;
+        username: string | null;
+      }>) {
+        emailByPost.set(pr.post_id, pr.email);
+        nameByPost.set(pr.post_id, pr.username);
+      }
+
+      const infIds = Array.from(
+        new Set(
+          paidSnapshot
+            .map((p) => p.infId)
+            .filter((x): x is string => !!x),
+        ),
+      );
+      const creatorByInf = new Map<
+        string,
+        { email: string | null; inf_name: string | null }
+      >();
+      if (infIds.length > 0) {
+        const { data: creatorRows } = await (sb as any)
+          .from("creators")
+          .select("inf_id, email, inf_name")
+          .in("inf_id", infIds);
+        for (const cr of (creatorRows ?? []) as Array<{
+          inf_id: string;
+          email: string | null;
+          inf_name: string | null;
+        }>) {
+          creatorByInf.set(cr.inf_id, {
+            email: cr.email,
+            inf_name: cr.inf_name,
+          });
+        }
+      }
+
+      const esc = (s: string) =>
+        s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+      for (const pp of paidSnapshot) {
+        const creator = pp.infId ? creatorByInf.get(pp.infId) : undefined;
+        const to =
+          emailByPost.get(pp.postId) ?? creator?.email ?? null;
+        if (!to || !to.includes("@")) continue; // skip silently
+        const greetName =
+          creator?.inf_name ?? nameByPost.get(pp.postId) ?? "there";
+        const amountFmt = new Intl.NumberFormat("en-IN").format(pp.amount);
+        const bodyHtml = `
+          <p style="margin:0 0 12px;">Hi <strong>${esc(greetName)}</strong>,</p>
+          <p style="margin:0 0 14px;">Your payment for collaboration <strong>${esc(pp.postId)}</strong> has been processed.</p>
+          <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 14px;">
+            <tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;font-weight:800;width:40%;">Amount</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;">INR ${amountFmt}</td></tr>
+            ${pp.utr ? `<tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">UTR / Reference</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;">${esc(pp.utr)}</td></tr>` : ""}
+            ${pp.paymentDate ? `<tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">Payment Date</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;">${esc(pp.paymentDate)}</td></tr>` : ""}
+          </table>
+          <p style="margin:0;font-size:13px;color:#6E695E;">If anything looks off, simply reply to this email and our team will help.</p>`;
+        const plainBody =
+          `Hi ${greetName},\n\n` +
+          `Your payment for collaboration ${pp.postId} has been processed.\n` +
+          `Amount: INR ${amountFmt}` +
+          (pp.utr ? `\nUTR/Reference: ${pp.utr}` : "") +
+          (pp.paymentDate ? `\nPayment Date: ${pp.paymentDate}` : "") +
+          `\n\nIf anything looks off, reply to this email.`;
+        await sendNotification({
+          type: NOTIFICATION_TYPES.PAYMENT_PROCESSED,
+          to,
+          subject: `Payment Processed · ${pp.postId}`,
+          htmlBody: bodyHtml,
+          plainBody,
+          postId: pp.postId,
+        });
+      }
+    });
   }
 
   // Cache invalidation — every Accounts read tag.
