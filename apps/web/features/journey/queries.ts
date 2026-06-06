@@ -27,6 +27,7 @@ const POSTS_SELECT = [
   "content_type",
   "ads_usage_rights",
   "collab_number",
+  "collab_id",
   "inf_id",
   "onboarded_by",
 ].join(",");
@@ -210,6 +211,7 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
       ads_usage_rights: (p.ads_usage_rights as string | null) ?? null,
       collab_number:
         typeof p.collab_number === "number" ? p.collab_number : null,
+      collab_id: (p.collab_id as string | null) ?? null,
       inf_id: (p.inf_id as string | null) ?? null,
       onboarded_by: (p.onboarded_by as string | null) ?? null,
       inf_name: creator?.inf_name ?? null,

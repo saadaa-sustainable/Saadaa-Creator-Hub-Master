@@ -62,6 +62,9 @@ export function PostingOverviewModal({
             <span className="chip text-[10px] tabular">
               {row.post_id_short ?? row.post_id}
             </span>
+            <span className="text-[0.7rem] text-text-tertiary tabular">
+              · {collabId}
+            </span>
           </div>
           <button
             type="button"
@@ -125,7 +128,18 @@ export function PostingOverviewModal({
           </section>
 
           <section className="ob-overview-grid">
-            <OverviewItem label="Post ID" value={row.post_id} mono />
+            <OverviewItem
+              label="Post ID"
+              value={
+                <span className="inline-flex items-baseline gap-1">
+                  {row.post_id}
+                  <span className="text-[0.7rem] text-text-tertiary tabular">
+                    · {collabId}
+                  </span>
+                </span>
+              }
+              mono
+            />
             <OverviewItem label="Collab ID" value={collabId} mono />
             <OverviewItem
               label="Post Date"

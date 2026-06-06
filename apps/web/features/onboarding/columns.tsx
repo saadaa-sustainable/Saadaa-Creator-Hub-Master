@@ -324,12 +324,6 @@ export function CreatorCell({ r }: { r: OnboardingRow }) {
  *  Action column appended by table renderer (uses local modal state). */
 export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
   {
-    id: "creator",
-    accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
-    header: "Creator",
-    cell: ({ row }) => <CreatorCell r={row.original} />,
-  },
-  {
     id: "post_id",
     header: "Post ID",
     cell: ({ row }) => (
@@ -349,6 +343,22 @@ export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
         {collabIdLabel(row.original)}
       </span>
     ),
+  },
+  {
+    id: "inf_id",
+    header: "INF ID",
+    accessorFn: (r) => r.inf_id ?? r.creator?.inf_id ?? "",
+    cell: ({ row }) => (
+      <span className="tabular text-[0.78rem]">
+        {row.original.inf_id ?? row.original.creator?.inf_id ?? "—"}
+      </span>
+    ),
+  },
+  {
+    id: "creator",
+    accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
+    header: "Creator",
+    cell: ({ row }) => <CreatorCell r={row.original} />,
   },
   {
     id: "campaign",

@@ -68,13 +68,8 @@ type Density = "cozy" | "compact";
 
 // Client-side resolvers for virtual columns — keyed on ColDef.key. The schema
 // defines `virtual: true` but cannot ship a function over the RSC boundary.
-const VIRTUAL_RESOLVERS: Record<string, (row: SheetRow) => unknown> = {
-  __lineage: (r) => {
-    const idx = r.deliverable_index as number | null | undefined;
-    if (idx == null || Number(idx) === 1) return "Parent";
-    return `Child ${idx}`;
-  },
-};
+// (The parent/child Lineage column was retired with the collab-id model.)
+const VIRTUAL_RESOLVERS: Record<string, (row: SheetRow) => unknown> = {};
 
 function resolveValue(col: ColDef, row: SheetRow): unknown {
   if (col.virtual) {

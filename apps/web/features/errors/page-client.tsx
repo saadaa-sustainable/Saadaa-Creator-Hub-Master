@@ -498,6 +498,9 @@ function MissingEmailsCard({ rows }: { rows: MissingEmailRow[] }) {
               </span>
               <span className="text-[0.55rem] text-text-tertiary tabular whitespace-nowrap">
                 {r.post_id}
+                {r.collab_id && (
+                  <span className="text-[0.7rem]"> · {r.collab_id}</span>
+                )}
               </span>
             </div>
             <div className="flex items-center gap-1.5 flex-wrap text-[0.6rem] text-text-secondary">

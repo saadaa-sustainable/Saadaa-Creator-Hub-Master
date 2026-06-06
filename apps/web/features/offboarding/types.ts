@@ -8,6 +8,8 @@
  */
 export interface OffboardingRow {
   postId: string;
+  collabId?: string | null;
+  collabNumber?: number | null;
   infId: string | null;
   name: string;
   username: string;

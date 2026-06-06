@@ -43,6 +43,7 @@ import {
 interface OnboardingFormProps {
   postId: string;
   postIdShort?: string;
+  collabId?: string | null;
   creatorName?: string | null;
   username?: string | null;
   /** Existing values from posts row (when re-opening a partially-onboarded row). */
@@ -68,6 +69,7 @@ interface ShopifyPreview {
 export function OrderCreationModal({
   postId,
   postIdShort,
+  collabId,
   creatorName,
   username,
   initial,
@@ -290,6 +292,14 @@ export function OrderCreationModal({
               <span className="chip text-[10px] tabular">
                 {postIdShort ?? postId}
               </span>
+              {collabId && (
+                <span
+                  className="tabular text-[0.66rem] text-text-tertiary"
+                  title="Collab ID — groups all deliverables of this collaboration"
+                >
+                  {collabId}
+                </span>
+              )}
             </div>
             <button
               type="button"
@@ -325,6 +335,14 @@ export function OrderCreationModal({
             <span className="chip text-[10px] tabular">
               {postIdShort ?? postId}
             </span>
+            {collabId && (
+              <span
+                className="tabular text-[0.66rem] text-text-tertiary"
+                title="Collab ID — groups all deliverables of this collaboration"
+              >
+                {collabId}
+              </span>
+            )}
           </div>
           <button
             type="button"

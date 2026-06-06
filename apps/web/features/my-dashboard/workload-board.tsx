@@ -108,6 +108,15 @@ function compactId(post: MyPost): string {
   return post.post_id_short ?? post.post_id ?? "—";
 }
 
+// Collab ID groups all deliverables of one collaboration.
+// Legacy rows may have a null collab_id — fall back to inf_id||'-C'||collab_number.
+function collabId(post: MyPost): string | null {
+  return (
+    post.collab_id ??
+    (post.inf_id ? `${post.inf_id}-C${Number(post.collab_number ?? 1)}` : null)
+  );
+}
+
 function creatorName(post: MyPost): string {
   return post.creator?.inf_name ?? post.inf_name ?? post.username ?? "Creator";
 }
@@ -373,6 +382,14 @@ function WorkloadCard({
         </dt>
         <dd className="text-right tabular font-bold text-text-primary truncate">
           {compactId(post)}
+          {collabId(post) && (
+            <span
+              className="block text-[0.55rem] font-bold text-text-tertiary truncate"
+              title="Collab ID — groups all deliverables of this collaboration"
+            >
+              {collabId(post)}
+            </span>
+          )}
         </dd>
         <dt className="text-text-tertiary font-bold uppercase tracking-[0.05em]">
           Date
@@ -459,6 +476,14 @@ function PaymentQuickModal({
             </div>
             <h2 className="text-xl font-extrabold text-text-primary">
               {compactId(post)}
+              {collabId(post) && (
+                <span
+                  className="ml-2 text-[0.7rem] font-bold text-text-tertiary"
+                  title="Collab ID — groups all deliverables of this collaboration"
+                >
+                  · {collabId(post)}
+                </span>
+              )}
             </h2>
           </div>
           <button type="button" className="icon-btn" onClick={onClose}>

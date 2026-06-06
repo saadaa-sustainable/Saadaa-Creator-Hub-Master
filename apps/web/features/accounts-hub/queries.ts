@@ -503,6 +503,7 @@ export async function fetchPayableEligiblePosts(): Promise<
   Array<{
     post_id: string;
     post_id_short: string | null;
+    collab_id: string | null;
     inf_name: string | null;
     username: string | null;
     profile_pic: string | null;
@@ -586,6 +587,8 @@ export async function fetchPayableEligiblePosts(): Promise<
     .map(([key, r]) => ({
       post_id: r.post_id,
       post_id_short: r.post_id_short ?? null,
+      // `key` already resolves the real collab_id (or legacy inf_id-Cn fallback).
+      collab_id: (r.collab_id as string | null) ?? key ?? null,
       commercial_amount: collabTotal.get(key) ?? r.commercial_amount ?? null,
       campaign_id: r.campaign_id ?? null,
       workflow_status: r.workflow_status,

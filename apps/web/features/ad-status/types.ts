@@ -2,6 +2,8 @@ export interface AdStatusRow {
   postId: string;
   postIdShort: string;
   infId: string | null;
+  /** Stamped collab_id, or fallback inf_id||'-C'||collab_number for legacy rows. */
+  collabId: string | null;
   name: string;
   username: string;
   profilePicUrl: string | null;

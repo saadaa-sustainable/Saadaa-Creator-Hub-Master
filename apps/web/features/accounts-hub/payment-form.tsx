@@ -34,6 +34,7 @@ import { submitPayments } from "./actions";
 interface EligiblePost {
   post_id: string;
   post_id_short: string | null;
+  collab_id: string | null;
   inf_name: string | null;
   username: string | null;
   profile_pic: string | null;
@@ -529,7 +530,8 @@ export function PaymentEntryPanel() {
                       </option>
                       {eligible.map((p) => (
                         <option key={p.post_id} value={p.post_id}>
-                          {p.post_id_short ?? p.post_id} ·{" "}
+                          {p.post_id_short ?? p.post_id}
+                          {p.collab_id ? ` · ${p.collab_id}` : ""} ·{" "}
                           {p.inf_name ?? p.username ?? "—"}
                         </option>
                       ))}

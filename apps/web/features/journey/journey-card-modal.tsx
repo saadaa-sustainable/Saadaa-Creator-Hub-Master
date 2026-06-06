@@ -10,6 +10,7 @@ import {
   workflowStatusLabel,
 } from "@/lib/formatters";
 import type { JourneyCard } from "./types";
+import { journeyCollabId } from "./collab-id";
 
 /**
  * Journey Card detail modal — read-only summary of all collab data
@@ -45,6 +46,7 @@ export function JourneyCardModal({
 
   const payStatusRaw = (card.payment_status ?? "").trim().toLowerCase();
   const isSettled = payStatusRaw === "done" || payStatusRaw === "paid";
+  const collabId = journeyCollabId(card);
 
   return createPortal(
     <div
@@ -61,6 +63,11 @@ export function JourneyCardModal({
             <Eye size={16} aria-hidden />
             <h2 className="font-semibold">Creator Journey</h2>
             <span className="chip text-[10px] tabular">{card.post_id}</span>
+            {collabId && (
+              <span className="text-[10px] tabular text-text-tertiary whitespace-nowrap">
+                · {collabId}
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -177,6 +184,9 @@ export function JourneyCardModal({
               label="Ads Rights"
               value={card.ads_usage_rights ?? "—"}
             />
+            {collabId && (
+              <OverviewItem label="Collab ID" value={collabId} mono />
+            )}
             {card.order_id && (
               <OverviewItem label="Order ID" value={card.order_id} mono />
             )}

@@ -37,6 +37,8 @@ export interface SystemErrorRow {
 export interface MissingEmailRow {
   post_id: string;
   inf_id: string | null;
+  /** Stamped collab_id, or fallback inf_id||'-C'||collab_number for legacy rows. */
+  collab_id: string | null;
   inf_name: string | null;
   username: string | null;
   campaign_id: string | null;

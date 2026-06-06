@@ -15,6 +15,8 @@ export type OrderStatusBucket =
 
 export interface OrderStatusRow {
   postId: string;
+  /** Collab ID (SIF-1-C1) grouping this collab's deliverables; legacy fallback inf_id-C{n}. */
+  collabId?: string | null;
   infId: string | null;
   name: string;
   username: string;

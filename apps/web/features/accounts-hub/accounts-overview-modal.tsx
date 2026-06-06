@@ -24,6 +24,9 @@ import { PaymentStatusPill } from "./columns";
 interface DeliverableRow {
   post_id: string;
   post_id_short: string | null;
+  collab_id: string | null;
+  inf_id: string | null;
+  collab_number: number | null;
   workflow_status: string;
   deliverable_index: number | null;
   deliverable_type: string | null;
@@ -47,6 +50,9 @@ interface ApiPayload {
   parent: {
     post_id: string;
     post_id_short: string | null;
+    collab_id: string | null;
+    inf_id: string | null;
+    collab_number: number | null;
     workflow_status: string;
     content_type: string | null;
     nomenclature: string | null;
@@ -80,6 +86,21 @@ interface ApiPayload {
     perDeliverableAmount: number;
     hasAdsRights: boolean;
   };
+}
+
+/**
+ * Collab ID for a row — prefer the real `collab_id` column; fall back to
+ * `inf_id||'-C'||collab_number` for legacy rows not yet backfilled.
+ */
+function collabIdOf(r: {
+  collab_id?: string | null;
+  inf_id?: string | null;
+  collab_number?: number | null;
+}): string | null {
+  return (
+    r.collab_id ??
+    (r.inf_id ? `${r.inf_id}-C${Number(r.collab_number ?? 1)}` : null)
+  );
 }
 
 /**
@@ -172,6 +193,15 @@ export function AccountsOverviewModal({
             {data && (
               <span className="chip text-[10px] tabular">
                 {data.parent.post_id_short ?? data.parent.post_id}
+                {collabIdOf(data.parent) && (
+                  <span
+                    className="text-text-tertiary"
+                    title="Collab ID — groups all deliverables of this collaboration"
+                  >
+                    {" · "}
+                    {collabIdOf(data.parent)}
+                  </span>
+                )}
               </span>
             )}
           </div>
@@ -400,7 +430,18 @@ function DeliverableCard({
       <dl className="acc-overview-deliverable__meta">
         <div>
           <dt>Post ID</dt>
-          <dd className="tabular">{d.post_id_short ?? d.post_id}</dd>
+          <dd className="tabular">
+            {d.post_id_short ?? d.post_id}
+            {collabIdOf(d) && (
+              <span
+                className="text-[0.7rem] text-text-tertiary"
+                title="Collab ID — groups all deliverables of this collaboration"
+              >
+                {" · "}
+                {collabIdOf(d)}
+              </span>
+            )}
+          </dd>
         </div>
         <div>
           <dt>Posted</dt>

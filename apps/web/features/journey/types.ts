@@ -20,6 +20,7 @@ export interface JourneyPost {
   content_type: string | null;
   ads_usage_rights: string | null;
   collab_number: number | null;
+  collab_id: string | null;
   inf_id: string | null;
   onboarded_by: string | null;
 }

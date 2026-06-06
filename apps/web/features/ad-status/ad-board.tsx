@@ -212,11 +212,24 @@ function CreatorCell({ row }: { row: AdStatusRow }) {
   );
 }
 
-function PostIdCode({ value }: { value: string }) {
+function PostIdCode({
+  value,
+  collabId,
+}: {
+  value: string;
+  collabId?: string | null;
+}) {
   return (
-    <code className="text-[0.78rem] font-mono text-text-secondary">
-      {value || "—"}
-    </code>
+    <span className="inline-flex items-baseline gap-1 flex-wrap">
+      <code className="text-[0.78rem] font-mono text-text-secondary">
+        {value || "—"}
+      </code>
+      {collabId && (
+        <span className="text-text-tertiary text-[0.7rem] tabular">
+          · {collabId}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -379,6 +392,11 @@ function AdStatusOverviewModal({
             <span className="chip text-[10px] tabular">
               {row.postIdShort || row.postId}
             </span>
+            {row.collabId && (
+              <span className="text-text-tertiary text-[0.7rem] tabular">
+                · {row.collabId}
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -431,7 +449,13 @@ function AdStatusOverviewModal({
           </section>
 
           <section className="ob-overview-grid">
-            <OverviewItem label="Post ID" value={row.postId} mono />
+            <OverviewItem
+              label="Post ID"
+              value={
+                row.collabId ? `${row.postId} · ${row.collabId}` : row.postId
+              }
+              mono
+            />
             <OverviewItem
               label="Post Date"
               value={
@@ -590,7 +614,10 @@ function UntestedListTable({
                   <CreatorCell row={r} />
                 </td>
                 <td data-column-id="post_id">
-                  <PostIdCode value={r.postIdShort || r.postId} />
+                  <PostIdCode
+                    value={r.postIdShort || r.postId}
+                    collabId={r.collabId}
+                  />
                 </td>
                 <td data-column-id="campaign">
                   {r.campaign ? (
@@ -691,6 +718,12 @@ function UntestedCardsGrid({
               <span className="ob-card-meta-label">Post ID</span>
               <span className="ob-card-meta-val tabular">
                 {r.postIdShort || r.postId || "—"}
+                {r.collabId && (
+                  <span className="text-text-tertiary text-[0.7rem] tabular font-normal">
+                    {" · "}
+                    {r.collabId}
+                  </span>
+                )}
               </span>
             </div>
             <div className="ob-card-meta">
@@ -807,7 +840,10 @@ function AdRunListTable({
                   <CreatorCell row={r} />
                 </td>
                 <td data-column-id="post_id">
-                  <PostIdCode value={r.postIdShort || r.postId} />
+                  <PostIdCode
+                    value={r.postIdShort || r.postId}
+                    collabId={r.collabId}
+                  />
                 </td>
                 <td data-column-id="campaign">
                   {r.campaign ? (
@@ -923,6 +959,12 @@ function AdRunCardsGrid({
               <span className="ob-card-meta-label">Post ID</span>
               <span className="ob-card-meta-val tabular">
                 {r.postIdShort || r.postId || "—"}
+                {r.collabId && (
+                  <span className="text-text-tertiary text-[0.7rem] tabular font-normal">
+                    {" · "}
+                    {r.collabId}
+                  </span>
+                )}
               </span>
             </div>
             <div className="ob-card-meta">

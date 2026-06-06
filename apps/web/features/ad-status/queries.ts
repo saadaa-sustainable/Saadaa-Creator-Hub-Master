@@ -18,6 +18,8 @@ const POSTS_COLS_BASE = [
   "post_id",
   "post_id_short",
   "inf_id",
+  "collab_id",
+  "collab_number",
   "username",
   "campaign_id",
   "workflow_status",
@@ -183,10 +185,16 @@ export async function fetchAdStatusData(
     if (adsResults === "Winner") kpi.winners++;
     if (adsResults === "Discarded" || adsResults === "Discarded but analyse") kpi.discarded++;
 
+    const infId = (p.inf_id as string | null) ?? null;
+    const collabId =
+      (p.collab_id as string | null) ||
+      (infId ? `${infId}-C${Number(p.collab_number ?? 1)}` : null);
+
     const row: AdStatusRow = {
       postId: String(p.post_id ?? ""),
       postIdShort,
-      infId: (p.inf_id as string | null) ?? null,
+      infId,
+      collabId,
       name: String(cRow.inf_name ?? p.username ?? ""),
       username: String(p.username ?? ""),
       profilePicUrl:

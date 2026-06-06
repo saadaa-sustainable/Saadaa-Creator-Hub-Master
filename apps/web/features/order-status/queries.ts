@@ -18,6 +18,8 @@ import {
 // lists it. Use est_delivery from posts + delivery_date from shopify_orders.
 const POSTS_COLS = [
   "post_id",
+  "collab_id",
+  "collab_number",
   "inf_id",
   "username",
   "campaign_id",
@@ -230,9 +232,15 @@ export async function fetchOrderStatusData(
       estDelivery < today &&
       !safeStatuses.some((s) => effective.indexOf(s) !== -1);
 
+    const infId = (p.inf_id as string | null) ?? null;
+    const collabId =
+      (p.collab_id as string | null) ||
+      (infId ? `${infId}-C${Number(p.collab_number ?? 1)}` : null);
+
     rows.push({
       postId: String(p.post_id ?? ""),
-      infId: (p.inf_id as string | null) ?? null,
+      collabId,
+      infId,
       name: String(cRow.inf_name ?? p.username ?? ""),
       username: String(p.username ?? ""),
       profilePicUrl:

@@ -22,6 +22,27 @@ import { OverduePill, ShippingStatusPill } from "./columns";
 import type { OrderStatusFilters, OrderStatusRow } from "./types";
 
 /**
+ * Post ID with adjacent muted Collab ID secondary — primary post_id unchanged,
+ * collab_id rendered inline as a small muted secondary (middot separator).
+ * Mirrors the shared `PostIdWithCollab` pattern from the Posting stage so the
+ * deliverable id always reads "post id · collab id". Reuses the shared
+ * `.post-id-cell` / `.post-id` classes (no globals.css edits).
+ */
+function PostIdWithCollab({ row }: { row: OrderStatusRow }) {
+  if (!row.postId) return <>—</>;
+  return (
+    <span className="post-id-cell">
+      <span className="post-id tabular">{row.postId}</span>
+      {row.collabId && (
+        <span className="text-[0.7rem] text-text-tertiary tabular">
+          · {row.collabId}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
  * Order Status board — view toggle + List / Cards.
  * Reuses existing shared classes from Onboarding/Posting so the visual
  * language stays consistent across stages:
@@ -157,6 +178,9 @@ function OrderListTable({
       <table className="ob-list-table">
         <thead>
           <tr>
+            <th>Post ID</th>
+            <th>Collab ID</th>
+            <th>INF ID</th>
             <th>Creator</th>
             <th>Campaign</th>
             <th>Order ID</th>
@@ -171,6 +195,22 @@ function OrderListTable({
         <tbody>
           {rows.map((r) => (
             <tr key={r.postId}>
+              <td className="tabular whitespace-nowrap">
+                <span className="post-id tabular">{r.postId || "—"}</span>
+              </td>
+              <td className="tabular whitespace-nowrap">
+                {r.collabId ? (
+                  <span
+                    className="campaign-chip tabular"
+                    title="Groups all deliverables of this collaboration"
+                  >
+                    {r.collabId}
+                  </span>
+                ) : (
+                  <span className="text-text-tertiary">—</span>
+                )}
+              </td>
+              <td className="tabular whitespace-nowrap">{r.infId || "—"}</td>
               <td>
                 <div className="flex items-center gap-2 min-w-0">
                   <Avatar
@@ -195,13 +235,15 @@ function OrderListTable({
                 <span className="campaign-chip">{r.campaign || "—"}</span>
               </td>
               <td className="tabular whitespace-nowrap">
-                {r.orderId}
-                {r.isOverdue && (
-                  <>
-                    {" "}
-                    <OverduePill />
-                  </>
-                )}
+                <span>
+                  {r.orderId}
+                  {r.isOverdue && (
+                    <>
+                      {" "}
+                      <OverduePill />
+                    </>
+                  )}
+                </span>
               </td>
               <td>
                 <ShippingStatusPill
@@ -290,6 +332,7 @@ function OrderCardsGrid({
             <div className="ob-card-meta">
               <span className="ob-card-meta-label">Order ID</span>
               <span className="ob-card-meta-val tabular">{r.orderId}</span>
+              <PostIdWithCollab row={r} />
             </div>
             <div className="ob-card-meta">
               <span className="ob-card-meta-label">Tracking</span>
@@ -437,6 +480,18 @@ function OrderStatusOverviewModal({
               icon={<ReceiptText size={14} aria-hidden />}
               label="Order ID"
               value={row.orderId}
+              mono
+            />
+            <OverviewTile
+              icon={<ReceiptText size={14} aria-hidden />}
+              label="Post ID"
+              value={
+                row.postId
+                  ? row.collabId
+                    ? `${row.postId} · ${row.collabId}`
+                    : row.postId
+                  : "—"
+              }
               mono
             />
             <OverviewTile

@@ -16,6 +16,7 @@ import type {
  */
 const POSTS_COLS = [
   "post_id",
+  "collab_id",
   "inf_id",
   "username",
   "campaign_id",
@@ -108,6 +109,8 @@ export async function fetchOffboardingData(
 
     rows.push({
       postId: String(p.post_id ?? ""),
+      collabId: (p.collab_id as string | null) ?? null,
+      collabNumber: Number(p.collab_number ?? 0) || null,
       infId: (p.inf_id as string | null) ?? null,
       name: String(cRow.inf_name ?? p.username ?? ""),
       username: String(p.username ?? ""),

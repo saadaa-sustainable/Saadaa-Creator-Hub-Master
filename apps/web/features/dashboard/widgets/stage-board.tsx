@@ -145,6 +145,14 @@ function StageCardItem({ card, stage }: { card: StageCard; stage: StageDef }) {
         </dt>
         <dd className="text-right tabular font-bold text-text-primary truncate">
           {card.postId}
+          {card.collabId && (
+            <span
+              className="block text-[0.55rem] font-bold text-text-tertiary truncate"
+              title="Collab ID — groups all deliverables of this collaboration"
+            >
+              {card.collabId}
+            </span>
+          )}
         </dd>
         {card.campaign && (
           <>

@@ -2,6 +2,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { JourneyCard as JourneyCardType, JourneyColumnId } from "./types";
 import { cn } from "@/lib/cn";
+import { journeyCollabId } from "./collab-id";
 
 /** Date field to show per column — mirrors legacy card_foot logic. */
 function resolveDate(
@@ -96,6 +97,7 @@ export function JourneyCardItem({
   const handle = card.username ?? undefined;
 
   const payChip = colId === "payment" ? paymentChip(card.payment_status) : null;
+  const collabId = journeyCollabId(card);
 
   return (
     <article
@@ -184,6 +186,16 @@ export function JourneyCardItem({
         <dd className="text-right tabular text-text-secondary truncate">
           {formatDate(dateField.value)}
         </dd>
+        {collabId && (
+          <>
+            <dt className="text-text-tertiary font-bold uppercase tracking-[0.05em] whitespace-nowrap">
+              Collab
+            </dt>
+            <dd className="text-right tabular text-text-tertiary truncate font-mono text-[0.6rem]">
+              {collabId}
+            </dd>
+          </>
+        )}
         {card.order_id && (
           <>
             <dt className="text-text-tertiary font-bold uppercase tracking-[0.05em] whitespace-nowrap">

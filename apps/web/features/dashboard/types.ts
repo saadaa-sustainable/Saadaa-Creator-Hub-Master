@@ -126,6 +126,8 @@ export interface DashboardData {
 
 export interface StageCard {
   postId: string;
+  /** Collab ID grouping this deliverable — shown as a small muted secondary under postId. */
+  collabId: string | null;
   username: string;
   name: string | null;
   profilePic: string | null;

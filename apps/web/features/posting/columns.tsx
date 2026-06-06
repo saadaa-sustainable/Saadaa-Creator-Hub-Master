@@ -43,6 +43,19 @@ export function formatDeliverables(r: PostingRow): string {
   return `${reels}R + ${posts}P + ${stories}S`;
 }
 
+/**
+ * Post ID pill for the card. Renders the post_id alone — collab_id is carried by
+ * the adjacent CollabIdBadge chip, so no inline collab secondary is shown here
+ * (avoids displaying the same collab_id twice in the card pill row).
+ */
+export function PostIdWithCollab({ r }: { r: PostingRow }) {
+  return (
+    <span className="post-id-cell">
+      <span className="post-id tabular">{r.post_id_short ?? r.post_id}</span>
+    </span>
+  );
+}
+
 /** Collab ID chip — groups all deliverables of a collaboration. */
 export function CollabIdBadge({
   r,
@@ -144,18 +157,15 @@ export function AdsRightsCell({ r }: { r: PostingRow }) {
   );
 }
 
-/** Column parity (Creator|Post ID|Collab ID|Campaign|Deliverables|Ads
- *  Rights|Stage|Onboarded|Post Date|Live Link|Drive). Action appended by table. */
+/** Column order: Post ID | Collab ID | INF ID | Creator | Campaign |
+ *  Deliverables | Ads Rights | Partnership Key | Stage | Followers | Onboarded |
+ *  Post Date | Live Link | Drive. Action appended by table. */
 export const postingColumns: ColumnDef<PostingRow>[] = [
-  {
-    id: "creator",
-    accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
-    header: "Creator",
-    cell: ({ row }) => <CreatorCell r={row.original} />,
-  },
   {
     id: "post_id",
     header: "Post ID",
+    // Plain post_id only — the dedicated Collab ID column carries collab_id now,
+    // so no inline secondary line is rendered here.
     cell: ({ row }) => (
       <span className="post-id tabular">
         {row.original.post_id_short ?? row.original.post_id}
@@ -171,6 +181,25 @@ export const postingColumns: ColumnDef<PostingRow>[] = [
         rows={table.options.data as PostingRow[]}
       />
     ),
+  },
+  {
+    id: "inf_id",
+    accessorFn: (r) => r.inf_id ?? "",
+    header: "INF ID",
+    cell: ({ row }) =>
+      row.original.inf_id ? (
+        <span className="tabular text-[0.78rem] text-text-secondary">
+          {row.original.inf_id}
+        </span>
+      ) : (
+        <span className="text-text-tertiary">—</span>
+      ),
+  },
+  {
+    id: "creator",
+    accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
+    header: "Creator",
+    cell: ({ row }) => <CreatorCell r={row.original} />,
   },
   {
     id: "campaign",

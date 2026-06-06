@@ -33,10 +33,24 @@ export function OutstandingAlert({ rows }: { rows: AccountsRow[] }) {
         </span>
       </div>
       <ul className="acc-outstanding-alert__list">
-        {preview.map((r) => (
+        {preview.map((r) => {
+          const hasName = !!(r.creator?.inf_name ?? r.creator?.username);
+          const collabId =
+            r.collab_id ??
+            (r.inf_id ? `${r.inf_id}-C${Number(r.collab_number ?? 1)}` : null);
+          return (
           <li key={r.post_id}>
             <span className="acc-outstanding-alert__who">
               {r.creator?.inf_name ?? r.creator?.username ?? r.post_id_short ?? r.post_id}
+              {!hasName && collabId && (
+                <span
+                  className="text-[0.7rem] text-text-tertiary"
+                  title="Collab ID — groups all deliverables of this collaboration"
+                >
+                  {" · "}
+                  {collabId}
+                </span>
+              )}
             </span>
             <span className="acc-outstanding-alert__bal tabular">
               {formatRupees(Number(r._remainder ?? 0))} due
@@ -47,7 +61,8 @@ export function OutstandingAlert({ rows }: { rows: AccountsRow[] }) {
               </span>
             </span>
           </li>
-        ))}
+          );
+        })}
         {extra > 0 && (
           <li className="acc-outstanding-alert__more">
             +{extra} more partially-paid collab{extra === 1 ? "" : "s"}

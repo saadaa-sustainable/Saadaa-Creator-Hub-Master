@@ -62,14 +62,9 @@ export const SHEET_TABLES: SheetTable[] = [
     defaultSort: { col: "reach_out_date", dir: "desc" },
 
     columns: [
-      {
-        key: "__lineage",
-        label: "Lineage",
-        type: "status",
-        width: 90,
-        virtual: true,
-      },
       { key: "post_id", label: "Post ID", type: "text", width: 140 },
+      { key: "collab_id", label: "Collab ID", type: "text", width: 120 },
+      { key: "inf_id", label: "Inf ID", type: "text", width: 90 },
       { key: "post_id_short", label: "Short", type: "text", width: 90 },
       { key: "campaign_id", label: "Campaign", type: "text", width: 90, editable: true },
       { key: "username", label: "Username", type: "text", width: 140 },
@@ -106,7 +101,6 @@ export const SHEET_TABLES: SheetTable[] = [
       { key: "partnership_id", label: "Partnership ID", type: "text", width: 130, editable: true },
       { key: "deliverable_index", label: "Del Idx", type: "number", width: 70 },
       { key: "collab_number", label: "Collab #", type: "number", width: 70 },
-      { key: "inf_id", label: "Inf ID", type: "text", width: 90 },
       { key: "onboarded_by", label: "Onboarded By", type: "text", width: 160 },
       { key: "created_at", label: "Created", type: "datetime", width: 140 },
     ],
@@ -182,6 +176,7 @@ export const SHEET_TABLES: SheetTable[] = [
     defaultSort: { col: "created_at", dir: "desc" },
     columns: [
       { key: "post_id", label: "Post ID", type: "text", width: 140 },
+      { key: "collab_id", label: "Collab ID", type: "text", width: 120 },
       { key: "inf_id", label: "Inf ID", type: "text", width: 90 },
       { key: "username", label: "Username", type: "text", width: 140 },
       { key: "amount", label: "Amount ₹", type: "currency", width: 120, editable: true },

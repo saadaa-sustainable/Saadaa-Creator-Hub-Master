@@ -31,6 +31,8 @@ import { submitPosting } from "./actions";
 interface PostingFormProps {
   postId: string;
   postIdShort?: string;
+  /** Collab grouping id (SIF-1-C1) — shown as muted secondary next to Post ID. */
+  collabId?: string;
   creatorName?: string | null;
   username?: string | null;
   adsUsageRights?: string | null;
@@ -43,6 +45,7 @@ interface PostingFormProps {
 export function PostingModal({
   postId,
   postIdShort,
+  collabId,
   creatorName,
   username,
   adsUsageRights,
@@ -264,6 +267,11 @@ export function PostingModal({
             <span className="chip text-[10px] tabular">
               {postIdShort ?? postId}
             </span>
+            {collabId && (
+              <span className="text-[0.7rem] text-text-tertiary tabular">
+                · {collabId}
+              </span>
+            )}
           </div>
           <button
             type="button"

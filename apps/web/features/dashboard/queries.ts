@@ -34,6 +34,7 @@ function monthLabel(iso: string): string {
 const POSTS_COLS_BASE = [
   "post_id",
   "post_id_short",
+  "collab_id",
   "workflow_status",
   "payment_status",
   "campaign_id",
@@ -497,8 +498,14 @@ export async function fetchDashboardData(
       stuckLabel = effectivePay === "done" || effectivePay === "paid" ? "Settled" : "Payment pending";
     else stuckLabel = effectivePay === "done" || effectivePay === "paid" ? "Settled" : "Payment pending";
     const stageDate = dateForStage[bucketKey];
+    // Collab ID groups all deliverables of one collaboration. Legacy rows may
+    // have a null collab_id — fall back to inf_id||'-C'||collab_number.
+    const collabId =
+      (p.collab_id as string | null) ??
+      (inf ? `${inf}-C${Number(p.collab_number ?? 1)}` : null);
     return {
       postId: String(p.post_id_short ?? p.post_id ?? ""),
+      collabId,
       username: String(p.username ?? ""),
       name: (c.inf_name as string | null) ?? null,
       profilePic: (c.profile_pic as string | null) ?? null,

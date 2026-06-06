@@ -6,6 +6,7 @@
 export interface MyPost {
   post_id: string | null;
   post_id_short?: string | null;
+  collab_id?: string | null;
   username: string | null;
   campaign_id: string | null;
   workflow_status: string | null;

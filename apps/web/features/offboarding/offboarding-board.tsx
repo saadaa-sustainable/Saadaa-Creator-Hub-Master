@@ -95,6 +95,16 @@ export function OffboardingBoard({
   );
 }
 
+// Collab ID for display — prefer the stamped collab_id, fall back to the
+// legacy inf_id||'-C'||collab_number shape for older rows that predate the
+// stamped column.
+function collabIdOf(r: OffboardingRow): string | null {
+  return (
+    r.collabId ??
+    (r.infId ? `${r.infId}-C${Number(r.collabNumber ?? 1)}` : null)
+  );
+}
+
 function PaymentPill({ status }: { status: string }) {
   const s = status.toLowerCase();
   const tone =
@@ -122,6 +132,9 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
       <table className="ob-list-table">
         <thead>
           <tr>
+            <th>Post ID</th>
+            <th>Collab ID</th>
+            <th>INF ID</th>
             <th>Creator</th>
             <th>Campaign</th>
             <th>Order ID</th>
@@ -134,6 +147,22 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.postId}>
+              <td className="tabular whitespace-nowrap">
+                <span className="post-id tabular">{r.postId || "—"}</span>
+              </td>
+              <td className="tabular whitespace-nowrap">
+                {collabIdOf(r) ? (
+                  <span
+                    className="campaign-chip tabular"
+                    title="Groups all deliverables of this collaboration"
+                  >
+                    {collabIdOf(r)}
+                  </span>
+                ) : (
+                  <span className="text-text-tertiary">—</span>
+                )}
+              </td>
+              <td className="tabular whitespace-nowrap">{r.infId || "—"}</td>
               <td>
                 <div className="flex items-center gap-2 min-w-0">
                   <Avatar
@@ -194,6 +223,15 @@ function OffboardingCardsGrid({ rows }: { rows: OffboardingRow[] }) {
           </div>
 
           <div className="ob-card-pills">
+            {r.postId && <span className="post-id tabular">{r.postId}</span>}
+            {collabIdOf(r) && (
+              <span
+                className="campaign-chip tabular"
+                title="Collab ID — groups all deliverables of this collaboration"
+              >
+                {collabIdOf(r)}
+              </span>
+            )}
             <PaymentPill status={r.paymentStatus} />
             <span className="campaign-chip">{r.campaign || "—"}</span>
             {r.category && <span className="pill pill--muted">{r.category}</span>}

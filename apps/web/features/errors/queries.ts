@@ -18,6 +18,8 @@ const POSTS_SELECT = [
   "post_id",
   "post_id_short",
   "inf_id",
+  "collab_id",
+  "collab_number",
   "username",
   "campaign_id",
   "workflow_status",
@@ -250,9 +252,13 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
       PARENT_STATUSES.has(wf) &&
       !hasValue(p.collab_email_sent_at)
     ) {
+      const meInfId = (p.inf_id as string | null) ?? null;
       missingEmails.push({
         post_id: String(p.post_id ?? ""),
-        inf_id: (p.inf_id as string | null) ?? null,
+        inf_id: meInfId,
+        collab_id:
+          (p.collab_id as string | null) ||
+          (meInfId ? `${meInfId}-C${Number(p.collab_number ?? 1)}` : null),
         inf_name: null,
         username: (p.username as string | null) ?? null,
         campaign_id: (p.campaign_id as string | null) ?? null,

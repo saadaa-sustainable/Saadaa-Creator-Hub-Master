@@ -14,7 +14,9 @@ import {
   AdsRightsCell,
   CollabIdBadge,
   DriveLinkCell,
+  PostIdWithCollab,
   PostLinkCell,
+  collabIdLabel,
   formatDeliverables,
   isPosted,
   postingColumns,
@@ -95,6 +97,7 @@ export function PostingTable({
           onClose={() => setSelected(null)}
           postId={selected.post_id}
           postIdShort={selected.post_id_short ?? undefined}
+          collabId={collabIdLabel(selected)}
           creatorName={selected.creator?.inf_name}
           username={selected.creator?.username}
           adsUsageRights={selected.ads_usage_rights}
@@ -225,7 +228,7 @@ function PostingCard({
         {r.campaign?.campaign_id && (
           <span className="campaign-chip">{r.campaign.campaign_id}</span>
         )}
-        <span className="post-id tabular">{r.post_id_short ?? r.post_id}</span>
+        <PostIdWithCollab r={r} />
         <CollabIdBadge r={r} rows={rows} />
         {(r.nomenclature ?? r.content_type) && (
           <span className="pill pill--muted">

@@ -20,6 +20,17 @@ import {
 import type { AccountsRow } from "./types";
 
 /**
+ * Collab ID for a row — prefer the real `collab_id` column; fall back to
+ * `inf_id||'-C'||collab_number` for legacy rows not yet backfilled.
+ */
+function collabIdOf(row: AccountsRow): string | null {
+  return (
+    row.collab_id ??
+    (row.inf_id ? `${row.inf_id}-C${Number(row.collab_number ?? 1)}` : null)
+  );
+}
+
+/**
  * Accounts Hub list view — flat table, Posted/Delivered scope only.
  * Legacy parity: Index.html:7036-7058 cols.
  */
@@ -40,6 +51,34 @@ export function AccountsTable({ rows }: { rows: AccountsRow[] }) {
         cell: ({ row }) => (
           <span className="post-id tabular">
             {row.original.post_id_short ?? row.original.post_id}
+          </span>
+        ),
+      },
+      {
+        id: "collab_id",
+        header: "Collab ID",
+        accessorFn: (r) => collabIdOf(r) ?? "",
+        cell: ({ row }) => {
+          const collabId = collabIdOf(row.original);
+          return collabId ? (
+            <span
+              className="campaign-chip tabular"
+              title="Groups all deliverables of this collaboration"
+            >
+              {collabId}
+            </span>
+          ) : (
+            <span className="text-text-tertiary">—</span>
+          );
+        },
+      },
+      {
+        id: "inf_id",
+        header: "INF ID",
+        accessorFn: (r) => r.inf_id ?? r.creator?.inf_id ?? "",
+        cell: ({ row }) => (
+          <span className="tabular text-xs">
+            {row.original.inf_id ?? row.original.creator?.inf_id ?? "—"}
           </span>
         ),
       },
@@ -157,6 +196,12 @@ function AccountsListMobileCard({ row }: { row: AccountsRow }) {
             </div>
             <div className="text-[0.65rem] text-text-tertiary tabular truncate leading-tight">
               {row.post_id_short ?? row.post_id}
+              {collabIdOf(row) && (
+                <span title="Collab ID — groups all deliverables of this collaboration">
+                  {" · "}
+                  {collabIdOf(row)}
+                </span>
+              )}
             </div>
           </div>
         </div>

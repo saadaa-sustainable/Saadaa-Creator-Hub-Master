@@ -20,6 +20,7 @@ const RTO_STATUSES = [
 const POSTS_SELECT = [
   "post_id",
   "post_id_short",
+  "collab_id",
   "username",
   "campaign_id",
   "workflow_status",

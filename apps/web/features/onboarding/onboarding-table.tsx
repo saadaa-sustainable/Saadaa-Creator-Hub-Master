@@ -159,6 +159,7 @@ export function OnboardingTable({
           onClose={() => setOrderRow(null)}
           postId={orderRow.post_id}
           postIdShort={orderRow.post_id_short ?? undefined}
+          collabId={collabIdLabel(orderRow)}
           creatorName={orderRow.creator?.inf_name}
           username={orderRow.creator?.username}
           initial={{
@@ -525,6 +526,12 @@ function OnboardingOverviewModal({
             <span className="chip text-[10px] tabular">
               {row.post_id_short ?? row.post_id}
             </span>
+            <span
+              className="tabular text-[0.66rem] text-text-tertiary"
+              title="Collab ID — groups all deliverables of this collaboration"
+            >
+              {collabIdLabel(row)}
+            </span>
           </div>
           <button
             type="button"
@@ -677,6 +684,12 @@ function OnboardingOverviewModal({
                       </span>
                       <span className="post-id tabular">
                         {d.post_id_short ?? d.post_id}
+                      </span>
+                      <span
+                        className="tabular text-[0.66rem] text-text-tertiary"
+                        title="Collab ID — groups all deliverables of this collaboration"
+                      >
+                        {collabIdLabel(d)}
                       </span>
                       {isPrimary ? (
                         <span

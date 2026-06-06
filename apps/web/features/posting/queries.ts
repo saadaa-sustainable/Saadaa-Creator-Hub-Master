@@ -3,6 +3,19 @@ import { createServiceClient } from "@/lib/supabase/server";
 import type { PostingFilters, PostingKpi, PostingRow } from "./types";
 
 /**
+ * Canonical "has ad usage rights" truthiness — identical to
+ * features/accounts-hub/queries.ts ADS_YES. `ads_usage_rights` is free-text and
+ * commonly holds a DURATION ("11 months"), so any non-empty, non-trivial value
+ * counts as "Yes".
+ */
+const ADS_YES = (raw: string | null | undefined): boolean => {
+  if (!raw) return false;
+  return !["", "no", "n/a", "none", "0", "false"].includes(
+    raw.trim().toLowerCase(),
+  );
+};
+
+/**
  * Server-side fetch of the Posting table.
  * Mirrors legacy InfluencerBackend.js#getPostingTableData. Surfaces rows in
  * workflow_status ∈ {On Board, Order Sent, Posted} — matches the legacy
@@ -66,7 +79,11 @@ export async function fetchPostingTable(
   if (filters.campaign) q = q.eq("campaign_id", filters.campaign);
   if (filters.statusFilter) q = q.eq("workflow_status", filters.statusFilter);
   if (filters.creatorTier) q = q.eq("creators.category", filters.creatorTier);
-  if (filters.adsRights) q = q.eq("ads_usage_rights", filters.adsRights);
+  // Ad-rights filter is applied in JS below (see ADS_YES). ads_usage_rights is
+  // free-text and frequently stores a DURATION ("11 months", "12 Months", …)
+  // rather than the literal "Yes", so a PostgREST `.eq("ads_usage_rights","Yes")`
+  // silently dropped every valid duration. We instead match on TRUTHINESS,
+  // mirroring features/accounts-hub/queries.ts ADS_YES.
   if (filters.onboardDateFrom)
     q = q.gte("onboard_date", filters.onboardDateFrom);
   if (filters.onboardDateTo) q = q.lte("onboard_date", filters.onboardDateTo);
@@ -76,7 +93,18 @@ export async function fetchPostingTable(
     .limit(500);
   if (error) throw error;
 
-  const rows = (data ?? []) as unknown as PostingRow[];
+  let rows = (data ?? []) as unknown as PostingRow[];
+
+  // Ad-rights filter (truthiness): a value counts as "Yes" when it's non-empty
+  // AND not in the trivial set. Applied here in JS so free-text durations
+  // ("11 months") correctly land under the "Yes" filter, and only the
+  // empty/trivial rows land under "No".
+  const adsFilter = filters.adsRights?.trim().toLowerCase();
+  if (adsFilter === "yes") {
+    rows = rows.filter((r) => ADS_YES(r.ads_usage_rights));
+  } else if (adsFilter === "no") {
+    rows = rows.filter((r) => !ADS_YES(r.ads_usage_rights));
+  }
   const missingProfileUsernames = [
     ...new Set(
       rows
