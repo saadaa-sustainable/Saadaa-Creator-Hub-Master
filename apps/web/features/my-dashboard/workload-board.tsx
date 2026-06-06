@@ -162,7 +162,7 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
             <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
               My workload
             </p>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-text-primary tabular leading-none">
+            <h2 className="text-lg sm:text-xl font-extrabold text-text-primary tabular leading-none">
               {stats.total}
             </h2>
           </div>
@@ -202,7 +202,7 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
             return (
               <div
                 key={stage.key}
-                className="grid grid-cols-[78px_minmax(0,1fr)_24px] sm:grid-cols-[92px_minmax(0,1fr)_34px] items-center gap-2 text-[0.7rem] sm:text-xs min-w-0"
+                className="grid grid-cols-[78px_minmax(0,1fr)_24px] sm:grid-cols-[92px_minmax(0,1fr)_34px] items-center gap-2 text-[0.66rem] sm:text-[0.7rem] min-w-0"
               >
                 <span className="font-bold text-text-secondary truncate">
                   {stage.title}
@@ -293,13 +293,13 @@ function MiniStat({
     <div className="rounded-xl border border-border bg-bg-muted/45 p-2.5 sm:p-3 min-w-0">
       <div
         className={cn(
-          "text-lg sm:text-xl font-extrabold tabular leading-none",
+          "text-base sm:text-lg font-extrabold tabular leading-none",
           tone,
         )}
       >
         {value}
       </div>
-      <div className="mt-1 text-[0.52rem] sm:text-[0.58rem] uppercase tracking-[0.07em] font-extrabold text-text-tertiary">
+      <div className="mt-1 text-[0.5rem] sm:text-[0.54rem] uppercase tracking-[0.07em] font-extrabold text-text-tertiary">
         {label}
       </div>
     </div>
@@ -715,7 +715,10 @@ export function MyDashboardWorkloadBoard({
       {paymentPost?.post_id && (
         <AccountsOverviewModal
           postId={paymentPost.post_id}
-          onClose={() => { setPaymentPost(null); router.refresh(); }}
+          onClose={() => {
+            setPaymentPost(null);
+            router.refresh();
+          }}
         />
       )}
     </>

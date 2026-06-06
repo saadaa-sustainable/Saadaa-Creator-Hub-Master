@@ -1,8 +1,9 @@
 "use client";
 
-import { Menu } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { Lightbulb, Menu } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useSidebar } from "@/stores/sidebar-store";
+import { resolveTab, tabKnowMoreSlug } from "@/features/dashboard/tab-config";
 
 const SECTION_TITLES: Array<[string, string]> = [
   ["/accounts-hub", "Accounts Hub"],
@@ -31,6 +32,32 @@ const SECTION_TITLES: Array<[string, string]> = [
   ["/tat", "TAT"],
 ];
 
+const SECTION_KM_SLUGS: Array<[string, string]> = [
+  ["/accounts-hub", "accounts-hub"],
+  ["/admin/users", "user-panel"],
+  ["/campaigns/new", "campaigns"],
+  ["/campaigns", "campaigns"],
+  ["/compliance", "compliance"],
+  ["/cost-analytics", "cost-analytics"],
+  ["/dashboard", "dashboard"],
+  ["/errors", "errors"],
+  ["/funnel", "funnel"],
+  ["/internal-dashboard", "internal-dashboard"],
+  ["/journey", "journey"],
+  ["/my-dashboard", "my-dashboard"],
+  ["/offboarding", "offboarding"],
+  ["/onboarding", "onboarding"],
+  ["/order-status", "order-status"],
+  ["/orders", "orders"],
+  ["/performance/ad-run-status", "ad-status"],
+  ["/performance/untested-ads", "ad-status"],
+  ["/posting", "posting"],
+  ["/reach-out/inbound", "reach-out-inbound"],
+  ["/reach-out/outbound", "reach-out-outbound"],
+  ["/sheets", "sheets"],
+  ["/tat", "tat"],
+];
+
 function getSectionTitle(pathname: string) {
   return (
     SECTION_TITLES.find(
@@ -39,11 +66,22 @@ function getSectionTitle(pathname: string) {
   );
 }
 
+function getKnowMoreSlug(pathname: string, tabParam: string | null) {
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
+    return tabKnowMoreSlug(resolveTab(tabParam));
+  }
+  return SECTION_KM_SLUGS.find(
+    ([href]) => pathname === href || pathname.startsWith(`${href}/`),
+  )?.[1];
+}
+
 export function MobileTopbar() {
   const open = useSidebar((s) => s.open);
   const isOpen = useSidebar((s) => s.isOpen);
   const pathname = usePathname();
+  const params = useSearchParams();
   const sectionTitle = getSectionTitle(pathname);
+  const knowMoreSlug = getKnowMoreSlug(pathname, params.get("tab"));
 
   return (
     <header className="mobile-topbar" aria-label="Mobile header">
@@ -64,6 +102,17 @@ export function MobileTopbar() {
           <span className="brand-subtitle">Saadaa Creator Hub</span>
         </span>
       </div>
+      {knowMoreSlug && (
+        <button
+          type="button"
+          className="topbar-know-more"
+          data-know-more={knowMoreSlug}
+          aria-label={`Open help for ${sectionTitle}`}
+        >
+          <Lightbulb className="h-3.5 w-3.5" aria-hidden />
+          <span>Know More</span>
+        </button>
+      )}
     </header>
   );
 }

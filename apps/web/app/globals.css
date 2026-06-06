@@ -83,6 +83,10 @@
   --font-display: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-emph: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
+  /* ---- Type scale --------------------------------------------------------- */
+  --text-kpi: 1.18rem;
+  --text-kpi--line-height: 1.08;
+
   /* ---- Geometry ----------------------------------------------------------- */
   --radius-sm: 0.375rem; /* 6px */
   --radius-md: 0.75rem; /* 12px (default) */
@@ -1744,6 +1748,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex: 1 1 auto;
     min-width: 0;
   }
   .mobile-topbar .brand-text .logo-badge {
@@ -1783,9 +1788,48 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .mobile-topbar .topbar-know-more {
+    display: inline-flex;
+    min-height: 36px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-bg-ecru);
+    color: var(--color-text-secondary);
+    padding: 0 10px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+    box-shadow: 0 1px 2px rgba(22, 21, 19, 0.04);
+    transition:
+      background 0.15s,
+      border-color 0.15s,
+      color 0.15s,
+      transform 0.15s;
+  }
+  .mobile-topbar .topbar-know-more:hover,
+  .mobile-topbar .topbar-know-more:focus-visible {
+    border-color: var(--color-border-strong);
+    color: var(--color-text-primary);
+  }
+  .mobile-topbar .topbar-know-more:active {
+    transform: translateY(1px);
+  }
   @media (max-width: 1023px) {
     .mobile-topbar {
       display: flex;
+    }
+  }
+  @media (max-width: 380px) {
+    .mobile-topbar .topbar-know-more {
+      width: 36px;
+      padding: 0;
+    }
+    .mobile-topbar .topbar-know-more span {
+      display: none;
     }
   }
 
@@ -1814,16 +1858,7 @@
     }
 
     .page-header {
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-      flex-wrap: wrap;
-      row-gap: 0.4rem;
-      column-gap: 0.5rem;
-      margin: 0.95rem 0 0.85rem;
-      font-size: 1.05rem;
-      line-height: 1.15;
-      letter-spacing: -0.02em;
+      display: none;
     }
     .page-header > .flex {
       flex: 1 1 100%;
@@ -5321,10 +5356,14 @@
       font-size: 0.42rem;
       padding: 0 4px;
     }
-    .ob-card-actions button {
-      min-height: 2rem;
-      padding: 0.42rem 0.6rem;
-      font-size: 0.68rem;
+    .ob-card-actions button,
+    .ob-card-actions a.action-view,
+    .ob-card-actions .action-danger {
+      min-height: 1.88rem;
+      padding: 0.32rem 0.5rem;
+      border-radius: 0.48rem;
+      font-size: 0.63rem;
+      gap: 0.22rem;
     }
     .ob-card-email-row,
     .ob-card-email-alert {
@@ -5497,7 +5536,7 @@
   }
   .ob-card-name {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     color: var(--color-text-primary);
     line-height: 1.2;
     white-space: nowrap;
@@ -5505,7 +5544,7 @@
     text-overflow: ellipsis;
   }
   .ob-card-handle {
-    font-size: 0.74rem;
+    font-size: 0.7rem;
     color: var(--color-text-tertiary);
     margin-top: 3px;
   }
@@ -5537,14 +5576,14 @@
     overflow: visible;
   }
   .ob-card-meta-label {
-    font-size: 0.62rem;
+    font-size: 0.58rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
     color: var(--color-text-tertiary);
   }
   .ob-card-meta-val {
-    font-size: 0.84rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: var(--color-text-primary);
     font-variant-numeric: tabular-nums;
@@ -5570,7 +5609,7 @@
   .ob-card-meta-sub {
     color: var(--color-text-tertiary);
     font-weight: 500;
-    font-size: 0.7rem;
+    font-size: 0.66rem;
   }
   .ob-card-overdue {
     position: relative;
@@ -5802,14 +5841,15 @@
   }
   .ob-card-actions {
     display: flex;
-    gap: 8px;
-    margin-top: 2px;
+    gap: 7px;
+    margin-top: 1px;
   }
   .ob-card-actions button {
     flex: 1;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 0.78rem;
+    min-height: 2.06rem;
+    padding: 0.42rem 0.7rem;
+    border-radius: 0.55rem;
+    font-size: 0.72rem;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.12s ease-out;
@@ -5819,20 +5859,21 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
+    gap: 4px;
   }
   .ob-card-actions a.action-view {
     flex: 1;
-    padding: 8px 12px;
+    min-height: 2.06rem;
+    padding: 0.42rem 0.7rem;
     border: 1px solid rgba(43, 91, 181, 0.3);
-    border-radius: 8px;
+    border-radius: 0.55rem;
     background: #f0f6fb;
     color: #2b5bb5;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    font-size: 0.78rem;
+    gap: 4px;
+    font-size: 0.72rem;
     font-weight: 700;
     text-decoration: none;
     transition: all 0.12s ease-out;
@@ -5861,6 +5902,13 @@
     background: #2b5bb5;
     color: #fff;
     border-color: #2b5bb5;
+  }
+  .ob-card-actions button svg,
+  .ob-card-actions a.action-view svg,
+  .ob-card-actions .action-danger svg {
+    width: 0.72rem;
+    height: 0.72rem;
+    flex: 0 0 auto;
   }
 
   @media (max-width: 767px) {
@@ -5950,10 +5998,14 @@
       display: none;
     }
 
-    .ob-card-actions button {
-      min-height: 2rem;
-      padding: 0.42rem 0.6rem;
-      font-size: 0.68rem;
+    .ob-card-actions button,
+    .ob-card-actions a.action-view,
+    .ob-card-actions .action-danger {
+      min-height: 1.88rem;
+      padding: 0.32rem 0.5rem;
+      border-radius: 0.48rem;
+      font-size: 0.63rem;
+      gap: 0.22rem;
     }
 
     .ob-card-email-row {
@@ -7707,11 +7759,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 4px;
   flex: 1;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 0.78rem;
+  min-height: 2.06rem;
+  padding: 0.42rem 0.7rem;
+  border-radius: 0.55rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
   background: var(--color-danger-text, #c0392b);
@@ -7730,6 +7783,15 @@
 }
 .ob-card-actions .action-danger:active {
   transform: translateY(0);
+}
+@media (max-width: 767px) {
+  .ob-card-actions .action-danger {
+    min-height: 1.88rem;
+    padding: 0.32rem 0.5rem;
+    border-radius: 0.48rem;
+    font-size: 0.63rem;
+    gap: 0.22rem;
+  }
 }
 
 /* ============================================================
@@ -7969,13 +8031,13 @@ body:has(.km-backdrop) {
 }
 .acc-kpi {
   position: relative;
-  padding: 14px 16px 16px;
+  padding: 12px 14px 13px;
   border-radius: 12px;
   background: var(--color-bg-white, #ffffff);
   border: 1px solid var(--color-border, #e7e2d2);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   overflow: hidden;
 }
 .acc-kpi::before {
@@ -8137,20 +8199,20 @@ body:has(.km-backdrop) {
   justify-content: center;
 }
 .acc-kpi__label {
-  font-size: 0.7rem;
+  font-size: 0.64rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .acc-kpi__primary {
-  font-size: 1.6rem;
+  font-size: 1.34rem;
   font-weight: 700;
   color: var(--color-text-primary, #161513);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
 .acc-kpi__secondary {
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   color: var(--color-text-secondary, #6e695e);
   font-variant-numeric: tabular-nums;
 }
@@ -8368,7 +8430,7 @@ body:has(.km-backdrop) {
   .my-dashboard-stage .acc-kpi,
   .journey-stage .acc-kpi,
   .dash-overview-stage .acc-kpi {
-    padding: 0.58rem 0.65rem 0.62rem;
+    padding: 0.52rem 0.58rem 0.56rem;
     border-radius: 10px;
   }
   .my-dashboard-stage .acc-kpi__head,
@@ -8379,18 +8441,18 @@ body:has(.km-backdrop) {
   .my-dashboard-stage .acc-kpi__label,
   .journey-stage .acc-kpi__label,
   .dash-overview-stage .acc-kpi__label {
-    font-size: 0.56rem;
+    font-size: 0.52rem;
     letter-spacing: 0.05em;
   }
   .my-dashboard-stage .acc-kpi__primary,
   .journey-stage .acc-kpi__primary,
   .dash-overview-stage .acc-kpi__primary {
-    font-size: 1.18rem;
+    font-size: 1.08rem;
   }
   .my-dashboard-stage .acc-kpi__secondary,
   .journey-stage .acc-kpi__secondary,
   .dash-overview-stage .acc-kpi__secondary {
-    font-size: 0.62rem;
+    font-size: 0.58rem;
     line-height: 1.15;
   }
   .my-dashboard-stage .dashboard-kanban-track,
@@ -10057,18 +10119,18 @@ body:has(.km-backdrop) {
     gap: 8px;
   }
   .acc-kpi {
-    padding: 10px 12px 12px;
+    padding: 8px 10px 9px;
     border-radius: 10px;
   }
   .acc-kpi__primary {
-    font-size: 1.25rem;
+    font-size: 1.12rem;
   }
   .acc-kpi__label {
-    font-size: 0.62rem;
+    font-size: 0.56rem;
     letter-spacing: 0.06em;
   }
   .acc-kpi__secondary {
-    font-size: 0.68rem;
+    font-size: 0.62rem;
   }
 
   /* Filter bar — Search full-width on top, then Campaign + Status inline,
@@ -10246,7 +10308,7 @@ body:has(.km-backdrop) {
     overflow: hidden;
   }
   .order-status-stage .acc-kpi {
-    padding: 10px 11px 11px;
+    padding: 8px 10px 9px;
   }
   .order-status-stage .acc-kpi__head {
     gap: 5px;
@@ -10255,10 +10317,10 @@ body:has(.km-backdrop) {
     flex: 0 0 auto;
   }
   .order-status-stage .acc-kpi__label {
-    font-size: 0.58rem;
+    font-size: 0.54rem;
   }
   .order-status-stage .acc-kpi__secondary {
-    font-size: 0.66rem;
+    font-size: 0.6rem;
   }
   .order-status-board-toolbar {
     justify-content: flex-start;

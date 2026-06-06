@@ -30,11 +30,11 @@ export function KpiCard({
 }: KpiCardProps) {
   return (
     <div
-      className="flex min-w-[140px] flex-col gap-1 rounded-[var(--radius)] border border-border bg-bg-white px-4 py-3 shadow-sm transition-[border-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-[0_10px_24px_-22px_rgba(22,21,19,0.3)]"
+      className="flex min-w-[132px] flex-col gap-1 rounded-[var(--radius)] border border-border bg-bg-white px-3.5 py-2.5 shadow-sm transition-[border-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-[0_10px_24px_-22px_rgba(22,21,19,0.3)]"
       role="figure"
       aria-label={label}
     >
-      <div className="text-[0.7rem] uppercase tracking-[0.04em] font-semibold text-text-secondary">
+      <div className="text-[0.64rem] uppercase tracking-[0.04em] font-semibold text-text-secondary">
         {label}
       </div>
       <div
@@ -47,7 +47,7 @@ export function KpiCard({
           value
         )}
       </div>
-      {sub && <div className="text-[0.72rem] text-text-tertiary">{sub}</div>}
+      {sub && <div className="text-[0.66rem] text-text-tertiary">{sub}</div>}
     </div>
   );
 }
@@ -55,7 +55,7 @@ export function KpiCard({
 export function KpiStrip({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
+      className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4"
       role="group"
       aria-label="Key performance indicators"
     >
