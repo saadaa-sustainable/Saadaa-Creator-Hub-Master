@@ -2,23 +2,23 @@
  * Tabbed Dashboard — command-centre tab registry.
  *
  * The Dashboard is a TABBED command centre: an "Overview" tab with
- * cross-system headline KPIs, followed by one tab per workflow view. Each
- * view tab reuses that feature's already-exported KPI query fn + strip
- * component (no logic re-implemented here). Tab state lives in the `?tab=`
- * URL search param so tabs are linkable + server-rendered.
+ * cross-system headline KPIs, followed by one tab per SYSTEM-section view
+ * (Influencer Journey → Internal Dashboard, mirroring the sidebar order).
+ * Each view tab REUSES that feature's full page-view component + data fetch
+ * (no logic re-implemented here) so the tab shows an identical experience to
+ * the standalone route. Tab state lives in the `?tab=` URL search param so
+ * tabs are linkable + server-rendered.
  */
 
 export const DASHBOARD_TABS = [
   "overview",
-  "reach-out",
-  "onboarding",
-  "order-status",
-  "posting",
-  "ad-status",
-  "payments",
-  "cost",
-  "tat",
   "journey",
+  "tat",
+  "ad-status",
+  "compliance",
+  "cost",
+  "funnel",
+  "internal",
 ] as const;
 
 export type DashboardTab = (typeof DASHBOARD_TABS)[number];
@@ -27,15 +27,13 @@ export const DEFAULT_TAB: DashboardTab = "overview";
 
 export const TAB_LABELS: Record<DashboardTab, string> = {
   overview: "Overview",
-  "reach-out": "Reach Out",
-  onboarding: "Onboarding",
-  "order-status": "Order Status",
-  posting: "Posting",
+  journey: "Influencer Journey",
+  tat: "TAT Analytics",
   "ad-status": "Ad Status",
-  payments: "Payments",
-  cost: "Cost",
-  tat: "TAT",
-  journey: "Journey",
+  compliance: "Compliance KPIs",
+  cost: "Cost Analytics",
+  funnel: "Funnel View",
+  internal: "Internal Dashboard",
 };
 
 export function resolveTab(raw: string | undefined | null): DashboardTab {

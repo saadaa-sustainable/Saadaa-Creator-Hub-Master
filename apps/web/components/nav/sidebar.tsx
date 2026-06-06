@@ -56,6 +56,7 @@ const NAV: NavSection[] = [
         icon: Wallet,
         show: (a) => hasPermission(a, "accounts_write"),
       },
+      { label: "My Dashboard", href: "/my-dashboard", icon: UserSquare },
     ],
   },
   {
@@ -109,7 +110,6 @@ const NAV: NavSection[] = [
   {
     label: "System",
     items: [
-      { label: "My Dashboard", href: "/my-dashboard", icon: UserSquare },
       { label: "Influencer Journey", href: "/journey", icon: Map },
       { label: "TAT Analytics", href: "/tat", icon: Timer },
       {

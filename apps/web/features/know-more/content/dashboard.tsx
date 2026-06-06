@@ -5,7 +5,7 @@ export default function DashboardKM() {
     <>
       <KMHeader
         title="Dashboard"
-        subtitle="Tabbed command centre — an Overview tab of cross-system headline KPIs plus the full bento grid, followed by one tab per workflow view (Reach Out · Onboarding · Order Status · Posting · Ad Status · Payments · Cost · TAT · Journey). Each tab reuses that view's own KPI aggregate. Only the active tab fetches data."
+        subtitle="Tabbed command centre — an Overview tab of cross-system headline KPIs plus the full bento grid, followed by one tab per SYSTEM-section view, mirroring the sidebar order: Influencer Journey · TAT Analytics · Ad Status · Compliance KPIs · Cost Analytics · Funnel View · Internal Dashboard. Each view tab reuses that feature's FULL page view (same data + KPI strips + boards / charts) — not a reduced summary. Only the active tab fetches data."
       />
 
       <KMSection tag="Tabbed layout">
@@ -28,20 +28,26 @@ export default function DashboardKM() {
             paid) on top of the full bento command centre described below.
           </li>
           <li>
-            <strong>View tabs</strong> · each renders that feature&apos;s
-            exported KPI strip from its own global aggregate — Onboarding
-            (<KMCode>OnboardingKpiStrip</KMCode>), Posting
-            (<KMCode>PostingKpiStrip</KMCode>), Payments
-            (<KMCode>AccountsKpiStrip</KMCode>), Ad Status
-            (<KMCode>AdStatusKpiStrip</KMCode>), Order Status (Order Volume +
-            Commerce Intel strips), TAT (<KMCode>TatKpiStrip</KMCode>), Journey
-            (KPI + funnel strips). Cost + Reach Out have no exported strip, so
-            the Dashboard composes a compact <KMCode>.acc-kpi</KMCode> grid
-            from their query / the dashboard aggregate.
+            <strong>View tabs</strong> · each tab renders the SAME full view as
+            the matching SYSTEM-section route, not a reduced KPI summary —
+            Influencer Journey (<KMCode>JourneyPageClient</KMCode>: filter bar +
+            KPI strip + funnel strip + kanban board), TAT Analytics
+            (<KMCode>TatFiltersBar</KMCode> + <KMCode>TatPageClient</KMCode>:
+            KPI strip + three TAT grids + campaign benchmark chart), Ad Status
+            (<KMCode>AdStatusFiltersBar</KMCode> + <KMCode>AdStatusKpiStrip</KMCode>{" "}
+            + <KMCode>AdStatusBoard</KMCode>), Compliance KPIs
+            (<KMCode>ComplianceBody</KMCode>), Cost Analytics
+            (<KMCode>CostAnalyticsBody</KMCode>), Funnel View
+            (<KMCode>FunnelBody</KMCode>), Internal Dashboard
+            (<KMCode>InternalDashboardBody</KMCode>). The component + data fetch
+            are reused verbatim; only the duplicate per-page header is dropped
+            (the Dashboard shell already shows one).
           </li>
           <li>
             <strong>Filters</strong> · the Campaign / Date / Content / Tier /
-            Status filter bar applies to the Overview tab only.
+            Status filter bar applies to the Overview tab only. The Journey,
+            TAT, and Ad Status tabs carry their own feature filter bars — their
+            URL keys coexist with <KMCode>?tab=</KMCode> without collision.
           </li>
         </KMList>
       </KMSection>
