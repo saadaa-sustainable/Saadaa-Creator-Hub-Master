@@ -22,17 +22,18 @@ export function PageHeader({
 }: PageHeaderProps) {
   const ModeIcon = modePill?.icon;
   return (
-    <div className="page-header">
+    <header className="page-header">
       <div className="flex items-center gap-3">
         <span className="header-icon" aria-hidden>
           <Icon />
         </span>
-        <span>{title}</span>
+        <h1>{title}</h1>
         {knowMore && (
           <button
             type="button"
             className="btn-know-more"
             data-know-more={knowMore}
+            aria-label={`Open help for ${title}`}
           >
             <Lightbulb className="h-3.5 w-3.5" aria-hidden /> Know More
           </button>
@@ -46,6 +47,6 @@ export function PageHeader({
           {modePill.label}
         </span>
       )}
-    </div>
+    </header>
   );
 }

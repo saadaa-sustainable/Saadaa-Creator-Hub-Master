@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 
 /**
@@ -19,6 +20,17 @@ export function SubmissionToggle({
   onChange: (submittedYes: boolean) => void;
   className?: string;
 }) {
+  const [optimisticValue, setOptimisticValue] = useState(submittedYes);
+
+  useEffect(() => {
+    setOptimisticValue(submittedYes);
+  }, [submittedYes]);
+
+  const choose = (next: boolean) => {
+    setOptimisticValue(next);
+    onChange(next);
+  };
+
   return (
     <div
       role="tablist"
@@ -30,26 +42,32 @@ export function SubmissionToggle({
     >
       {(
         [
-          { label: "Not Submitted", active: !submittedYes, value: false },
-          { label: "Submitted", active: submittedYes, value: true },
+          { label: "Not Submitted", value: false },
+          { label: "Submitted", value: true },
         ] as const
-      ).map((tab) => (
-        <button
-          key={tab.label}
-          type="button"
-          role="tab"
-          aria-selected={tab.active}
-          className={cn(
-            "rounded-md px-3 py-1.5 text-xs font-semibold transition-colors",
-            tab.active
-              ? "bg-accent text-text-primary shadow-sm"
-              : "text-text-secondary hover:text-text-primary",
-          )}
-          onClick={() => onChange(tab.value)}
-        >
-          {tab.label}
-        </button>
-      ))}
+      ).map((tab) => {
+        const active = tab.value === optimisticValue;
+        const pending = optimisticValue !== submittedYes && active;
+        return (
+          <button
+            key={tab.label}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            data-pending={pending ? "true" : undefined}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-xs font-semibold transition-[background,color,box-shadow,transform] duration-150 active:translate-y-px",
+              active
+                ? "bg-accent text-text-primary shadow-sm"
+                : "text-text-secondary hover:text-text-primary",
+              pending && "submission-toggle-pending",
+            )}
+            onClick={() => choose(tab.value)}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

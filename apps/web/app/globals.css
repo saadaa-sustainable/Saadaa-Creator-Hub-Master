@@ -98,6 +98,8 @@
   --shadow-lg:
     0 18px 40px -12px rgba(22, 21, 19, 0.18),
     0 6px 12px -4px rgba(22, 21, 19, 0.08);
+  --shadow-focus: 0 0 0 3px rgba(240, 198, 30, 0.24);
+  --shadow-surface-hover: 0 12px 28px -24px rgba(22, 21, 19, 0.34);
 
   /* ---- Width tokens ------------------------------------------------------- */
   --width-sidebar: 260px;
@@ -163,6 +165,8 @@
 @layer base {
   html {
     color-scheme: light;
+    scroll-behavior: smooth;
+    text-size-adjust: 100%;
   }
   body {
     background-color: var(--color-bg-base);
@@ -170,6 +174,7 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     font-variant-numeric: tabular-nums;
+    min-width: 320px;
   }
   ::selection {
     background: var(--color-accent);
@@ -180,6 +185,35 @@
   ::after {
     border-color: var(--color-border);
   }
+  :focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  [role="button"],
+  a {
+    touch-action: manipulation;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
 }
 
 /* ============================================================================
@@ -187,9 +221,42 @@
  * ========================================================================== */
 @layer components {
   /* ---- Layout shell ----------------------------------------------------- */
+  .app-shell {
+    min-height: 100dvh;
+    background:
+      radial-gradient(
+        circle at 18% -10%,
+        color-mix(in srgb, var(--color-bg-ecru) 54%, transparent),
+        transparent 32rem
+      ),
+      var(--color-bg-base);
+  }
+  .app-shell-main {
+    min-width: 0;
+  }
+  .skip-link {
+    position: fixed;
+    left: 1rem;
+    top: 0.75rem;
+    z-index: 120;
+    transform: translateY(-140%);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-white);
+    color: var(--color-text-primary);
+    padding: 0.55rem 0.8rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-decoration: none;
+    box-shadow: var(--shadow-md);
+    transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .skip-link:focus-visible {
+    transform: translateY(0);
+  }
   .app-shell-sidebar {
     width: var(--width-sidebar);
-    height: 100vh;
+    height: 100dvh;
     position: fixed;
     top: 0;
     left: 0;
@@ -218,14 +285,18 @@
   .main-content {
     margin-left: var(--width-sidebar);
     width: calc(100% - var(--width-sidebar));
-    padding: 2.5rem 3rem;
-    min-height: 100vh;
+    padding: clamp(1.5rem, 2.8vw, 3rem);
+    min-height: 100dvh;
     box-sizing: border-box;
     /* `clip` (not `hidden`) prevents horizontal overflow WITHOUT making
        .main-content a scroll container — otherwise `position: sticky`
        descendants (e.g. the Dashboard tab rail) never stick because the
        window scrolls, not main-content. */
     overflow-x: clip;
+  }
+  .main-content > * {
+    max-width: var(--container-content);
+    margin-inline: auto;
   }
   @media (max-width: 1023px) {
     /* Content-dense mobile — minimal outer chrome, max usable area */
@@ -276,6 +347,7 @@
       gap: 8px;
       align-items: center;
     }
+    .page-header > .flex h1,
     .page-header > .flex span {
       min-width: 0;
       white-space: nowrap;
@@ -556,7 +628,8 @@
     font-size: 0.875rem;
     transition:
       background 0.15s,
-      color 0.15s;
+      color 0.15s,
+      transform 0.15s;
     display: flex;
     align-items: center;
     gap: 10px;
@@ -572,6 +645,12 @@
   .nav-link:hover {
     background: var(--color-bg-surface);
     color: var(--color-text-primary);
+  }
+  .nav-link:active {
+    transform: translateY(1px);
+  }
+  .nav-link:focus-visible {
+    box-shadow: var(--shadow-focus);
   }
   .nav-link:hover svg {
     opacity: 1;
@@ -653,12 +732,16 @@
     transition:
       background 0.15s,
       color 0.15s,
-      border-color 0.15s;
+      border-color 0.15s,
+      transform 0.15s;
   }
   .sidebar-footer .sign-out:hover {
     background: var(--color-bg-surface);
     color: var(--color-text-primary);
     border-color: var(--color-border);
+  }
+  .sidebar-footer .sign-out:active {
+    transform: translateY(1px);
   }
   .sidebar-footer .sidebar-version {
     display: block;
@@ -679,6 +762,12 @@
     display: flex;
     align-items: center;
     gap: 15px;
+  }
+  .page-header h1 {
+    margin: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    min-width: 0;
   }
   .header-icon {
     background: var(--color-bg-ecru);
@@ -706,13 +795,21 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    transition: all 0.18s;
+    min-height: 32px;
+    transition:
+      background 0.18s,
+      border-color 0.18s,
+      color 0.18s,
+      transform 0.18s;
     white-space: nowrap;
   }
   .btn-know-more:hover {
     background: var(--color-accent);
     border-color: var(--color-accent);
     color: #1a1208;
+  }
+  .btn-know-more:active {
+    transform: translateY(1px);
   }
 
   .mode-pill {
@@ -764,18 +861,18 @@
   /* ---- Glass card (solid surface, legacy) ------------------------------- */
   .glass-card {
     background: var(--color-bg-surface);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
     border-radius: var(--radius-lg);
     padding: 2.5rem;
     margin-bottom: 2rem;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--color-border);
-    transition: all 0.3s ease;
+    transition:
+      border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .glass-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-surface-hover);
     border-color: var(--color-border-strong);
   }
   .glass-card.dense {
@@ -900,8 +997,11 @@
     padding: 1rem 2rem;
     font-weight: 700;
     font-size: 1rem;
-    color: white;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--color-bg-base);
+    transition:
+      background 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: var(--shadow-md);
     display: inline-flex;
     align-items: center;
@@ -909,9 +1009,11 @@
     cursor: pointer;
   }
   .btn-submit:hover {
-    background: #000;
-    transform: translateY(-2px);
+    background: var(--color-text-charcoal);
     box-shadow: var(--shadow-lg);
+  }
+  .btn-submit:active {
+    transform: translateY(1px);
   }
   .btn-submit:disabled,
   .btn-submit[disabled] {
@@ -933,12 +1035,15 @@
     font-weight: 500;
     font-size: 0.95rem;
     padding: 0.75rem 0.9rem;
-    transition: all 0.2s ease;
+    transition:
+      background 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
   }
   .form-control:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgba(240, 198, 30, 0.2);
+    box-shadow: var(--shadow-focus);
   }
   .form-control:hover:not(:disabled):not([readonly]) {
     border-color: var(--color-border-strong);
@@ -996,7 +1101,9 @@
     font-weight: 500;
     font-size: 0.7rem;
     pointer-events: none;
-    transition: all 0.15s ease;
+    transition:
+      color 0.15s ease,
+      transform 0.15s ease;
     background: transparent !important;
     white-space: nowrap;
     overflow: hidden;
@@ -1123,7 +1230,10 @@
     background: var(--color-bg-white);
     color: var(--color-text-secondary);
     cursor: pointer;
-    transition: all 0.15s;
+    transition:
+      border-color 0.15s,
+      color 0.15s,
+      transform 0.15s;
   }
   .verif-auto-pill .override-btn:hover {
     border-color: var(--color-border-strong);
@@ -1132,7 +1242,7 @@
   .verif-auto-pill .override-btn:focus-visible,
   .verif-pending-pill .override-btn:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(240, 198, 30, 0.22);
+    box-shadow: var(--shadow-focus);
     border-color: var(--color-accent);
   }
 
@@ -1230,7 +1340,7 @@
   }
   .input-group .btn-input-attached:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(240, 198, 30, 0.24);
+    box-shadow: var(--shadow-focus);
   }
   .input-group .btn-input-attached:disabled {
     background: var(--color-bg-muted);
@@ -1281,7 +1391,10 @@
     border-radius: var(--radius-lg);
     background: var(--color-bg-white);
     overflow: hidden;
-    transition: all 0.25s ease;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
     animation: rise 0.4s cubic-bezier(0.22, 1, 0.36, 1);
     box-shadow: 0 8px 24px -12px rgba(22, 21, 19, 0.08);
   }
@@ -1511,7 +1624,11 @@
     font-weight: 600;
     font-size: 0.85rem;
     cursor: pointer;
-    transition: all 0.15s;
+    transition:
+      background 0.15s,
+      border-color 0.15s,
+      color 0.15s,
+      transform 0.15s;
   }
   .verif-btn:hover {
     border-color: var(--color-border-strong);
@@ -1522,7 +1639,7 @@
   }
   .verif-btn:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(240, 198, 30, 0.22);
+    box-shadow: var(--shadow-focus);
     border-color: var(--color-accent);
   }
   .verif-btn.active-verified {
@@ -1652,6 +1769,20 @@
     text-overflow: ellipsis;
     letter-spacing: -0.2px;
   }
+  .mobile-topbar .brand-stack {
+    display: grid;
+    min-width: 0;
+    gap: 1px;
+  }
+  .mobile-topbar .brand-text .brand-subtitle {
+    color: var(--color-text-tertiary);
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   @media (max-width: 1023px) {
     .mobile-topbar {
       display: flex;
@@ -1712,7 +1843,7 @@
       height: 1rem;
     }
     /* Let the title wrap to 2 lines on phones instead of truncating to "…" */
-    .page-header > .flex > span:not(.header-icon) {
+    .page-header > .flex > h1 {
       min-width: 0;
       white-space: normal;
       overflow: visible;
@@ -1852,7 +1983,7 @@
     .section-info-trigger:focus-visible,
     .mobile-field-tooltip:focus-visible {
       outline: none;
-      box-shadow: 0 0 0 3px rgba(240, 198, 30, 0.22);
+      box-shadow: var(--shadow-focus);
       border-color: var(--color-accent);
     }
 
@@ -2133,6 +2264,30 @@
   @media (min-width: 768px) {
     .bento-grid.md-4 {
       grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-bg-muted);
+  }
+  .skeleton-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--color-bg-white) 72%, transparent),
+      transparent
+    );
+    animation: shimmer 1.55s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-shimmer::after {
+      display: none;
     }
   }
 
@@ -8036,6 +8191,32 @@ body:has(.km-backdrop) {
   background: var(--color-sidebar-active-bg, #161513);
   color: var(--color-sidebar-active-text, #ffffff);
 }
+.dash-tab-pill[data-pending],
+.submission-toggle-pending {
+  position: relative;
+  overflow: hidden;
+}
+.dash-tab-pill[data-pending]::after,
+.submission-toggle-pending::after {
+  content: "";
+  position: absolute;
+  inset: auto 8px 4px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 72%, transparent);
+  animation: tab-pending-sweep 0.72s cubic-bezier(0.16, 1, 0.3, 1) infinite
+    alternate;
+}
+@keyframes tab-pending-sweep {
+  from {
+    transform: scaleX(0.35);
+    opacity: 0.45;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
 /* ≥40px touch target for the scrollable tabs (≥44px on phones), while the rail
    stays visually light. A subtle right-edge fade hints there is more to scroll. */
 .dash-tabbar [role="tab"] {
@@ -10023,6 +10204,7 @@ body:has(.km-backdrop) {
   }
   .order-status-stage .page-header h1,
   .order-status-stage .page-header [class*="title"],
+  .order-status-stage .page-header > .flex > h1,
   .order-status-stage .page-header > .flex > span:not(.header-icon) {
     min-width: 0;
     overflow: hidden;

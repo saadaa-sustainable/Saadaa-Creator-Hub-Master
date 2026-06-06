@@ -1,6 +1,7 @@
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutGrid,
   Wallet,
@@ -121,11 +122,18 @@ const NAV: NavSection[] = [
 
 export function Sidebar({ actor }: { actor: UserAccessRow }) {
   const pathname = usePathname();
+  const router = useRouter();
   const isOpen = useSidebar((s) => s.isOpen);
   const close = useSidebar((s) => s.close);
+  const [optimisticPath, setOptimisticPath] = useState(pathname);
+
+  useEffect(() => {
+    setOptimisticPath(pathname);
+  }, [pathname]);
 
   return (
     <aside
+      id="primary-navigation"
       className={cn("app-shell-sidebar", isOpen && "is-open")}
       aria-label="Primary navigation"
       aria-hidden={isOpen ? false : undefined}
@@ -155,7 +163,12 @@ export function Sidebar({ actor }: { actor: UserAccessRow }) {
           key={section.label}
           section={section}
           actor={actor}
-          pathname={pathname}
+          pathname={optimisticPath}
+          onNavigate={(href) => {
+            setOptimisticPath(href);
+            close();
+          }}
+          prefetch={(href) => router.prefetch(href as never)}
         />
       ))}
 
@@ -175,10 +188,14 @@ function SidebarSection({
   section,
   actor,
   pathname,
+  onNavigate,
+  prefetch,
 }: {
   section: NavSection;
   actor: UserAccessRow;
   pathname: string;
+  onNavigate: (href: string) => void;
+  prefetch: (href: string) => void;
 }) {
   // Strip groups where every child is hidden by permission.
   const visible = section.items
@@ -207,7 +224,13 @@ function SidebarSection({
                 <ul className="nav-children">
                   {item.children.map((c) => (
                     <li key={c.href}>
-                      <NavLink leaf={c} pathname={pathname} sub />
+                      <NavLink
+                        leaf={c}
+                        pathname={pathname}
+                        onNavigate={onNavigate}
+                        prefetch={prefetch}
+                        sub
+                      />
                     </li>
                   ))}
                 </ul>
@@ -216,7 +239,12 @@ function SidebarSection({
           }
           return (
             <li key={item.href}>
-              <NavLink leaf={item} pathname={pathname} />
+              <NavLink
+                leaf={item}
+                pathname={pathname}
+                onNavigate={onNavigate}
+                prefetch={prefetch}
+              />
             </li>
           );
         })}
@@ -228,19 +256,25 @@ function SidebarSection({
 function NavLink({
   leaf,
   pathname,
+  onNavigate,
+  prefetch,
   sub,
 }: {
   leaf: NavLeaf;
   pathname: string;
+  onNavigate: (href: string) => void;
+  prefetch: (href: string) => void;
   sub?: boolean;
 }) {
   const Icon = leaf.icon;
-  const closeSidebar = useSidebar((s) => s.close);
   const active = pathname === leaf.href || pathname.startsWith(leaf.href + "/");
   return (
     <Link
       href={leaf.href as never}
-      onClick={closeSidebar}
+      prefetch
+      onClick={() => onNavigate(leaf.href)}
+      onPointerEnter={() => prefetch(leaf.href)}
+      onFocus={() => prefetch(leaf.href)}
       className={cn("nav-link", sub && "nav-sub-link", active && "active")}
       aria-current={active ? "page" : undefined}
     >

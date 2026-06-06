@@ -9,7 +9,7 @@ export function Skeleton({
 }) {
   return (
     <div
-      className={cn("animate-pulse rounded bg-bg-muted", className)}
+      className={cn("skeleton-shimmer rounded", className)}
       style={style}
       aria-hidden
     />

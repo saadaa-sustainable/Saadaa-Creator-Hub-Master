@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { DASHBOARD_TABS, TAB_LABELS, type DashboardTab } from "./tab-config";
 
@@ -27,8 +27,14 @@ import { DASHBOARD_TABS, TAB_LABELS, type DashboardTab } from "./tab-config";
  */
 export function DashboardTabs({ active }: { active: DashboardTab }) {
   const pathname = usePathname();
+  const router = useRouter();
   const params = useSearchParams();
   const tabRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+  const [optimisticActive, setOptimisticActive] = useState(active);
+
+  useEffect(() => {
+    setOptimisticActive(active);
+  }, [active]);
 
   // Build the href for a tab, preserving every other search param (filters)
   // and only swapping `?tab=`.
@@ -68,14 +74,16 @@ export function DashboardTabs({ active }: { active: DashboardTab }) {
       style={{ scrollbarWidth: "thin" }}
     >
       {DASHBOARD_TABS.map((tab, i) => {
-        const isActive = tab === active;
+        const href = hrefFor(tab);
+        const isActive = tab === optimisticActive;
+        const isPendingSelection = optimisticActive !== active && isActive;
         return (
           <Link
             key={tab}
             ref={(el) => {
               tabRefs.current[i] = el;
             }}
-            href={hrefFor(tab) as never}
+            href={href as never}
             prefetch
             scroll={false}
             role="tab"
@@ -83,8 +91,12 @@ export function DashboardTabs({ active }: { active: DashboardTab }) {
             aria-selected={isActive}
             aria-controls="dash-tabpanel"
             tabIndex={isActive ? 0 : -1}
+            onClick={() => setOptimisticActive(tab)}
+            onPointerEnter={() => router.prefetch(href as never)}
+            onFocus={() => router.prefetch(href as never)}
             onKeyDown={(e) => onKeyDown(e, i)}
             data-active={isActive ? "true" : undefined}
+            data-pending={isPendingSelection ? "true" : undefined}
             className={cn(
               // inline-flex + items-center so the <a> honours the [role=tab]
               // min-height touch target exactly as the old <button> did.
@@ -94,6 +106,7 @@ export function DashboardTabs({ active }: { active: DashboardTab }) {
               "focus-visible:outline-none focus-visible:ring-2",
               "focus-visible:ring-accent/60",
               !isActive && "text-text-secondary hover:text-text-primary",
+              isPendingSelection && "dash-tab-pill-pending",
             )}
           >
             {TAB_LABELS[tab]}

@@ -24,12 +24,17 @@ export default async function AppShell({
   }
 
   return (
-    <div>
+    <div className="app-shell">
+      <a href="#main-content" className="skip-link">
+        Skip to workspace
+      </a>
       <Sidebar actor={actor} />
       <SidebarScrim />
-      <div>
+      <div className="app-shell-main">
         <MobileTopbar />
-        <main className="main-content">{children}</main>
+        <main id="main-content" className="main-content" tabIndex={-1}>
+          {children}
+        </main>
       </div>
       <KnowMoreModal />
     </div>

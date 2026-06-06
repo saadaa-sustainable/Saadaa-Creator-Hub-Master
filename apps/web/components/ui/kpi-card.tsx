@@ -30,7 +30,7 @@ export function KpiCard({
 }: KpiCardProps) {
   return (
     <div
-      className="rounded-[var(--radius)] border border-border bg-bg-white px-4 py-3 min-w-[140px] flex flex-col gap-1"
+      className="flex min-w-[140px] flex-col gap-1 rounded-[var(--radius)] border border-border bg-bg-white px-4 py-3 shadow-sm transition-[border-color,box-shadow] duration-150 hover:border-border-strong hover:shadow-[0_10px_24px_-22px_rgba(22,21,19,0.3)]"
       role="figure"
       aria-label={label}
     >
@@ -42,7 +42,7 @@ export function KpiCard({
         aria-busy={loading}
       >
         {loading ? (
-          <span className="inline-block h-6 w-16 animate-pulse rounded bg-bg-muted" />
+          <span className="skeleton-shimmer inline-block h-6 w-16 rounded" />
         ) : (
           value
         )}
@@ -55,7 +55,7 @@ export function KpiCard({
 export function KpiStrip({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-4"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
       role="group"
       aria-label="Key performance indicators"
     >

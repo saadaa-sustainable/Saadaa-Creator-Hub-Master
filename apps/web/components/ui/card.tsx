@@ -16,7 +16,7 @@ export function Card({ className, ref, ...props }: BaseProps) {
     <div
       ref={ref}
       className={cn(
-        "rounded-md border border-border bg-bg-white text-text-primary shadow-sm",
+        "rounded-md border border-border bg-bg-white text-text-primary shadow-sm transition-[border-color,box-shadow] duration-150 ease-out focus-within:border-border-strong focus-within:shadow-[0_12px_28px_-24px_rgba(22,21,19,0.34)]",
         className,
       )}
       {...props}
@@ -28,7 +28,7 @@ export function CardHeader({ className, ref, ...props }: BaseProps) {
   return (
     <div
       ref={ref}
-      className={cn("flex flex-col gap-1.5 p-5 pb-3", className)}
+      className={cn("flex flex-col gap-1.5 p-5 pb-3 sm:p-6 sm:pb-3", className)}
       {...props}
     />
   );
@@ -66,14 +66,23 @@ export function CardDescription({
 }
 
 export function CardContent({ className, ref, ...props }: BaseProps) {
-  return <div ref={ref} className={cn("p-5 pt-0", className)} {...props} />;
+  return (
+    <div
+      ref={ref}
+      className={cn("p-5 pt-0 sm:p-6 sm:pt-0", className)}
+      {...props}
+    />
+  );
 }
 
 export function CardFooter({ className, ref, ...props }: BaseProps) {
   return (
     <div
       ref={ref}
-      className={cn("flex items-center gap-2 p-5 pt-0", className)}
+      className={cn(
+        "flex items-center gap-2 p-5 pt-0 sm:p-6 sm:pt-0",
+        className,
+      )}
       {...props}
     />
   );
