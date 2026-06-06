@@ -70,6 +70,26 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     return { ok: false, error: "Could not derive username from URL" };
   }
 
+  // Shrishti error-handling: duplicate-creator guard. Block re-reaching the
+  // same creator within the same campaign unless the prior collab was
+  // Cancelled (per-campaign; RTO/Delivered/etc. still count as active).
+  const { data: dupes } = await (supabase as any)
+    .from("posts")
+    .select("post_id, workflow_status")
+    .ilike("username", username)
+    .eq("campaign_id", v.campaignId)
+    .limit(10);
+  const activeDup = ((dupes ?? []) as Array<{ workflow_status: string | null }>).find(
+    (p) => String(p.workflow_status ?? "") !== "Cancelled",
+  );
+  if (activeDup) {
+    return {
+      ok: false,
+      error: "This creator is already in this campaign.",
+      fieldErrors: { instagramLink: "Already reached out in this campaign" },
+    };
+  }
+
   const { data, error } = await (supabase as any)
     .rpc("submit_reachout", {
       p_username: username,

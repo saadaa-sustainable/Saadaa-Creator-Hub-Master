@@ -79,6 +79,24 @@ export async function submitInboundBatch(
       });
       continue;
     }
+
+    // Shrishti duplicate-creator guard (per-campaign; Cancelled allows re-add).
+    // Sequential loop → a prior row's commit is visible to later rows, so
+    // intra-batch duplicates are caught too.
+    const { data: dupes } = await (supabase as any)
+      .from("posts")
+      .select("workflow_status")
+      .ilike("username", username)
+      .eq("campaign_id", campaignId)
+      .limit(10);
+    const activeDup = (
+      (dupes ?? []) as Array<{ workflow_status: string | null }>
+    ).some((p) => String(p.workflow_status ?? "") !== "Cancelled");
+    if (activeDup) {
+      failures.push({ row: i + 1, error: "Already in this campaign" });
+      continue;
+    }
+
     const contentName = findContentCode(r.contentCode)?.name ?? null;
 
     const { data, error } = await (supabase as any)
