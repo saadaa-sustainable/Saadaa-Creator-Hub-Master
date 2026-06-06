@@ -170,6 +170,9 @@ export async function fetchAccountsHubData(
     .filter((id): id is string => typeof id === "string" && id.length > 0);
 
   let paymentsByPostId = new Map<string, PaymentsRow>();
+  // Partial-payments: sum of all installment amounts (UTR-bearing rows) per
+  // post_id — the paid-so-far baseline. Drafts (null utr) never count.
+  const paidSoFarByPostId = new Map<string, number>();
   if (postIds.length > 0) {
     const { data: paymentsRaw, error: payErr } = await (supabase as any)
       .from("payments")
@@ -187,6 +190,13 @@ export async function fetchAccountsHubData(
       // first hit wins.
       if (!paymentsByPostId.has(row.post_id)) {
         paymentsByPostId.set(row.post_id, row);
+      }
+      // Accumulate paid-so-far across every installment row (those with a UTR).
+      if ((row.utr ?? "").trim().length > 0) {
+        paidSoFarByPostId.set(
+          row.post_id,
+          (paidSoFarByPostId.get(row.post_id) ?? 0) + Number(row.amount ?? 0),
+        );
       }
     }
   }
@@ -290,12 +300,17 @@ export async function fetchAccountsHubData(
           payment_advice_sent: false,
         };
       });
+    // Partial-payments model dropped UNIQUE(post_id) (swapped for
+    // UNIQUE(post_id, utr)), so onConflict:'post_id' is no longer valid. These
+    // candidates already have ZERO payment rows (filtered against
+    // paymentsByPostId above), so a plain insert is safe and preserves the
+    // at-most-one-null-utr-draft-per-collab invariant.
     const { data: inserted, error: insErr } = await (supabase as any)
       .from("payments")
-      .upsert(drafts, { onConflict: "post_id", ignoreDuplicates: true })
+      .insert(drafts)
       .select("*");
     if (insErr)
-      console.error("[accounts-hub] backfill upsert failed:", insErr.message);
+      console.error("[accounts-hub] backfill insert failed:", insErr.message);
       for (const row of (inserted ?? []) as PaymentsRow[]) {
         if (!paymentsByPostId.has(row.post_id)) {
           paymentsByPostId.set(row.post_id, row);
@@ -330,10 +345,27 @@ export async function fetchAccountsHubData(
       paymentsByPostId.set(p.post_id!, { ...pay, ...patch } as PaymentsRow);
   }
 
-  let rows: AccountsRow[] = posts.map((p) => ({
-    ...p,
-    payment: paymentsByPostId.get(p.post_id) ?? null,
-  }));
+  // Decorate a representative row with the partial-payments rollup. The
+  // representative's `commercial_amount` already holds the collab agreed total
+  // (summed above). paid-so-far is the sum of installment amounts; remainder is
+  // the still-owed balance; _isPartial is true while 0 < paid < total.
+  const decorate = (p: (typeof posts)[number]): AccountsRow => {
+    const payment = paymentsByPostId.get(p.post_id) ?? null;
+    const total = Number(p.commercial_amount ?? 0);
+    const paidSoFar = paidSoFarByPostId.get(p.post_id) ?? 0;
+    const remainder = Math.max(0, total - paidSoFar);
+    const isPartial =
+      paidSoFar > 0 && total > 0 && paidSoFar + 0.0001 < total;
+    return {
+      ...p,
+      payment,
+      _paidSoFar: paidSoFar,
+      _remainder: remainder,
+      _isPartial: isPartial,
+    };
+  };
+
+  let rows: AccountsRow[] = posts.map(decorate);
 
   // Apply free-text search + status filter in memory (cross-join would have
   // been a nightmare in PostgREST; dataset is bounded by .limit(2000)).
@@ -362,10 +394,7 @@ export async function fetchAccountsHubData(
   // KPIs — derived BEFORE filters so they always reflect the corpus, NOT the
   // filter view. Matches legacy behavior (filter bar shows count chip; KPIs
   // stay global).
-  const corpus = posts.map((p) => ({
-    ...p,
-    payment: paymentsByPostId.get(p.post_id) ?? null,
-  }));
+  const corpus = posts.map(decorate);
   const kpi = computeKpi(corpus);
 
   return { rows, kpi };
@@ -379,33 +408,50 @@ function computeKpi(rows: AccountsRow[]): AccountsKpi {
   let dueSum = 0;
   let doneCount = 0;
   let doneSum = 0;
+  let partialCount = 0;
+  let partialOutstanding = 0;
   let totalPayable = 0;
 
   for (const r of rows) {
     if (!KPI_STAGES.has(String(r.workflow_status))) continue;
     postsDone++;
-    const amount = Number(
-      r.payment?.amount ?? r.commercial_amount ?? 0,
-    );
-    totalPayable += amount;
+    // totalPayable tracks the agreed collab total (commercial_amount), not the
+    // latest installment, so a partially-paid collab still contributes its full
+    // value to the payable corpus.
+    const total = Number(r.commercial_amount ?? 0);
+    totalPayable += total;
+
+    // Partial takes precedence: a collab with a balance outstanding belongs in
+    // the Partial / Outstanding bucket regardless of the latest row's status.
+    if (r._isPartial) {
+      partialCount++;
+      partialOutstanding += Number(r._remainder ?? 0);
+      continue;
+    }
 
     const status = r.payment?.status ?? null;
     switch (status) {
       case "Not Due":
         notDueCount++;
-        notDueSum += amount;
+        notDueSum += total;
         break;
       case "Due":
         dueCount++;
-        dueSum += amount;
+        dueSum += total;
+        break;
+      case "Partial":
+        // Defensive: status says Partial but no remainder computed (e.g. data
+        // drift). Treat as outstanding with whatever balance we have.
+        partialCount++;
+        partialOutstanding += Number(r._remainder ?? total);
         break;
       case "Done":
         doneCount++;
-        doneSum += amount;
+        doneSum += total;
         break;
       default:
         notDueCount++;
-        notDueSum += amount;
+        notDueSum += total;
     }
   }
 
@@ -414,6 +460,7 @@ function computeKpi(rows: AccountsRow[]): AccountsKpi {
     notDue: { count: notDueCount, sum: notDueSum },
     due: { count: dueCount, sum: dueSum },
     done: { count: doneCount, sum: doneSum },
+    partial: { count: partialCount, sum: partialOutstanding },
     totalPayable,
   };
 }
@@ -429,7 +476,7 @@ export const fetchAccountsFilterOptions = unstable_cache(
       .limit(200);
     return {
       campaigns: campaigns ?? [],
-      statuses: ["Not Due", "Due", "Done"] as const,
+      statuses: ["Not Due", "Due", "Partial", "Done"] as const,
       adsRights: ["yes", "no"] as const,
     };
   },

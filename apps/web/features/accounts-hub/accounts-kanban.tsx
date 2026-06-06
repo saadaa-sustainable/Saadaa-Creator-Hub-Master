@@ -14,6 +14,7 @@ import {
   PaymentDateCell,
   PaymentStatusPill,
   PostedNotTestedPill,
+  RemainderPill,
   UtrCell,
 } from "./columns";
 import { KANBAN_COLUMNS, type AccountsRow } from "./types";
@@ -174,6 +175,7 @@ function KanbanCard({
         )}
         <AdsPartnershipPill row={row} />
         <PostedNotTestedPill row={row} />
+        <RemainderPill row={row} />
         <MatchStatusPill row={row} />
       </div>
 

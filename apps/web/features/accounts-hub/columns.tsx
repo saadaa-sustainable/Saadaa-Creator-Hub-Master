@@ -18,6 +18,16 @@ export function PaymentStatusPill({
   if (value === "Done") {
     return <span className="kb-pill kb-pill--done">Paid</span>;
   }
+  if (value === "Partial") {
+    return (
+      <span
+        className="kb-pill kb-pill--warning"
+        title="Part of the agreed amount has been paid — a balance is still outstanding."
+      >
+        Partial
+      </span>
+    );
+  }
   if (value === "Due") {
     return <span className="kb-pill kb-pill--due">Due</span>;
   }
@@ -27,9 +37,37 @@ export function PaymentStatusPill({
   return <span className="kb-pill kb-pill--muted">{value}</span>;
 }
 
+/**
+ * Outstanding-balance pill — shown on partially-paid collabs (an installment
+ * is recorded but the agreed total isn't met yet). Surfaces the remaining
+ * amount the operator still has to pay. Part of the user's "full payment not
+ * done" alert.
+ */
+export function RemainderPill({ row }: { row: AccountsRow }) {
+  if (!row._isPartial) return null;
+  const remainder = Number(row._remainder ?? 0);
+  if (remainder <= 0) return null;
+  const total = Number(row.commercial_amount ?? 0);
+  const paid = Number(row._paidSoFar ?? 0);
+  return (
+    <span
+      className="kb-pill kb-pill--warning"
+      title={`Paid ${formatRupees(paid)} of ${formatRupees(total)}. Balance pending.`}
+    >
+      <AlertTriangle size={10} aria-hidden />
+      {formatRupees(remainder)} due
+    </span>
+  );
+}
+
 /** Match-status pill (computed live; not stored on DB). */
 export function MatchStatusPill({ row }: { row: AccountsRow }) {
-  const paid = Number(row.payment?.amount ?? 0);
+  // Partial collabs are surfaced by the RemainderPill instead — a partial is a
+  // deliberate installment, NOT a mismatch, so don't flag it as "Off by".
+  if (row._isPartial) return null;
+  // Compare paid-so-far (sum of installments) against the agreed total so a
+  // fully-paid-over-multiple-installments collab still reads as Matched.
+  const paid = Number(row._paidSoFar ?? row.payment?.amount ?? 0);
   const commercial = Number(row.commercial_amount ?? 0);
   const status: MatchStatus = computeMatchStatus(paid, commercial);
   // Only show after a real payment is logged (UTR present). Draft rows have
@@ -122,12 +160,24 @@ export function CreatorCell({ row }: { row: AccountsRow }) {
 }
 
 export function AmountCell({ row }: { row: AccountsRow }) {
-  const paid = row.payment?.amount;
-  const commercial = row.commercial_amount;
-  const value = paid ?? commercial;
+  // Always show the agreed collab total (commercial_amount holds the summed
+  // collab total on the representative row). For partial collabs we add a
+  // "paid of total" subline so the operator sees progress at a glance.
+  const total = row.commercial_amount ?? row.payment?.amount;
+  if (row._isPartial) {
+    const paid = Number(row._paidSoFar ?? 0);
+    return (
+      <span className="tabular">
+        {total != null ? formatRupees(Number(total)) : "—"}
+        <span className="block text-[0.65rem] text-warning-text leading-tight">
+          {formatRupees(paid)} paid
+        </span>
+      </span>
+    );
+  }
   return (
     <span className="tabular">
-      {value != null ? formatRupees(Number(value)) : "—"}
+      {total != null ? formatRupees(Number(total)) : "—"}
     </span>
   );
 }

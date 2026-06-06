@@ -13,6 +13,7 @@ import {
   Banknote,
   CalendarCheck,
   CheckCircle2,
+  CircleDollarSign,
   ClipboardPaste,
   Hash,
   Link2,
@@ -363,7 +364,7 @@ export function PaymentEntryPanel() {
           }
         }
         if (dupBlocked.has(pid))
-          reasons.push("already paid (Done) or duplicate UTR");
+          reasons.push("collab already fully paid or duplicate UTR");
         return reasons.length > 0 ? reasons.join(" · ") : "blocked";
       };
 
@@ -400,8 +401,17 @@ export function PaymentEntryPanel() {
           (pid) => `${shortenPostId(pid)} — ${renderReason(pid)}`,
         );
         toast.warning(
-          `${res.saved} saved (${res.paid} paid · ${res.due} due), ${blockedOrdered.length} blocked`,
+          `${res.saved} saved (${res.paid} paid · ${res.partial} partial · ${res.due} due), ${blockedOrdered.length} blocked`,
           { description: lines.join("\n"), duration: 10000 },
+        );
+      } else if (res.partial > 0) {
+        toast.success(
+          `${res.saved} saved (${res.paid} paid · ${res.partial} partial · ${res.due} due)`,
+          {
+            description:
+              "Partial payments recorded — the remaining balance stays outstanding until the collab total is paid.",
+            duration: 8000,
+          },
         );
       } else {
         toast.success(
@@ -712,10 +722,22 @@ function MatchBadge({
       </div>
     );
   }
+  // Amount LESS than the agreed total is a valid PARTIAL installment, not an
+  // error. Surface the remaining balance instead of an "Off by" warning.
+  if (entered < commercial) {
+    return (
+      <div className="acc-entry-match acc-entry-match--partial">
+        <CircleDollarSign size={11} aria-hidden />
+        Partial · {formatRupees(commercial - entered)} will stay due of{" "}
+        {formatRupees(commercial)}
+      </div>
+    );
+  }
+  // Amount GREATER than the agreed total — still a genuine mismatch to flag.
   return (
     <div className="acc-entry-match acc-entry-match--off">
       <AlertTriangle size={11} aria-hidden />
-      Off by {formatRupees(Math.abs(diff))} · Agreed {formatRupees(commercial)}
+      Over by {formatRupees(diff)} · Agreed {formatRupees(commercial)}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
   PaymentDateCell,
   PaymentStatusPill,
   PostedNotTestedPill,
+  RemainderPill,
   UtrCell,
 } from "./columns";
 import type { AccountsRow } from "./types";
@@ -79,6 +80,7 @@ export function AccountsTable({ rows }: { rows: AccountsRow[] }) {
         cell: ({ row }) => (
           <span className="acc-status-stack">
             <PaymentStatusPill status={row.original.payment?.status} />
+            <RemainderPill row={row.original} />
             <MatchStatusPill row={row.original} />
             <AdsPartnershipPill row={row.original} />
             <PostedNotTestedPill row={row.original} />
@@ -183,6 +185,7 @@ function AccountsListMobileCard({ row }: { row: AccountsRow }) {
         </dd>
       </dl>
       <div className="flex flex-wrap gap-0.5 mt-0.5">
+        <RemainderPill row={row} />
         <MatchStatusPill row={row} />
         <AdsPartnershipPill row={row} />
         <PostedNotTestedPill row={row} />

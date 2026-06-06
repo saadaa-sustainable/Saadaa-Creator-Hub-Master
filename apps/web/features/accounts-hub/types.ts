@@ -64,6 +64,17 @@ export interface AccountsRow {
    * persisted.
    */
   _collabDeliverableCount?: number;
+
+  /**
+   * Partial-payments rollup (presentation-only, computed in queries.ts):
+   *   _paidSoFar  — sum of all installment amounts (UTR-bearing rows) for the
+   *                 collab.
+   *   _remainder  — collab agreed total − paid-so-far (clamped ≥ 0).
+   *   _isPartial  — true when 0 < paid < total (balance outstanding).
+   */
+  _paidSoFar?: number;
+  _remainder?: number;
+  _isPartial?: boolean;
 }
 
 export interface AccountsKpi {
@@ -71,6 +82,12 @@ export interface AccountsKpi {
   notDue: { count: number; sum: number };
   due: { count: number; sum: number };
   done: { count: number; sum: number };
+  /**
+   * Partially-paid collabs (an installment is recorded but the agreed total
+   * is not yet met). `sum` is the total OUTSTANDING balance across them — the
+   * money still owed. Drives the Accounts Hub outstanding alert + KPI card.
+   */
+  partial: { count: number; sum: number };
   totalPayable: number;
 }
 

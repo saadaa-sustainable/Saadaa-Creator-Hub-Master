@@ -7783,11 +7783,17 @@ body:has(.km-backdrop) {
    Mirrors legacy `view-accounts` (Index.html:6868-7059).
    ============================================================ */
 
-/* KPI strip — 4 cards across, collapses on small viewports. */
+/* KPI strip — 5 cards across (incl. Partial/Outstanding), collapses on small
+   viewports. Fixed column counts per breakpoint (no auto-fit). */
 .acc-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
+}
+@media (max-width: 1200px) {
+  .acc-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 @media (max-width: 900px) {
   .acc-kpi-grid {
@@ -7819,6 +7825,74 @@ body:has(.km-backdrop) {
   border-top-left-radius: 12px;
   border-bottom-left-radius: 12px;
 }
+/* Outstanding-balance alert — partial-payments "full payment not done" banner,
+   rendered above the board. Uses the warning palette so it reads as an action
+   item without the hard-stop weight of a danger banner. */
+.acc-outstanding-alert {
+  border: 1px solid var(--color-warning-text, #b57514);
+  background: var(--color-warning-bg, #faf1dc);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.acc-outstanding-alert__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-warning-text, #b57514);
+}
+.acc-outstanding-alert__title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+.acc-outstanding-alert__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 18px;
+}
+@media (max-width: 700px) {
+  .acc-outstanding-alert__list {
+    grid-template-columns: 1fr;
+  }
+}
+.acc-outstanding-alert__list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary, #6e695e);
+  min-width: 0;
+}
+.acc-outstanding-alert__who {
+  font-weight: 600;
+  color: var(--color-text-primary, #161513);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.acc-outstanding-alert__bal {
+  font-weight: 700;
+  color: var(--color-warning-text, #b57514);
+  white-space: nowrap;
+}
+.acc-outstanding-alert__of {
+  font-weight: 500;
+  color: var(--color-text-tertiary, #9a9384);
+}
+.acc-outstanding-alert__more {
+  font-style: italic;
+  color: var(--color-text-tertiary, #9a9384);
+}
+
 .acc-kpi--accent::before {
   background: var(--color-accent, #f0c61e);
 }
@@ -8608,6 +8682,10 @@ body:has(.km-backdrop) {
   background: var(--color-warning-bg, #faf1dc);
   color: var(--color-warning-text, #b57514);
 }
+.kb-pill--warning {
+  background: var(--color-warning-bg, #faf1dc);
+  color: var(--color-warning-text, #b57514);
+}
 .kb-pill--done {
   background: var(--color-success-bg, #ecf1e9);
   color: var(--color-success-text, #4f7c4d);
@@ -9070,6 +9148,10 @@ body:has(.km-backdrop) {
 .acc-entry-match--off {
   background: var(--color-danger-bg, #fdecea);
   color: var(--color-danger-text, #c0392b);
+}
+.acc-entry-match--partial {
+  background: var(--color-warning-bg, #faf1dc);
+  color: var(--color-warning-text, #b57514);
 }
 .acc-entry-add {
   align-self: flex-start;

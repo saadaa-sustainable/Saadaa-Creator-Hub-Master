@@ -1,4 +1,10 @@
-import { Banknote, CheckCircle2, CircleDollarSign, Clock } from "lucide-react";
+import {
+  AlertTriangle,
+  Banknote,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock,
+} from "lucide-react";
 import { formatRupees } from "@/lib/formatters";
 import type { AccountsKpi } from "./types";
 
@@ -36,6 +42,17 @@ export function AccountsKpiStrip({ kpi }: { kpi: AccountsKpi }) {
         secondary={formatRupees(kpi.due.sum)}
       />
       <KpiCard
+        tone="danger"
+        icon={<AlertTriangle size={16} aria-hidden />}
+        label="Partial / Outstanding"
+        primary={String(kpi.partial.count)}
+        secondary={
+          kpi.partial.count > 0
+            ? `${formatRupees(kpi.partial.sum)} balance pending`
+            : "All settled"
+        }
+      />
+      <KpiCard
         tone="success"
         icon={<Banknote size={16} aria-hidden />}
         label="Done"
@@ -53,7 +70,7 @@ function KpiCard({
   primary,
   secondary,
 }: {
-  tone: "accent" | "muted" | "warning" | "success";
+  tone: "accent" | "muted" | "warning" | "success" | "danger";
   icon: React.ReactNode;
   label: string;
   primary: string;

@@ -79,6 +79,7 @@ export function AdResultPill({ result }: { result: AdResult | null }) {
 const paymentToneMap: Record<PaymentStatus, PillTone> = {
   "Not Due": "neutral",
   Due: "warning",
+  Partial: "warning",
   Done: "success",
 };
 

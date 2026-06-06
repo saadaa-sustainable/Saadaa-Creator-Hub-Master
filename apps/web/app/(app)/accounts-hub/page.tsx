@@ -6,6 +6,7 @@ import { AccountsBoard } from "@/features/accounts-hub/accounts-board";
 import { AccountsExportBar } from "@/features/accounts-hub/export-bar";
 import { AccountsFiltersBar } from "@/features/accounts-hub/filters";
 import { AccountsKpiStrip } from "@/features/accounts-hub/kpi-strip";
+import { OutstandingAlert } from "@/features/accounts-hub/outstanding-alert";
 import { PaymentEntryPanel } from "@/features/accounts-hub/payment-form";
 import {
   fetchAccountsFilterOptions,
@@ -66,13 +67,18 @@ async function AccountsBoardSection({
   filters: AccountsFilters;
 }) {
   const { rows } = await fetchAccountsHubData(filters);
-  return <AccountsBoard rows={rows} />;
+  return (
+    <>
+      <OutstandingAlert rows={rows} />
+      <AccountsBoard rows={rows} />
+    </>
+  );
 }
 
 function KpiSkeleton() {
   return (
     <div className="acc-kpi-grid">
-      {[0, 1, 2, 3].map((i) => (
+      {[0, 1, 2, 3, 4].map((i) => (
         <div key={i} className="acc-kpi acc-kpi--skeleton" aria-hidden />
       ))}
     </div>

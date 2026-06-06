@@ -33,7 +33,7 @@ export type AdResult =
   | "Discarded"
   | "Discarded but analyse"
   | "Pending";
-export type PaymentStatus = "Not Due" | "Due" | "Done";
+export type PaymentStatus = "Not Due" | "Due" | "Partial" | "Done";
 
 export interface PostsRow {
   id: string;

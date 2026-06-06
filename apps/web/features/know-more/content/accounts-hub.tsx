@@ -19,8 +19,16 @@ export default function AccountsHubKM() {
             status, ads rights.
           </li>
           <li>
-            <strong>3. KPI strip</strong> — Posts Done · Not Due · Due · Done
-            (4 cards with rupee totals).
+            <strong>3. KPI strip</strong> — Posts Done · Not Due · Due ·
+            Partial / Outstanding · Done (5 cards with rupee totals). The
+            Partial / Outstanding card shows how many collabs are part-paid and
+            the total balance still owed.
+          </li>
+          <li>
+            <strong>3b. Outstanding alert</strong> — a banner above the board
+            listing every partially-paid collab + its remaining balance
+            whenever full payment isn&apos;t done. Silent when nothing is
+            outstanding.
           </li>
           <li>
             <strong>4. Toolbar</strong> — Downloads (Due CSV · Paid CSV ·
@@ -46,11 +54,15 @@ export default function AccountsHubKM() {
           <li>
             <strong>status</strong> · <KMCode>Not Due</KMCode> →{" "}
             <KMCode>Due</KMCode> (cron after due_date) →{" "}
-            <KMCode>Done</KMCode> (UTR added).
+            <KMCode>Partial</KMCode> (an installment paid, balance still owed) →{" "}
+            <KMCode>Done</KMCode> (collab total fully paid).
           </li>
           <li>
             <strong>amount · utr · payment_date</strong> · what was paid and
-            when. UTR is the cross-post dedup key.
+            when. Each installment is its own row carrying a distinct UTR;{" "}
+            <KMCode>(post_id, utr)</KMCode> is the dedup key (multiple
+            installments per collab are allowed). The auto-init draft row has a
+            null UTR and never counts toward paid-so-far.
           </li>
           <li>
             <strong>due_date · estimated_payable_date</strong> · due_date =
@@ -156,9 +168,45 @@ export default function AccountsHubKM() {
           (lowest post_id). When it is marked Paid, every other deliverable of
           the collab has its <KMCode>posts.payment_status</KMCode> cascaded to{" "}
           <KMCode>Done</KMCode> and any stray payment rows on those deliverables
-          are removed — no double-counting. (Partial payments are not yet
-          supported; the full collab amount is paid in one row.)
+          are removed — no double-counting.
         </KMCallout>
+      </KMSection>
+
+      <KMSection tag="Partial payments (installments)">
+        <p>
+          A collab&apos;s agreed total can be paid in <strong>installments</strong>.
+          Enter an amount <strong>less than the collab total</strong> in the Log
+          Payments form — the inline badge confirms{" "}
+          <KMCode>Partial · ₹X will stay due</KMCode> (an under-payment is NOT
+          an error). On submit:
+        </p>
+        <KMList>
+          <li>
+            Each installment is recorded as a <strong>new payment row</strong>{" "}
+            with its own UTR (never an overwrite). Paid-so-far ={" "}
+            <KMCode>sum of all installment amounts</KMCode> for the collab.
+          </li>
+          <li>
+            <KMCode>0 &lt; paid &lt; total</KMCode> → collab status{" "}
+            <KMCode>Partial</KMCode>: a <KMCode>Partial</KMCode> pill + a{" "}
+            <KMCode>₹remainder due</KMCode> pill show on the card, the
+            board-top alert lists it, and the Partial / Outstanding KPI tallies
+            the balance.
+          </li>
+          <li>
+            <KMCode>paid ≥ total</KMCode> → collab flips to <KMCode>Done</KMCode>{" "}
+            and cascades to every deliverable (same as a single full payment).
+          </li>
+          <li>
+            A collab that is <strong>already fully paid</strong> blocks further
+            installments (reported as a duplicate). Re-submitting the same UTR
+            on a post is also blocked.
+          </li>
+        </KMList>
+        <p>
+          The Due CSV export includes Partial collabs (balance still owed) with{" "}
+          <KMCode>Paid So Far</KMCode> + <KMCode>Outstanding</KMCode> columns.
+        </p>
       </KMSection>
 
       <KMSection tag="Exports + cron">
