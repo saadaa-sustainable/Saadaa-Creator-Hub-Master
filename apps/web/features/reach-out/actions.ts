@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { ReachOutSchema } from "./schema";
 import { assertPermission } from "@/lib/rbac.server";
@@ -14,6 +15,10 @@ export type ReachOutResult =
       collabNumber: number;
       infId: string;
     }
+  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+export type ReachOutEditResult =
+  | { ok: true; postId: string; message: string }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 function extractUsernameFromInput(input: string): string {
@@ -181,6 +186,158 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     postNumber: row.post_number,
     collabNumber: row.collab_number,
     infId: row.inf_id,
+  };
+}
+
+// ----------------------------------------------------------------------------
+// Edit reach-out — DECISION D7 (applied).
+//
+// Only CONTENT fields are editable: contentType (persisted to posts.content_type)
+// and contentName (legacy nomenclature segment — not a posts column, so it only
+// affects the rebuilt nomenclature string).
+//
+// Creator metadata (followers / verification / inf_id / username) is FROZEN once
+// the collab has progressed past "Reach Out". An edit that tries to change any
+// frozen field after that point is REJECTED. While still in "Reach Out", those
+// fields live on `creators`, not `posts`, so they are not edited here either —
+// re-run the IG lookup / onboarding flow to refresh creator metadata.
+//
+// TODO(UI wiring): no standalone "existing reach-outs" list exists yet — reach-
+// out posts surface inside the Onboarding board and Journey timeline. When an
+// edit affordance is added there, render an inline content-type <select>
+// (CONTENT_CODES) on the card and call editReachOut(post.post_id, { contentType,
+// contentName }). The action already enforces D7 freezing, so the UI only needs
+// to disable the control (or show the lock reason) when workflow_status leaves
+// "Reach Out". Deferred here: threading an editor into the kanban card is a
+// larger board change with no obvious single home, out of scope for this wave.
+// ----------------------------------------------------------------------------
+
+const ReachOutEditSchema = z.object({
+  contentType: z.string().trim().min(1, "Content type required"),
+  contentName: z.string().trim().optional().default(""),
+  // Frozen creator metadata — accepted so callers can pass the full form, but
+  // only used to DETECT an attempted change vs. the stored row. Never written.
+  followers: z.coerce.number().int().nonnegative().optional(),
+  verification: z.enum(["Verified", "Non-Verified", "Pending"]).optional(),
+  influencerName: z.string().trim().optional(),
+  username: z.string().trim().optional(),
+});
+
+export async function editReachOut(
+  postId: string,
+  input: unknown,
+): Promise<ReachOutEditResult> {
+  await assertPermission("reachout_outbound");
+
+  const id = (postId ?? "").trim();
+  if (!id) return { ok: false, error: "Post ID is required." };
+
+  const parsed = ReachOutEditSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const path = issue.path.join(".");
+      if (!fieldErrors[path]) fieldErrors[path] = issue.message;
+    }
+    return { ok: false, error: "Validation failed", fieldErrors };
+  }
+
+  const v = parsed.data;
+  const supabase = createServiceClient();
+
+  const { data: post, error: postErr } = await (supabase as any)
+    .from("posts")
+    .select("post_id, username, inf_id, content_type, workflow_status")
+    .eq("post_id", id)
+    .maybeSingle();
+  if (postErr) return { ok: false, error: postErr.message };
+  if (!post) return { ok: false, error: `Reach-out ${id} not found.` };
+
+  const stage = String(post.workflow_status ?? "");
+  const isFrozen = stage !== "" && stage !== "Reach Out";
+
+  // D7 — reject attempts to mutate frozen creator metadata past Reach Out.
+  if (isFrozen) {
+    const frozenViolations: string[] = [];
+    if (
+      v.username != null &&
+      v.username.toLowerCase() !==
+        String(post.username ?? "").toLowerCase()
+    ) {
+      frozenViolations.push("username");
+    }
+    // followers / verification / influencerName live on `creators` and are
+    // surfaced read-only; any inbound value differing from the frozen snapshot
+    // is a violation. We only have username/inf_id on the post row, so compare
+    // the creator-owned fields against the live creators row.
+    if (
+      v.followers != null ||
+      v.verification != null ||
+      (v.influencerName != null && v.influencerName !== "")
+    ) {
+      const { data: creator } = await (supabase as any)
+        .from("creators")
+        .select("followers, verification, inf_name")
+        .eq("inf_id", post.inf_id)
+        .maybeSingle();
+      const curVer =
+        creator?.verification === "Yes"
+          ? "Verified"
+          : creator?.verification === "No"
+            ? "Non-Verified"
+            : null;
+      if (v.followers != null && creator && v.followers !== creator.followers) {
+        frozenViolations.push("followers");
+      }
+      if (
+        v.verification != null &&
+        v.verification !== "Pending" &&
+        curVer != null &&
+        v.verification !== curVer
+      ) {
+        frozenViolations.push("verification");
+      }
+      if (
+        v.influencerName != null &&
+        v.influencerName !== "" &&
+        creator?.inf_name != null &&
+        v.influencerName !== creator.inf_name
+      ) {
+        frozenViolations.push("name");
+      }
+    }
+    if (frozenViolations.length > 0) {
+      return {
+        ok: false,
+        error: `Creator details are locked once a collab leaves Reach Out. Cannot edit: ${frozenViolations.join(", ")}.`,
+      };
+    }
+  }
+
+  // Persist content edit. content_name has no posts column; it only feeds the
+  // legacy nomenclature string, which we rebuild to stay consistent.
+  const username = String(post.username ?? "");
+  const { error: updateErr } = await (supabase as any)
+    .from("posts")
+    .update({
+      content_type: v.contentType,
+      nomenclature: buildLegacyNomenclature(id, username, v.contentType),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("post_id", id);
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
+
+  revalidateTag("posts");
+  revalidatePath("/reach-out/outbound");
+  revalidatePath("/onboarding");
+  revalidatePath("/journey");
+
+  return {
+    ok: true,
+    postId: id,
+    message: `Reach-out ${id} updated.`,
   };
 }
 

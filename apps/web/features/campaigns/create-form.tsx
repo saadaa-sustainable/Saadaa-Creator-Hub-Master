@@ -27,7 +27,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
-import { submitCampaign } from "./actions";
+import { submitCampaign, editCampaign } from "./actions";
 import {
   CampaignCreateSchema,
   CAMPAIGN_DEFAULTS,
@@ -65,12 +65,30 @@ function blockNonNumericChromeKeys(event: KeyboardEvent<HTMLInputElement>) {
 
 type CapState = "none" | "under" | "at" | "over";
 
-export function CampaignCreateForm() {
+export interface CampaignCreateFormProps {
+  /** "create" (default) submits via submitCampaign; "edit" via editCampaign. */
+  mode?: "create" | "edit";
+  /** Pre-fill values when editing an existing campaign. */
+  initial?: CampaignCreateInput;
+  /** Required in edit mode — the IFC{NNN} of the campaign being edited. */
+  campaignId?: string;
+  /** Called after a successful edit (e.g. close the modal + refresh). */
+  onEdited?: () => void;
+}
+
+export function CampaignCreateForm({
+  mode = "create",
+  initial,
+  campaignId,
+  onEdited,
+}: CampaignCreateFormProps = {}) {
   const router = useRouter();
+  const isEdit = mode === "edit";
   const [submitting, startSubmit] = useTransition();
   const [lastCampNameForSegment, setLastCampNameForSegment] = useState("");
   const [submitAttempted, setSubmitAttempted] = useState(false);
-  const seededRef = useRef(false);
+  // In edit mode, rows are prefilled — suppress the auto-seed effect.
+  const seededRef = useRef(isEdit);
 
   const {
     register,
@@ -82,7 +100,7 @@ export function CampaignCreateForm() {
     formState: { errors },
   } = useForm<CampaignCreateInput>({
     resolver: zodResolver(CampaignCreateSchema),
-    defaultValues: CAMPAIGN_DEFAULTS,
+    defaultValues: initial ?? CAMPAIGN_DEFAULTS,
     mode: "onBlur",
     criteriaMode: "all",
     reValidateMode: "onChange",
@@ -110,14 +128,16 @@ export function CampaignCreateForm() {
   }
 
   // ── Effect: seed 2 default rows on first numCreators entry (legacy) ────
+  // Skipped in edit mode — rows arrive prefilled from the existing campaign.
   useEffect(() => {
+    if (isEdit) return;
     if (hasCap && rows.length === 0 && !seededRef.current) {
       seededRef.current = true;
       append(makeBudgetRow({ collabType: "Barter", campaignName: campName }));
       append(makeBudgetRow({ collabType: "Paid", campaignName: campName }));
     }
     if (!hasCap) seededRef.current = false;
-  }, [hasCap, rows.length, campName, append]);
+  }, [isEdit, hasCap, rows.length, campName, append]);
 
   // ── Effect: sync segment col with Campaign Name (legacy) ──────────────
   useEffect(() => {
@@ -149,6 +169,22 @@ export function CampaignCreateForm() {
 
   const onSubmit = (values: CampaignCreateInput) => {
     startSubmit(async () => {
+      if (isEdit) {
+        if (!campaignId) {
+          toast.error("Missing campaign ID for edit.");
+          return;
+        }
+        const res = await editCampaign(campaignId, values);
+        if (!res.ok) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success(res.message);
+        if (res.warning) toast.warning(res.warning);
+        router.refresh();
+        onEdited?.();
+        return;
+      }
       const res = await submitCampaign(values);
       if (!res.ok) {
         toast.error(res.error);
@@ -267,8 +303,12 @@ export function CampaignCreateForm() {
           <PlusCircle size={17} />
         </span>
         <div className="campaign-form-header__copy">
-          <h1>Create Campaign</h1>
-          <p>Campaign details, cap, and tracker budget in one pass.</p>
+          <h1>{isEdit ? `Edit Campaign ${campaignId ?? ""}`.trim() : "Create Campaign"}</h1>
+          <p>
+            {isEdit
+              ? "Update details, creator count, and budget. Existing reach-out commercials are unchanged."
+              : "Campaign details, cap, and tracker budget in one pass."}
+          </p>
         </div>
       </div>
 
@@ -887,12 +927,12 @@ export function CampaignCreateForm() {
           {submitting ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              Creating...
+              {isEdit ? "Saving..." : "Creating..."}
             </>
           ) : (
             <>
               <CheckCircle2 size={14} />
-              Create Campaign
+              {isEdit ? "Save Changes" : "Create Campaign"}
             </>
           )}
         </button>

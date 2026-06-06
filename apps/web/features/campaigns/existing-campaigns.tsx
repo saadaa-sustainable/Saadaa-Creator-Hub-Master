@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   CalendarDays,
@@ -8,16 +8,27 @@ import {
   Eye,
   FileText,
   IndianRupee,
+  Loader2,
+  Pencil,
   Plus,
   Target,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import type { CampaignListRow } from "./queries";
+import { fetchCampaignForEdit } from "./actions";
+import { CampaignCreateForm } from "./create-form";
+import type { CampaignCreateInput } from "./schema";
 
 interface ExistingCampaignsProps {
   campaigns: CampaignListRow[];
   showCreateAction?: boolean;
+}
+
+interface EditTarget {
+  campaignId: string;
+  initial: CampaignCreateInput;
 }
 
 function normalizeNumber(
@@ -37,6 +48,23 @@ export function ExistingCampaigns({
   showCreateAction = false,
 }: ExistingCampaignsProps) {
   const [selected, setSelected] = useState<CampaignListRow | null>(null);
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
+  const [, startLoadEdit] = useTransition();
+
+  const openEdit = (campaignId: string) => {
+    setLoadingEditId(campaignId);
+    startLoadEdit(async () => {
+      const res = await fetchCampaignForEdit(campaignId);
+      setLoadingEditId(null);
+      if (!res) {
+        toast.error(`Could not load ${campaignId} for editing.`);
+        return;
+      }
+      setSelected(null);
+      setEditTarget(res);
+    });
+  };
   const stats = useMemo(() => {
     const totalBudget = campaigns.reduce(
       (sum, c) => sum + (normalizeNumber(c.total_budget) ?? 0),
@@ -167,6 +195,22 @@ export function ExistingCampaigns({
                   <Eye size={12} />
                   View Details
                 </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-xs"
+                  disabled={loadingEditId === campaign.campaign_id}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    openEdit(campaign.campaign_id);
+                  }}
+                >
+                  {loadingEditId === campaign.campaign_id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Pencil size={12} />
+                  )}
+                  Edit
+                </button>
                 {campaign.brief_link && (
                   <a
                     href={campaign.brief_link}
@@ -188,18 +232,73 @@ export function ExistingCampaigns({
         <CampaignDetailsModal
           campaign={selected}
           onClose={() => setSelected(null)}
+          onEdit={() => openEdit(selected.campaign_id)}
+          editLoading={loadingEditId === selected.campaign_id}
+        />
+      )}
+
+      {editTarget && (
+        <CampaignEditModal
+          target={editTarget}
+          onClose={() => setEditTarget(null)}
         />
       )}
     </section>
   );
 }
 
+function CampaignEditModal({
+  target,
+  onClose,
+}: {
+  target: EditTarget;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-panel campaign-edit-modal"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="modal-head">
+          <div className="min-w-0">
+            <div className="campaign-card__id-row">
+              <strong>{target.campaignId}</strong>
+            </div>
+            <h2>Edit campaign</h2>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close edit campaign"
+          >
+            <X size={14} />
+          </button>
+        </header>
+        <div className="modal-body campaign-edit-body">
+          <CampaignCreateForm
+            mode="edit"
+            campaignId={target.campaignId}
+            initial={target.initial}
+            onEdited={onClose}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CampaignDetailsModal({
   campaign,
   onClose,
+  onEdit,
+  editLoading,
 }: {
   campaign: CampaignListRow;
   onClose: () => void;
+  onEdit: () => void;
+  editLoading: boolean;
 }) {
   const target = normalizeNumber(campaign.no_of_creators);
   const budgetRows = campaign.budget_rows ?? [];
@@ -224,14 +323,29 @@ function CampaignDetailsModal({
             </div>
             <h2>{campaign.campaign_name ?? "Untitled campaign"}</h2>
           </div>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={onClose}
-            aria-label="Close campaign details"
-          >
-            <X size={14} />
-          </button>
+          <div className="modal-head__actions">
+            <button
+              type="button"
+              className="btn btn-secondary btn-xs"
+              onClick={onEdit}
+              disabled={editLoading}
+            >
+              {editLoading ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <Pencil size={12} />
+              )}
+              Edit
+            </button>
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={onClose}
+              aria-label="Close campaign details"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </header>
 
         <div className="modal-body campaign-detail-body">

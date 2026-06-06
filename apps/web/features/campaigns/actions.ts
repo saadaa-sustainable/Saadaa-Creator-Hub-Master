@@ -7,6 +7,9 @@ import {
   CampaignCreateSchema,
   computeRowEstGarment,
   computeTotals,
+  INFLUENCER_TIERS,
+  MIN_GARMENTS_FIXED,
+  type CampaignCreateInput,
 } from "./schema";
 
 export type CampaignCreateResult =
@@ -16,6 +19,17 @@ export type CampaignCreateResult =
       campaignNum: number;
       totalBudget: number;
       message: string;
+    }
+  | { ok: false; error: string; fieldErrors?: Record<string, string> };
+
+export type CampaignEditResult =
+  | {
+      ok: true;
+      campaignId: string;
+      totalBudget: number;
+      message: string;
+      /** Present when reach-outs are already tied to this campaign (D8). */
+      warning?: string;
     }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
@@ -113,4 +127,211 @@ export async function submitCampaign(
     totalBudget: row.total_budget,
     message: `Campaign "${row.campaign_id} - ${v.campaignName}" created. ₹${formattedBudget} total budget (compensation only). With garments: ₹${new Intl.NumberFormat("en-IN").format(totalAll)}.`,
   };
+}
+
+/**
+ * Server action — edit an existing campaign. UPDATEs the `campaigns` row and
+ * REPLACES its `campaign_budget` rows (delete-then-insert), then recomputes
+ * total_budget = compensation + garment cost. No RPC — IDs are already minted;
+ * there is no counter to serialise. Validated with the same CampaignCreateSchema.
+ *
+ * DECISION D8 (applied, not changed): editing avg_comp / num_influencers does
+ * NOT retroactively rewrite existing posts' commercial_amount; posts already
+ * paid are never touched. If reach-outs are already tied to this campaign, the
+ * edit is still allowed but the result carries a `warning` with the count.
+ */
+export async function editCampaign(
+  campaignId: string,
+  input: unknown,
+): Promise<CampaignEditResult> {
+  await assertPermission("campaign_create");
+
+  const id = (campaignId ?? "").trim();
+  if (!id) return { ok: false, error: "Campaign ID is required." };
+
+  const parsed = CampaignCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const path = issue.path.join(".");
+      if (!fieldErrors[path]) fieldErrors[path] = issue.message;
+    }
+    return { ok: false, error: "Validation failed", fieldErrors };
+  }
+
+  const v = parsed.data;
+  const { allocated, totalAll } = computeTotals(v.budgetRows);
+  if (allocated === 0) {
+    return {
+      ok: false,
+      error: "Allocate at least one influencer across budget lines.",
+      fieldErrors: { budgetRows: "Allocate >=1 influencer" },
+    };
+  }
+
+  const supabase = createServiceClient();
+
+  // Guard — campaign must exist before we delete/replace its budget rows.
+  const { data: existing, error: existingErr } = await (supabase as any)
+    .from("campaigns")
+    .select("campaign_id")
+    .eq("campaign_id", id)
+    .maybeSingle();
+  if (existingErr) return { ok: false, error: existingErr.message };
+  if (!existing) return { ok: false, error: `Campaign ${id} not found.` };
+
+  // D8 — count reach-outs already tied to this campaign (commercials unchanged).
+  const { count: tiedCount } = await (supabase as any)
+    .from("posts")
+    .select("post_id", { count: "exact", head: true })
+    .eq("campaign_id", id);
+
+  // total_budget mirrors submit_campaign: compensation + garment cost.
+  const totalBudget = totalAll;
+
+  const { error: updateErr } = await (supabase as any)
+    .from("campaigns")
+    .update({
+      campaign_name: v.campaignName,
+      key_message: v.keyMessage,
+      start_date: v.startDate || null,
+      end_date: v.endDate || null,
+      brief_link: v.briefLink,
+      internal_brief_link: v.internalBrief,
+      no_of_creators: v.numCreators,
+      total_budget: totalBudget,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("campaign_id", id);
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  // Preserve the original month_label so monthly roll-ups stay stable across
+  // edits; fall back to the current month if no prior rows exist.
+  const { data: priorBudget } = await (supabase as any)
+    .from("campaign_budget")
+    .select("month_label")
+    .eq("campaign_id", id)
+    .limit(1);
+  const now = new Date();
+  const monthLabel =
+    (Array.isArray(priorBudget) && priorBudget[0]?.month_label) ||
+    now.toLocaleString("en-IN", {
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    });
+
+  // REPLACE budget rows — delete existing, insert the new set. Only raw inputs;
+  // total_cost / est_garment_cost / total_with_garments are GENERATED columns.
+  const { error: deleteErr } = await (supabase as any)
+    .from("campaign_budget")
+    .delete()
+    .eq("campaign_id", id);
+  if (deleteErr) return { ok: false, error: deleteErr.message };
+
+  const budgetRows = v.budgetRows.map((r) => ({
+    campaign_id: id,
+    month_label: monthLabel,
+    tier: r.tier,
+    collab_type: r.collabType,
+    campaign_name: r.campaignName,
+    num_influencers: r.numInfluencers,
+    avg_comp: r.avgComp,
+    min_garments: r.minGarments,
+    max_garments: r.maxGarments,
+  }));
+
+  const { error: insertErr } = await (supabase as any)
+    .from("campaign_budget")
+    .insert(budgetRows);
+  if (insertErr) return { ok: false, error: insertErr.message };
+
+  // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
+
+  revalidateTag("campaigns");
+  revalidatePath("/campaigns");
+  revalidatePath("/campaigns/new");
+  revalidatePath("/reach-out/outbound");
+  revalidatePath("/onboarding");
+
+  const formattedBudget = new Intl.NumberFormat("en-IN").format(totalBudget);
+  const tied = typeof tiedCount === "number" ? tiedCount : 0;
+
+  return {
+    ok: true,
+    campaignId: id,
+    totalBudget,
+    message: `Campaign "${id} - ${v.campaignName}" updated. ₹${formattedBudget} total budget (with garments).`,
+    ...(tied > 0
+      ? {
+          warning: `${tied} reach-out${tied === 1 ? "" : "s"} already tied; their commercials unchanged.`,
+        }
+      : {}),
+  };
+}
+
+/**
+ * Fetch a single campaign + its budget rows, shaped for the create-form's
+ * EDIT prefill (CampaignCreateInput). Service-role read (RLS bypass) —
+ * permission-gated like the edit action itself.
+ */
+export async function fetchCampaignForEdit(campaignId: string): Promise<{
+  campaignId: string;
+  initial: CampaignCreateInput;
+} | null> {
+  await assertPermission("campaign_create");
+  const id = (campaignId ?? "").trim();
+  if (!id) return null;
+
+  const supabase = createServiceClient();
+
+  const { data: campaign, error } = await (supabase as any)
+    .from("campaigns")
+    .select(
+      "campaign_id, campaign_name, key_message, start_date, end_date, brief_link, internal_brief_link, no_of_creators",
+    )
+    .eq("campaign_id", id)
+    .maybeSingle();
+  if (error || !campaign) return null;
+
+  const { data: budget } = await (supabase as any)
+    .from("campaign_budget")
+    .select(
+      "tier, collab_type, campaign_name, num_influencers, avg_comp, min_garments, max_garments",
+    )
+    .eq("campaign_id", id)
+    .order("id", { ascending: true });
+
+  const numericTier = (t: string | null): CampaignCreateInput["budgetRows"][number]["tier"] => {
+    const match = (INFLUENCER_TIERS as readonly string[]).find((x) => x === t);
+    return (match ?? "Mid tier (50K to 500K)") as CampaignCreateInput["budgetRows"][number]["tier"];
+  };
+  const collab = (c: string | null): CampaignCreateInput["budgetRows"][number]["collabType"] =>
+    c === "Paid" ? "Paid" : "Barter";
+
+  const budgetRows: CampaignCreateInput["budgetRows"] = (
+    (budget ?? []) as Array<Record<string, unknown>>
+  ).map((r) => ({
+    tier: numericTier(r.tier as string | null),
+    collabType: collab(r.collab_type as string | null),
+    campaignName: (r.campaign_name as string | null) ?? "",
+    numInfluencers: Number(r.num_influencers ?? 0),
+    avgComp: Number(r.avg_comp ?? 0),
+    minGarments: Number(r.min_garments ?? MIN_GARMENTS_FIXED),
+    maxGarments: Number(r.max_garments ?? 3),
+  }));
+
+  const initial: CampaignCreateInput = {
+    campaignName: (campaign.campaign_name as string | null) ?? "",
+    keyMessage: (campaign.key_message as string | null) ?? "",
+    startDate: (campaign.start_date as string | null) ?? "",
+    endDate: (campaign.end_date as string | null) ?? "",
+    numCreators:
+      campaign.no_of_creators == null ? "" : String(campaign.no_of_creators),
+    briefLink: (campaign.brief_link as string | null) ?? "",
+    internalBrief: (campaign.internal_brief_link as string | null) ?? "",
+    budgetRows,
+  };
+
+  return { campaignId: id, initial };
 }
