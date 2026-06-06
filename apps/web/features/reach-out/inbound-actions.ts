@@ -199,7 +199,7 @@ export async function submitInboundBatch(
         summaryLines: [
           `Your inbound batch was logged — ${createdCount} creator${
             createdCount === 1 ? "" : "s"
-          } added to this campaign${
+          } added to this campaign and now in the Reach Out stage${
             failureCount > 0
               ? `, ${failureCount} row${failureCount === 1 ? "" : "s"} skipped`
               : ""

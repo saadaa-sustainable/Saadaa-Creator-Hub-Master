@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { formatDate } from "@/lib/formatters";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -182,7 +183,18 @@ export async function submitCampaign(
       rows: [
         { label: "Campaign ID", value: createdById },
         { label: "Campaign Name", value: createdName },
-        { label: "Total Budget", value: `INR ${budgetForEmail}` },
+        { label: "Key Message", value: v.keyMessage },
+        { label: "Start Date", value: v.startDate ? formatDate(v.startDate) : null },
+        { label: "End Date", value: v.endDate ? formatDate(v.endDate) : null },
+        { label: "No. of Creators", value: v.numCreators || null },
+        { label: "Influencers Allocated", value: allocated },
+        { label: "Total Compensation", value: `INR ${budgetForEmail}` },
+        {
+          label: "Total Budget (with garments)",
+          value: `INR ${new Intl.NumberFormat("en-IN").format(totalAll)}`,
+        },
+        { label: "Brief Link", value: v.briefLink || null },
+        { label: "Internal Brief", value: v.internalBrief || null },
       ],
       collabId: createdById,
     });

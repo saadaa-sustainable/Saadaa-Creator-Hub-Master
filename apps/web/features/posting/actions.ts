@@ -113,7 +113,9 @@ export async function submitPosting(input: unknown) {
         { label: "Post ID", value: postId },
         { label: "Post Date", value: resolvedDate },
         { label: "Post Link", value: postLink },
-        { label: "Partnership ID", value: partnershipId || null },
+        { label: "Drive / Download Link", value: downloadLink || null },
+        { label: "Raw Footage Dump", value: rawDump || null },
+        { label: "Partnership Key", value: partnershipId || null },
       ],
       postId,
     });

@@ -108,7 +108,7 @@ export function DashboardOverviewStrip({ data }: { data: DashboardData }) {
             icon={<Hourglass size={16} aria-hidden />}
             label="Pending Onboardings"
             primary={String(data.actions.awaitingPost)}
-            secondary="On Board, awaiting post"
+            secondary="In Posting, awaiting post"
           />
           <KpiCard
             tone="warning"

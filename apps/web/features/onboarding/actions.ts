@@ -6,6 +6,7 @@ import { readTermsAttachmentFile, TERMS_ATTACHMENT } from "@/lib/attachments";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendMail } from "@/lib/email";
+import { formatDate, formatRupees } from "@/lib/formatters";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -467,18 +468,25 @@ export async function submitOnboarding(
       title: "Onboarding saved",
       subtitle: `POST ID: ${v.postId}`,
       summaryLines: [
-        `Onboarding details for @${creatorHandle} have been saved and the collab moved to On Board.`,
+        `Onboarding details for @${creatorHandle} have been saved. The collaboration is now in the Posting stage.`,
       ],
       rows: [
         { label: "Creator", value: `@${creatorHandle}` },
         { label: "Post ID", value: v.postId },
         { label: "Order ID", value: v.orderId },
-        { label: "Collab Type", value: v.collabType },
+        { label: "Collaboration Type", value: v.collabType },
+        { label: "Commercials", value: formatRupees(v.commercials) },
         { label: "Deliverables", value: deliverableSummary },
-        {
-          label: "Child Deliverables",
-          value: childrenSpawned > 0 ? childrenSpawned : null,
-        },
+        { label: "Stories", value: v.stories > 0 ? v.stories : null },
+        { label: "Ads Usage Rights", value: v.adsUsageRights || "None" },
+        { label: "Content Duration", value: v.duration || null },
+        { label: "Estimated Delivery", value: formatDate(v.estDelivery) },
+        { label: "Order Status", value: v.orderStatus },
+        { label: "Agency", value: v.agency || null },
+        { label: "Bank Name", value: v.bankName || null },
+        { label: "Bank Account", value: v.bankNumber || null },
+        { label: "IFSC Code", value: v.ifsc || null },
+        { label: "Remarks", value: v.remarks || null },
       ],
       footnote:
         "This confirms your save. The collaboration email to the creator is sent separately.",

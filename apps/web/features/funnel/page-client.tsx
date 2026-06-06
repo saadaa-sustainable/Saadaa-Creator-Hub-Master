@@ -212,7 +212,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       value: totals.o,
       tone: "info",
       icon: <Users size={16} aria-hidden />,
-      secondary: "moved to onboard",
+      secondary: "onboarding complete",
     },
     {
       label: "Barter",
