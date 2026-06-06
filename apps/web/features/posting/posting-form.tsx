@@ -314,7 +314,7 @@ export function PostingModal({
               />
               <label htmlFor="pt_postDate">
                 <CalendarCheck size={11} className="inline mr-1" />
-                Post Date *
+                Post Date <span className="req">*</span>
               </label>
               {errors.postDate && (
                 <small className="field-error">
@@ -333,7 +333,7 @@ export function PostingModal({
               />
               <label htmlFor="pt_postLink">
                 <LinkIcon size={11} className="inline mr-1" />
-                Live Post URL *
+                Live Post URL <span className="req">*</span>
               </label>
               {errors.postLink && (
                 <small className="field-error">
@@ -393,7 +393,7 @@ export function PostingModal({
                     onChange={(e) => setDateVerified(e.target.checked)}
                   />
                   <span>
-                    I checked the live post — the Post Date matches what
+                    I checked the live post and the Post Date matches what
                     Instagram shows.
                   </span>
                 </label>
@@ -429,7 +429,14 @@ export function PostingModal({
               />
               <label htmlFor="pt_downloadLink">
                 <Download size={11} className="inline mr-1" />
-                Drive Link {requiresDownload ? "*" : "(optional)"}
+                Drive Link{" "}
+                {requiresDownload ? (
+                  <span className="req">*</span>
+                ) : (
+                  <span className="text-text-tertiary font-normal">
+                    (Optional)
+                  </span>
+                )}
               </label>
               <button
                 ref={driveBtnRef}
@@ -508,11 +515,11 @@ export function PostingModal({
               <label htmlFor="pt_partId">
                 <Handshake size={11} className="inline mr-1" />
                 Partnership Key
-                {adRightsGranted && <span className="text-danger"> *</span>}
+                {adRightsGranted && <span className="req">*</span>}
               </label>
-              <p className="px-1 pt-1 text-[11px] text-text-tertiary">
-                Numeric Meta partnership code — required when ad usage rights
-                are granted.
+              <p className="px-1 pt-1.5 text-[11px] leading-relaxed text-text-tertiary">
+                Numeric Meta partnership code, required when ad usage rights are
+                granted.
               </p>
             </div>
           </div>

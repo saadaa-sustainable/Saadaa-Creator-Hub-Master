@@ -323,7 +323,7 @@ export function OutboundForm({
                     ))}
                   </select>
                   <label htmlFor="ro_campaign">
-                    Campaign ID <span className="text-danger">*</span>
+                    Campaign ID <span className="req">*</span>
                   </label>
                 </div>
               )}
@@ -378,7 +378,7 @@ export function OutboundForm({
           <div className="lg:col-span-2 space-y-4">
             <div>
               <label htmlFor="ro_username" className="form-label-static">
-                Instagram Profile URL <span className="text-danger">*</span>
+                Instagram Profile URL <span className="req">*</span>
               </label>
               <div className="input-group">
                 <span className="input-group-text">
@@ -472,7 +472,7 @@ export function OutboundForm({
                   readOnly={lockName}
                 />
                 <label htmlFor="ro_name">
-                  Full Name <span className="text-danger">*</span>
+                  Full Name <span className="req">*</span>
                 </label>
                 {lockName && <span className="autofill-badge">{isQueued ? "PENDING" : "AUTO"}</span>}
               </div>
@@ -488,7 +488,7 @@ export function OutboundForm({
                   readOnly={lockFollowers}
                 />
                 <label htmlFor="ro_followers">
-                  Followers <span className="text-danger">*</span>
+                  Followers <span className="req">*</span>
                 </label>
                 {lockFollowers && <span className="autofill-badge">{isQueued ? "PENDING" : "AUTO"}</span>}
               </div>
@@ -629,7 +629,7 @@ export function OutboundForm({
                   ))}
                 </select>
                 <label htmlFor="ro_gender">
-                  Gender <span className="text-danger">*</span>
+                  Gender <span className="req">*</span>
                 </label>
                 {isExistingCreator && (
                   <span className="autofill-badge">AUTO</span>
@@ -645,7 +645,7 @@ export function OutboundForm({
             render={({ field }) => (
               <div className="reachout-verification-field lg:col-span-1">
                 <label className="form-label-static">
-                  Verification Status <span className="text-danger">*</span>
+                  Verification Status <span className="req">*</span>
                 </label>
                 {isAutoDetected && field.value === "Verified" ? (
                   <div className="verif-auto-pill">
@@ -777,7 +777,7 @@ export function OutboundForm({
                   ))}
                 </select>
                 <label htmlFor="ro_contentCode">
-                  Content Type Code <span className="text-danger">*</span>
+                  Content Type Code <span className="req">*</span>
                 </label>
               </div>
             )}
@@ -816,7 +816,7 @@ export function OutboundForm({
                   ))}
                 </select>
                 <label htmlFor="ro_language">
-                  Primary Language <span className="text-danger">*</span>
+                  Primary Language <span className="req">*</span>
                 </label>
                 {isExistingCreator && (
                   <span className="autofill-badge">AUTO</span>

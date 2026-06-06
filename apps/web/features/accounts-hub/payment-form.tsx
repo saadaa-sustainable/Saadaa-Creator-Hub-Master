@@ -452,14 +452,14 @@ export function PaymentEntryPanel() {
       </header>
 
       <form onSubmit={onSubmit} className="acc-entry-panel__body">
-        <label className="flex items-center gap-2 px-1 pb-2 text-[12px] text-text-secondary cursor-pointer select-none">
+        <label className="acc-entry-samedate">
           <input
             type="checkbox"
             checked={sameDateForAll}
             onChange={(e) => setSameDateForAll(e.target.checked)}
           />
           Same payment date for all entries
-          <span className="text-text-tertiary">
+          <span className="acc-entry-samedate__hint">
             (copies the first row&rsquo;s date)
           </span>
         </label>

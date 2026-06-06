@@ -381,7 +381,9 @@ export function OrderCreationModal({
                     </option>
                   ))}
                 </select>
-                <label htmlFor="ob_collab">Collab Type *</label>
+                <label htmlFor="ob_collab">
+                  Collab Type <span className="req">*</span>
+                </label>
                 {collabLocked && (
                   <span className="autofill-badge">FROM REACH OUT</span>
                 )}
@@ -426,7 +428,9 @@ export function OrderCreationModal({
                   placeholder=" "
                   {...register("estDelivery")}
                 />
-                <label htmlFor="ob_estDate">Est. Content Delivery *</label>
+                <label htmlFor="ob_estDate">
+                  Est. Content Delivery <span className="req">*</span>
+                </label>
                 {errors.estDelivery && (
                   <small className="field-error">
                     {errors.estDelivery.message}
@@ -533,7 +537,9 @@ export function OrderCreationModal({
                       }
                     }}
                   />
-                  <label htmlFor="ob_orderId">Shopify Order ID *</label>
+                  <label htmlFor="ob_orderId">
+                    Shopify Order ID <span className="req">*</span>
+                  </label>
                 </div>
                 <button
                   type="button"

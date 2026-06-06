@@ -2241,10 +2241,13 @@
     grid-column: 1 / -1;
   }
 
-  /* Required-marker asterisk */
+  /* Required-marker asterisk — single shared marker used on every form label
+     (Reach Out, Onboarding, Posting, Campaigns, Accounts). Consistent danger
+     token + weight + a hair of left spacing so it never butts the label text. */
   .req {
     color: var(--color-danger-text);
     font-weight: 600;
+    margin-left: 2px;
   }
 
   /* Small "code chip" inline tag (IFC###, Budget) */
@@ -2834,6 +2837,15 @@
   }
   .inbound-table thead th.right {
     text-align: right;
+  }
+  /* Conditional-requirement note in a column header (e.g. Commercials is only
+     required for Barter + Paid). Lighter + lowercase so it reads as a caveat,
+     not a hard required-marker like .req. */
+  .inbound-table thead th .th-cond-note {
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--color-text-tertiary);
   }
   .inbound-table tbody td {
     padding: 16px 10px;
@@ -7907,6 +7919,31 @@ body:has(.km-backdrop) {
   font-variant-numeric: tabular-nums;
 }
 
+/* Dashboard tab bar — thin, unobtrusive horizontal scrollbar so the rail can
+   overflow on mobile without a chunky webkit bar adding visual noise under the
+   tabs. Active/inactive + focus states live on the Tailwind classes in
+   tabs.tsx; both states keep a 2px bottom border so there is no layout shift. */
+.dash-tabbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong, #c9c2ae) transparent;
+}
+.dash-tabbar::-webkit-scrollbar {
+  height: 6px;
+}
+.dash-tabbar::-webkit-scrollbar-thumb {
+  background: var(--color-border-mid, #ddd8cc);
+  border-radius: 999px;
+}
+.dash-tabbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* ≥44px touch target for the scrollable tabs on phones. */
+@media (max-width: 640px) {
+  .dash-tabbar [role="tab"] {
+    min-height: 44px;
+  }
+}
+
 /* Dashboard-style kanban shared by main-adjacent workflow pages.
    Matches the main dashboard: horizontal rail on mobile and desktop. */
 .dashboard-kanban-scroll {
@@ -9183,6 +9220,54 @@ body:has(.km-backdrop) {
   gap: 12px;
 }
 
+/* "Same payment date for all entries" toggle — design-system checkbox row.
+   Mirrors the .pt-verify-check accent-color affordance so the only checkbox
+   in this panel reads as on-system, with a ≥44px touch target on mobile. */
+.acc-entry-samedate {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  padding: 8px 10px;
+  min-height: 40px;
+  border-radius: 9px;
+  border: 1px solid var(--color-border, #e7e2d2);
+  background: var(--color-bg-white, #ffffff);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6e695e);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 0.15s ease-out,
+    border-color 0.15s ease-out;
+}
+.acc-entry-samedate:hover {
+  border-color: var(--color-border-strong, #c9c2ae);
+  background: var(--color-bg-base, #faf8f5);
+}
+.acc-entry-samedate:focus-within {
+  border-color: var(--color-border-strong, #c9c2ae);
+  box-shadow: 0 0 0 3px rgba(240, 198, 30, 0.2);
+}
+.acc-entry-samedate input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: #f0c61e;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.acc-entry-samedate__hint {
+  color: var(--color-text-tertiary, #9a9384);
+  font-weight: 500;
+}
+@media (max-width: 480px) {
+  .acc-entry-samedate {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
 /* Each entry row — labels ABOVE inputs (clean, no overlap). */
 .acc-entry-row {
   position: relative;
@@ -9277,10 +9362,6 @@ body:has(.km-backdrop) {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-text-secondary, #6e695e);
-}
-.acc-field__label .req {
-  color: var(--color-danger-text, #c0392b);
-  margin-left: 2px;
 }
 .acc-field__input {
   width: 100%;

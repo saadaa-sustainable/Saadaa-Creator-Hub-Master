@@ -879,7 +879,8 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                   Collab Type <span className="req">*</span>
                 </th>
                 <th className="right">
-                  Commercials ₹ <span className="req">*</span>
+                  Commercials ₹{" "}
+                  <span className="th-cond-note">(Barter + Paid)</span>
                 </th>
               </tr>
             </thead>
@@ -1192,7 +1193,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                 )}
 
                 <label className="form-field mb-3 block">
-                  <span>Profile URL *</span>
+                  <span>
+                    Profile URL <span className="req">*</span>
+                  </span>
                   <input
                     type="url"
                     className={cn(
@@ -1215,7 +1218,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="form-field block">
-                    <span>Gender *</span>
+                    <span>
+                      Gender <span className="req">*</span>
+                    </span>
                     <select
                       className={cn(
                         "form-control form-select",
@@ -1237,7 +1242,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                     )}
                   </label>
                   <label className="form-field block">
-                    <span>Content Code *</span>
+                    <span>
+                      Content Code <span className="req">*</span>
+                    </span>
                     <select
                       className={cn(
                         "form-control form-select",
@@ -1262,7 +1269,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                     )}
                   </label>
                   <label className="form-field block">
-                    <span>Collab Type *</span>
+                    <span>
+                      Collab Type <span className="req">*</span>
+                    </span>
                     <select
                       className={cn(
                         "form-control form-select",
