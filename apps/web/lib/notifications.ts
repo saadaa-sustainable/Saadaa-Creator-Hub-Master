@@ -337,6 +337,32 @@ export async function resolveGlobalAdminEmails(): Promise<string[]> {
 }
 
 /**
+ * Resolve active Accounts-team email addresses from user_access (best-effort).
+ * Returns a de-duped, lower-cased list; empty array on any error or no match.
+ * "Accounts team" = active rows whose role is one of the accounts labels. The
+ * cron's payment notifications (eligibility / SLA breach) target this set.
+ */
+export async function resolveAccountsTeamEmails(): Promise<string[]> {
+  try {
+    const supabase = createServiceClient();
+    const { data } = await (supabase as any)
+      .from("user_access")
+      .select("email, role, active")
+      .eq("active", true)
+      .in("role", ["Accounts Team", "Accounts"]);
+    return Array.from(
+      new Set(
+        ((data ?? []) as Array<{ email: string | null }>)
+          .map((u) => (u.email ?? "").trim().toLowerCase())
+          .filter((e) => e.length > 0 && e.includes("@")),
+      ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Submitter-confirmation helper — emails the logged-in actor a branded
  * confirmation for a form submission they just made. One call per submit
  * action; collapses the body-build + send into a single best-effort step that
