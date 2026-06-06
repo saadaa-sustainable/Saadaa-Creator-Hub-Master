@@ -24,6 +24,28 @@ export default function OnboardingKM() {
             table. Filter by campaign / stage / tier / email-missing.
           </li>
           <li>
+            <strong>One row per collab</strong> · the board collapses
+            multi-deliverable collabs to a single row — the primary deliverable
+            stands in for the whole collab (mirrors how Accounts Hub and Order
+            Status detect parents: <KMCode>deliverable_index is null OR = 1</KMCode>).
+            A <KMCode>Layers</KMCode> chip shows the human count
+            (<KMCode>1 deliverable</KMCode>, <KMCode>3 deliverables</KMCode> …)
+            with the <KMCode>NR + NP + NS</KMCode> breakdown as its tooltip /
+            sub-label. <strong>Single-deliverable collabs still read
+            &ldquo;1 deliverable&rdquo;</strong> — the count is never hidden.
+            This replaces the old Parent / Child N / Single lineage badges.
+          </li>
+          <li>
+            <strong>See every deliverable</strong> · on a multi-deliverable
+            collab, the card&apos;s <KMCode>View N</KMCode> affordance and the
+            row&apos;s <KMCode>Overview</KMCode> both open the overview modal,
+            which lists each deliverable (primary + linked children) with its
+            own post_id. Children are never removed from the database — they are
+            only folded into the parent for a cleaner board. They are still
+            submitted individually in the <strong>Posting</strong> stage, and
+            payment stays <strong>one-per-collab</strong> on the primary row.
+          </li>
+          <li>
             <strong>Submit form (order-form.tsx)</strong> · opens per row.
             Pencil-to-Send icon swaps once email is queued.
           </li>
@@ -105,7 +127,10 @@ export default function OnboardingKM() {
             <KMCode>SIF-&#123;N&#125;-P&#123;N&#125;-C&#123;collab&#125;</KMCode>
             , deliverable_index 2…N, inherits collab_number,{" "}
             <KMCode>commercial_amount</KMCode> = the same split share. Payment
-            still lives on the parent.
+            still lives on the parent. On the Onboarding board these child rows
+            are folded into the parent (see &ldquo;One row per collab&rdquo;
+            above) — they remain full rows in the database and surface
+            individually in the Posting stage.
           </li>
           <li>
             <strong>creators</strong> · email, address fields (state, city,

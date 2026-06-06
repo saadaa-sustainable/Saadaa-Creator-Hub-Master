@@ -6,11 +6,11 @@ import {
   Eye,
   Grid3X3,
   Inbox,
+  Layers,
+  Link as LinkIcon,
   List as ListIcon,
   Mail,
-  Network,
   Send,
-  Star,
   X,
 } from "lucide-react";
 import { DataTable } from "@/components/data-table/data-table";
@@ -23,14 +23,17 @@ import {
 } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import {
+  DeliverablesChip,
   EmailStatusCell,
-  LineageBadge,
-  findParentPostId,
-  formatDeliverables,
-  isChildRow,
+  collabCommercialTotal,
+  collabDeliverableBreakdown,
+  collabSiblings,
+  countCollabDeliverables,
+  deliverableBreakdown,
+  formatDeliverableCount,
   isOnboarded,
   isOverdue,
-  lineageLabel,
+  isParentRow,
   onboardingColumns,
 } from "./columns";
 import { OrderCreationModal } from "./order-form";
@@ -53,6 +56,28 @@ export function OnboardingTable({
     draft?: CollabEmailDraft;
   } | null>(null);
   const [view, setView] = useState<"list" | "cards">(initialView);
+
+  // Collapse the board to ONE row per collab: render parents only (mirrors the
+  // Accounts Hub / Order Status `deliverable_index is null OR = 1` filter).
+  // Counts/breakdowns are pre-computed against the FULL `rows` set (so hidden
+  // children still contribute) and stamped onto each parent. The complete
+  // `rows` array is still passed to cards + the overview modal so the
+  // per-deliverable list stays viewable.
+  const parentRows = useMemo<OnboardingRow[]>(
+    () =>
+      rows.filter(isParentRow).map((parent) => {
+        const commercialTotal = collabCommercialTotal(parent, rows);
+        return {
+          ...parent,
+          _collabDeliverableCount: countCollabDeliverables(parent, rows),
+          _collabDeliverableBreakdown: collabDeliverableBreakdown(parent, rows),
+          ...(commercialTotal != null
+            ? { _collabCommercialTotal: commercialTotal }
+            : {}),
+        };
+      }),
+    [rows],
+  );
 
   // Force cards-only on mobile (≤768px); restore previous view on desktop.
   useEffect(() => {
@@ -187,7 +212,7 @@ export function OnboardingTable({
       {view === "list" ? (
         <div className="ob-list-wrap">
           <DataTable<OnboardingRow>
-            data={rows}
+            data={parentRows}
             columns={columnsWithActions}
             emptyTitle="No onboarding rows match these filters"
             emptyDescription="Try clearing filters or widening the reach-out date range."
@@ -202,7 +227,7 @@ export function OnboardingTable({
             )}
           />
         </div>
-      ) : rows.length === 0 ? (
+      ) : parentRows.length === 0 ? (
         <div className="glass-card text-center py-10 text-text-tertiary">
           <Inbox size={28} className="mx-auto mb-2" />
           <p className="font-medium text-text-primary">
@@ -214,7 +239,7 @@ export function OnboardingTable({
         </div>
       ) : (
         <div className="ob-card-grid">
-          {rows.map((r) => (
+          {parentRows.map((r) => (
             <ObCard
               key={r.post_id}
               r={r}
@@ -245,26 +270,21 @@ function ObCard({
   onEmail: (postId: string) => void;
 }) {
   const onboarded = isOnboarded(r);
-  const child = isChildRow(r);
   const overdue = isOverdue(r);
   const overdueInfo =
     "Estimated delivery date has passed and this post is not marked Posted yet.";
-  const hasSiblings = rows.some(
-    (x) =>
-      x &&
-      x.inf_id === r.inf_id &&
-      Number(x.collab_number ?? 1) === Number(r.collab_number ?? 1) &&
-      Number(x.deliverable_index ?? 0) > 1,
-  );
+  // The board renders one card per collab (parent only). Count the whole
+  // collab's deliverables so a multi-deliverable collab reads as one entity.
+  const deliverableCount = countCollabDeliverables(r, rows);
+  const hasMultiple = deliverableCount > 1;
   const showMissingEmailAlert =
-    onboarded && !r.collab_email_sent_at && !r.collab_email_skipped && !child;
+    onboarded && !r.collab_email_sent_at && !r.collab_email_skipped;
 
   return (
     <div
       className={cn(
         "ob-card",
         onboarded ? "ob-card-onboarded" : "ob-card-pending",
-        child && "ob-card-child",
       )}
     >
       <div className="ob-card-head">
@@ -299,23 +319,7 @@ function ObCard({
           <span className="campaign-chip">{r.campaign.campaign_id}</span>
         )}
         <span className="post-id tabular">{r.post_id_short ?? r.post_id}</span>
-        {child ? (
-          <span
-            className="pill pill--child"
-            title={`Child of ${findParentPostId(r, rows)}`}
-          >
-            <Network size={10} aria-hidden />
-            Child {Number(r.deliverable_index ?? 0)}
-          </span>
-        ) : hasSiblings ? (
-          <span
-            className="pill pill--parent"
-            title="Primary deliverable for this collab"
-          >
-            <Star size={10} aria-hidden />
-            Parent
-          </span>
-        ) : null}
+        <DeliverablesChip r={r} rows={rows} />
         {(r.nomenclature ?? r.content_type) && (
           <span className="pill pill--muted">
             {r.nomenclature ?? r.content_type}
@@ -340,15 +344,35 @@ function ObCard({
         <div className="ob-card-meta">
           <span className="ob-card-meta-label">Commercials</span>
           <span className="ob-card-meta-val tabular">
-            {r.commercial_amount != null
-              ? formatRupees(r.commercial_amount)
+            {(r._collabCommercialTotal ?? r.commercial_amount) != null
+              ? formatRupees(
+                  r._collabCommercialTotal ?? (r.commercial_amount as number),
+                )
               : "—"}
           </span>
         </div>
         <div className="ob-card-meta">
           <span className="ob-card-meta-label">Deliverables</span>
           <span className="ob-card-meta-val tabular">
-            {formatDeliverables(r)}
+            {formatDeliverableCount(deliverableCount)}
+            <span className="ob-card-meta-sub">
+              {" · "}
+              {collabDeliverableBreakdown(r, rows)}
+            </span>
+            {hasMultiple && onboarded && (
+              <button
+                type="button"
+                className="ml-1 inline-flex items-center gap-1 rounded-full border border-border bg-bg-surface px-2 py-0.5 text-[0.62rem] font-semibold text-text-secondary transition-colors hover:bg-bg-ecru"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOverview(r);
+                }}
+                title="See each deliverable in this collab"
+              >
+                <Layers size={9} aria-hidden />
+                View {deliverableCount}
+              </button>
+            )}
           </span>
         </div>
         <div className="ob-card-meta">
@@ -469,11 +493,16 @@ function OnboardingOverviewModal({
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
-  const child = isChildRow(row);
-  const parentPostId = child ? findParentPostId(row, rows) : row.post_id;
+  // The board passes a parent row in; gather its siblings so the per-deliverable
+  // breakdown (the collapsed children) stays viewable here.
+  const siblings = collabSiblings(row, rows).sort(
+    (a, b) => Number(a.deliverable_index ?? 1) - Number(b.deliverable_index ?? 1),
+  );
+  const deliverableRows = siblings.length > 0 ? siblings : [row];
+  const deliverableCount = countCollabDeliverables(row, rows);
+  const isMulti = deliverableCount > 1;
   const canSendEmail =
     isOnboarded(row) &&
-    !child &&
     !row.collab_email_sent_at &&
     !row.collab_email_skipped;
 
@@ -516,12 +545,9 @@ function OnboardingOverviewModal({
               <WorkflowStatusPill status={row.workflow_status} />
             </div>
             <div className="ob-overview-pills">
-              <LineageBadge r={row} rows={rows} />
+              <DeliverablesChip r={row} rows={rows} />
               <span className="campaign-chip">
                 {row.campaign?.campaign_id ?? "—"}
-              </span>
-              <span className="pill pill--muted">
-                {lineageLabel(row, rows)}
               </span>
               {row.nomenclature && (
                 <span className="pill pill--muted" title="Nomenclature">
@@ -539,16 +565,18 @@ function OnboardingOverviewModal({
           <section className="ob-overview-grid">
             <OverviewItem label="Post ID" value={row.post_id} mono />
             <OverviewItem
-              label="Parent"
-              value={child ? parentPostId : "This row"}
-              mono
+              label="Deliverables"
+              value={formatDeliverableCount(deliverableCount)}
             />
             <OverviewItem label="Collab" value={row.collab_type ?? "—"} />
             <OverviewItem
               label="Commercials"
               value={
-                row.commercial_amount != null
-                  ? formatRupees(row.commercial_amount)
+                (row._collabCommercialTotal ?? row.commercial_amount) != null
+                  ? formatRupees(
+                      row._collabCommercialTotal ??
+                        (row.commercial_amount as number),
+                    )
                   : "—"
               }
               mono
@@ -563,8 +591,8 @@ function OnboardingOverviewModal({
               mono
             />
             <OverviewItem
-              label="Deliverables"
-              value={formatDeliverables(row)}
+              label="Deliverable Mix"
+              value={collabDeliverableBreakdown(row, rows)}
               mono
             />
             <OverviewItem label="Order ID" value={row.order_id ?? "—"} mono />
@@ -606,11 +634,62 @@ function OnboardingOverviewModal({
             />
           </section>
 
-          {child && (
-            <div className="ob-overview-note">
-              Email is handled from the parent deliverable row:{" "}
-              <strong>{parentPostId}</strong>.
-            </div>
+          {isMulti && (
+            <section className="mt-3">
+              <div className="mb-2 flex items-center gap-2 text-[0.78rem] text-text-secondary">
+                <Layers size={13} aria-hidden />
+                <strong className="text-text-primary">
+                  Deliverables in this collab
+                </strong>
+                <span className="pill pill--parent">
+                  {formatDeliverableCount(deliverableCount)}
+                </span>
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {deliverableRows.map((d) => {
+                  const isParent =
+                    d.deliverable_index == null ||
+                    Number(d.deliverable_index) === 1;
+                  return (
+                    <li
+                      key={d.post_id}
+                      className="flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-bg-surface px-2.5 py-1.5"
+                    >
+                      <span className="tabular text-[0.7rem] font-semibold text-text-tertiary">
+                        #{Number(d.deliverable_index ?? 1)}
+                      </span>
+                      <span className="text-[0.78rem] text-text-primary capitalize">
+                        {d.deliverable_type ?? deliverableBreakdown(d)}
+                      </span>
+                      <span className="post-id tabular">
+                        {d.post_id_short ?? d.post_id}
+                      </span>
+                      {isParent ? (
+                        <span
+                          className="pill pill--muted"
+                          title="Payment + collab email live on this row"
+                        >
+                          Primary
+                        </span>
+                      ) : (
+                        <span
+                          className="pill pill--linked"
+                          title="Payment + email handled on the primary row"
+                        >
+                          <LinkIcon size={9} aria-hidden />
+                          Linked
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="ob-overview-note mt-2">
+                One collab, one payment. Each deliverable is posted individually
+                in the Posting stage; payment + the collab email stay on the
+                primary row.
+              </p>
+            </section>
           )}
         </div>
 

@@ -46,6 +46,16 @@ export interface OnboardingRow {
     | "state"
     | "profile_pic"
   > | null;
+  /**
+   * Presentation-only: total deliverables across the whole collab
+   * (parent + children), pre-computed when the board collapses children into
+   * the parent. Not persisted. Absent on raw query rows.
+   */
+  _collabDeliverableCount?: number;
+  /** Presentation-only: collab-level "NR + NP + NS" breakdown. Not persisted. */
+  _collabDeliverableBreakdown?: string;
+  /** Presentation-only: agreed commercial total summed across collab siblings. */
+  _collabCommercialTotal?: number;
 }
 
 export interface OnboardingFilters {
