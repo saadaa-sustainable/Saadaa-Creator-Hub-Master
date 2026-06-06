@@ -6,6 +6,7 @@ import type {
   JourneyCreator,
   JourneyFilterOptions,
   JourneyFilters,
+  JourneyFunnel,
   JourneyKpi,
   JourneyPost,
 } from "./types";
@@ -70,6 +71,7 @@ export const JOURNEY_COLUMNS: Omit<JourneyColumn, "cards">[] = [
 export async function fetchJourneyData(filters: JourneyFilters): Promise<{
   columns: JourneyColumn[];
   kpi: JourneyKpi;
+  funnel: JourneyFunnel;
 }> {
   const supabase = createServiceClient();
 
@@ -139,6 +141,13 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
   let postedCount = 0;
   let closedCount = 0;
 
+  // Funnel — cumulative collab counts (parent rows only). Each collab is
+  // counted at every stage it has reached, so rates are monotonic.
+  let reachedCount = 0;
+  let onboardedCount = 0;
+  let postedFunnelCount = 0;
+  let paidCount = 0;
+
   for (const p of posts) {
     const statusRaw = String(p.workflow_status ?? "").trim();
     const statusKey = statusRaw.toLowerCase();
@@ -154,6 +163,30 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
       statusKey.startsWith("rto")
     ) {
       closedCount++;
+    }
+
+    // Funnel — parent collabs only. Determine the furthest stage reached, then
+    // increment every prior stage too (cumulative). RTO/Cancelled collabs that
+    // had been onboarded/posted still count toward those stages.
+    const isParentRow =
+      p.deliverable_index == null || Number(p.deliverable_index) === 1;
+    if (isParentRow) {
+      const reachedOnboard =
+        statusKey.includes("on board") ||
+        statusKey === "order sent" ||
+        statusKey.includes("posted") ||
+        statusKey.includes("delivered") ||
+        statusKey.startsWith("rto") ||
+        statusKey === "cancelled";
+      const reachedPost =
+        statusKey.includes("posted") || statusKey.includes("delivered");
+      const reachedPaid =
+        String(p.payment_status ?? "").trim().toLowerCase() === "done";
+
+      reachedCount++; // every parent collab entered at Reach Out
+      if (reachedOnboard) onboardedCount++;
+      if (reachedPost) postedFunnelCount++;
+      if (reachedPaid) paidCount++;
     }
 
     const username = String(p.username ?? "").trim().toLowerCase();
@@ -231,7 +264,20 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
     closed: closedCount,
   };
 
-  return { columns, kpi };
+  const rate = (num: number, den: number) =>
+    den > 0 ? Math.round((num / den) * 1000) / 10 : 0;
+
+  const funnel: JourneyFunnel = {
+    reached: reachedCount,
+    onboarded: onboardedCount,
+    posted: postedFunnelCount,
+    paid: paidCount,
+    reachToOnboard: rate(onboardedCount, reachedCount),
+    onboardToPost: rate(postedFunnelCount, onboardedCount),
+    postToPayment: rate(paidCount, postedFunnelCount),
+  };
+
+  return { columns, kpi, funnel };
 }
 
 export async function fetchJourneyFilterOptions(): Promise<JourneyFilterOptions> {

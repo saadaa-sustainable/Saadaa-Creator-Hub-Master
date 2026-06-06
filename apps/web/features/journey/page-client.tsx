@@ -7,10 +7,12 @@ import type {
   JourneyColumn,
   JourneyFilterOptions,
   JourneyFilters,
+  JourneyFunnel,
   JourneyKpi,
 } from "./types";
 import { EMPTY_CLIENT_FILTERS } from "./types";
 import { JourneyKpiStrip } from "./kpi-strip";
+import { JourneyFunnelStrip } from "./funnel-strip";
 import { JourneyBoard } from "./journey-board";
 import { JourneyFiltersBar } from "./filters";
 
@@ -91,11 +93,13 @@ function applyClientFilters(
 export function JourneyPageClient({
   columns,
   kpi,
+  funnel,
   initialFilters,
   filterOptions,
 }: {
   columns: JourneyColumn[];
   kpi: JourneyKpi;
+  funnel: JourneyFunnel;
   initialFilters: JourneyFilters;
   filterOptions: JourneyFilterOptions;
 }) {
@@ -133,6 +137,7 @@ export function JourneyPageClient({
         teamMemberOptions={teamMembers}
       />
       <JourneyKpiStrip kpi={kpi} />
+      <JourneyFunnelStrip funnel={funnel} />
       <JourneyBoard columns={filteredColumns} />
     </>
   );

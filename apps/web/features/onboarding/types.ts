@@ -58,6 +58,35 @@ export interface OnboardingRow {
   _collabCommercialTotal?: number;
 }
 
+/**
+ * Onboarding KPI strip aggregates — all counts are per-collab (parent rows
+ * only). Rates are percentages already rounded to 1 dp.
+ */
+export interface OnboardingKpi {
+  /** Collabs with onboarding form filled (On Board / Order Sent / Posted / Delivered). */
+  totalOnboarded: number;
+  /** Collabs still in Reach Out (onboarding pending). */
+  pendingOnboardings: number;
+  /** Onboarded ÷ (Onboarded + Pending) × 100. */
+  completionRate: number;
+  /** Onboarded collabs with ads_usage_rights = Yes. */
+  adRightsSelected: number;
+  /** Onboarded collabs without ad rights. */
+  noAdRights: number;
+  /** Mean reels per onboarded collab. */
+  avgReels: number;
+  /** Mean static posts per onboarded collab. */
+  avgStatic: number;
+  /** Mean stories per onboarded collab. */
+  avgStories: number;
+  /** Matched-to-shopify ÷ collabs-with-order_id × 100. */
+  shopifyValidationRate: number;
+  /** Count of onboarded collabs whose order_id matched a shopify_orders row. */
+  shopifyMatched: number;
+  /** Count of onboarded collabs that have an order_id entered. */
+  shopifyWithOrderId: number;
+}
+
 export interface OnboardingFilters {
   campaign?: string;
   statusFilter?: string;

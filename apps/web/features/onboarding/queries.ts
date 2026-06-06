@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import type { OnboardingFilters, OnboardingRow } from "./types";
+import type { OnboardingFilters, OnboardingKpi, OnboardingRow } from "./types";
 
 /**
  * Server-side fetch of the Onboarding table.
@@ -187,3 +187,115 @@ export const fetchOnboardingFilterOptions = unstable_cache(
   ["onboarding-filter-options"],
   { revalidate: 300, tags: ["posts", "creators", "campaigns"] },
 );
+
+/**
+ * Onboarding KPI aggregation — closes the gap vs Shrishti's Analytics KPI
+ * Matrix (the Onboarding page previously had no KPI strip).
+ *
+ * Counts COLLABS, not child deliverable rows, so the parent filter
+ * (`deliverable_index IS NULL OR = 1`) mirrors features/accounts-hub/queries.ts
+ * and features/order-status/queries.ts. Avg deliverable counts and ad-rights
+ * splits are therefore per-collab, matching how operators read the board.
+ *
+ * Definitions (Shrishti, verbatim where given):
+ *   - Total Onboarded      = collabs whose onboarding form is filled
+ *                            (workflow_status ∈ On Board / Order Sent /
+ *                             Posted / Delivered).
+ *   - Pending Onboardings  = collabs still in Reach Out (onboarding status
+ *                            pending).
+ *   - Completion Rate      = Onboarded ÷ (Onboarded + Pending) × 100.
+ *   - Ad Rights Selected / No Ad Rights = onboarded collabs split on
+ *                            ads_usage_rights = Yes vs not.
+ *   - Avg Reels/Story/Static = mean per-collab deliverable counts across
+ *                            onboarded collabs.
+ *   - Shopify Validation Success Rate = of onboarded collabs that entered an
+ *                            order_id, the share matched to a shopify_orders
+ *                            row (mirrors the order-status validation join).
+ */
+export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
+  const supabase = createServiceClient();
+
+  const ONBOARDED_SET = ["On Board", "Order Sent", "Posted", "Delivered"];
+
+  // Parent rows only (one per collab). We pull both the onboarded set and the
+  // Reach Out queue so Completion Rate has a denominator.
+  const [onboardedRes, pendingRes, shopifyRes] = await Promise.all([
+    (supabase as any)
+      .from("posts")
+      .select(
+        "ads_usage_rights, reels, static_posts, stories, order_id",
+      )
+      .in("workflow_status", ONBOARDED_SET)
+      .or("deliverable_index.is.null,deliverable_index.eq.1")
+      .limit(20000),
+    (supabase as any)
+      .from("posts")
+      .select("post_id")
+      .eq("workflow_status", "Reach Out")
+      .or("deliverable_index.is.null,deliverable_index.eq.1")
+      .limit(20000),
+    (supabase as any).from("shopify_orders").select("order_id").limit(50000),
+  ]);
+
+  if (onboardedRes.error) throw onboardedRes.error;
+
+  const onboardedRows = (onboardedRes.data ?? []) as Array<
+    Record<string, unknown>
+  >;
+  const pendingRows = (pendingRes.data ?? []) as Array<unknown>;
+
+  const normalizeOrderId = (raw: unknown) =>
+    String(raw ?? "")
+      .replace(/^#+/, "")
+      .trim()
+      .toLowerCase();
+
+  const shopifyOrderIds = new Set<string>();
+  for (const s of (shopifyRes?.data ?? []) as Array<Record<string, unknown>>) {
+    const key = normalizeOrderId(s.order_id);
+    if (key) shopifyOrderIds.add(key);
+  }
+
+  const totalOnboarded = onboardedRows.length;
+  const pendingOnboardings = pendingRows.length;
+
+  let adRightsSelected = 0;
+  let reelsSum = 0;
+  let staticSum = 0;
+  let storiesSum = 0;
+  let withOrderId = 0;
+  let shopifyMatched = 0;
+
+  for (const r of onboardedRows) {
+    if (String(r.ads_usage_rights ?? "").trim().toLowerCase() === "yes") {
+      adRightsSelected++;
+    }
+    reelsSum += Number(r.reels ?? 0) || 0;
+    staticSum += Number(r.static_posts ?? 0) || 0;
+    storiesSum += Number(r.stories ?? 0) || 0;
+
+    const oid = normalizeOrderId(r.order_id);
+    if (oid) {
+      withOrderId++;
+      if (shopifyOrderIds.has(oid)) shopifyMatched++;
+    }
+  }
+
+  const denom = totalOnboarded + pendingOnboardings;
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+
+  return {
+    totalOnboarded,
+    pendingOnboardings,
+    completionRate: denom > 0 ? round1((totalOnboarded / denom) * 100) : 0,
+    adRightsSelected,
+    noAdRights: totalOnboarded - adRightsSelected,
+    avgReels: totalOnboarded > 0 ? round1(reelsSum / totalOnboarded) : 0,
+    avgStatic: totalOnboarded > 0 ? round1(staticSum / totalOnboarded) : 0,
+    avgStories: totalOnboarded > 0 ? round1(storiesSum / totalOnboarded) : 0,
+    shopifyValidationRate:
+      withOrderId > 0 ? round1((shopifyMatched / withOrderId) * 100) : 0,
+    shopifyMatched,
+    shopifyWithOrderId: withOrderId,
+  };
+}

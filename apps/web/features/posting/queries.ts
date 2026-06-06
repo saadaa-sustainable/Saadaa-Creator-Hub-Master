@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import type { PostingFilters, PostingRow } from "./types";
+import type { PostingFilters, PostingKpi, PostingRow } from "./types";
 
 /**
  * Server-side fetch of the Posting table.
@@ -172,3 +172,81 @@ export const fetchPostingFilterOptions = unstable_cache(
   ["posting-filter-options"],
   { revalidate: 300, tags: ["posts", "creators", "campaigns"] },
 );
+
+/**
+ * Posting KPI aggregation — closes the Analytics-Matrix gap (the Posting page
+ * previously had no KPI strip).
+ *
+ * Counts COLLABS (parent rows only: deliverable_index IS NULL OR = 1) so the
+ * filter mirrors features/accounts-hub/queries.ts. Definitions follow
+ * Shrishti's matrix verbatim:
+ *   - Total Posts Due       = Σ deliverables (reels + static + stories) across
+ *                             the posting pipeline (On Board / Order Sent /
+ *                             Posted).
+ *   - Total Posts Submitted = collabs with workflow_status = Posted.
+ *   - Posting Completion Rate = Submitted ÷ (Submitted + Pending) × 100.
+ *   - Delayed Posts         = submitted collabs where post_date > est_delivery
+ *                             (post date later than expected delivery).
+ *   - Pending Posts         = collabs awaiting posting (On Board / Order Sent).
+ */
+export async function fetchPostingKpis(): Promise<PostingKpi> {
+  const supabase = createServiceClient();
+
+  const PIPELINE_SET = ["On Board", "Order Sent", "Posted"];
+
+  const { data, error } = await (supabase as any)
+    .from("posts")
+    .select("workflow_status, reels, static_posts, stories, post_date, est_delivery")
+    .in("workflow_status", PIPELINE_SET)
+    .or("deliverable_index.is.null,deliverable_index.eq.1")
+    .limit(20000);
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  let totalPostsDue = 0;
+  let totalPostsSubmitted = 0;
+  let delayedPosts = 0;
+  let pendingPosts = 0;
+
+  for (const r of rows) {
+    const status = String(r.workflow_status ?? "").trim();
+    totalPostsDue +=
+      (Number(r.reels ?? 0) || 0) +
+      (Number(r.static_posts ?? 0) || 0) +
+      (Number(r.stories ?? 0) || 0);
+
+    if (status === "Posted") {
+      totalPostsSubmitted++;
+      const postDate = r.post_date ? new Date(String(r.post_date)) : null;
+      const estDelivery = r.est_delivery
+        ? new Date(String(r.est_delivery))
+        : null;
+      if (
+        postDate &&
+        estDelivery &&
+        !Number.isNaN(postDate.getTime()) &&
+        !Number.isNaN(estDelivery.getTime()) &&
+        postDate.getTime() > estDelivery.getTime()
+      ) {
+        delayedPosts++;
+      }
+    } else {
+      // On Board / Order Sent → awaiting posting.
+      pendingPosts++;
+    }
+  }
+
+  const denom = totalPostsSubmitted + pendingPosts;
+  const completionRate =
+    denom > 0 ? Math.round((totalPostsSubmitted / denom) * 1000) / 10 : 0;
+
+  return {
+    totalPostsDue,
+    totalPostsSubmitted,
+    completionRate,
+    delayedPosts,
+    pendingPosts,
+  };
+}

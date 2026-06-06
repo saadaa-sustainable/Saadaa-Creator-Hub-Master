@@ -193,7 +193,13 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
     pendingPost: 0,
     posted: 0,
     rtos: 0,
+    totalCampaigns: 0,
+    activeCampaigns: 0,
+    totalReachouts: 0,
   };
+
+  const allCampaigns = new Set<string>();
+  const activeCampaignSet = new Set<string>();
 
   for (const p of posts) {
     const s = p.workflow_status ?? "";
@@ -202,7 +208,19 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
       kpi.pendingPost++;
     if ((POSTED_STATUSES as readonly string[]).includes(s)) kpi.posted++;
     if ((RTO_STATUSES as readonly string[]).includes(s)) kpi.rtos++;
+    if (s === "Reach Out") kpi.totalReachouts++;
+
+    const camp = String(p.campaign_id ?? "").trim();
+    if (camp) {
+      allCampaigns.add(camp);
+      if ((ACTIVE_STATUSES as readonly string[]).includes(s)) {
+        activeCampaignSet.add(camp);
+      }
+    }
   }
+
+  kpi.totalCampaigns = allCampaigns.size;
+  kpi.activeCampaigns = activeCampaignSet.size;
 
   // Compute pending actions
   const today = new Date();

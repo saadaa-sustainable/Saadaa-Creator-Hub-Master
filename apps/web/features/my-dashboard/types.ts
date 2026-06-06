@@ -48,6 +48,12 @@ export interface MyDashboardKpi {
   posted: number;
   /** workflow_status IN ('RTO', 'Cancelled', 'RTO - Reverse Picked', 'RTO - Delivered') */
   rtos: number;
+  /** Distinct campaign_id across my posts. */
+  totalCampaigns: number;
+  /** Distinct campaign_id among my active posts (Reach Out / On Board / Order Sent). */
+  activeCampaigns: number;
+  /** My posts in Reach Out status. */
+  totalReachouts: number;
 }
 
 export interface PendingAction {

@@ -45,6 +45,24 @@ export interface PostingRow {
   > | null;
 }
 
+/**
+ * Posting KPI strip aggregates. Collab-level counts use parent rows only
+ * (deliverable_index IS NULL OR = 1). `totalPostsDue` sums the per-collab
+ * deliverable counts (reels + static + stories) across the posting pipeline.
+ */
+export interface PostingKpi {
+  /** Sum of deliverables (reels + static + stories) across posting-pipeline collabs. */
+  totalPostsDue: number;
+  /** Collabs whose posting form is filled (workflow_status = Posted). */
+  totalPostsSubmitted: number;
+  /** Submitted ÷ (Submitted + Pending) × 100. */
+  completionRate: number;
+  /** Submitted collabs whose post_date is after est_delivery. */
+  delayedPosts: number;
+  /** Collabs awaiting posting (On Board / Order Sent). */
+  pendingPosts: number;
+}
+
 export interface PostingFilters {
   campaign?: string;
   statusFilter?: string;

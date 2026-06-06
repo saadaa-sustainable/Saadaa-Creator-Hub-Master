@@ -3,9 +3,11 @@ import { UserRoundCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { OnboardingFiltersBar } from "@/features/onboarding/filters";
+import { OnboardingKpiStrip } from "@/features/onboarding/kpi-strip";
 import { OnboardingTable } from "@/features/onboarding/onboarding-table";
 import {
   fetchOnboardingFilterOptions,
+  fetchOnboardingKpis,
   fetchOnboardingTable,
 } from "@/features/onboarding/queries";
 import type { OnboardingFilters } from "@/features/onboarding/types";
@@ -26,6 +28,10 @@ export default async function OnboardingPage({
 
       <OnboardingFiltersBar initial={params} options={options} />
 
+      <Suspense fallback={<KpiSkeleton rows={2} />}>
+        <OnboardingKpiSection />
+      </Suspense>
+
       <Suspense
         key={JSON.stringify(params)}
         fallback={<TableSkeleton rows={10} cols={10} />}
@@ -36,6 +42,11 @@ export default async function OnboardingPage({
   );
 }
 
+async function OnboardingKpiSection() {
+  const kpi = await fetchOnboardingKpis();
+  return <OnboardingKpiStrip kpi={kpi} />;
+}
+
 async function OnboardingTableSection({
   filters,
 }: {
@@ -43,4 +54,18 @@ async function OnboardingTableSection({
 }) {
   const rows = await fetchOnboardingTable(filters);
   return <OnboardingTable rows={rows} />;
+}
+
+function KpiSkeleton({ rows = 1 }: { rows?: number }) {
+  return (
+    <section className="flex flex-col gap-3">
+      {Array.from({ length: rows }).map((_, r) => (
+        <div key={r} className="acc-kpi-grid">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="acc-kpi acc-kpi--skeleton" aria-hidden />
+          ))}
+        </div>
+      ))}
+    </section>
+  );
 }

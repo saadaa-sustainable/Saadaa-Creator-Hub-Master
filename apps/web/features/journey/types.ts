@@ -58,6 +58,25 @@ export interface JourneyKpi {
   closed: number;
 }
 
+/**
+ * Funnel conversion metrics across the pipeline stages. Stage counts are
+ * cumulative collab counts (parent rows only): each collab is counted at every
+ * stage it has reached or passed, so conversion rates are monotonic.
+ *
+ *   reachToOnboard = Onboarded ÷ Reached × 100
+ *   onboardToPost  = Posted    ÷ Onboarded × 100
+ *   postToPayment  = Paid      ÷ Posted × 100
+ */
+export interface JourneyFunnel {
+  reached: number;
+  onboarded: number;
+  posted: number;
+  paid: number;
+  reachToOnboard: number;
+  onboardToPost: number;
+  postToPayment: number;
+}
+
 export interface JourneyFilters {
   campaign?: string;
 }
