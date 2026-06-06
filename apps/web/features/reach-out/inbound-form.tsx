@@ -28,6 +28,7 @@ import {
   Gift,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { isInstagramProfileUrl } from "@/lib/validators";
 import { formatFollowers, proxyAvatarUrl } from "@/lib/formatters";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
 import { GENDERS, type Gender } from "./schema";
@@ -886,6 +887,10 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               {rows.map((r, idx) => {
                 const valid = isRowValid(r);
                 const hasUrl = !!r.instagramLink.trim();
+                // REQ #1: live URL feedback — flag a non-empty, non-Instagram
+                // value immediately on type/blur, before submit.
+                const igLiveInvalid =
+                  hasUrl && !isInstagramProfileUrl(r.instagramLink);
                 const showRowValidation =
                   submitAttempted &&
                   (rowHasEntry(r) || rows.every((row) => !rowHasEntry(row)));
@@ -956,7 +961,8 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                         type="url"
                         className={cn(
                           "form-control",
-                          rowErrors.instagramLink && "is-invalid-control",
+                          (rowErrors.instagramLink || igLiveInvalid) &&
+                            "is-invalid-control",
                         )}
                         placeholder="https://instagram.com/handle"
                         value={r.instagramLink}

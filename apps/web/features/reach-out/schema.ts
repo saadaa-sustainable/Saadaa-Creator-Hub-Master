@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { IG_PROFILE_RE } from "@/lib/validators";
 
 /**
  * Reach-Out outbound submission schema — mirrors legacy form fields ONLY.
@@ -37,8 +38,6 @@ export type Gender = (typeof GENDERS)[number];
 export const VERIFICATIONS = ["Verified", "Non-Verified", "Pending"] as const;
 export type Verification = (typeof VERIFICATIONS)[number];
 
-const igUrlRe = /^https?:\/\/(www\.)?instagram\.com\/[A-Za-z0-9._]+/i;
-
 export const REACHOUT_DIRECTIONS = ["outbound", "inbound"] as const;
 export type ReachoutDirection = (typeof REACHOUT_DIRECTIONS)[number];
 
@@ -54,7 +53,7 @@ export const ReachOutSchema = z.object({
     .string()
     .trim()
     .min(1, "Instagram URL required")
-    .regex(igUrlRe, "Must be a valid Instagram profile URL"),
+    .regex(IG_PROFILE_RE, "Must be a valid Instagram profile URL"),
   influencerName: z.string().trim().min(1, "Full name required"),
   followers: z.coerce.number().int().nonnegative().optional(),
 

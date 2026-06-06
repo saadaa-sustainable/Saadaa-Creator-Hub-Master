@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidUrl } from "@/lib/validators";
 
 /**
  * Campaign Create — exact legacy parity with InfluencerBackend.js#submitCampaign
@@ -61,7 +62,7 @@ type BudgetRowDraft = Omit<
 const urlSchema = z
   .string()
   .trim()
-  .refine((v) => v === "" || /^https?:\/\//i.test(v), {
+  .refine((v) => v === "" || isValidUrl(v), {
     message: "Must be a valid URL",
   });
 

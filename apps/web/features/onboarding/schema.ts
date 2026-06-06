@@ -55,6 +55,15 @@ export const ORDER_STATUSES = [
 ] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
+/** REQ #2: content duration captured per-collab on onboarding. "" = unset. */
+export const CONTENT_DURATIONS = [
+  "",
+  "24-25 sec",
+  "35-45 sec",
+  "45+ sec",
+] as const;
+export type ContentDuration = (typeof CONTENT_DURATIONS)[number];
+
 export const OnboardingSchema = z
   .object({
     postId: z.string().trim().min(1, "Post ID required"),
@@ -71,7 +80,8 @@ export const OnboardingSchema = z
     bankName: z.string().trim().optional().default(""),
     bankNumber: z.string().trim().optional().default(""),
     ifsc: z.string().trim().optional().default(""),
-    duration: z.string().trim().optional().default(""),
+    // .catch("") so legacy free-text durations don't fail re-submit validation.
+    duration: z.enum(CONTENT_DURATIONS).catch("").optional().default(""),
     remarks: z.string().trim().optional().default(""),
   })
   .superRefine((data, ctx) => {

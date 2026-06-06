@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { GENDERS } from "./schema";
+import { IG_PROFILE_RE } from "@/lib/validators";
 
 /**
  * Inbound batch — mirrors legacy submitReachOutBatch + #view-reachout-inbound.
@@ -15,15 +16,13 @@ import { GENDERS } from "./schema";
 export const INBOUND_COLLAB_TYPES = ["Barter", "Barter + Paid"] as const;
 export type InboundCollabType = (typeof INBOUND_COLLAB_TYPES)[number];
 
-const igUrlRe = /^https?:\/\/(www\.)?instagram\.com\/[A-Za-z0-9._]+/i;
-
 export const InboundRowSchema = z
   .object({
     instagramLink: z
       .string()
       .trim()
       .min(1, "Profile URL required")
-      .regex(igUrlRe, "Must be a valid Instagram profile URL"),
+      .regex(IG_PROFILE_RE, "Must be a valid Instagram profile URL"),
     gender: z.enum(GENDERS, { message: "Gender required" }),
     contentCode: z.string().trim().min(1, "Content Code required"),
     collabType: z.enum(INBOUND_COLLAB_TYPES, {

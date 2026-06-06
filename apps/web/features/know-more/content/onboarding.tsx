@@ -51,6 +51,12 @@ export default function OnboardingKM() {
             <strong>Bank Details</strong> — Bank Name, Bank Number, IFSC.
             Required for <strong>Barter + Paid</strong>.
           </li>
+          <li>
+            <strong>Content Duration</strong> — fixed dropdown:{" "}
+            <KMCode>24-25 sec</KMCode>, <KMCode>35-45 sec</KMCode>,{" "}
+            <KMCode>45+ sec</KMCode> (per-collab). Legacy free-text values are
+            tolerated on read.
+          </li>
         </KMList>
       </KMSection>
 

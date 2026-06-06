@@ -28,6 +28,7 @@ import { cn } from "@/lib/cn";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
 import {
   OnboardingSchema,
+  CONTENT_DURATIONS,
   COLLAB_TYPES,
   ADS_USAGE_RIGHTS,
   ORDER_STATUSES,
@@ -663,13 +664,18 @@ export function OrderCreationModal({
           <section className="ob-form-section">
             <div className="form-grid">
               <div className="form-floating form-grid-full">
-                <input
-                  type="text"
+                <select
                   className="form-control"
                   id="ob_duration"
-                  placeholder=" "
                   {...register("duration")}
-                />
+                >
+                  <option value="">Select content duration…</option>
+                  {CONTENT_DURATIONS.filter((d) => d).map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
                 <label htmlFor="ob_duration">Content Duration</label>
               </div>
               <div className="form-floating form-grid-full">

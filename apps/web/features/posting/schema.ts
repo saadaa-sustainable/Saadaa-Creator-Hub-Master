@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidUrl } from "@/lib/validators";
 
 /**
  * Posting submit — mirrors legacy submitPosting(postId, postDate, postLink,
@@ -34,8 +35,18 @@ export const PostingSchema = z
       .trim()
       .min(1, "Post link required")
       .regex(/^https?:\/\//i, "Must be a valid URL"),
-    downloadLink: z.string().trim().optional().default(""),
-    rawDump: z.string().trim().optional().default(""),
+    downloadLink: z
+      .string()
+      .trim()
+      .optional()
+      .default("")
+      .refine((v) => !v || isValidUrl(v), "Download link must be a valid URL"),
+    rawDump: z
+      .string()
+      .trim()
+      .optional()
+      .default("")
+      .refine((v) => !v || isValidUrl(v), "Raw footage link must be a valid URL"),
     partnershipId: z.string().trim().optional().default(""),
     adsUsageRights: z.string().trim().optional().default(""),
   })
