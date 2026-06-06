@@ -24,26 +24,38 @@ export default function OnboardingKM() {
             table. Filter by campaign / stage / tier / email-missing.
           </li>
           <li>
-            <strong>One row per collab</strong> · the board collapses
-            multi-deliverable collabs to a single row — the primary deliverable
-            stands in for the whole collab (mirrors how Accounts Hub and Order
-            Status detect parents: <KMCode>deliverable_index is null OR = 1</KMCode>).
-            A <KMCode>Layers</KMCode> chip shows the human count
-            (<KMCode>1 deliverable</KMCode>, <KMCode>3 deliverables</KMCode> …)
-            with the <KMCode>NR + NP + NS</KMCode> breakdown as its tooltip /
-            sub-label. <strong>Single-deliverable collabs still read
+            <strong>Collab ID model — one row per collab</strong> · every
+            deliverable carries a <KMCode>collab_id</KMCode>{" "}
+            (<KMCode>SIF-1-C1</KMCode>) = creator id + the collaboration number.
+            All deliverables of one reach-out share that collab_id. The board
+            groups by <KMCode>collab_id</KMCode> and renders ONE representative
+            row per collab (the deliverable with the lowest{" "}
+            <KMCode>post_id</KMCode>). There is no parent/child — grouping is
+            purely by collab_id. A dedicated <strong>Collab ID</strong> column /
+            chip shows it on the row, card, and overview.
+          </li>
+          <li>
+            <strong>Deliverables chip</strong> · a <KMCode>Layers</KMCode> chip
+            shows the human count (<KMCode>1 deliverable</KMCode>,{" "}
+            <KMCode>3 deliverables</KMCode> …) with the{" "}
+            <KMCode>NR + NP + NS</KMCode> breakdown as its tooltip / sub-label.
+            <strong> Single-deliverable collabs still read
             &ldquo;1 deliverable&rdquo;</strong> — the count is never hidden.
-            This replaces the old Parent / Child N / Single lineage badges.
+            This replaces the old Parent / Child N / Single lineage badges,
+            which are gone entirely.
           </li>
           <li>
             <strong>See every deliverable</strong> · on a multi-deliverable
             collab, the card&apos;s <KMCode>View N</KMCode> affordance and the
             row&apos;s <KMCode>Overview</KMCode> both open the overview modal,
-            which lists each deliverable (primary + linked children) with its
-            own post_id. Children are never removed from the database — they are
-            only folded into the parent for a cleaner board. They are still
+            which lists each deliverable with its own short{" "}
+            <KMCode>post_id</KMCode> (<KMCode>SIF-1-P1</KMCode>,{" "}
+            <KMCode>SIF-1-P2</KMCode> …) under the shared collab_id. The other
+            deliverables are never removed from the database — they are only
+            folded into the representative for a cleaner board. They are still
             submitted individually in the <strong>Posting</strong> stage, and
-            payment stays <strong>one-per-collab</strong> on the primary row.
+            payment is raised <strong>once per collab_id</strong> on the
+            representative row.
           </li>
           <li>
             <strong>Submit form (order-form.tsx)</strong> · opens per row.
@@ -63,8 +75,8 @@ export default function OnboardingKM() {
 
       <KMSection tag="KPIs">
         <p>
-          A KPI strip sits above the board. Every count is per-collab (parent
-          row only).
+          A KPI strip sits above the board. Every count is per-collab —
+          deliverables are grouped by <KMCode>collab_id</KMCode>.
         </p>
         <KMList>
           <li>
@@ -140,13 +152,13 @@ export default function OnboardingKM() {
       <KMSection tag="Equal-split commercial rule">
         <KMCallout tone="warning">
           <strong>Single agreed total ÷ deliverable count.</strong> The
-          operator enters one total commercial figure. On submit, the parent
-          + every child row each get{" "}
+          operator enters one total commercial figure. On submit, every
+          deliverable row of the collab gets{" "}
           <KMCode>commercial_amount = total / (reels + static_posts)</KMCode>
           . Example: ₹10,000 across 3 deliverables = ₹3,333.33 per row, summing
           back to ₹9,999.99 ≈ ₹10,000. Cost Analytics, Accounts Hub, Order
-          Status, My Dashboard and the Dashboard stage board all sum siblings
-          per <KMCode>(inf_id, collab_number)</KMCode> to display the
+          Status, My Dashboard and the Dashboard stage board all sum the
+          deliverables of a <KMCode>collab_id</KMCode> to display the
           originally-agreed total.
         </KMCallout>
       </KMSection>
@@ -154,23 +166,24 @@ export default function OnboardingKM() {
       <KMSection tag="Fields written">
         <KMList>
           <li>
-            <strong>posts (parent)</strong> · workflow_status{" "}
+            <strong>posts (representative)</strong> · workflow_status{" "}
             <KMCode>On Board</KMCode>, onboard_date, agency_name, collab_type,
             commercial_amount (per-row split), est_delivery, reels,
             static_posts, stories, ads_usage_rights, email, tracking_id,
-            garment_qty, deliverable_index <KMCode>1</KMCode>, deliverable_type,
-            bank_name, bank_number, ifsc.
+            garment_qty, <KMCode>collab_id</KMCode> (shared across the collab),
+            deliverable_type, bank_name, bank_number, ifsc.
           </li>
           <li>
-            <strong>posts (children)</strong> · auto-inserted when reels +
-            posts &gt; 1. Each child gets its own post_id{" "}
-            <KMCode>SIF-&#123;N&#125;-P&#123;N&#125;-C&#123;collab&#125;</KMCode>
-            , deliverable_index 2…N, inherits collab_number,{" "}
-            <KMCode>commercial_amount</KMCode> = the same split share. Payment
-            still lives on the parent. On the Onboarding board these child rows
-            are folded into the parent (see &ldquo;One row per collab&rdquo;
-            above) — they remain full rows in the database and surface
-            individually in the Posting stage.
+            <strong>posts (additional deliverables)</strong> · auto-inserted
+            when reels + posts &gt; 1. Each gets its own SHORT post_id{" "}
+            <KMCode>SIF-&#123;N&#125;-P&#123;M&#125;</KMCode> (no{" "}
+            <KMCode>-C</KMCode> suffix), the SAME{" "}
+            <KMCode>collab_id</KMCode> as the rest of the collab, and{" "}
+            <KMCode>commercial_amount</KMCode> = the same split share. Payment is
+            raised once per collab_id on the representative. On the Onboarding
+            board these rows fold into the representative (see &ldquo;Collab ID
+            model&rdquo; above) — they remain full rows in the database and
+            surface individually in the Posting stage.
           </li>
           <li>
             <strong>creators</strong> · email, address fields (state, city,

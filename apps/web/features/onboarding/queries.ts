@@ -58,6 +58,7 @@ export async function fetchOnboardingTable(
       deliverable_index,
       deliverable_type,
       collab_number,
+      collab_id,
       inf_id,
       campaign:campaigns ( campaign_id, campaign_name ),
       creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic )
@@ -217,32 +218,43 @@ export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
 
   const ONBOARDED_SET = ["On Board", "Order Sent", "Posted", "Delivered"];
 
-  // Parent rows only (one per collab). We pull both the onboarded set and the
-  // Reach Out queue so Completion Rate has a denominator.
+  // Collab ID model: fetch ALL deliverable rows; we group by collab_id in JS so
+  // every KPI counts COLLABS (not individual deliverable rows). Avg deliverable
+  // counts sum reels/static/stories across each collab's deliverables.
   const [onboardedRes, pendingRes, shopifyRes] = await Promise.all([
     (supabase as any)
       .from("posts")
       .select(
-        "ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped",
+        "inf_id, collab_number, collab_id, ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped",
       )
       .in("workflow_status", ONBOARDED_SET)
-      .or("deliverable_index.is.null,deliverable_index.eq.1")
       .limit(20000),
     (supabase as any)
       .from("posts")
-      .select("post_id")
+      .select("inf_id, collab_number, collab_id, post_id")
       .eq("workflow_status", "Reach Out")
-      .or("deliverable_index.is.null,deliverable_index.eq.1")
       .limit(20000),
     (supabase as any).from("shopify_orders").select("order_id").limit(50000),
   ]);
 
   if (onboardedRes.error) throw onboardedRes.error;
 
-  const onboardedRows = (onboardedRes.data ?? []) as Array<
+  const onboardedDeliverables = (onboardedRes.data ?? []) as Array<
     Record<string, unknown>
   >;
-  const pendingRows = (pendingRes.data ?? []) as Array<unknown>;
+  const pendingDeliverables = (pendingRes.data ?? []) as Array<
+    Record<string, unknown>
+  >;
+
+  // collab_id grouping key with legacy fallback.
+  const collabKeyOf = (r: Record<string, unknown>): string => {
+    const cid = r.collab_id as string | null;
+    if (cid) return cid;
+    const inf = r.inf_id as string | null;
+    const cn = (r.collab_number as number | null) ?? 1;
+    if (inf) return `${inf}-C${cn}`;
+    return (r.post_id as string) ?? JSON.stringify(r);
+  };
 
   const normalizeOrderId = (raw: unknown) =>
     String(raw ?? "")
@@ -256,8 +268,51 @@ export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
     if (key) shopifyOrderIds.add(key);
   }
 
-  const totalOnboarded = onboardedRows.length;
-  const pendingOnboardings = pendingRows.length;
+  // Aggregate onboarded deliverables into per-collab buckets.
+  interface CollabAgg {
+    reels: number;
+    static: number;
+    stories: number;
+    adsRights: boolean;
+    orderId: string | null;
+    emailSent: boolean;
+    emailSkipped: boolean;
+  }
+  const collabs = new Map<string, CollabAgg>();
+  for (const r of onboardedDeliverables) {
+    const key = collabKeyOf(r);
+    let agg = collabs.get(key);
+    if (!agg) {
+      agg = {
+        reels: 0,
+        static: 0,
+        stories: 0,
+        adsRights: false,
+        orderId: null,
+        emailSent: false,
+        emailSkipped: false,
+      };
+      collabs.set(key, agg);
+    }
+    agg.reels += Number(r.reels ?? 0) || 0;
+    agg.static += Number(r.static_posts ?? 0) || 0;
+    agg.stories += Number(r.stories ?? 0) || 0;
+    const adv = String(r.ads_usage_rights ?? "").trim().toLowerCase();
+    if (adv && !["no", "n/a", "none", "0", "false"].includes(adv)) {
+      agg.adsRights = true;
+    }
+    const oid = normalizeOrderId(r.order_id);
+    if (oid && !agg.orderId) agg.orderId = oid;
+    if (r.collab_email_sent_at) agg.emailSent = true;
+    if (r.collab_email_skipped === true) agg.emailSkipped = true;
+  }
+
+  // Pending collabs = distinct collab_ids still in Reach Out.
+  const pendingCollabKeys = new Set<string>();
+  for (const r of pendingDeliverables) pendingCollabKeys.add(collabKeyOf(r));
+
+  const totalOnboarded = collabs.size;
+  const pendingOnboardings = pendingCollabKeys.size;
 
   let adRightsSelected = 0;
   let pendingEmail = 0;
@@ -267,26 +322,17 @@ export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
   let withOrderId = 0;
   let shopifyMatched = 0;
 
-  for (const r of onboardedRows) {
-    // Ad-rights truthiness — values are durations ("12 Months"), never "Yes".
-    const adv = String(r.ads_usage_rights ?? "").trim().toLowerCase();
-    if (adv && !["no", "n/a", "none", "0", "false"].includes(adv)) {
-      adRightsSelected++;
-    }
-    reelsSum += Number(r.reels ?? 0) || 0;
-    staticSum += Number(r.static_posts ?? 0) || 0;
-    storiesSum += Number(r.stories ?? 0) || 0;
-
-    const oid = normalizeOrderId(r.order_id);
-    if (oid) {
+  for (const agg of collabs.values()) {
+    if (agg.adsRights) adRightsSelected++;
+    reelsSum += agg.reels;
+    staticSum += agg.static;
+    storiesSum += agg.stories;
+    if (agg.orderId) {
       withOrderId++;
-      if (shopifyOrderIds.has(oid)) shopifyMatched++;
+      if (shopifyOrderIds.has(agg.orderId)) shopifyMatched++;
     }
-
     // Pending collab email: onboarded but not yet sent and not intentionally skipped.
-    if (!r.collab_email_sent_at && r.collab_email_skipped !== true) {
-      pendingEmail++;
-    }
+    if (!agg.emailSent && !agg.emailSkipped) pendingEmail++;
   }
 
   const denom = totalOnboarded + pendingOnboardings;

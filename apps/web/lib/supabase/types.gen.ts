@@ -41,6 +41,7 @@ export interface PostsRow {
   post_id_short: string | null;
   post_number: number | null;
   collab_number: number | null;
+  collab_id: string | null;
   deliverable_index: number | null;
   deliverable_type: DeliverableType | null;
   inf_id: string | null;
@@ -154,6 +155,7 @@ export interface CampaignsRow {
 export interface PaymentsRow {
   id: string;
   post_id: string;
+  collab_id: string | null;
   inf_id: string | null;
   username: string | null;
   collab_number: number | null;

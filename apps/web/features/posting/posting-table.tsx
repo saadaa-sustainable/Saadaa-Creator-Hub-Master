@@ -1,14 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Eye,
-  Grid3X3,
-  Inbox,
-  List as ListIcon,
-  Network,
-  Send,
-  Star,
-} from "lucide-react";
+import { Eye, Grid3X3, Inbox, List as ListIcon, Send } from "lucide-react";
 import { DataTable } from "@/components/data-table/data-table";
 import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
 import {
@@ -20,11 +12,10 @@ import {
 import { cn } from "@/lib/cn";
 import {
   AdsRightsCell,
+  CollabIdBadge,
   DriveLinkCell,
   PostLinkCell,
-  findParentPostId,
   formatDeliverables,
-  isChildRow,
   isPosted,
   postingColumns,
 } from "./columns";
@@ -198,21 +189,12 @@ function PostingCard({
   onOverview: (row: PostingRow) => void;
 }) {
   const posted = isPosted(r);
-  const child = isChildRow(r);
-  const hasSiblings = rows.some(
-    (x) =>
-      x &&
-      x.inf_id === r.inf_id &&
-      Number(x.collab_number ?? 1) === Number(r.collab_number ?? 1) &&
-      Number(x.deliverable_index ?? 0) > 1,
-  );
 
   return (
     <div
       className={cn(
         "ob-card",
         posted ? "ob-card-onboarded" : "ob-card-pending",
-        child && "ob-card-child",
       )}
     >
       <div className="ob-card-head">
@@ -244,23 +226,7 @@ function PostingCard({
           <span className="campaign-chip">{r.campaign.campaign_id}</span>
         )}
         <span className="post-id tabular">{r.post_id_short ?? r.post_id}</span>
-        {child ? (
-          <span
-            className="pill pill--child"
-            title={`Child of ${findParentPostId(r, rows)}`}
-          >
-            <Network size={10} aria-hidden />
-            Child {Number(r.deliverable_index ?? 0)}
-          </span>
-        ) : hasSiblings ? (
-          <span
-            className="pill pill--parent"
-            title="Primary deliverable for this collab"
-          >
-            <Star size={10} aria-hidden />
-            Parent
-          </span>
-        ) : null}
+        <CollabIdBadge r={r} rows={rows} />
         {(r.nomenclature ?? r.content_type) && (
           <span className="pill pill--muted">
             {r.nomenclature ?? r.content_type}

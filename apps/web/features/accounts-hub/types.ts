@@ -24,6 +24,7 @@ export interface AccountsRow {
   inf_id: PostsRow["inf_id"];
   campaign_id: PostsRow["campaign_id"];
   collab_number: PostsRow["collab_number"];
+  collab_id?: PostsRow["collab_id"];
   deliverable_index: PostsRow["deliverable_index"];
   content_type: PostsRow["content_type"];
   nomenclature: PostsRow["nomenclature"];
@@ -56,6 +57,13 @@ export interface AccountsRow {
 
   /** Latest non-Done payment row + any Done row(s). Latest by created_at. */
   payment: PaymentsRow | null;
+
+  /**
+   * Presentation-only: number of deliverable rows sharing this collab_id.
+   * Stamped on the representative row when the board collapses a collab. Not
+   * persisted.
+   */
+  _collabDeliverableCount?: number;
 }
 
 export interface AccountsKpi {

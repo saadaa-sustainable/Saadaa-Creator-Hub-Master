@@ -1,12 +1,6 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
-import {
-  AlertTriangle,
-  Download,
-  ExternalLink,
-  Network,
-  Star,
-} from "lucide-react";
+import { AlertTriangle, Download, ExternalLink, Layers } from "lucide-react";
 import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { PostingRow } from "./types";
@@ -16,23 +10,29 @@ export function isPosted(r: PostingRow): boolean {
   return r.workflow_status === "Posted";
 }
 
-/** Child deliverable (deliverable_index > 1). */
-export function isChildRow(r: PostingRow): boolean {
-  return r.deliverable_index != null && Number(r.deliverable_index) > 1;
+/**
+ * Collab grouping key — prefer the stamped collab_id (SIF-1-C1), fall back to
+ * inf_id||'-C'||collab_number for legacy rows, then post_id. All deliverables
+ * of one collab share this key. Replaces the old parent/child grouping.
+ */
+export function collabKeyOf(r: PostingRow): string {
+  if (r.collab_id) return r.collab_id;
+  if (r.inf_id) return `${r.inf_id}-C${Number(r.collab_number ?? 1)}`;
+  return r.post_id ?? "";
 }
 
-/** Lookup parent post_id within the loaded set by (inf_id, collab_number). */
-export function findParentPostId(r: PostingRow, rows: PostingRow[]): string {
-  for (const row of rows) {
-    if (!row) continue;
-    if (row.inf_id !== r.inf_id) continue;
-    if (Number(row.collab_number ?? 1) !== Number(r.collab_number ?? 1))
-      continue;
-    if (row.deliverable_index == null || Number(row.deliverable_index) === 1) {
-      return row.post_id ?? "";
-    }
-  }
-  return String(r.post_id ?? "").replace(/-P\d+-/, "-P?-");
+/** Display-friendly Collab ID. */
+export function collabIdLabel(r: PostingRow): string {
+  return collabKeyOf(r);
+}
+
+/** Count of deliverables sharing this row's collab_id within the loaded set. */
+export function collabDeliverableCount(
+  r: PostingRow,
+  rows: PostingRow[],
+): number {
+  const key = collabKeyOf(r);
+  return rows.filter((x) => x && collabKeyOf(x) === key).length;
 }
 
 /** "2R + 1P + 0S" — legacy parity. */
@@ -43,56 +43,28 @@ export function formatDeliverables(r: PostingRow): string {
   return `${reels}R + ${posts}P + ${stories}S`;
 }
 
-export function lineageLabel(r: PostingRow, rows: PostingRow[]): string {
-  if (isChildRow(r)) return `Child ${Number(r.deliverable_index ?? 0)}`;
-  const hasSiblings = rows.some(
-    (x) =>
-      x &&
-      x.inf_id === r.inf_id &&
-      Number(x.collab_number ?? 1) === Number(r.collab_number ?? 1) &&
-      Number(x.deliverable_index ?? 0) > 1,
-  );
-  return hasSiblings ? "Parent" : "Single";
-}
-
-export function LineageBadge({
+/** Collab ID chip — groups all deliverables of a collaboration. */
+export function CollabIdBadge({
   r,
   rows,
 }: {
   r: PostingRow;
   rows: PostingRow[];
 }) {
-  if (isChildRow(r)) {
-    const parent = findParentPostId(r, rows);
-    return (
-      <span
-        className="pill pill--child"
-        title={`Additional deliverable for parent ${parent}`}
-      >
-        <Network size={10} aria-hidden />
-        Child {Number(r.deliverable_index ?? 0)}
-      </span>
-    );
-  }
-  const hasSiblings = rows.some(
-    (x) =>
-      x &&
-      x.inf_id === r.inf_id &&
-      Number(x.collab_number ?? 1) === Number(r.collab_number ?? 1) &&
-      Number(x.deliverable_index ?? 0) > 1,
+  const count = collabDeliverableCount(r, rows);
+  return (
+    <span
+      className="campaign-chip tabular"
+      title={
+        count > 1
+          ? `${count} deliverables share this Collab ID`
+          : "Collab ID — groups all deliverables of this collaboration"
+      }
+    >
+      {count > 1 && <Layers size={10} aria-hidden />}
+      {collabIdLabel(r)}
+    </span>
   );
-  if (hasSiblings) {
-    return (
-      <span
-        className="pill pill--parent"
-        title="Primary deliverable for this collab"
-      >
-        <Star size={10} aria-hidden />
-        Parent
-      </span>
-    );
-  }
-  return null;
 }
 
 export function CreatorCell({ r }: { r: PostingRow }) {
@@ -172,7 +144,7 @@ export function AdsRightsCell({ r }: { r: PostingRow }) {
   );
 }
 
-/** 9-column legacy parity (Creator|Post ID|Lineage|Campaign|Deliverables|Ads
+/** Column parity (Creator|Post ID|Collab ID|Campaign|Deliverables|Ads
  *  Rights|Stage|Onboarded|Post Date|Live Link|Drive). Action appended by table. */
 export const postingColumns: ColumnDef<PostingRow>[] = [
   {
@@ -191,10 +163,10 @@ export const postingColumns: ColumnDef<PostingRow>[] = [
     ),
   },
   {
-    id: "lineage",
-    header: "Lineage",
+    id: "collab_id",
+    header: "Collab ID",
     cell: ({ row, table }) => (
-      <LineageBadge
+      <CollabIdBadge
         r={row.original}
         rows={table.options.data as PostingRow[]}
       />

@@ -8,17 +8,19 @@ import {
   ExternalLink,
   Eye,
   Film,
-  Handshake,
+  Layers,
   Link as LinkIcon,
-  Network,
   ShieldCheck,
-  Star,
   X,
 } from "lucide-react";
 import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
-import { findParentPostId, formatDeliverables, isChildRow } from "./columns";
+import {
+  collabDeliverableCount,
+  collabIdLabel,
+  formatDeliverables,
+} from "./columns";
 import type { PostingRow } from "./types";
 
 /**
@@ -47,15 +49,8 @@ export function PostingOverviewModal({
 
   if (!mounted) return null;
 
-  const child = isChildRow(row);
-  const parentPostId = child ? findParentPostId(row, rows) : row.post_id;
-  const hasSiblings = rows.some(
-    (x) =>
-      x &&
-      x.inf_id === row.inf_id &&
-      Number(x.collab_number ?? 1) === Number(row.collab_number ?? 1) &&
-      Number(x.deliverable_index ?? 0) > 1,
-  );
+  const collabId = collabIdLabel(row);
+  const collabCount = collabDeliverableCount(row, rows);
 
   return createPortal(
     <div className="modal-backdrop modal-backdrop--onboarding">
@@ -96,23 +91,17 @@ export function PostingOverviewModal({
               <WorkflowStatusPill status={row.workflow_status} />
             </div>
             <div className="ob-overview-pills">
-              {child ? (
-                <span
-                  className="pill pill--child"
-                  title={`Additional deliverable for parent ${parentPostId}`}
-                >
-                  <Network size={10} aria-hidden />
-                  Child {Number(row.deliverable_index ?? 0)}
-                </span>
-              ) : hasSiblings ? (
-                <span
-                  className="pill pill--parent"
-                  title="Primary deliverable for this collab"
-                >
-                  <Star size={10} aria-hidden />
-                  Parent
-                </span>
-              ) : null}
+              <span
+                className="campaign-chip tabular"
+                title={
+                  collabCount > 1
+                    ? `${collabCount} deliverables share this Collab ID`
+                    : "Collab ID — groups all deliverables of this collaboration"
+                }
+              >
+                {collabCount > 1 && <Layers size={10} aria-hidden />}
+                {collabId}
+              </span>
               <span className="campaign-chip">
                 {row.campaign?.campaign_id ?? "—"}
               </span>
@@ -137,11 +126,7 @@ export function PostingOverviewModal({
 
           <section className="ob-overview-grid">
             <OverviewItem label="Post ID" value={row.post_id} mono />
-            <OverviewItem
-              label="Parent"
-              value={child ? parentPostId : "This row"}
-              mono
-            />
+            <OverviewItem label="Collab ID" value={collabId} mono />
             <OverviewItem
               label="Post Date"
               value={
@@ -230,10 +215,11 @@ export function PostingOverviewModal({
             />
           </section>
 
-          {child && (
+          {collabCount > 1 && (
             <div className="ob-overview-note">
-              Posting fields are tracked per deliverable. Parent:{" "}
-              <strong>{parentPostId}</strong>.
+              Posting is tracked per deliverable. This deliverable belongs to
+              Collab <strong>{collabId}</strong>, which has {collabCount}{" "}
+              deliverables in total. Payment is raised once per Collab ID.
             </div>
           )}
         </div>

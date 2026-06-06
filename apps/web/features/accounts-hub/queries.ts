@@ -44,6 +44,7 @@ export async function fetchAccountsHubData(
       inf_id,
       campaign_id,
       collab_number,
+      collab_id,
       deliverable_index,
       content_type,
       nomenclature,
@@ -69,9 +70,11 @@ export async function fetchAccountsHubData(
       creator:creators  ( inf_id, username, inf_name, profile_pic, category, followers, verification )
     `,
     )
-    .in("workflow_status", PAYABLE_STAGES)
-    // Parent deliverables only — child rows do not own a payment row.
-    .or("deliverable_index.is.null,deliverable_index.eq.1");
+    .in("workflow_status", PAYABLE_STAGES);
+  // Collab ID model: fetch ALL deliverables (no parent/child filter). We
+  // collapse to ONE representative row per collab_id in JS below, and sum
+  // commercial_amount across every deliverable sharing that collab_id. Payment
+  // is raised per collab_id (one payment covers the whole collab).
 
   if (filters.campaign) {
     postsQuery = postsQuery.eq("campaign_id", filters.campaign);
@@ -85,12 +88,48 @@ export async function fetchAccountsHubData(
     .limit(2000);
 
   if (postsErr) throw postsErr;
-  let postsLoaded = (postsRaw ?? []) as Array<
+  const allDeliverables = (postsRaw ?? []) as Array<
     Omit<AccountsRow, "payment"> & {
       campaign: AccountsRow["campaign"];
       creator: AccountsRow["creator"];
     }
   >;
+
+  // collab_id grouping key — prefer the stamped collab_id; fall back to
+  // inf_id||'-C'||collab_number for legacy rows not yet backfilled, then to
+  // post_id so a lone row still forms its own group.
+  const collabKeyOf = (p: Record<string, unknown>): string => {
+    const cid = p.collab_id as string | null;
+    if (cid) return cid;
+    const inf = p.inf_id as string | null;
+    const cn = (p.collab_number as number | null) ?? 1;
+    if (inf) return `${inf}-C${cn}`;
+    return (p.post_id as string) ?? "";
+  };
+
+  // Collapse to ONE representative row per collab_id (lowest post_id), and sum
+  // commercial_amount across all deliverables of the collab so the representative
+  // carries the originally-agreed total (each row stores the per-row split).
+  const repByCollab = new Map<string, (typeof allDeliverables)[number]>();
+  const collabSumMap = new Map<string, number>();
+  const collabCountMap = new Map<string, number>();
+  for (const d of allDeliverables) {
+    const dAny = d as Record<string, unknown>;
+    const key = collabKeyOf(dAny);
+    collabSumMap.set(
+      key,
+      (collabSumMap.get(key) ?? 0) + Number(dAny.commercial_amount ?? 0),
+    );
+    collabCountMap.set(key, (collabCountMap.get(key) ?? 0) + 1);
+    const cur = repByCollab.get(key);
+    if (
+      !cur ||
+      String(dAny.post_id ?? "") < String((cur as Record<string, unknown>).post_id ?? "")
+    ) {
+      repByCollab.set(key, d);
+    }
+  }
+  let postsLoaded = Array.from(repByCollab.values());
 
   // Ad-rights filter (REQ #8): use the canonical ADS_YES truthiness helper so
   // free-text durations ("5 Months", "12 Months", …) count as "Yes".
@@ -107,43 +146,21 @@ export async function fetchAccountsHubData(
     );
   }
 
-  // Sibling sum: parent's commercial_amount holds the per-row split value;
-  // the originally-agreed total = sum across all deliverables of the collab.
-  // Fetch every row keyed on (inf_id, collab_number) and overwrite the parent's
-  // commercial_amount before downstream consumers (KPIs, payment drafts, UI).
-  const parentInfIds = Array.from(
-    new Set(
-      postsLoaded
-        .map((p) => (p as Record<string, unknown>).inf_id as string | null)
-        .filter((v): v is string => !!v),
-    ),
-  );
-  const collabTotalMap = new Map<string, number>();
-  if (parentInfIds.length > 0) {
-    const { data: sibRows } = await (supabase as any)
-      .from("posts")
-      .select("inf_id, collab_number, commercial_amount")
-      .in("inf_id", parentInfIds);
-    for (const s of (sibRows ?? []) as Array<{
-      inf_id: string | null;
-      collab_number: number | null;
-      commercial_amount: number | null;
-    }>) {
-      const key = `${s.inf_id ?? ""}|${Number(s.collab_number ?? 1)}`;
-      collabTotalMap.set(
-        key,
-        (collabTotalMap.get(key) ?? 0) + Number(s.commercial_amount ?? 0),
-      );
-    }
-  }
+  // Collab total: each deliverable's commercial_amount holds the per-row split
+  // value; the originally-agreed total = sum across all deliverables sharing the
+  // collab_id (already computed in collabSumMap above). Overwrite the
+  // representative row's commercial_amount before downstream consumers (KPIs,
+  // payment drafts, UI).
   const posts = postsLoaded.map((p) => {
     const pAny = p as Record<string, unknown>;
-    const key = `${(pAny.inf_id as string | null) ?? ""}|${Number(
-      (pAny.collab_number as number | null) ?? 1,
-    )}`;
-    const collabTotal = collabTotalMap.get(key);
-    if (collabTotal == null) return p;
-    return { ...p, commercial_amount: collabTotal };
+    const key = collabKeyOf(pAny);
+    const collabTotal = collabSumMap.get(key);
+    const count = collabCountMap.get(key) ?? 1;
+    return {
+      ...p,
+      ...(collabTotal != null ? { commercial_amount: collabTotal } : {}),
+      _collabDeliverableCount: count,
+    };
   });
 
   // Overlay payments — pull every payment whose post_id is in this batch,
@@ -174,19 +191,18 @@ export async function fetchAccountsHubData(
     }
   }
 
-  // Backfill: Posted/Delivered parent posts that have no payment row yet,
-  // BUT only for collabs that are fully payment-eligible. A collab is
-  // payment-eligible when:
-  //   1. EVERY sibling deliverable is posted (post_link + post_date present), and
-  //   2. NO sibling with ads_usage_rights=Yes is missing a partnership_id.
+  // Backfill: Posted/Delivered collabs (one representative row per collab_id)
+  // that have no payment row yet, BUT only for collabs that are fully
+  // payment-eligible. A collab is payment-eligible when:
+  //   1. EVERY deliverable of the collab is posted (post_link + post_date), and
+  //   2. NO deliverable with ads_usage_rights=Yes is missing a partnership_id.
   // If either condition fails, we skip the draft so the operator doesn't see
-  // a phantom UTR-less row sitting in payments for a collab that can't be paid
-  // yet. Mirrors the collab-level gate in `submitPayments`.
+  // a phantom UTR-less row for a collab that can't be paid yet. Mirrors the
+  // collab-level gate in `submitPayments`. Keyed on collab_id.
   const payableStages = new Set(["Posted", "Delivered"]);
   const candidates = posts.filter(
     (p) =>
       p.post_id &&
-      p.post_date &&
       payableStages.has(p.workflow_status as string) &&
       !paymentsByPostId.has(p.post_id!),
   );
@@ -205,24 +221,32 @@ export async function fetchAccountsHubData(
           .filter((v): v is string => !!v),
       ),
     ];
+    // Track, per collab_id: whether it is locked, and the latest post_date
+    // across its deliverables (used to set the draft due_date).
     const collabLocked = new Set<string>();
+    const collabPostDate = new Map<string, string>();
     if (candidateInfIds.length > 0) {
       const { data: sibs } = await (supabase as any)
         .from("posts")
         .select(
-          "inf_id, collab_number, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
+          "inf_id, collab_number, collab_id, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
         )
         .in("inf_id", candidateInfIds);
       for (const s of (sibs ?? []) as Array<{
         inf_id: string | null;
         collab_number: number | null;
+        collab_id: string | null;
         post_link: string | null;
         post_date: string | null;
         ads_usage_rights: string | null;
         partnership_id: string | null;
         ad_partnership_valid: boolean | null;
       }>) {
-        const key = `${s.inf_id ?? ""}|${Number(s.collab_number ?? 1)}`;
+        const key = collabKeyOf(s as unknown as Record<string, unknown>);
+        if (s.post_date) {
+          const prev = collabPostDate.get(key);
+          if (!prev || s.post_date > prev) collabPostDate.set(key, s.post_date);
+        }
         if (!s.post_link || !s.post_date) {
           collabLocked.add(key);
           continue;
@@ -236,44 +260,46 @@ export async function fetchAccountsHubData(
       }
     }
     backfillEligible = candidates.filter((p) => {
-      const pAny = p as Record<string, unknown>;
-      const key = `${(pAny.inf_id as string | null) ?? ""}|${Number(
-        (pAny.collab_number as number | null) ?? 1,
-      )}`;
-      return !collabLocked.has(key);
+      const key = collabKeyOf(p as Record<string, unknown>);
+      // Eligible only when every deliverable is posted (so a post_date exists)
+      // and nothing locked the collab.
+      return !collabLocked.has(key) && collabPostDate.has(key);
     });
-  }
 
-  if (backfillEligible.length > 0) {
-    const drafts = backfillEligible.map((p) => {
-      const due = paymentDueDateFor(p.post_date);
-      const pAny = p as Record<string, unknown>;
-      return {
-        post_id: p.post_id,
-        deliverable_post_id: p.post_id,
-        inf_id: pAny.inf_id ?? null,
-        username: pAny.username ?? null,
-        collab_number: pAny.collab_number ?? null,
-        deliverable_index: pAny.deliverable_index ?? null,
-        amount: Number(p.commercial_amount ?? 0),
-        bank_name: pAny.bank_name ?? null,
-        bank_number: pAny.bank_number ?? null,
-        ifsc: pAny.ifsc ?? null,
-        status: "Not Due",
-        due_date: due,
-        estimated_payable_date: nextPayableCycleDate(due),
-        payment_advice_sent: false,
-      };
-    });
+    if (backfillEligible.length > 0) {
+      const drafts = backfillEligible.map((p) => {
+        const key = collabKeyOf(p as Record<string, unknown>);
+        const collabDate = collabPostDate.get(key) ?? p.post_date ?? null;
+        const due = paymentDueDateFor(collabDate);
+        const pAny = p as Record<string, unknown>;
+        return {
+          post_id: p.post_id,
+          deliverable_post_id: p.post_id,
+          collab_id: pAny.collab_id ?? key,
+          inf_id: pAny.inf_id ?? null,
+          username: pAny.username ?? null,
+          collab_number: pAny.collab_number ?? null,
+          deliverable_index: pAny.deliverable_index ?? null,
+          amount: Number(p.commercial_amount ?? 0),
+          bank_name: pAny.bank_name ?? null,
+          bank_number: pAny.bank_number ?? null,
+          ifsc: pAny.ifsc ?? null,
+          status: "Not Due",
+          due_date: due,
+          estimated_payable_date: nextPayableCycleDate(due),
+          payment_advice_sent: false,
+        };
+      });
     const { data: inserted, error: insErr } = await (supabase as any)
       .from("payments")
       .upsert(drafts, { onConflict: "post_id", ignoreDuplicates: true })
       .select("*");
     if (insErr)
       console.error("[accounts-hub] backfill upsert failed:", insErr.message);
-    for (const row of (inserted ?? []) as PaymentsRow[]) {
-      if (!paymentsByPostId.has(row.post_id)) {
-        paymentsByPostId.set(row.post_id, row);
+      for (const row of (inserted ?? []) as PaymentsRow[]) {
+        if (!paymentsByPostId.has(row.post_id)) {
+          paymentsByPostId.set(row.post_id, row);
+        }
       }
     }
   }
@@ -423,8 +449,8 @@ const ADS_YES = (raw: string | null | undefined): boolean => {
  *   1. Every deliverable in the collab must have a post_link (posting form submitted).
  *   2. If ANY deliverable has ads_usage_rights, ALL must have a partnership_id.
  *
- * Fetches all Posted/Delivered deliverables (parents + children), groups by
- * collab (inf_id + collab_number), and returns only parent rows from ready collabs.
+ * Fetches all Posted/Delivered deliverables, groups by collab_id, and returns
+ * ONE representative row per ready collab (payment is raised per collab_id).
  */
 export async function fetchPayableEligiblePosts(): Promise<
   Array<{
@@ -442,14 +468,14 @@ export async function fetchPayableEligiblePosts(): Promise<
   }>
 > {
   const supabase = createServiceClient();
-  // Fetch ALL deliverables (parents + children) so we can gate per-collab.
+  // Fetch ALL deliverables so we can gate + collapse per collab_id.
   const { data, error } = await (supabase as any)
     .from("posts")
     .select(
       `
       post_id, post_id_short, commercial_amount, campaign_id, workflow_status,
       ads_usage_rights, partnership_id, ad_partnership_valid, deliverable_index,
-      post_link, inf_id, collab_number,
+      post_link, inf_id, collab_number, collab_id,
       creator:creators ( username, inf_name, profile_pic )
     `,
     )
@@ -460,10 +486,16 @@ export async function fetchPayableEligiblePosts(): Promise<
   if (error) throw error;
   const rows = (data ?? []) as any[];
 
-  // Group deliverables by collab (inf_id + collab_number).
+  // collab_id grouping key — prefer collab_id, fall back to inf_id||'-C'||cn,
+  // then post_id (so a lone row still forms its own collab group).
+  const keyOf = (r: any): string =>
+    (r.collab_id as string | null) ??
+    (r.inf_id ? `${r.inf_id}-C${r.collab_number ?? 1}` : (r.post_id as string));
+
+  // Group deliverables by collab_id.
   const collabMap = new Map<string, typeof rows>();
   for (const r of rows) {
-    const key = `${r.inf_id ?? ""}|${r.collab_number ?? 0}`;
+    const key = keyOf(r);
     if (!collabMap.has(key)) collabMap.set(key, []);
     collabMap.get(key)!.push(r);
   }
@@ -483,31 +515,31 @@ export async function fetchPayableEligiblePosts(): Promise<
     if (allPosted && allPartnershipped) readyKeys.add(key);
   }
 
-  // Sum commercial_amount across all deliverables per collab — parent's
-  // value is the per-row split, not the original total.
+  // Sum commercial_amount across all deliverables per collab_id — each row
+  // stores the per-row split, not the original total.
   const collabTotal = new Map<string, number>();
+  // Pick ONE representative row per collab_id (lowest post_id) — payment is
+  // raised once per collab_id.
+  const repByCollab = new Map<string, any>();
   for (const r of rows) {
-    const key = `${r.inf_id ?? ""}|${r.collab_number ?? 0}`;
+    const key = keyOf(r);
     collabTotal.set(
       key,
       (collabTotal.get(key) ?? 0) + Number(r.commercial_amount ?? 0),
     );
+    const cur = repByCollab.get(key);
+    if (!cur || String(r.post_id ?? "") < String(cur.post_id ?? "")) {
+      repByCollab.set(key, r);
+    }
   }
 
-  // Return only parent rows from ready collabs.
-  return rows
-    .filter((r) => {
-      const key = `${r.inf_id ?? ""}|${r.collab_number ?? 0}`;
-      const isParent = r.deliverable_index === null || r.deliverable_index === 1;
-      return isParent && readyKeys.has(key);
-    })
-    .map((r) => ({
+  // Return one representative row per ready collab.
+  return Array.from(repByCollab.entries())
+    .filter(([key]) => readyKeys.has(key))
+    .map(([key, r]) => ({
       post_id: r.post_id,
       post_id_short: r.post_id_short ?? null,
-      commercial_amount:
-        collabTotal.get(`${r.inf_id ?? ""}|${r.collab_number ?? 0}`) ??
-        r.commercial_amount ??
-        null,
+      commercial_amount: collabTotal.get(key) ?? r.commercial_amount ?? null,
       campaign_id: r.campaign_id ?? null,
       workflow_status: r.workflow_status,
       ads_usage_rights: r.ads_usage_rights ?? null,

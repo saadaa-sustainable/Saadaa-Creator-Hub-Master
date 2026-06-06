@@ -379,9 +379,19 @@ function DeliverableCard({
             {d.deliverable_label}
           </span>
           {d.is_parent ? (
-            <span className="pill pill--parent">Parent</span>
+            <span
+              className="pill pill--muted"
+              title="Payment for the whole collab is raised on this deliverable"
+            >
+              Primary
+            </span>
           ) : (
-            <span className="pill pill--child">Child</span>
+            <span
+              className="pill pill--linked"
+              title="Payment is handled on the collab's primary deliverable"
+            >
+              Linked
+            </span>
           )}
         </div>
         <PaymentStatusPill status={paymentStatus} />

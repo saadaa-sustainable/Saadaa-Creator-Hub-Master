@@ -27,13 +27,14 @@ import {
   EmailStatusCell,
   collabCommercialTotal,
   collabDeliverableBreakdown,
+  collabIdLabel,
   collabSiblings,
   countCollabDeliverables,
   deliverableBreakdown,
   formatDeliverableCount,
+  isCollabRepresentative,
   isOnboarded,
   isOverdue,
-  isParentRow,
   onboardingColumns,
 } from "./columns";
 import { OrderCreationModal } from "./order-form";
@@ -57,25 +58,27 @@ export function OnboardingTable({
   } | null>(null);
   const [view, setView] = useState<"list" | "cards">(initialView);
 
-  // Collapse the board to ONE row per collab: render parents only (mirrors the
-  // Accounts Hub / Order Status `deliverable_index is null OR = 1` filter).
-  // Counts/breakdowns are pre-computed against the FULL `rows` set (so hidden
-  // children still contribute) and stamped onto each parent. The complete
-  // `rows` array is still passed to cards + the overview modal so the
+  // Collapse the board to ONE row per collab_id: render the collab
+  // representative only (lowest post_id within each collab_id group).
+  // Counts/breakdowns are pre-computed against the FULL `rows` set (so the other
+  // deliverables still contribute) and stamped onto each representative. The
+  // complete `rows` array is still passed to cards + the overview modal so the
   // per-deliverable list stays viewable.
   const parentRows = useMemo<OnboardingRow[]>(
     () =>
-      rows.filter(isParentRow).map((parent) => {
-        const commercialTotal = collabCommercialTotal(parent, rows);
-        return {
-          ...parent,
-          _collabDeliverableCount: countCollabDeliverables(parent, rows),
-          _collabDeliverableBreakdown: collabDeliverableBreakdown(parent, rows),
-          ...(commercialTotal != null
-            ? { _collabCommercialTotal: commercialTotal }
-            : {}),
-        };
-      }),
+      rows
+        .filter((r) => isCollabRepresentative(r, rows))
+        .map((rep) => {
+          const commercialTotal = collabCommercialTotal(rep, rows);
+          return {
+            ...rep,
+            _collabDeliverableCount: countCollabDeliverables(rep, rows),
+            _collabDeliverableBreakdown: collabDeliverableBreakdown(rep, rows),
+            ...(commercialTotal != null
+              ? { _collabCommercialTotal: commercialTotal }
+              : {}),
+          };
+        }),
     [rows],
   );
 
@@ -319,6 +322,12 @@ function ObCard({
           <span className="campaign-chip">{r.campaign.campaign_id}</span>
         )}
         <span className="post-id tabular">{r.post_id_short ?? r.post_id}</span>
+        <span
+          className="campaign-chip tabular"
+          title="Collab ID — groups all deliverables of this collaboration"
+        >
+          {collabIdLabel(r)}
+        </span>
         <DeliverablesChip r={r} rows={rows} />
         {(r.nomenclature ?? r.content_type) && (
           <span className="pill pill--muted">
@@ -546,6 +555,12 @@ function OnboardingOverviewModal({
             </div>
             <div className="ob-overview-pills">
               <DeliverablesChip r={row} rows={rows} />
+              <span
+                className="campaign-chip tabular"
+                title="Collab ID — groups all deliverables of this collaboration"
+              >
+                {collabIdLabel(row)}
+              </span>
               <span className="campaign-chip">
                 {row.campaign?.campaign_id ?? "—"}
               </span>
@@ -564,6 +579,7 @@ function OnboardingOverviewModal({
 
           <section className="ob-overview-grid">
             <OverviewItem label="Post ID" value={row.post_id} mono />
+            <OverviewItem label="Collab ID" value={collabIdLabel(row)} mono />
             <OverviewItem
               label="Deliverables"
               value={formatDeliverableCount(deliverableCount)}
@@ -647,9 +663,7 @@ function OnboardingOverviewModal({
               </div>
               <ul className="flex flex-col gap-1.5">
                 {deliverableRows.map((d) => {
-                  const isParent =
-                    d.deliverable_index == null ||
-                    Number(d.deliverable_index) === 1;
+                  const isPrimary = isCollabRepresentative(d, rows);
                   return (
                     <li
                       key={d.post_id}
@@ -664,7 +678,7 @@ function OnboardingOverviewModal({
                       <span className="post-id tabular">
                         {d.post_id_short ?? d.post_id}
                       </span>
-                      {isParent ? (
+                      {isPrimary ? (
                         <span
                           className="pill pill--muted"
                           title="Payment + collab email live on this row"

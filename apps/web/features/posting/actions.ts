@@ -137,77 +137,126 @@ export async function submitPosting(input: unknown) {
  * Spawn a Not-Due draft payment row when a post flips to Posted. Mirrors
  * legacy `_autoInitDraftPayment_` (InfluencerBackend.js:10256-10306).
  *
- * Idempotent: if any non-Done payment row already exists for this post_id,
- * we leave it alone. Children deliverables (deliverable_index > 1) are
- * skipped — payment lives on the parent collab.
+ * Idempotent: if any non-Done payment row already exists for this collab's
+ * representative, we leave it alone. Collab ID model: one payment per collab_id
+ * raised on the representative deliverable (lowest post_id in the collab).
  */
 async function autoInitDraftPayment(
   supabase: ReturnType<typeof createServiceClient>,
   postId: string,
   postDate: string,
 ): Promise<void> {
-  // Skip if this is a child deliverable row.
   const { data: postRow } = await (supabase as any)
     .from("posts")
     .select(
-      "deliverable_index, commercial_amount, inf_id, collab_number, ads_usage_rights",
+      "post_id, deliverable_index, commercial_amount, inf_id, username, collab_number, collab_id, ads_usage_rights",
     )
     .eq("post_id", postId)
     .maybeSingle();
   if (!postRow) return;
-  const deliverableIndex = Number(postRow.deliverable_index ?? 1);
-  if (deliverableIndex > 1) return;
 
-  // Idempotency: any existing non-Done payment row is the draft already.
+  // collab_id grouping key (legacy fallback to inf_id||'-C'||collab_number).
+  const collabId: string =
+    postRow.collab_id ??
+    (postRow.inf_id
+      ? `${postRow.inf_id}-C${Number(postRow.collab_number ?? 1)}`
+      : postId);
+
+  // Resolve the collab's deliverables once: used both to gate eligibility and
+  // to pick the representative (lowest post_id) that owns the single payment.
+  let collabDeliverables: Array<{
+    post_id: string;
+    post_link: string | null;
+    post_date: string | null;
+    commercial_amount: number | null;
+    ads_usage_rights: string | null;
+    partnership_id: string | null;
+    ad_partnership_valid: boolean | null;
+    collab_id: string | null;
+    inf_id: string | null;
+    collab_number: number | null;
+  }> = [];
+  if (postRow.inf_id) {
+    const { data: sibs } = await (supabase as any)
+      .from("posts")
+      .select(
+        "post_id, post_link, post_date, commercial_amount, ads_usage_rights, partnership_id, ad_partnership_valid, collab_id, inf_id, collab_number",
+      )
+      .eq("inf_id", postRow.inf_id);
+    collabDeliverables = ((sibs ?? []) as typeof collabDeliverables).filter(
+      (s) =>
+        (s.collab_id ??
+          (s.inf_id ? `${s.inf_id}-C${Number(s.collab_number ?? 1)}` : "")) ===
+        collabId,
+    );
+  } else {
+    collabDeliverables = [
+      {
+        post_id: postRow.post_id,
+        post_link: null,
+        post_date: postDate,
+        commercial_amount: postRow.commercial_amount ?? null,
+        ads_usage_rights: postRow.ads_usage_rights ?? null,
+        partnership_id: null,
+        ad_partnership_valid: null,
+        collab_id: postRow.collab_id ?? null,
+        inf_id: postRow.inf_id ?? null,
+        collab_number: postRow.collab_number ?? null,
+      },
+    ];
+  }
+
+  // The representative deliverable owns the single payment row (lowest post_id).
+  const representativeId = collabDeliverables.reduce(
+    (lo, d) => (String(d.post_id) < lo ? String(d.post_id) : lo),
+    String(postRow.post_id),
+  );
+
+  // Idempotency: any existing non-Done payment row keyed on the representative.
   const { data: existing } = await (supabase as any)
     .from("payments")
     .select("id, status")
-    .eq("post_id", postId)
+    .eq("post_id", representativeId)
     .neq("status", "Done")
     .limit(1);
   if (existing && existing.length > 0) return;
 
   // Collab-level eligibility: don't create a draft until the whole collab is
-  // payable. A collab is payable when EVERY sibling has been posted (link +
-  // date) AND no sibling with ads_usage_rights=Yes is missing a partnership_id.
+  // payable. A collab is payable when EVERY deliverable has been posted (link +
+  // date) AND no deliverable with ads_usage_rights=Yes is missing a partnership.
   // Otherwise we'd leak a phantom UTR-less row that the operator can't act on.
-  if (postRow.inf_id) {
-    const { data: sibs } = await (supabase as any)
-      .from("posts")
-      .select(
-        "post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
-      )
-      .eq("inf_id", postRow.inf_id)
-      .eq("collab_number", Number(postRow.collab_number ?? 1));
-    const adsYes = (raw: string | null | undefined) => {
-      if (!raw) return false;
-      const v = String(raw).trim().toLowerCase();
-      return !["", "no", "n/a", "none", "0", "false"].includes(v);
-    };
-    for (const s of (sibs ?? []) as Array<{
-      post_link: string | null;
-      post_date: string | null;
-      ads_usage_rights: string | null;
-      partnership_id: string | null;
-      ad_partnership_valid: boolean | null;
-    }>) {
-      if (!s.post_link || !s.post_date) return;
-      if (adsYes(s.ads_usage_rights)) {
-        const hasKey =
-          s.ad_partnership_valid === true ||
-          (s.partnership_id ?? "").trim().length > 0;
-        if (!hasKey) return;
-      }
+  const adsYes = (raw: string | null | undefined) => {
+    if (!raw) return false;
+    const v = String(raw).trim().toLowerCase();
+    return !["", "no", "n/a", "none", "0", "false"].includes(v);
+  };
+  for (const s of collabDeliverables) {
+    if (!s.post_link || !s.post_date) return;
+    if (adsYes(s.ads_usage_rights)) {
+      const hasKey =
+        s.ad_partnership_valid === true ||
+        (s.partnership_id ?? "").trim().length > 0;
+      if (!hasKey) return;
     }
   }
+
+  // Full collab amount = sum of per-row splits across all deliverables.
+  const collabAmount = collabDeliverables.reduce(
+    (sum, d) => sum + Number(d.commercial_amount ?? 0),
+    0,
+  );
 
   const dueDate = paymentDueDateFor(postDate);
   const estPayable = nextPayableCycleDate(dueDate);
 
   const { error: insErr } = await (supabase as any).from("payments").insert({
-    post_id: postId,
-    deliverable_post_id: postId,
-    amount: Number(postRow.commercial_amount ?? 0),
+    post_id: representativeId,
+    deliverable_post_id: representativeId,
+    collab_id: collabId,
+    inf_id: postRow.inf_id ?? null,
+    username: postRow.username ?? null,
+    collab_number: postRow.collab_number ?? null,
+    amount: collabAmount,
     status: "Not Due",
     due_date: dueDate,
     estimated_payable_date: estPayable,

@@ -30,6 +30,7 @@ export interface PostingRow {
   deliverable_index?: number | null;
   deliverable_type?: PostsRow["deliverable_type"];
   collab_number?: number | null;
+  collab_id?: string | null;
   inf_id?: string | null;
   est_delivery?: string | null;
   campaign: Pick<CampaignsRow, "campaign_id" | "campaign_name"> | null;

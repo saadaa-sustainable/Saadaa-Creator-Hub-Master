@@ -125,7 +125,11 @@ function newRow(): FormRow {
   };
 }
 
-/** Strip "-C1" collab suffix for shorter operator-facing post labels. */
+/**
+ * Operator-facing short post label. Post IDs are already short under the Collab
+ * ID model (SIF-1-P1); this also strips any legacy "-C1" suffix defensively so
+ * pre-migration ids still render cleanly.
+ */
 function shortenPostId(id: string): string {
   return id.replace(/-C\d+$/i, "");
 }

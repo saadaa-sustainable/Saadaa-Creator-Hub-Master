@@ -36,8 +36,12 @@ export default function AccountsHubKM() {
       <KMSection tag="Fields written (payments table)">
         <KMList>
           <li>
-            <strong>post_id · deliverable_post_id · inf_id · username</strong>{" "}
-            · denormalised so the ledger row is self-contained.
+            <strong>collab_id · post_id · deliverable_post_id · inf_id ·
+            username</strong>{" "}
+            · the payment is keyed on <KMCode>collab_id</KMCode>{" "}
+            (<KMCode>SIF-1-C1</KMCode>) — one payment covers the whole collab.
+            post_id stores the representative deliverable. Denormalised so the
+            ledger row is self-contained.
           </li>
           <li>
             <strong>status</strong> · <KMCode>Not Due</KMCode> →{" "}
@@ -53,8 +57,8 @@ export default function AccountsHubKM() {
             post_date + 30; est_payable = next 15th or 30th of the month.
           </li>
           <li>
-            <strong>collab_number · deliverable_index · bank_name ·
-            bank_number · ifsc</strong> · pulled from posts at submit time.
+            <strong>collab_number · bank_name · bank_number · ifsc</strong> ·
+            pulled from posts at submit time.
           </li>
           <li>
             <strong>posted_but_not_tested</strong> · stamped{" "}
@@ -76,19 +80,19 @@ export default function AccountsHubKM() {
             <KMCode>Posted</KMCode> or <KMCode>Delivered</KMCode>.
           </li>
           <li>
-            <strong>Collab readiness</strong> — EVERY sibling deliverable
-            must have post_link AND post_date. One missing sibling locks
-            the whole collab.
+            <strong>Collab readiness</strong> — EVERY deliverable sharing the{" "}
+            <KMCode>collab_id</KMCode> must have post_link AND post_date. One
+            missing deliverable locks the whole collab.
           </li>
           <li>
-            <strong>Partnership</strong> — when ads_usage_rights = Yes on
-            any sibling, every sibling needs a partnership_id before any
-            payment can settle.
+            <strong>Partnership</strong> — when ads_usage_rights = Yes on any
+            deliverable of the collab, every deliverable needs a partnership_id
+            before any payment can settle.
           </li>
         </KMList>
         <p>
           Blocked rows surface in the toast with the exact reason per post
-          (e.g. <KMCode>siblings not posted yet: SIF-1-P2, SIF-1-P3</KMCode>
+          (e.g. <KMCode>not posted yet: SIF-1-P2, SIF-1-P3</KMCode>
           or <KMCode>partnership key missing on: SIF-1-P2</KMCode>).
         </p>
       </KMSection>
@@ -126,10 +130,11 @@ export default function AccountsHubKM() {
       <KMSection tag="Kanban vs List + click-through">
         <KMList>
           <li>
-            <strong>Kanban</strong> — Posted column shows only parents with a{" "}
-            <KMCode>Parent · N delivs</KMCode> chip + split-amount line. Click
-            any card → stage-wise overview modal listing every sibling
-            deliverable with IG verification button + partnership status.
+            <strong>Kanban</strong> — Posted column shows ONE card per{" "}
+            <KMCode>collab_id</KMCode> (the representative) with a{" "}
+            <KMCode>N delivs</KMCode> chip + split-amount line. Click any card →
+            stage-wise overview modal listing every deliverable of the collab
+            with IG verification button + partnership status.
           </li>
           <li>
             <strong>List</strong> — flat table for batch scanning; same
@@ -140,15 +145,19 @@ export default function AccountsHubKM() {
 
       <KMSection tag="Equal-split + payment cascade">
         <KMCallout tone="info">
-          After 2026-05-27 the agreed total is equal-split across every
-          deliverable on Onboarding submit ·{" "}
+          The agreed total is equal-split across every deliverable on
+          Onboarding submit ·{" "}
           <KMCode>per_row = total ÷ deliverable_count</KMCode>. Accounts Hub
-          queries sum siblings per <KMCode>(inf_id, collab_number)</KMCode> so
-          the parent row always renders the originally-agreed total in the KPI
-          strip + Posting Overview modal. <strong>One payment per collab</strong>
-          : when the parent row is marked Paid, every child row&apos;s{" "}
-          <KMCode>posts.payment_status</KMCode> cascades to <KMCode>Done</KMCode>{" "}
-          and no separate child payment rows are inserted.
+          queries sum the deliverables of a <KMCode>collab_id</KMCode> so the
+          representative row always renders the originally-agreed total in the
+          KPI strip + overview modal.{" "}
+          <strong>One payment per collab_id</strong>: the payment is keyed on{" "}
+          <KMCode>collab_id</KMCode> and stored on the representative deliverable
+          (lowest post_id). When it is marked Paid, every other deliverable of
+          the collab has its <KMCode>posts.payment_status</KMCode> cascaded to{" "}
+          <KMCode>Done</KMCode> and any stray payment rows on those deliverables
+          are removed — no double-counting. (Partial payments are not yet
+          supported; the full collab amount is paid in one row.)
         </KMCallout>
       </KMSection>
 

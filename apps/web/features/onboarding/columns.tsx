@@ -12,31 +12,56 @@ import { Avatar, WorkflowStatusPill } from "@/components/ui";
 import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
 import type { OnboardingRow } from "./types";
 
-/** Returns true if this row is a child deliverable (deliverable_index > 1). */
-export function isChildRow(r: OnboardingRow): boolean {
-  return r.deliverable_index != null && Number(r.deliverable_index) > 1;
-}
-
 /**
- * Parent-row detection — mirrors the exact DB filter used by Accounts Hub and
- * Order Status (`.or("deliverable_index.is.null,deliverable_index.eq.1")`).
- * A parent owns the payment and represents the whole collab on the board.
+ * Collab grouping key — prefer the stamped collab_id (SIF-1-C1), fall back to
+ * inf_id||'-C'||collab_number for legacy rows, then post_id so a lone row still
+ * forms its own group. All deliverables of one collab share this key.
  */
-export function isParentRow(r: OnboardingRow): boolean {
-  return r.deliverable_index == null || Number(r.deliverable_index) === 1;
+export function collabKeyOf(r: OnboardingRow): string {
+  if (r.collab_id) return r.collab_id;
+  if (r.inf_id) return `${r.inf_id}-C${Number(r.collab_number ?? 1)}`;
+  return r.post_id ?? "";
 }
 
-/** All rows belonging to the same collab (inf_id, collab_number) as `r`. */
+/** Display-friendly Collab ID (the stamped collab_id, with legacy fallback). */
+export function collabIdLabel(r: OnboardingRow): string {
+  return collabKeyOf(r);
+}
+
+/** All deliverable rows belonging to the same collab_id as `r`. */
 export function collabSiblings(
   r: OnboardingRow,
   rows: OnboardingRow[],
 ): OnboardingRow[] {
-  return rows.filter(
-    (x) =>
-      x &&
-      x.inf_id === r.inf_id &&
-      Number(x.collab_number ?? 1) === Number(r.collab_number ?? 1),
-  );
+  const key = collabKeyOf(r);
+  return rows.filter((x) => x && collabKeyOf(x) === key);
+}
+
+/**
+ * Representative-row detection for the collab_id model — the board renders ONE
+ * row per collab_id. The representative is the deliverable with the lowest
+ * post_id within its collab group. Replaces the old parent/child (deliverable_
+ * index) test entirely.
+ */
+export function isCollabRepresentative(
+  r: OnboardingRow,
+  rows: OnboardingRow[],
+): boolean {
+  const key = collabKeyOf(r);
+  const mine = String(r.post_id ?? "");
+  for (const x of rows) {
+    if (!x || collabKeyOf(x) !== key) continue;
+    if (String(x.post_id ?? "") < mine) return false;
+  }
+  return true;
+}
+
+/** True when `r` is NOT the collab representative (email/payment live on the rep). */
+export function isLinkedDeliverable(
+  r: OnboardingRow,
+  rows: OnboardingRow[],
+): boolean {
+  return !isCollabRepresentative(r, rows);
 }
 
 /**
@@ -89,21 +114,22 @@ export function collabCommercialTotal(
   );
 }
 
-/** Lookup the parent post_id within the loaded set by (inf_id, collab_number). */
-export function findParentPostId(
+/**
+ * The representative deliverable's post_id within the collab group (the row that
+ * carries the collab email + payment). Lowest post_id in the collab_id group.
+ */
+export function findRepresentativePostId(
   r: OnboardingRow,
   rows: OnboardingRow[],
 ): string {
+  const key = collabKeyOf(r);
+  let rep: string | null = null;
   for (const row of rows) {
-    if (!row) continue;
-    if (row.inf_id !== r.inf_id) continue;
-    if (Number(row.collab_number ?? 1) !== Number(r.collab_number ?? 1))
-      continue;
-    if (row.deliverable_index == null || Number(row.deliverable_index) === 1) {
-      return row.post_id ?? "";
-    }
+    if (!row || collabKeyOf(row) !== key) continue;
+    const pid = String(row.post_id ?? "");
+    if (rep == null || pid < rep) rep = pid;
   }
-  return String(r.post_id ?? "").replace(/-P\d+-/, "-P?-");
+  return rep ?? String(r.post_id ?? "");
 }
 
 /**
@@ -196,12 +222,12 @@ export function EmailStatusCell({
 }) {
   if (!isOnboarded(r)) return <span className="text-text-tertiary">—</span>;
 
-  if (isChildRow(r)) {
-    const parent = findParentPostId(r, rows);
+  if (isLinkedDeliverable(r, rows)) {
+    const rep = findRepresentativePostId(r, rows);
     return (
       <span
         className="pill pill--linked"
-        title={`Email is handled on parent ${parent}`}
+        title={`Email is handled on the collab's primary deliverable ${rep}`}
       >
         <LinkIcon size={10} aria-hidden />
         Linked
@@ -309,6 +335,18 @@ export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
     cell: ({ row }) => (
       <span className="post-id tabular">
         {row.original.post_id_short ?? row.original.post_id}
+      </span>
+    ),
+  },
+  {
+    id: "collab_id",
+    header: "Collab ID",
+    cell: ({ row }) => (
+      <span
+        className="campaign-chip tabular"
+        title="Groups all deliverables of this collaboration"
+      >
+        {collabIdLabel(row.original)}
       </span>
     ),
   },

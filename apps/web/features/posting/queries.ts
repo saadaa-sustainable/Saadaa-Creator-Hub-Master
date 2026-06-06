@@ -55,6 +55,7 @@ export async function fetchPostingTable(
       deliverable_index,
       deliverable_type,
       collab_number,
+      collab_id,
       inf_id,
       campaign:campaigns ( campaign_id, campaign_name ),
       creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic )
@@ -194,31 +195,59 @@ export async function fetchPostingKpis(): Promise<PostingKpi> {
 
   const PIPELINE_SET = ["On Board", "Order Sent", "Posted"];
 
+  // Collab ID model: fetch ALL deliverables and group by collab_id in JS so
+  // collab-level counts (submitted / pending / delayed) count COLLABS, while
+  // totalPostsDue sums every individual deliverable across the pipeline.
   const { data, error } = await (supabase as any)
     .from("posts")
-    .select("workflow_status, reels, static_posts, stories, post_date, est_delivery")
+    .select(
+      "inf_id, collab_number, collab_id, workflow_status, reels, static_posts, stories, post_date, est_delivery",
+    )
     .in("workflow_status", PIPELINE_SET)
-    .or("deliverable_index.is.null,deliverable_index.eq.1")
     .limit(20000);
 
   if (error) throw error;
 
   const rows = (data ?? []) as Array<Record<string, unknown>>;
 
+  const collabKeyOf = (r: Record<string, unknown>): string => {
+    const cid = r.collab_id as string | null;
+    if (cid) return cid;
+    const inf = r.inf_id as string | null;
+    const cn = (r.collab_number as number | null) ?? 1;
+    return inf ? `${inf}-C${cn}` : JSON.stringify(r);
+  };
+
   let totalPostsDue = 0;
   let totalPostsSubmitted = 0;
   let delayedPosts = 0;
   let pendingPosts = 0;
 
+  // Per-collab aggregation: a collab is "Posted" only when ALL its deliverables
+  // are Posted; otherwise it's pending. Delayed if any deliverable's post_date
+  // exceeds its est_delivery.
+  interface CollabAgg {
+    total: number;
+    posted: number;
+    delayed: boolean;
+  }
+  const collabs = new Map<string, CollabAgg>();
   for (const r of rows) {
-    const status = String(r.workflow_status ?? "").trim();
     totalPostsDue +=
       (Number(r.reels ?? 0) || 0) +
       (Number(r.static_posts ?? 0) || 0) +
       (Number(r.stories ?? 0) || 0);
 
+    const key = collabKeyOf(r);
+    let agg = collabs.get(key);
+    if (!agg) {
+      agg = { total: 0, posted: 0, delayed: false };
+      collabs.set(key, agg);
+    }
+    agg.total++;
+    const status = String(r.workflow_status ?? "").trim();
     if (status === "Posted") {
-      totalPostsSubmitted++;
+      agg.posted++;
       const postDate = r.post_date ? new Date(String(r.post_date)) : null;
       const estDelivery = r.est_delivery
         ? new Date(String(r.est_delivery))
@@ -230,10 +259,17 @@ export async function fetchPostingKpis(): Promise<PostingKpi> {
         !Number.isNaN(estDelivery.getTime()) &&
         postDate.getTime() > estDelivery.getTime()
       ) {
-        delayedPosts++;
+        agg.delayed = true;
       }
+    }
+  }
+
+  for (const agg of collabs.values()) {
+    const fullyPosted = agg.total > 0 && agg.posted === agg.total;
+    if (fullyPosted) {
+      totalPostsSubmitted++;
+      if (agg.delayed) delayedPosts++;
     } else {
-      // On Board / Order Sent → awaiting posting.
       pendingPosts++;
     }
   }

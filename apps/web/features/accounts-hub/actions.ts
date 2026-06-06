@@ -57,6 +57,7 @@ interface PostContext {
   inf_id: string | null;
   username: string | null;
   collab_number: number | null;
+  collab_id: string | null;
   deliverable_index: number | null;
   ads_usage_rights: string | null;
   ads_results: string | null;
@@ -129,10 +130,21 @@ export async function submitPayments(
   const { data: postRows, error: postsErr } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, bank_name, bank_number, ifsc",
+      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, collab_id, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, bank_name, bank_number, ifsc",
     )
     .in("post_id", postIds);
   if (postsErr) return { ok: false, error: postsErr.message };
+
+  // collab_id grouping key — prefer the stamped collab_id, fall back to
+  // inf_id||'-C'||collab_number for legacy rows, then post_id.
+  const collabKeyOf = (p: {
+    collab_id: string | null;
+    inf_id: string | null;
+    collab_number: number | null;
+    post_id: string;
+  }): string =>
+    p.collab_id ??
+    (p.inf_id ? `${p.inf_id}-C${p.collab_number ?? 1}` : p.post_id);
 
   const postById = new Map<string, PostContext>(
     ((postRows ?? []) as PostContext[]).map((p) => [p.post_id, p]),
@@ -165,38 +177,39 @@ export async function submitPayments(
     ),
   );
 
-  // §7.2 Reel rule pre-check — per (inf_id, collab_number) collab,
-  // pull all deliverables to verify at least one has reel content with link.
+  // §7.2 Reel rule pre-check — per collab_id, pull all deliverables to verify
+  // at least one has reel content with link.
   const collabKeys = new Set<string>();
+  // inf_ids of the collabs we touch — used to fetch every deliverable of those
+  // collabs in one query (deliverables of a collab share inf_id).
+  const touchedInfIds = new Set<string>();
   for (const r of rows) {
     const p = postById.get(r.postId);
-    if (!p?.inf_id) continue;
-    collabKeys.add(`${p.inf_id}|${Number(p.collab_number ?? 1)}`);
+    if (!p) continue;
+    collabKeys.add(collabKeyOf(p));
+    if (p.inf_id) touchedInfIds.add(p.inf_id);
   }
   const collabsWithReel = new Set<string>();
   if (collabKeys.size > 0) {
-    // Pull all deliverables for these collabs in one query.
-    const infIds = [
-      ...new Set(
-        [...collabKeys].map((k) => k.split("|")[0]).filter(Boolean),
-      ),
-    ];
+    const infIds = [...touchedInfIds];
     if (infIds.length > 0) {
       const { data: collabRows } = await (supabase as any)
         .from("posts")
         .select(
-          "inf_id, collab_number, reels, deliverable_type, post_link, post_date",
+          "post_id, inf_id, collab_number, collab_id, reels, deliverable_type, post_link, post_date",
         )
         .in("inf_id", infIds);
       for (const cr of (collabRows ?? []) as Array<{
+        post_id: string;
         inf_id: string | null;
         collab_number: number | null;
+        collab_id: string | null;
         reels: number | null;
         deliverable_type: string | null;
         post_link: string | null;
         post_date: string | null;
       }>) {
-        const key = `${cr.inf_id ?? ""}|${Number(cr.collab_number ?? 1)}`;
+        const key = collabKeyOf(cr);
         const reelCount = Number(cr.reels ?? 0);
         const isReelDeliverable =
           reelCount > 0 || cr.deliverable_type === "reel";
@@ -220,30 +233,27 @@ export async function submitPayments(
   const collabUnpostedByKey = new Map<string, string[]>();
   const collabPartnershipMissingByKey = new Map<string, string[]>();
   if (collabKeys.size > 0) {
-    const infIds = [
-      ...new Set(
-        [...collabKeys].map((k) => k.split("|")[0]).filter(Boolean),
-      ),
-    ];
+    const infIds = [...touchedInfIds];
     if (infIds.length > 0) {
       const { data: collabRows } = await (supabase as any)
         .from("posts")
         .select(
-          "post_id, post_id_short, inf_id, collab_number, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
+          "post_id, post_id_short, inf_id, collab_number, collab_id, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
         )
         .in("inf_id", infIds);
       for (const cr of (collabRows ?? []) as Array<{
-        post_id: string | null;
+        post_id: string;
         post_id_short: string | null;
         inf_id: string | null;
         collab_number: number | null;
+        collab_id: string | null;
         post_link: string | null;
         post_date: string | null;
         ads_usage_rights: string | null;
         partnership_id: string | null;
         ad_partnership_valid: boolean | null;
       }>) {
-        const key = `${cr.inf_id ?? ""}|${Number(cr.collab_number ?? 1)}`;
+        const key = collabKeyOf(cr);
         const sibLabel = cr.post_id_short ?? cr.post_id ?? "?";
         if (!cr.post_link || !cr.post_date) {
           const arr = collabUnpostedByKey.get(key) ?? [];
@@ -293,15 +303,10 @@ export async function submitPayments(
     }
 
     const hasUtr = (r.utr ?? "").trim().length > 0;
-    const collabKey = p.inf_id
-      ? `${p.inf_id}|${Number(p.collab_number ?? 1)}`
-      : null;
-    const unposted = collabKey
-      ? (collabUnpostedByKey.get(collabKey) ?? [])
-      : [];
-    const partnershipMissing = collabKey
-      ? (collabPartnershipMissingByKey.get(collabKey) ?? [])
-      : [];
+    const collabKey = collabKeyOf(p);
+    const unposted = collabUnpostedByKey.get(collabKey) ?? [];
+    const partnershipMissing =
+      collabPartnershipMissingByKey.get(collabKey) ?? [];
 
     // §7.2 — collab-level posting completeness. ANY sibling without
     // post_link OR post_date locks payment for the whole collab. Stricter
@@ -415,6 +420,8 @@ export async function submitPayments(
       bank_number: r.bankNumber || post.bank_number || null,
       ifsc: r.ifsc || post.ifsc || null,
       // Collab tracking — always sourced from the post, not the form.
+      // collab_id keys the payment to the whole collab (one payment per collab).
+      collab_id: collabKeyOf(post),
       collab_number: post.collab_number ?? null,
       deliverable_index: post.deliverable_index ?? null,
       // §ad-tested — flag a payment whose paid post is an ad-eligible
@@ -485,36 +492,40 @@ export async function submitPayments(
       });
     } else due++;
 
-    // When parent post is paid, cascade "Done" to all sibling child deliverables
-    // (same inf_id + collab_number, deliverable_index > 1) on the `posts`
-    // table ONLY. Children do NOT get their own payment rows — the full collab
-    // amount lives on the parent's single payment row. This prevents spend
-    // metrics from triple-counting (one collab of ₹10,000 for 3 deliverables
-    // must total ₹10,000, not ₹30,000).
-    //
-    // We also remove any pre-existing child payment rows that were inserted
-    // before this fix was deployed.
-    const isParent =
-      post.deliverable_index == null || Number(post.deliverable_index) === 1;
-    if (
-      status === "Done" &&
-      isParent &&
-      post.inf_id &&
-      post.collab_number != null
-    ) {
-      const { data: siblings } = await (supabase as any)
+    // Collab ID model: one payment covers the whole collab. When the
+    // representative deliverable is paid, cascade "Done" to every OTHER
+    // deliverable sharing the same collab_id on the `posts` table, and remove
+    // any stray payment rows on those other deliverables. The full collab
+    // amount lives on this single payment row keyed by collab_id — this prevents
+    // spend metrics from double-counting (one collab of ₹10,000 for 3
+    // deliverables must total ₹10,000, not ₹30,000).
+    const cascadeCollabId = collabKeyOf(post);
+    if (status === "Done" && post.inf_id) {
+      // Fetch all deliverables of this collab. We match on inf_id (cheap index)
+      // then narrow to the collab_id group in JS so legacy rows without a
+      // stamped collab_id still group via the inf_id||'-C'||collab_number
+      // fallback inside collabKeyOf.
+      const { data: collabRows } = await (supabase as any)
         .from("posts")
-        .select("post_id, deliverable_index")
-        .eq("inf_id", post.inf_id)
-        .eq("collab_number", post.collab_number)
-        .gt("deliverable_index", 1);
+        .select("post_id, inf_id, collab_number, collab_id")
+        .eq("inf_id", post.inf_id);
 
-      const childIds = ((siblings ?? []) as Array<{ post_id: string }>).map(
-        (c) => c.post_id,
-      );
+      const otherIds = (
+        (collabRows ?? []) as Array<{
+          post_id: string;
+          inf_id: string | null;
+          collab_number: number | null;
+          collab_id: string | null;
+        }>
+      )
+        .filter(
+          (c) => collabKeyOf(c) === cascadeCollabId && c.post_id !== post.post_id,
+        )
+        .map((c) => c.post_id);
 
-      if (childIds.length > 0) {
-        // Mirror payment status onto child posts rows so UI shows them paid.
+      if (otherIds.length > 0) {
+        // Mirror payment status onto the other deliverable rows so UI shows
+        // them paid.
         await (supabase as any)
           .from("posts")
           .update({
@@ -522,14 +533,14 @@ export async function submitPayments(
             ...(hasUtr ? { utr: r.utr } : {}),
             ...(hasUtr ? { payment_date: r.paymentDate } : {}),
           })
-          .in("post_id", childIds);
+          .in("post_id", otherIds);
 
-        // Backfill safety: remove any orphan child payment rows so spend
-        // sums stay parent-only.
+        // Safety: remove any stray payment rows on the other deliverables so
+        // spend sums stay one-per-collab.
         await (supabase as any)
           .from("payments")
           .delete()
-          .in("post_id", childIds);
+          .in("post_id", otherIds);
       }
     }
   }

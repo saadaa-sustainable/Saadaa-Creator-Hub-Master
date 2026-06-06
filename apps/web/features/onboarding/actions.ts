@@ -196,7 +196,7 @@ export async function submitOnboarding(
   const { data: parentPost, error: parentErr } = await supabase
     .from("posts")
     .select(
-      "post_id, post_id_short, post_number, collab_number, inf_id, username, campaign_id, content_type, reach_out_date, reachout_direction, creator_brief_link, nomenclature",
+      "post_id, post_id_short, post_number, collab_number, collab_id, inf_id, username, campaign_id, content_type, reach_out_date, reachout_direction, creator_brief_link, nomenclature",
     )
     .eq("post_id", v.postId)
     .maybeSingle();
@@ -245,6 +245,15 @@ export async function submitOnboarding(
     null;
   const onboardedBy = actor.name || actor.email || null;
 
+  // Collab ID (groups all deliverable rows of this collaboration). Prefer the
+  // value already stamped at reach-out; otherwise derive it from
+  // inf_id || '-C' || collab_number so legacy rows created before the restructure
+  // still get a collab_id stamped on first onboard.
+  const collabNumber = (parent.collab_number as number | null) ?? 1;
+  const collabId =
+    (parent.collab_id as string | null) ??
+    (parent.inf_id ? `${parent.inf_id}-C${collabNumber}` : null);
+
   // §6.2 deliverable expansion — first deliverable type
   const total = v.reels + v.posts;
   const firstType: "reel" | "post" | null =
@@ -288,6 +297,10 @@ export async function submitOnboarding(
     // payment_status null keeps the PaymentStatus enum (Not Due | Due | Done)
     // intact for downstream Accounts Hub queries.
     payment_status: null,
+    // Collab ID model: all deliverable rows of this collab share collab_id.
+    // Grouping is by collab_id, NOT by parent/child. deliverable_index is kept
+    // for ordering only.
+    collab_id: collabId,
     parent_post_id: v.postId,
     deliverable_role: total > 1 ? "parent" : "single",
   };
@@ -350,13 +363,17 @@ export async function submitOnboarding(
 
     const children: Record<string, unknown>[] = [];
     const pushChild = (kind: "reel" | "post") => {
+      // Collab ID model: post_id IS the short deliverable id (no -C suffix).
+      // The -C{k} lives on collab_id, shared across every deliverable of the
+      // collab.
       const postIdShort = `${parent.inf_id}-P${nextPostNum}`;
-      const postId = `${postIdShort}-C${parent.collab_number ?? 1}`;
+      const postId = postIdShort;
       children.push({
         post_id: postId,
         post_id_short: postIdShort,
         post_number: nextPostNum,
-        collab_number: parent.collab_number ?? 1,
+        collab_number: collabNumber,
+        collab_id: collabId,
         inf_id: parent.inf_id as string,
         username: parent.username as string,
         campaign_id: parent.campaign_id as string,

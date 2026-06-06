@@ -34,6 +34,7 @@ export interface OnboardingRow {
   deliverable_index?: number | null;
   deliverable_type?: PostsRow["deliverable_type"];
   collab_number?: number | null;
+  collab_id?: string | null;
   inf_id?: string | null;
   campaign: Pick<CampaignsRow, "campaign_id" | "campaign_name"> | null;
   creator: Pick<

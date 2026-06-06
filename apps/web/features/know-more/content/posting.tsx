@@ -92,8 +92,9 @@ export default function PostingKM() {
           </li>
           <li>
             <strong>Identity card</strong> — avatar, creator name, handle,
-            workflow status chip, parent/child pill, campaign chip,
-            content_type pill.
+            workflow status chip, <strong>Collab ID</strong> chip (groups the
+            deliverables of the collaboration), campaign chip, content_type
+            pill.
           </li>
           <li>
             <strong>Fields grid</strong> — every field captured at submit
@@ -137,17 +138,20 @@ export default function PostingKM() {
           <li>
             <strong>payments</strong> · auto-init draft row (status{" "}
             <KMCode>Not Due</KMCode>, due_date = post_date + 30, est_payable
-            = next 15th/30th cycle) — created ONLY when the whole collab is
-            payment-eligible (see Auto-Init Gate).
+            = next 15th/30th cycle) — ONE per <KMCode>collab_id</KMCode>, keyed
+            on the collab representative (lowest post_id), created ONLY when the
+            whole collab is payment-eligible (see Auto-Init Gate).
           </li>
         </KMList>
       </KMSection>
 
       <KMSection tag="Auto-Init Gate (autoInitDraftPayment)">
         <p>
-          Draft payment rows only spawn when every sibling deliverable in the
-          collab has both post_link AND post_date, AND no sibling with
-          ads_usage_rights=Yes is missing a partnership_id. Prevents
+          Draft payment rows only spawn when every deliverable sharing the{" "}
+          <KMCode>collab_id</KMCode> has both post_link AND post_date, AND no
+          deliverable with ads_usage_rights=Yes is missing a partnership_id. The
+          single draft is keyed on the collab representative (lowest post_id) and
+          carries the full collab amount (sum of the per-row splits). Prevents
           UTR-less ghost rows in Accounts Hub before the collab is actually
           payable.
         </p>
@@ -167,8 +171,11 @@ export default function PostingKM() {
             verify tickmark forces a human check.
           </li>
           <li>
-            Children submit independently. The parent row stays in Posted;
-            children appear inside the Posting overview modal.
+            Each deliverable submits independently and keeps its own short
+            post_id (<KMCode>SIF-1-P1</KMCode>, <KMCode>SIF-1-P2</KMCode> …).
+            They are grouped on the board by their shared{" "}
+            <KMCode>collab_id</KMCode> via the Collab ID column — there is no
+            parent/child relationship.
           </li>
           <li>
             Re-submit overwrites post_link / post_date / raw_dump /

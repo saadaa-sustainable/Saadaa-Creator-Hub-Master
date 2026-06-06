@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Star } from "lucide-react";
+import { Layers } from "lucide-react";
 import { Avatar, PartnershipKeyEdit } from "@/components/ui";
 import { formatRupees } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
@@ -35,29 +35,11 @@ export function AccountsKanban({ rows }: { rows: AccountsRow[] }) {
         (c.statuses as readonly string[]).includes(status),
       );
       if (!col) continue;
-      // Posted column: parents only. Children render inside the overview modal.
-      if (col.id === "posted") {
-        const isChild =
-          row.deliverable_index != null && Number(row.deliverable_index) > 1;
-        if (isChild) continue;
-      }
+      // Collab ID model: `rows` already arrive collapsed to ONE representative
+      // per collab_id from fetchAccountsHubData — no child-skip needed.
       map.get(col.id)!.push(row);
     }
     return map;
-  }, [rows]);
-
-  // Posted-stage cards need to know how many deliverables exist for the
-  // collab so we can show "Parent · 3 deliverables · ₹X each" on the card.
-  const deliverableCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-      if (!row.inf_id) continue;
-      const status = String(row.workflow_status ?? "");
-      if (!["Posted", "Delivered"].includes(status)) continue;
-      const key = `${row.inf_id}|${Number(row.collab_number ?? 1)}`;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return counts;
   }, [rows]);
 
   return (
@@ -84,15 +66,7 @@ export function AccountsKanban({ rows }: { rows: AccountsRow[] }) {
                   </div>
                 ) : (
                   items.map((row) => {
-                    const isPosted =
-                      ["Posted", "Delivered"].includes(
-                        String(row.workflow_status ?? ""),
-                      ) && row.inf_id;
-                    const totalDeliverables = isPosted
-                      ? (deliverableCounts.get(
-                          `${row.inf_id}|${Number(row.collab_number ?? 1)}`,
-                        ) ?? 1)
-                      : 1;
+                    const totalDeliverables = row._collabDeliverableCount ?? 1;
                     return (
                       <KanbanCard
                         key={row.post_id}
@@ -132,6 +106,10 @@ function KanbanCard({
   const isPostedStage = ["Posted", "Delivered"].includes(
     String(row.workflow_status ?? ""),
   );
+  // Collab ID (legacy fallback to inf_id||'-C'||collab_number).
+  const collabId =
+    row.collab_id ??
+    (row.inf_id ? `${row.inf_id}-C${Number(row.collab_number ?? 1)}` : null);
   const splitAmount =
     totalDeliverables > 0
       ? Number(row.commercial_amount ?? 0) / totalDeliverables
@@ -174,17 +152,24 @@ function KanbanCard({
         <span className="post-id tabular">
           {row.post_id_short ?? row.post_id}
         </span>
+        {collabId && (
+          <span
+            className="campaign-chip tabular"
+            title="Collab ID — groups all deliverables of this collaboration"
+          >
+            {collabId}
+          </span>
+        )}
         {row.campaign?.campaign_id && (
           <span className="campaign-chip">{row.campaign.campaign_id}</span>
         )}
-        {isPostedStage && (
+        {isPostedStage && totalDeliverables > 1 && (
           <span
-            className="pill pill--parent"
-            title={`Parent · ${totalDeliverables} deliverable${totalDeliverables === 1 ? "" : "s"}`}
+            className="pill pill--muted"
+            title={`${totalDeliverables} deliverables share this Collab ID`}
           >
-            <Star size={10} aria-hidden />
-            Parent · {totalDeliverables}{" "}
-            {totalDeliverables === 1 ? "deliv." : "delivs"}
+            <Layers size={10} aria-hidden />
+            {totalDeliverables} delivs
           </span>
         )}
         <AdsPartnershipPill row={row} />
