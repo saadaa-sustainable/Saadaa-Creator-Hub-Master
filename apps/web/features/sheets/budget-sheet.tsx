@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { Calendar, Download } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatRupees } from "@/lib/formatters";
@@ -28,18 +28,24 @@ export function BudgetSheet({
       if (m) set.add(m);
     }
     return [...set].sort(
-      (a, b) =>
-        new Date(`${b} 01`).getTime() - new Date(`${a} 01`).getTime(),
+      (a, b) => new Date(`${b} 01`).getTime() - new Date(`${a} 01`).getTime(),
     );
   }, [rows]);
 
-  const [activeMonth, setActiveMonth] = useState<string>(months[0] ?? "");
+  const defaultMonth = months[0] ?? "";
+  const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
+  const [activeMonth, setActiveMonth] = useState<string>(defaultMonth);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (months.includes(selectedMonth)) return;
+    setSelectedMonth(defaultMonth);
+    setActiveMonth(defaultMonth);
+  }, [defaultMonth, months, selectedMonth]);
 
   const monthRows = useMemo(
     () =>
-      rows.filter(
-        (r) => String(r.month_label ?? "").trim() === activeMonth,
-      ),
+      rows.filter((r) => String(r.month_label ?? "").trim() === activeMonth),
     [rows, activeMonth],
   );
 
@@ -72,21 +78,31 @@ export function BudgetSheet({
     <div className="flex flex-col gap-3 min-w-0">
       {/* Month sub-tabs */}
       <div className="rounded-2xl bg-bg-surface border border-border p-2 flex items-center gap-1 overflow-x-auto">
-        {months.map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setActiveMonth(m)}
-            className={cn(
-              "inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-[0.7rem] font-extrabold whitespace-nowrap transition-all",
-              activeMonth === m
-                ? "bg-bg-white text-text-primary border border-[--accent] shadow-sm"
-                : "text-text-secondary hover:bg-bg-muted/60",
-            )}
-          >
-            <Calendar size={11} aria-hidden /> {m}
-          </button>
-        ))}
+        {months.map((m) => {
+          const isSelected = selectedMonth === m;
+          const isPendingSelection =
+            isPending && isSelected && activeMonth !== m;
+          return (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                setSelectedMonth(m);
+                startTransition(() => setActiveMonth(m));
+              }}
+              data-pending={isPendingSelection ? "true" : undefined}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-3 h-8 rounded-lg text-[0.7rem] font-extrabold whitespace-nowrap transition-all",
+                isPendingSelection && "submission-toggle-pending",
+                isSelected
+                  ? "bg-bg-white text-text-primary border border-[--accent] shadow-sm"
+                  : "text-text-secondary hover:bg-bg-muted/60",
+              )}
+            >
+              <Calendar size={11} aria-hidden /> {m}
+            </button>
+          );
+        })}
       </div>
 
       {/* KPI strip per month — TOTAL row preview */}

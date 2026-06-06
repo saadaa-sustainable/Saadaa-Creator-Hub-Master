@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ClipboardList,
   Database,
@@ -53,19 +54,37 @@ export function SheetsBody({
   canEdit,
   currentUserEmail = null,
 }: Props) {
+  const [optimisticActiveId, setOptimisticActiveId] = useState(active.id);
+
+  useEffect(() => {
+    setOptimisticActiveId(active.id);
+  }, [active.id]);
+
   return (
     <div className="flex flex-col gap-3 sm:gap-4 min-w-0">
-      <TabBar tables={tables} activeId={active.id} counts={counts} />
-      {active.variant === "budget" ? (
-        <BudgetSheet table={active} rows={data.rows} canEdit={canEdit} />
-      ) : (
-        <SheetGrid
-          table={active}
-          rows={data.rows}
-          canEdit={canEdit}
-          currentUserEmail={currentUserEmail}
-        />
-      )}
+      <TabBar
+        tables={tables}
+        activeId={active.id}
+        optimisticActiveId={optimisticActiveId}
+        counts={counts}
+        onOptimisticActive={setOptimisticActiveId}
+      />
+      <div
+        id="sheets-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`sheets-tab-${active.id}`}
+      >
+        {active.variant === "budget" ? (
+          <BudgetSheet table={active} rows={data.rows} canEdit={canEdit} />
+        ) : (
+          <SheetGrid
+            table={active}
+            rows={data.rows}
+            canEdit={canEdit}
+            currentUserEmail={currentUserEmail}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -73,28 +92,87 @@ export function SheetsBody({
 function TabBar({
   tables,
   activeId,
+  optimisticActiveId,
   counts,
+  onOptimisticActive,
 }: {
   tables: SheetTable[];
   activeId: string;
+  optimisticActiveId: string;
   counts: Record<string, number>;
+  onOptimisticActive: (id: string) => void;
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const params = useSearchParams();
+  const tabRefs = useRef<(HTMLAnchorElement | null)[]>([]);
+
+  const hrefFor = useCallback(
+    (tabId: string) => {
+      const next = new URLSearchParams(params.toString());
+      next.set("tab", tabId);
+      const qs = next.toString();
+      return `${pathname}${qs ? `?${qs}` : ""}`;
+    },
+    [params, pathname],
+  );
+
+  const onKeyDown = useCallback(
+    (event: React.KeyboardEvent, index: number) => {
+      let nextIndex: number | null = null;
+      if (event.key === "ArrowRight") nextIndex = (index + 1) % tables.length;
+      else if (event.key === "ArrowLeft")
+        nextIndex = (index - 1 + tables.length) % tables.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = tables.length - 1;
+      if (nextIndex === null) return;
+      event.preventDefault();
+      const target = tabRefs.current[nextIndex];
+      target?.focus();
+      target?.click();
+    },
+    [tables.length],
+  );
+
   return (
-    <div className="rounded-2xl bg-bg-surface/70 backdrop-blur border border-border p-1.5 flex items-center gap-1 overflow-x-auto shadow-sm">
-      {tables.map((t) => {
-        const isActive = t.id === activeId;
+    <div
+      role="tablist"
+      aria-label="Sheet tables"
+      className="dash-tabbar flex items-center gap-1 overflow-x-auto"
+      style={{ scrollbarWidth: "thin" }}
+    >
+      {tables.map((t, index) => {
+        const isActive = t.id === optimisticActiveId;
+        const isPendingSelection = optimisticActiveId !== activeId && isActive;
         const Icon = TAB_ICONS[t.id] ?? Database;
         const count = counts[t.id] ?? 0;
+        const href = hrefFor(t.id);
         return (
           <Link
             key={t.id}
-            href={`/sheets?tab=${t.id}`}
+            ref={(el) => {
+              tabRefs.current[index] = el;
+            }}
+            href={href as never}
+            prefetch
             scroll={false}
+            role="tab"
+            id={`sheets-tab-${t.id}`}
+            aria-selected={isActive}
+            aria-controls="sheets-tabpanel"
+            tabIndex={isActive ? 0 : -1}
+            onClick={() => onOptimisticActive(t.id)}
+            onPointerEnter={() => router.prefetch(href as never)}
+            onFocus={() => router.prefetch(href as never)}
+            onKeyDown={(event) => onKeyDown(event, index)}
+            data-active={isActive ? "true" : undefined}
+            data-pending={isPendingSelection ? "true" : undefined}
             className={cn(
-              "group relative inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-[0.72rem] font-extrabold whitespace-nowrap transition-all",
-              isActive
-                ? "bg-bg-white text-text-primary border border-[--accent] shadow-md shadow-[--accent]/10 scale-[1.02]"
-                : "text-text-secondary hover:bg-bg-white/70 hover:text-text-primary border border-transparent",
+              "dash-tab-pill group relative inline-flex shrink-0 items-center justify-center",
+              "gap-1.5 whitespace-nowrap rounded-[7px] px-3 py-1.5",
+              "text-[0.72rem] font-extrabold transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60",
+              !isActive && "text-text-secondary hover:text-text-primary",
             )}
           >
             <Icon
@@ -102,7 +180,7 @@ function TabBar({
               aria-hidden
               className={cn(
                 "transition-colors",
-                isActive ? "text-[--accent]" : "text-text-tertiary",
+                isActive ? "text-accent" : "text-text-tertiary",
               )}
             />
             <span>{t.label}</span>
@@ -111,15 +189,12 @@ function TabBar({
                 className={cn(
                   "inline-flex items-center justify-center min-w-[20px] h-4 px-1 rounded-full text-[0.55rem] font-extrabold tabular border",
                   isActive
-                    ? "bg-[--accent]/15 text-text-primary border-[--accent]/30"
+                    ? "bg-accent/20 text-current border-accent/35"
                     : "bg-bg-muted text-text-tertiary border-border group-hover:bg-bg-surface",
                 )}
               >
                 {formatCount(count)}
               </span>
-            )}
-            {isActive && (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 inline-block h-1 w-1 rounded-full bg-[--accent]" />
             )}
           </Link>
         );
