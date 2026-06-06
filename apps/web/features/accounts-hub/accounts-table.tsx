@@ -46,6 +46,12 @@ export function AccountsTable({ rows }: { rows: AccountsRow[] }) {
   const columns = useMemo<ColumnDef<AccountsRow>[]>(
     () => [
       {
+        id: "creator",
+        accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
+        header: "Influencer",
+        cell: ({ row }) => <CreatorCell row={row.original} />,
+      },
+      {
         id: "post_id",
         header: "Post ID",
         cell: ({ row }) => (
@@ -81,12 +87,6 @@ export function AccountsTable({ rows }: { rows: AccountsRow[] }) {
             {row.original.inf_id ?? row.original.creator?.inf_id ?? "—"}
           </span>
         ),
-      },
-      {
-        id: "creator",
-        accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
-        header: "Influencer",
-        cell: ({ row }) => <CreatorCell row={row.original} />,
       },
       {
         id: "campaign",
@@ -194,18 +194,24 @@ function AccountsListMobileCard({ row }: { row: AccountsRow }) {
             <div className="font-medium truncate text-[0.82rem] leading-tight">
               {row.creator?.inf_name ?? row.creator?.username ?? "—"}
             </div>
-            <div className="text-[0.65rem] text-text-tertiary tabular truncate leading-tight">
-              {row.post_id_short ?? row.post_id}
-              {collabIdOf(row) && (
-                <span title="Collab ID — groups all deliverables of this collaboration">
-                  {" · "}
-                  {collabIdOf(row)}
-                </span>
-              )}
-            </div>
+            {row.creator?.username && (
+              <div className="text-[0.65rem] text-text-tertiary truncate leading-tight">
+                @{row.creator.username}
+              </div>
+            )}
           </div>
         </div>
         <PaymentStatusPill status={row.payment?.status} />
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="post-id tabular">
+          {row.post_id_short ?? row.post_id}
+        </span>
+        {collabIdOf(row) && (
+          <span className="campaign-chip tabular" title="Collab ID">
+            {collabIdOf(row)}
+          </span>
+        )}
       </div>
       <dl className="acc-list-mobile-card__meta">
         <dt>Campaign</dt>

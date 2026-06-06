@@ -1,17 +1,13 @@
-import {
-  AlarmClock,
-  CheckCircle2,
-  HourglassIcon,
-  ListChecks,
-  Send,
-} from "lucide-react";
+import { AlarmClock, CheckCircle2, ListChecks, Send } from "lucide-react";
 import type { PostingKpi } from "./types";
 
 /**
  * Posting KPI strip — closes the Analytics-Matrix gap (the Posting page had no
  * KPI strip). Reuses the shared `.acc-kpi-grid` / `.acc-kpi--{tone}` classes so
  * the visual + responsive bento pattern matches other stages. Rendered between
- * the filter bar and the board (filter-above-KPI rule). Counts are per-collab.
+ * the filter bar and the board (filter-above-KPI rule). Counts are per-post_id
+ * (one deliverable per row): Submitted = post_ids Posted, Posts Due = post_ids
+ * yet to be submitted. (No separate "Pending" tile — it duplicated Posts Due.)
  */
 export function PostingKpiStrip({ kpi }: { kpi: PostingKpi }) {
   return (
@@ -21,14 +17,14 @@ export function PostingKpiStrip({ kpi }: { kpi: PostingKpi }) {
         icon={<ListChecks size={16} aria-hidden />}
         label="Posts Due"
         primary={String(kpi.totalPostsDue)}
-        secondary="Total deliverables"
+        secondary="Post IDs yet to submit"
       />
       <KpiCard
         tone="success"
         icon={<Send size={16} aria-hidden />}
         label="Submitted"
         primary={String(kpi.totalPostsSubmitted)}
-        secondary="Posts submitted"
+        secondary="Post IDs posted"
       />
       <KpiCard
         tone="info"
@@ -38,18 +34,11 @@ export function PostingKpiStrip({ kpi }: { kpi: PostingKpi }) {
         secondary="Submitted ÷ total"
       />
       <KpiCard
-        tone="warning"
-        icon={<HourglassIcon size={16} aria-hidden />}
-        label="Pending"
-        primary={String(kpi.pendingPosts)}
-        secondary="Awaiting posting"
-      />
-      <KpiCard
         tone="danger"
         icon={<AlarmClock size={16} aria-hidden />}
         label="Delayed"
         primary={String(kpi.delayedPosts)}
-        secondary="Post date past expected"
+        secondary="Posted after expected"
       />
     </section>
   );

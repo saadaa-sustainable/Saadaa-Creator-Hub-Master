@@ -36,25 +36,28 @@ export default function PostingKM() {
       </KMSection>
 
       <KMSection tag="KPIs">
-        <p>A KPI strip sits above the board:</p>
+        <p>
+          A KPI strip sits above the board. Every tile counts{" "}
+          <strong>post IDs</strong> — one row is one deliverable, so the counts
+          are deliverable counts, not a reels + static + stories sum:
+        </p>
         <KMList>
           <li>
-            <strong>Posts Due</strong> — sum of deliverables expected across
-            the scope (reels + static posts + stories).
+            <strong>Posts Due</strong> — post IDs yet to be submitted
+            (<KMCode>On Board</KMCode> / <KMCode>Order Sent</KMCode>).
           </li>
           <li>
-            <strong>Submitted</strong> — deliverables already posted.
+            <strong>Submitted</strong> — post IDs already posted
+            (<KMCode>Posted</KMCode>).
           </li>
           <li>
-            <strong>Completion Rate</strong> — Submitted ÷ Posts Due.
+            <strong>Completion Rate</strong> — Submitted ÷ (Submitted + Due) =
+            Submitted ÷ total post IDs.
           </li>
           <li>
-            <strong>Delayed</strong> — posted deliverables whose{" "}
-            <KMCode>post_date</KMCode> is later than the collab&apos;s{" "}
+            <strong>Delayed</strong> — posted post IDs whose{" "}
+            <KMCode>post_date</KMCode> is later than the row&apos;s{" "}
             <KMCode>est_delivery</KMCode>.
-          </li>
-          <li>
-            <strong>Pending</strong> — deliverables not yet posted.
           </li>
         </KMList>
       </KMSection>

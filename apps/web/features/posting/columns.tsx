@@ -67,14 +67,14 @@ export function CollabIdBadge({
   const count = collabDeliverableCount(r, rows);
   return (
     <span
-      className="campaign-chip tabular"
+      className="campaign-chip tabular inline-flex items-center gap-1 leading-none whitespace-nowrap"
       title={
         count > 1
           ? `${count} deliverables share this Collab ID`
           : "Collab ID — groups all deliverables of this collaboration"
       }
     >
-      {count > 1 && <Layers size={10} aria-hidden />}
+      {count > 1 && <Layers size={10} aria-hidden className="shrink-0" />}
       {collabIdLabel(r)}
     </span>
   );
@@ -157,10 +157,16 @@ export function AdsRightsCell({ r }: { r: PostingRow }) {
   );
 }
 
-/** Column order: Post ID | Collab ID | INF ID | Creator | Campaign |
+/** Column order: Creator | Post ID | Collab ID | INF ID | Campaign |
  *  Deliverables | Ads Rights | Partnership Key | Stage | Followers | Onboarded |
  *  Post Date | Live Link | Drive. Action appended by table. */
 export const postingColumns: ColumnDef<PostingRow>[] = [
+  {
+    id: "creator",
+    accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
+    header: "Creator",
+    cell: ({ row }) => <CreatorCell r={row.original} />,
+  },
   {
     id: "post_id",
     header: "Post ID",
@@ -194,12 +200,6 @@ export const postingColumns: ColumnDef<PostingRow>[] = [
       ) : (
         <span className="text-text-tertiary">—</span>
       ),
-  },
-  {
-    id: "creator",
-    accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
-    header: "Creator",
-    cell: ({ row }) => <CreatorCell r={row.original} />,
   },
   {
     id: "campaign",

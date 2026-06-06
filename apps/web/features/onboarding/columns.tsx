@@ -319,10 +319,16 @@ export function CreatorCell({ r }: { r: OnboardingRow }) {
   );
 }
 
-/** 11-column legacy parity (Creator, Post ID, Campaign, Stage, Followers,
- *  Collab, Commercials, Deliverables, Order ID, Email, Est. Delivery).
- *  Action column appended by table renderer (uses local modal state). */
+/** Column order: Creator, Post ID, Collab ID, INF ID, Campaign, Stage,
+ *  Followers, Collab, Commercials, Deliverables, Nomenclature, Order ID,
+ *  Email, Est. Delivery. Action column appended by table renderer. */
 export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
+  {
+    id: "creator",
+    accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
+    header: "Creator",
+    cell: ({ row }) => <CreatorCell r={row.original} />,
+  },
   {
     id: "post_id",
     header: "Post ID",
@@ -353,12 +359,6 @@ export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
         {row.original.inf_id ?? row.original.creator?.inf_id ?? "—"}
       </span>
     ),
-  },
-  {
-    id: "creator",
-    accessorFn: (r) => r.creator?.inf_name ?? r.creator?.username ?? "",
-    header: "Creator",
-    cell: ({ row }) => <CreatorCell r={row.original} />,
   },
   {
     id: "campaign",

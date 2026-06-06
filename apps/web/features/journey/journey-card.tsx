@@ -158,6 +158,20 @@ export function JourneyCardItem({
         </div>
       </div>
 
+      <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[0.6rem] font-bold bg-[--bg-ecru] border border-[--border] text-text-secondary tabular whitespace-nowrap">
+          {card.post_id}
+        </span>
+        {collabId && (
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[0.6rem] font-bold bg-[--bg-ecru] border border-[--border] text-text-secondary tabular whitespace-nowrap"
+            title="Collab ID"
+          >
+            {collabId}
+          </span>
+        )}
+      </div>
+
       {(card.creator?.category || card.creator?.followers) && (
         <div className="flex items-center gap-1.5 flex-wrap min-w-0">
           {card.creator.category && (
@@ -186,16 +200,6 @@ export function JourneyCardItem({
         <dd className="text-right tabular text-text-secondary truncate">
           {formatDate(dateField.value)}
         </dd>
-        {collabId && (
-          <>
-            <dt className="text-text-tertiary font-bold uppercase tracking-[0.05em] whitespace-nowrap">
-              Collab
-            </dt>
-            <dd className="text-right tabular text-text-tertiary truncate font-mono text-[0.6rem]">
-              {collabId}
-            </dd>
-          </>
-        )}
         {card.order_id && (
           <>
             <dt className="text-text-tertiary font-bold uppercase tracking-[0.05em] whitespace-nowrap">

@@ -704,6 +704,12 @@ function UntestedCardsGrid({
 
           <div className="ob-card-pills">
             <AsClassBadge value="" />
+            <span className="post-id tabular">{r.postIdShort || r.postId}</span>
+            {r.collabId && (
+              <span className="campaign-chip tabular" title="Collab ID">
+                {r.collabId}
+              </span>
+            )}
             {r.campaign && <span className="campaign-chip">{r.campaign}</span>}
             {r.adsUsageRights && (
               <span className="pill pill--info">
@@ -714,18 +720,6 @@ function UntestedCardsGrid({
           </div>
 
           <dl className="ob-card-meta-grid ad-status-card-meta">
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Post ID</span>
-              <span className="ob-card-meta-val tabular">
-                {r.postIdShort || r.postId || "—"}
-                {r.collabId && (
-                  <span className="text-text-tertiary text-[0.7rem] tabular font-normal">
-                    {" · "}
-                    {r.collabId}
-                  </span>
-                )}
-              </span>
-            </div>
             <div className="ob-card-meta">
               <span className="ob-card-meta-label">Days Since</span>
               <span className="ob-card-meta-val">
@@ -944,6 +938,12 @@ function AdRunCardsGrid({
 
           <div className="ob-card-pills">
             <AsClassBadge value={r.adsResults} />
+            <span className="post-id tabular">{r.postIdShort || r.postId}</span>
+            {r.collabId && (
+              <span className="campaign-chip tabular" title="Collab ID">
+                {r.collabId}
+              </span>
+            )}
             {r.campaign && <span className="campaign-chip">{r.campaign}</span>}
             <AdRunStatusPill value={r.adsStatus} />
             {r.adsUsageRights && (
@@ -955,18 +955,6 @@ function AdRunCardsGrid({
           </div>
 
           <dl className="ob-card-meta-grid ad-status-card-meta">
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Post ID</span>
-              <span className="ob-card-meta-val tabular">
-                {r.postIdShort || r.postId || "—"}
-                {r.collabId && (
-                  <span className="text-text-tertiary text-[0.7rem] tabular font-normal">
-                    {" · "}
-                    {r.collabId}
-                  </span>
-                )}
-              </span>
-            </div>
             <div className="ob-card-meta">
               <span className="ob-card-meta-label">In Meta Ads</span>
               <span

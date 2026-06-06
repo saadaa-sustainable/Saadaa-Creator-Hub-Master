@@ -132,10 +132,10 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
       <table className="ob-list-table">
         <thead>
           <tr>
+            <th>Creator</th>
             <th>Post ID</th>
             <th>Collab ID</th>
             <th>INF ID</th>
-            <th>Creator</th>
             <th>Campaign</th>
             <th>Order ID</th>
             <th>Collab</th>
@@ -147,22 +147,6 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.postId}>
-              <td className="tabular whitespace-nowrap">
-                <span className="post-id tabular">{r.postId || "—"}</span>
-              </td>
-              <td className="tabular whitespace-nowrap">
-                {collabIdOf(r) ? (
-                  <span
-                    className="campaign-chip tabular"
-                    title="Groups all deliverables of this collaboration"
-                  >
-                    {collabIdOf(r)}
-                  </span>
-                ) : (
-                  <span className="text-text-tertiary">—</span>
-                )}
-              </td>
-              <td className="tabular whitespace-nowrap">{r.infId || "—"}</td>
               <td>
                 <div className="flex items-center gap-2 min-w-0">
                   <Avatar
@@ -183,6 +167,22 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
                   </div>
                 </div>
               </td>
+              <td className="tabular whitespace-nowrap">
+                <span className="post-id tabular">{r.postId || "—"}</span>
+              </td>
+              <td className="tabular whitespace-nowrap">
+                {collabIdOf(r) ? (
+                  <span
+                    className="campaign-chip tabular"
+                    title="Groups all deliverables of this collaboration"
+                  >
+                    {collabIdOf(r)}
+                  </span>
+                ) : (
+                  <span className="text-text-tertiary">—</span>
+                )}
+              </td>
+              <td className="tabular whitespace-nowrap">{r.infId || "—"}</td>
               <td>
                 <span className="campaign-chip">{r.campaign || "—"}</span>
               </td>

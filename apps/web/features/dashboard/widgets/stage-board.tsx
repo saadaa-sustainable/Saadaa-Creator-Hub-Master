@@ -138,22 +138,23 @@ function StageCardItem({ card, stage }: { card: StageCard; stage: StageDef }) {
         </div>
       </div>
 
+      {/* Post + Collab id chips (below the header, with the pills) */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="pill text-[0.55rem] py-0.5 px-1.5 tabular">
+          {card.postId}
+        </span>
+        {card.collabId && (
+          <span
+            className="pill text-[0.55rem] py-0.5 px-1.5 tabular"
+            title="Collab ID"
+          >
+            {card.collabId}
+          </span>
+        )}
+      </div>
+
       {/* Meta rows — compact 2-col */}
       <dl className="grid grid-cols-[auto_1fr] gap-y-0.5 gap-x-2 text-[0.62rem]">
-        <dt className="text-text-tertiary font-bold uppercase tracking-[0.05em]">
-          POST
-        </dt>
-        <dd className="text-right tabular font-bold text-text-primary truncate">
-          {card.postId}
-          {card.collabId && (
-            <span
-              className="block text-[0.55rem] font-bold text-text-tertiary truncate"
-              title="Collab ID — groups all deliverables of this collaboration"
-            >
-              {card.collabId}
-            </span>
-          )}
-        </dd>
         {card.campaign && (
           <>
             <dt className="text-text-tertiary font-bold uppercase tracking-[0.05em]">
