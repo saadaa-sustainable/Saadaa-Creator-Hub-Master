@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { LayoutDashboard } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { KpiStripSkeleton } from "@/components/ui/skeleton";
-import { DashboardFiltersBar } from "@/features/dashboard/filters";
 import { DashboardTabs } from "@/features/dashboard/tabs";
 import {
   resolveTab,
@@ -21,7 +20,10 @@ import {
   type TabSearchParams,
 } from "@/features/dashboard/tab-bodies";
 import { fetchDashboardFilterOptions } from "@/features/dashboard/queries";
-import type { DashboardFilters } from "@/features/dashboard/types";
+import type {
+  DashboardFilterOptions,
+  DashboardFilters,
+} from "@/features/dashboard/types";
 
 export const metadata = { title: "Dashboard" };
 
@@ -39,9 +41,16 @@ export const metadata = { title: "Dashboard" };
  * - Only the ACTIVE tab's data is fetched — each tab body is its own async
  *   server component rendered inside a keyed <Suspense> so it streams in.
  *   Inactive tabs run no queries (perf).
- * - The Overview filter bar applies only to the Overview tab. The other tabs
- *   carry their own feature filter bars (Journey / TAT / Ad Status) whose URL
- *   keys coexist with `?tab=` without collision.
+ * - Each tab body reproduces its standalone route's content BELOW the header
+ *   verbatim: the same `<div className="onboarding-stage <name>-stage">` grid
+ *   wrapper holding the same filter bar / KPI strips / boards in the same order.
+ *   The Dashboard shell adds only the neutral `.dash-stage` block container
+ *   (header → tab rail → panel) and the single PageHeader; the tab body's own
+ *   `.onboarding-stage` owns all inter-section spacing, so each tab is
+ *   byte-for-byte identical to its sidebar page at every breakpoint.
+ * - Every tab carries its own feature filter bar inside its body (Overview's
+ *   aggregate bar included). Their URL keys coexist with `?tab=` without
+ *   collision.
  */
 export default async function DashboardPage({
   searchParams,
@@ -64,7 +73,7 @@ export default async function DashboardPage({
   };
 
   return (
-    <div className="onboarding-stage dash-stage dash-compact">
+    <div className="dash-stage">
       <PageHeader
         icon={LayoutDashboard}
         title="Dashboard"
@@ -75,21 +84,21 @@ export default async function DashboardPage({
         <DashboardTabs active={tab} />
       </div>
 
-      {tab === "overview" && (
-        <DashboardFiltersBar initial={overviewFilters} options={options} />
-      )}
-
       <div
         id="dash-tabpanel"
         role="tabpanel"
         aria-labelledby={`dash-tab-${tab}`}
-        className="mt-2"
       >
         <Suspense
           key={`${tab}:${JSON.stringify(rest)}`}
           fallback={<KpiStripSkeleton count={4} />}
         >
-          <TabBody tab={tab} sp={sp} overviewFilters={overviewFilters} />
+          <TabBody
+            tab={tab}
+            sp={sp}
+            overviewFilters={overviewFilters}
+            overviewOptions={options}
+          />
         </Suspense>
       </div>
     </div>
@@ -100,14 +109,18 @@ function TabBody({
   tab,
   sp,
   overviewFilters,
+  overviewOptions,
 }: {
   tab: DashboardTab;
   sp: TabSearchParams;
   overviewFilters: DashboardFilters;
+  overviewOptions: DashboardFilterOptions;
 }) {
   switch (tab) {
     case "overview":
-      return <OverviewTabBody params={overviewFilters} />;
+      return (
+        <OverviewTabBody params={overviewFilters} options={overviewOptions} />
+      );
     case "journey":
       return <JourneyTabBody sp={sp} />;
     case "tat":
@@ -123,6 +136,8 @@ function TabBody({
     case "internal":
       return <InternalTabBody />;
     default:
-      return <OverviewTabBody params={overviewFilters} />;
+      return (
+        <OverviewTabBody params={overviewFilters} options={overviewOptions} />
+      );
   }
 }

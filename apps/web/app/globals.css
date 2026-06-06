@@ -8069,111 +8069,23 @@ body:has(.km-backdrop) {
   }
 }
 
-/* ── dash-tab-stack ─────────────────────────────────────────────────────────
-   Reproduces the `.onboarding-stage` grid gap (1.25rem) BETWEEN a tab's filter
-   bar and its KPI+board block, without re-running the stage rise animation or
-   adding a gap inside that block. Used by the TAT + Ad Status tab bodies, which
-   on their standalone routes get that single gap from the page grid while their
-   KPI strip + board sit gap-free inside one Suspense slot. */
-.dash-tab-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+/* ── dash-stage ─────────────────────────────────────────────────────────────
+   Neutral Dashboard shell container: a plain block holding the single
+   PageHeader, the pill tab rail, and the active tab panel. It owns NO grid and
+   NO bespoke sizing — each tab body carries its standalone route's own
+   `.onboarding-stage <name>-stage` wrapper, which owns all inter-section
+   spacing/sizing, so every tab is byte-for-byte identical to its sidebar page
+   at all breakpoints. The only rhythm `.dash-stage` sets is a small gap between
+   the tab rail and the panel below it. */
+.dash-stage #dash-tabpanel {
+  margin-top: 1rem;
 }
-
-/* ── Dashboard spacing layer ────────────────────────────────────────────────
-   `.dash-compact` is applied to the Dashboard stage wrapper ONLY (never to the
-   standalone sidebar pages). DESKTOP (≥768px) is SPACIOUS: it gives a tab the
-   same — or slightly more breathing room than — its standalone sidebar page so
-   a tab never reads as more cramped than the page it mirrors. The MOBILE block
-   (≤767px) further below is where this layer actually compacts, by design (the
-   command-centre needs to fit more on a phone). The embedded view's own stage
-   class (`.journey-stage`, `.ad-status-stage`, …) still applies for parity;
-   this layer sits on top only to set the inter-section rhythm.
-
-   The historical name `.dash-compact` is retained so the page wrapper + the
-   mobile rules below need no churn; on desktop it is deliberately NOT compact. */
-
-/* Generous overall vertical rhythm for the dashboard grid (header → rail →
-   filter → panel): a touch MORE air than the standalone 1.25rem
-   `.onboarding-stage` gap, so the rail/filter/panel never collide. */
-.dash-compact.onboarding-stage {
-  gap: 1.4rem;
-}
-/* Tab panel keeps a clear gap from the filter/rail above. The inline `mt-2` on
-   the panel is neutralised so spacing comes from this single source. */
-.dash-compact #dash-tabpanel {
-  margin-top: 0.5rem;
-}
-
-/* KPI grids: comfortable gutters (≥ the standalone 12px) so cards never touch;
-   card padding/radius match the standalone `.acc-kpi` so a tab's KPI strip is
-   at least as roomy as the sidebar page's. */
-.dash-compact .acc-kpi-grid {
-  gap: 14px;
-}
-.dash-compact .acc-kpi {
-  padding: 14px 16px 16px;
-  border-radius: 12px;
-  gap: 4px;
-}
-.dash-compact .acc-kpi__label {
-  font-size: 0.7rem;
-}
-.dash-compact .acc-kpi__primary {
-  font-size: 1.6rem;
-}
-.dash-compact .acc-kpi__secondary {
-  font-size: 0.78rem;
-}
-.dash-compact .acc-kpi-group {
-  font-size: 0.62rem;
-  margin-bottom: 8px;
-}
-
-/* Overview bands + bento: keep a generous gap between the headline strip and
-   the bento so the sections read as distinct (≥ the standalone rhythm). */
-.dash-compact .dash-tab-stack {
-  gap: 1.4rem;
-}
-
-/* ── Dashboard compact — mobile (≤767px) ────────────────────────────────────
-   Two-column bento for KPI strips (never 1×1 stacked), smaller numbers, and a
-   lighter tab rail. Scoped to `.dash-compact` so standalone pages are
-   unaffected. Wins over the shared `@media (max-width:480px) .acc-kpi-grid {
-   grid-template-columns:1fr }` because this selector is more specific. */
 @media (max-width: 767px) {
-  .dash-compact #dash-tabpanel {
-    margin-top: 0.4rem;
+  .dash-stage #dash-tabpanel {
+    margin-top: 0.75rem;
   }
-  .dash-compact .acc-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
-  }
-  .dash-compact .acc-kpi {
-    padding: 0.55rem 0.62rem 0.6rem;
-    border-radius: 10px;
-  }
-  .dash-compact .acc-kpi__label {
-    font-size: 0.56rem;
-    letter-spacing: 0.04em;
-  }
-  .dash-compact .acc-kpi__primary {
-    font-size: 1.12rem;
-  }
-  .dash-compact .acc-kpi__secondary {
-    font-size: 0.6rem;
-    line-height: 1.15;
-  }
-  .dash-compact .acc-kpi-group {
-    font-size: 0.55rem;
-    margin-bottom: 4px;
-  }
-  .dash-compact .dash-tab-stack {
-    gap: 0.72rem;
-  }
-  /* Lighter tab labels + padding on phones. */
-  .dash-compact .dash-tabbar [role="tab"] {
+  /* Lighter tab labels + padding on phones — part of the pill-tab rail style. */
+  .dash-stage .dash-tabbar [role="tab"] {
     font-size: 0.76rem;
     padding-left: 0.7rem;
     padding-right: 0.7rem;
@@ -8209,22 +8121,26 @@ body:has(.km-backdrop) {
 
 @media (max-width: 767px) {
   .my-dashboard-stage,
-  .journey-stage {
+  .journey-stage,
+  .dash-overview-stage {
     gap: 0.72rem;
   }
   .my-dashboard-stage .onboarding-filter-card,
-  .journey-stage .onboarding-filter-card {
+  .journey-stage .onboarding-filter-card,
+  .dash-overview-stage .onboarding-filter-card {
     padding: 0.62rem;
     border-radius: 12px;
   }
   .my-dashboard-stage .onboarding-filter-field span,
-  .journey-stage .onboarding-filter-field span {
+  .journey-stage .onboarding-filter-field span,
+  .dash-overview-stage .onboarding-filter-field span {
     margin-bottom: 0.2rem;
     font-size: 0.54rem;
     letter-spacing: 0.06em;
   }
   .my-dashboard-stage .onboarding-filter-select,
-  .journey-stage .onboarding-filter-select {
+  .journey-stage .onboarding-filter-select,
+  .dash-overview-stage .onboarding-filter-select {
     height: 34px;
     min-height: 34px;
     border-radius: 9px;
@@ -8232,34 +8148,41 @@ body:has(.km-backdrop) {
     font-size: 0.72rem;
     line-height: 1.1;
   }
-  .my-dashboard-stage .onboarding-filter-select.pl-7 {
+  .my-dashboard-stage .onboarding-filter-select.pl-7,
+  .dash-overview-stage .onboarding-filter-select.pl-7 {
     padding-left: 1.65rem;
   }
   .my-dashboard-stage .acc-kpi-grid,
-  .journey-stage .acc-kpi-grid {
+  .journey-stage .acc-kpi-grid,
+  .dash-overview-stage .acc-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.5rem;
   }
   .my-dashboard-stage .acc-kpi,
-  .journey-stage .acc-kpi {
+  .journey-stage .acc-kpi,
+  .dash-overview-stage .acc-kpi {
     padding: 0.58rem 0.65rem 0.62rem;
     border-radius: 10px;
   }
   .my-dashboard-stage .acc-kpi__head,
-  .journey-stage .acc-kpi__head {
+  .journey-stage .acc-kpi__head,
+  .dash-overview-stage .acc-kpi__head {
     gap: 0.3rem;
   }
   .my-dashboard-stage .acc-kpi__label,
-  .journey-stage .acc-kpi__label {
+  .journey-stage .acc-kpi__label,
+  .dash-overview-stage .acc-kpi__label {
     font-size: 0.56rem;
     letter-spacing: 0.05em;
   }
   .my-dashboard-stage .acc-kpi__primary,
-  .journey-stage .acc-kpi__primary {
+  .journey-stage .acc-kpi__primary,
+  .dash-overview-stage .acc-kpi__primary {
     font-size: 1.18rem;
   }
   .my-dashboard-stage .acc-kpi__secondary,
-  .journey-stage .acc-kpi__secondary {
+  .journey-stage .acc-kpi__secondary,
+  .dash-overview-stage .acc-kpi__secondary {
     font-size: 0.62rem;
     line-height: 1.15;
   }

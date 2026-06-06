@@ -12,21 +12,28 @@
  * pages — the components rendered, but their stage-scoped styling did not.
  *
  * Each tab body therefore re-creates the standalone page MINUS its <PageHeader>
- * (the Dashboard shell already owns one): same wrapper class + same filter bar
- * + same body components in the same order. The result is pixel-identical to
- * the standalone route below its title.
+ * (the Dashboard shell already owns one): the SAME outer wrapper element
+ * (`<div className="onboarding-stage <name>-stage">`) holding the SAME children
+ * (filter bar, Suspense(s), KPI strips, boards) in the SAME order, reusing the
+ * SAME components. Because `.onboarding-stage` supplies the `display:grid;
+ * gap:1.25rem` rhythm that spaces filter → KPI → board on the standalone pages,
+ * applying it on the tab body too makes each tab byte-for-byte identical to its
+ * sidebar route below the title — at every breakpoint. No bespoke dashboard
+ * sizing layer is involved.
  *
  * Filter bars that a view renders at its own page level (Journey embeds its bar
- * inside the client; TAT + Ad Status render theirs above the body) are kept so
- * the experience is identical. Their URL keys (campaign / tier / status /
- * search / classification / …) don't collide with `?tab=`, so they coexist.
+ * inside the client; TAT + Ad Status render theirs above the body; Overview
+ * uses the dashboard aggregate bar) are kept so the experience is identical.
+ * Their URL keys (campaign / tier / status / search / classification / …) don't
+ * collide with `?tab=`, so they coexist.
  */
 
 // ── Overview (dashboard-native aggregate) ───────────────────────────────────
 import { fetchDashboardData } from "./queries";
+import { DashboardFiltersBar } from "./filters";
 import { DashboardOverviewStrip } from "./overview-strip";
 import { DashboardBento } from "./dashboard-bento";
-import type { DashboardFilters } from "./types";
+import type { DashboardFilterOptions, DashboardFilters } from "./types";
 
 // ── Influencer Journey ──────────────────────────────────────────────────────
 import { JourneyPageClient } from "@/features/journey/page-client";
@@ -78,15 +85,22 @@ export type TabSearchParams = Record<string, string | undefined> & {
 };
 
 // ── Overview ──────────────────────────────────────────────────────────────
-// Reuses the existing dashboard aggregate: headline cross-system KPI strip on
-// top, then the full bento command-centre (preserves all prior content).
-export async function OverviewTabBody({ params }: { params: DashboardFilters }) {
+// Dashboard-native aggregate (no standalone sidebar route). Reuses the existing
+// dashboard aggregate filter bar + headline cross-system KPI strip + the full
+// bento command-centre. Wrapped in `.onboarding-stage` so its filter bar / KPI
+// strip / bento get the same grid rhythm (gap 1.25rem) as every standalone
+// page, keeping the Overview tab consistent with its siblings.
+export async function OverviewTabBody({
+  params,
+  options,
+}: {
+  params: DashboardFilters;
+  options: DashboardFilterOptions;
+}) {
   const data = await fetchDashboardData(params);
-  // `dash-tab-stack` gives the overview strip + bento the same compact-aware
-  // vertical rhythm as the other tabs (1rem desktop / 0.72rem mobile under
-  // `.dash-compact`).
   return (
-    <div className="dash-tab-stack">
+    <div className="onboarding-stage dash-overview-stage">
+      <DashboardFiltersBar initial={params} options={options} />
       <DashboardOverviewStrip data={data} />
       <DashboardBento data={data} />
     </div>
@@ -102,10 +116,11 @@ export async function JourneyTabBody({ sp }: { sp: TabSearchParams }) {
     fetchJourneyData(journeyFilters),
     fetchJourneyFilterOptions(),
   ]);
-  // Wrapper class mirrors /journey's `<div className="onboarding-stage
-  // journey-stage">`; JourneyPageClient renders its own filter bar inside.
+  // Mirrors /journey verbatim below its header: same
+  // `<div className="onboarding-stage journey-stage">` wrapper holding the
+  // JourneyPageClient (which renders its own filter bar + KPI + funnel + board).
   return (
-    <div className="journey-stage">
+    <div className="onboarding-stage journey-stage">
       <JourneyPageClient
         columns={columns}
         kpi={kpi}
@@ -135,11 +150,12 @@ export async function TatTabBody({ sp }: { sp: TabSearchParams }) {
     fetchTatData(tatFilters),
     fetchTatFilterOptions(),
   ]);
-  // Mirrors /tat's `<div className="onboarding-stage">` — TAT has no extra
-  // stage class, but the filter bar and the client body are separated by the
-  // `.onboarding-stage` grid gap, reproduced here via `dash-tab-stack`.
+  // Mirrors /tat verbatim below its header: same `<div className="onboarding-
+  // stage">` (TAT has no extra stage class) holding the filter bar then the
+  // client body as direct grid children, so the `.onboarding-stage` gap spaces
+  // them exactly as on the standalone route.
   return (
-    <div className="dash-tab-stack">
+    <div className="onboarding-stage">
       <TatFiltersBar initial={tatFilters} options={options} />
       <TatPageClient tatData={tatData} campaignTats={campaignTats} kpi={kpi} />
     </div>
@@ -160,20 +176,18 @@ export async function AdStatusTabBody({ sp }: { sp: TabSearchParams }) {
     fetchAdStatusData(adFilters),
     fetchAdStatusFilterOptions(),
   ]);
-  // Mirrors /performance/ad-run-status's `<div className="onboarding-stage
-  // ad-status-stage">` — the `ad-status-stage` class scopes the card layout,
-  // link actions and ad-list table column widths, so it must wrap the body.
-  // The standalone separates the filter bar from the KPI+board block by the
-  // `.onboarding-stage` grid gap; here `dash-tab-stack` reproduces that gap
-  // and keeps the KPI strip + board as one gap-free unit (the standalone
-  // renders them inside one Suspense slot with no gap between them).
+  // Mirrors /performance/ad-run-status verbatim below its header: same
+  // `<div className="onboarding-stage ad-status-stage">` holding the filter
+  // bar, then the KPI strip and the board as direct grid children (the
+  // standalone renders the latter two inside a fragment in one Suspense slot,
+  // which the `.onboarding-stage` grid lays out the same way). The
+  // `ad-status-stage` class scopes the card layout, link actions and ad-list
+  // table column widths.
   return (
-    <div className="ad-status-stage dash-tab-stack">
+    <div className="onboarding-stage ad-status-stage">
       <AdStatusFiltersBar initial={adFilters} options={options} />
-      <div>
-        <AdStatusKpiStrip kpi={kpi} />
-        <AdStatusBoard untested={untested} adRun={adRun} filters={adFilters} />
-      </div>
+      <AdStatusKpiStrip kpi={kpi} />
+      <AdStatusBoard untested={untested} adRun={adRun} filters={adFilters} />
     </div>
   );
 }
@@ -182,11 +196,10 @@ export async function AdStatusTabBody({ sp }: { sp: TabSearchParams }) {
 // Mirrors /compliance — the full ComplianceBody view (no filters at page level).
 export async function ComplianceTabBody() {
   const data = await fetchComplianceData();
-  // Mirrors /compliance's `<div className="onboarding-stage compliance-stage">`
-  // — the `compliance-stage` class scopes section radii, table layout and the
-  // mobile-compact rules, so it must wrap the body.
+  // Mirrors /compliance verbatim below its header: same
+  // `<div className="onboarding-stage compliance-stage">` holding the body.
   return (
-    <div className="compliance-stage">
+    <div className="onboarding-stage compliance-stage">
       <ComplianceBody data={data} />
     </div>
   );
@@ -196,10 +209,10 @@ export async function ComplianceTabBody() {
 // Mirrors /cost-analytics — the full CostAnalyticsBody view.
 export async function CostTabBody() {
   const data = await fetchCostAnalyticsData();
-  // Mirrors /cost-analytics's `<div className="onboarding-stage
-  // cost-analytics-stage">`.
+  // Mirrors /cost-analytics verbatim below its header: same
+  // `<div className="onboarding-stage cost-analytics-stage">` holding the body.
   return (
-    <div className="cost-analytics-stage">
+    <div className="onboarding-stage cost-analytics-stage">
       <CostAnalyticsBody data={data} />
     </div>
   );
@@ -209,10 +222,10 @@ export async function CostTabBody() {
 // Mirrors /funnel — the full FunnelBody view.
 export async function FunnelTabBody() {
   const data = await fetchFunnelData();
-  // Mirrors /funnel's `<div className="onboarding-stage funnel-stage">` — the
-  // `funnel-stage` class scopes section radii, table layout and mobile-compact.
+  // Mirrors /funnel verbatim below its header: same
+  // `<div className="onboarding-stage funnel-stage">` holding the body.
   return (
-    <div className="funnel-stage">
+    <div className="onboarding-stage funnel-stage">
       <FunnelBody data={data} />
     </div>
   );
@@ -222,10 +235,10 @@ export async function FunnelTabBody() {
 // Mirrors /internal-dashboard — the full InternalDashboardBody view.
 export async function InternalTabBody() {
   const data = await fetchInternalDashboardData();
-  // Mirrors /internal-dashboard's `<div className="onboarding-stage
-  // internal-dashboard-stage">`.
+  // Mirrors /internal-dashboard verbatim below its header: same
+  // `<div className="onboarding-stage internal-dashboard-stage">` holding body.
   return (
-    <div className="internal-dashboard-stage">
+    <div className="onboarding-stage internal-dashboard-stage">
       <InternalDashboardBody data={data} />
     </div>
   );

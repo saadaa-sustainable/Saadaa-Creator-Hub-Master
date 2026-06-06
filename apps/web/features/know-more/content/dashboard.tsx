@@ -44,24 +44,21 @@ export default function DashboardKM() {
             (the Dashboard shell already shows one).
           </li>
           <li>
-            <strong>Pixel parity</strong> · each tab body is wrapped in the SAME
-            stage class its standalone route uses (
-            <KMCode>journey-stage</KMCode>, <KMCode>ad-status-stage</KMCode>,
-            <KMCode>compliance-stage</KMCode>, <KMCode>funnel-stage</KMCode>, …),
-            so the filter cards, KPI sizing, board / table layout and
-            mobile-compact rules scoped to those classes apply identically.
-            Clicking a tab is the same as visiting that sidebar page, minus the
-            title.
+            <strong>Pixel parity</strong> · each tab body renders the EXACT
+            wrapper its standalone route uses (
+            <KMCode>onboarding-stage journey-stage</KMCode>,{" "}
+            <KMCode>onboarding-stage ad-status-stage</KMCode>, …) with the same
+            children in the same order, so every standalone style (filter cards,
+            KPI sizing, inter-section gaps, board / table layout, and the mobile
+            rules) applies identically at all breakpoints. Clicking a tab is the
+            same as visiting that sidebar page, minus the title. There is no
+            Dashboard-specific sizing layer.
           </li>
           <li>
-            <strong>Compact density</strong> · the Dashboard shell carries a
-            <KMCode>dash-compact</KMCode> class that trims KPI-card padding,
-            number sizes, grid gutters and section rhythm one step versus the
-            standalone pages, so more of each tab fits without scrolling. On
-            phones the KPI strips hold a 2-column bento (never 1×1 stacked) with
-            smaller numbers, and the tab rail scrolls horizontally with a thin
-            scrollbar + right-edge fade hint. Scoped to the Dashboard only — the
-            sidebar pages keep their original sizing.
+            <strong>Dashboard-only chrome</strong> · the only things unique to
+            the Dashboard are the white-pill tab rail (active tab in a rounded
+            white pill; scrolls horizontally on mobile with a fade hint) and the
+            per-tab Know More (this button shows each tab&apos;s own view KM).
           </li>
           <li>
             <strong>Filters</strong> · the Campaign / Date / Content / Tier /
