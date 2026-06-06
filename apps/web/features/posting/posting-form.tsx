@@ -64,6 +64,12 @@ export function PostingModal({
   const driveBtnRef = useRef<HTMLButtonElement>(null);
 
   const requiresDownload = adsUsageRights === "Yes";
+  // Ad-rights truthiness — values are durations like "12 Months", not "Yes".
+  const adRightsGranted =
+    !!adsUsageRights &&
+    !["", "no", "n/a", "none", "0", "false"].includes(
+      String(adsUsageRights).trim().toLowerCase(),
+    );
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const {
@@ -502,6 +508,7 @@ export function PostingModal({
               <label htmlFor="pt_partId">
                 <Handshake size={11} className="inline mr-1" />
                 Partnership Key
+                {adRightsGranted && <span className="text-danger"> *</span>}
               </label>
               <p className="px-1 pt-1 text-[11px] text-text-tertiary">
                 Numeric Meta partnership code — required when ad usage rights

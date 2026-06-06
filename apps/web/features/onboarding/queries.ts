@@ -223,7 +223,7 @@ export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
     (supabase as any)
       .from("posts")
       .select(
-        "ads_usage_rights, reels, static_posts, stories, order_id",
+        "ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped",
       )
       .in("workflow_status", ONBOARDED_SET)
       .or("deliverable_index.is.null,deliverable_index.eq.1")
@@ -260,6 +260,7 @@ export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
   const pendingOnboardings = pendingRows.length;
 
   let adRightsSelected = 0;
+  let pendingEmail = 0;
   let reelsSum = 0;
   let staticSum = 0;
   let storiesSum = 0;
@@ -267,7 +268,9 @@ export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
   let shopifyMatched = 0;
 
   for (const r of onboardedRows) {
-    if (String(r.ads_usage_rights ?? "").trim().toLowerCase() === "yes") {
+    // Ad-rights truthiness — values are durations ("12 Months"), never "Yes".
+    const adv = String(r.ads_usage_rights ?? "").trim().toLowerCase();
+    if (adv && !["no", "n/a", "none", "0", "false"].includes(adv)) {
       adRightsSelected++;
     }
     reelsSum += Number(r.reels ?? 0) || 0;
@@ -278,6 +281,11 @@ export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
     if (oid) {
       withOrderId++;
       if (shopifyOrderIds.has(oid)) shopifyMatched++;
+    }
+
+    // Pending collab email: onboarded but not yet sent and not intentionally skipped.
+    if (!r.collab_email_sent_at && r.collab_email_skipped !== true) {
+      pendingEmail++;
     }
   }
 
@@ -290,6 +298,7 @@ export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
     completionRate: denom > 0 ? round1((totalOnboarded / denom) * 100) : 0,
     adRightsSelected,
     noAdRights: totalOnboarded - adRightsSelected,
+    pendingEmail,
     avgReels: totalOnboarded > 0 ? round1(reelsSum / totalOnboarded) : 0,
     avgStatic: totalOnboarded > 0 ? round1(staticSum / totalOnboarded) : 0,
     avgStories: totalOnboarded > 0 ? round1(storiesSum / totalOnboarded) : 0,

@@ -2,7 +2,7 @@ import {
   CheckCircle2,
   Clapperboard,
   HourglassIcon,
-  Images,
+  Mail,
   ShieldCheck,
   ShieldX,
   ShoppingCart,
@@ -68,16 +68,16 @@ export function OnboardingKpiStrip({ kpi }: { kpi: OnboardingKpi }) {
         <KpiCard
           tone="info"
           icon={<Clapperboard size={16} aria-hidden />}
-          label="Avg Reels / Story"
-          primary={`${kpi.avgReels} · ${kpi.avgStories}`}
-          secondary="Reels · Stories per collab"
+          label="Avg Deliverables"
+          primary={`${kpi.avgReels}R · ${kpi.avgStatic}P · ${kpi.avgStories}S`}
+          secondary="Per collab"
         />
         <KpiCard
-          tone="accent"
-          icon={<Images size={16} aria-hidden />}
-          label="Avg Static"
-          primary={String(kpi.avgStatic)}
-          secondary="Static posts per collab"
+          tone="danger"
+          icon={<Mail size={16} aria-hidden />}
+          label="Pending Email"
+          primary={String(kpi.pendingEmail)}
+          secondary="Collab email not sent"
         />
       </div>
     </section>

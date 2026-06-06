@@ -73,6 +73,8 @@ export interface OnboardingKpi {
   adRightsSelected: number;
   /** Onboarded collabs without ad rights. */
   noAdRights: number;
+  /** Onboarded collabs whose collab email is neither sent nor skipped. */
+  pendingEmail: number;
   /** Mean reels per onboarded collab. */
   avgReels: number;
   /** Mean static posts per onboarded collab. */
