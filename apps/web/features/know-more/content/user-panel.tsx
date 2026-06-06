@@ -19,7 +19,9 @@ export default function UserPanelKM() {
           <li>
             <strong>Roles & Permissions</strong> · card grid of every role from{" "}
             <KMCode>access_roles</KMCode>. System roles (Global Admin · User ·
-            Accounts Team) ship locked but tunable. Custom roles can be
+            Accounts Team · Campaign Owner) ship locked but tunable. Campaign
+            Owner creates/edits/closes/reopens campaigns (campaign management is
+            this role + Global Admin only). Custom roles can be
             created, edited, deleted (after reassigning users).
           </li>
         </KMList>

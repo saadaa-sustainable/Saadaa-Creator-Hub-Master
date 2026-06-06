@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   ExternalLink,
@@ -9,21 +10,29 @@ import {
   FileText,
   IndianRupee,
   Loader2,
+  Lock,
   Pencil,
   Plus,
+  RotateCcw,
   Target,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import type { CampaignListRow } from "./queries";
-import { fetchCampaignForEdit } from "./actions";
+import { closeCampaign, fetchCampaignForEdit, reopenCampaign } from "./actions";
 import { CampaignCreateForm } from "./create-form";
 import type { CampaignCreateInput } from "./schema";
 
 interface ExistingCampaignsProps {
   campaigns: CampaignListRow[];
   showCreateAction?: boolean;
+  /** Campaign Owner + Global Admin: may edit / close / reopen campaigns. */
+  canManage?: boolean;
+}
+
+function isClosedStatus(status: string | null | undefined): boolean {
+  return (status ?? "").trim().toLowerCase() === "closed";
 }
 
 interface EditTarget {
@@ -46,11 +55,35 @@ function statusLabel(status: string | null | undefined): string {
 export function ExistingCampaigns({
   campaigns,
   showCreateAction = false,
+  canManage = false,
 }: ExistingCampaignsProps) {
+  const router = useRouter();
   const [selected, setSelected] = useState<CampaignListRow | null>(null);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
+  const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [, startLoadEdit] = useTransition();
+  const [, startStatus] = useTransition();
+
+  const changeStatus = (campaignId: string, action: "close" | "reopen") => {
+    setStatusBusyId(campaignId);
+    startStatus(async () => {
+      const res =
+        action === "close"
+          ? await closeCampaign(campaignId)
+          : await reopenCampaign(campaignId);
+      setStatusBusyId(null);
+      if (!res.ok) {
+        toast.error(res.error ?? "Could not update campaign status.");
+        return;
+      }
+      toast.success(
+        action === "close" ? "Campaign closed." : "Campaign reopened.",
+      );
+      setSelected(null);
+      router.refresh();
+    });
+  };
 
   const openEdit = (campaignId: string) => {
     setLoadingEditId(campaignId);
@@ -116,6 +149,7 @@ export function ExistingCampaigns({
       <div className="campaign-card-grid">
         {campaigns.map((campaign) => {
           const target = normalizeNumber(campaign.no_of_creators);
+          const isClosed = isClosedStatus(campaign.status);
           const budgetRows = campaign.budget_rows ?? [];
           const totalWithGarments = budgetRows.reduce(
             (sum, row) => sum + (normalizeNumber(row.total_with_garments) ?? 0),
@@ -195,22 +229,47 @@ export function ExistingCampaigns({
                   <Eye size={12} />
                   View Details
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-xs"
-                  disabled={loadingEditId === campaign.campaign_id}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    openEdit(campaign.campaign_id);
-                  }}
-                >
-                  {loadingEditId === campaign.campaign_id ? (
-                    <Loader2 size={12} className="animate-spin" />
-                  ) : (
-                    <Pencil size={12} />
-                  )}
-                  Edit
-                </button>
+                {canManage && (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      disabled={loadingEditId === campaign.campaign_id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEdit(campaign.campaign_id);
+                      }}
+                    >
+                      {loadingEditId === campaign.campaign_id ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Pencil size={12} />
+                      )}
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      disabled={statusBusyId === campaign.campaign_id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        changeStatus(
+                          campaign.campaign_id,
+                          isClosed ? "reopen" : "close",
+                        );
+                      }}
+                    >
+                      {statusBusyId === campaign.campaign_id ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : isClosed ? (
+                        <RotateCcw size={12} />
+                      ) : (
+                        <Lock size={12} />
+                      )}
+                      {isClosed ? "Reopen" : "Close"}
+                    </button>
+                  </>
+                )}
                 {campaign.brief_link && (
                   <a
                     href={campaign.brief_link}
@@ -231,6 +290,7 @@ export function ExistingCampaigns({
       {selected && (
         <CampaignDetailsModal
           campaign={selected}
+          canManage={canManage}
           onClose={() => setSelected(null)}
           onEdit={() => openEdit(selected.campaign_id)}
           editLoading={loadingEditId === selected.campaign_id}
@@ -291,11 +351,13 @@ function CampaignEditModal({
 
 function CampaignDetailsModal({
   campaign,
+  canManage,
   onClose,
   onEdit,
   editLoading,
 }: {
   campaign: CampaignListRow;
+  canManage: boolean;
   onClose: () => void;
   onEdit: () => void;
   editLoading: boolean;
@@ -324,19 +386,21 @@ function CampaignDetailsModal({
             <h2>{campaign.campaign_name ?? "Untitled campaign"}</h2>
           </div>
           <div className="modal-head__actions">
-            <button
-              type="button"
-              className="btn btn-secondary btn-xs"
-              onClick={onEdit}
-              disabled={editLoading}
-            >
-              {editLoading ? (
-                <Loader2 size={12} className="animate-spin" />
-              ) : (
-                <Pencil size={12} />
-              )}
-              Edit
-            </button>
+            {canManage && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-xs"
+                onClick={onEdit}
+                disabled={editLoading}
+              >
+                {editLoading ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Pencil size={12} />
+                )}
+                Edit
+              </button>
+            )}
             <button
               type="button"
               className="icon-btn"

@@ -82,6 +82,29 @@ export default function CampaignsKM() {
         </KMCallout>
       </KMSection>
 
+      <KMSection tag="Status + lifecycle">
+        <KMList>
+          <li>
+            Every campaign carries a <KMCode>status</KMCode> — <strong>Active</strong>{" "}
+            or <strong>Closed</strong> — shown as a pill on the card + detail.
+          </li>
+          <li>
+            <strong>Auto-close:</strong> once a campaign&apos;s end date passes,
+            the daily job flips it to <strong>Closed</strong> (one-shot, stamped
+            via <KMCode>auto_closed_at</KMCode>).
+          </li>
+          <li>
+            <strong>Reopen:</strong> a Campaign Owner or Global Admin can reopen
+            a closed campaign from the card&apos;s <strong>Reopen</strong> button.
+            A reopened campaign stays Active and is never auto-closed again.
+          </li>
+          <li>
+            <strong>Close manually:</strong> the same managers can close an
+            Active campaign early via the <strong>Close</strong> button.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>
@@ -106,8 +129,12 @@ export default function CampaignsKM() {
       </KMSection>
 
       <KMCallout tone="info">
-        Create requires the <KMCode>campaign_create</KMCode> permission.
-        Without it, only the Existing tab is visible.
+        Campaign management is restricted to the <strong>Campaign Owner</strong>{" "}
+        role and <strong>Global Admin</strong>. Create needs{" "}
+        <KMCode>campaign_create</KMCode>; edit / close / reopen need{" "}
+        <KMCode>campaign_edit</KMCode>. Everyone else sees campaigns read-only
+        (no New / Edit / Close buttons). The creator is stamped as the campaign
+        owner and receives the &quot;ending soon&quot; alert.
       </KMCallout>
     </>
   );

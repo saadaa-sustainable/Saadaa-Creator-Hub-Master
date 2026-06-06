@@ -117,6 +117,18 @@ export async function submitCampaign(
     total_budget: number;
   };
 
+  // Stamp campaign ownership. The submit_campaign RPC has a fixed signature, so
+  // we set created_by in a follow-up service-role UPDATE. The owner (+ Global
+  // Admins) can edit/close/reopen, and the Campaign Ending alert targets them.
+  // Best-effort: a failed stamp leaves created_by NULL (owner "unknown").
+  const { error: ownerErr } = await (supabase as any)
+    .from("campaigns")
+    .update({ created_by: actor.email })
+    .eq("campaign_id", row.campaign_id);
+  if (ownerErr) {
+    console.error("[campaigns] created_by stamp failed:", ownerErr.message);
+  }
+
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 
   // ── Notifications: Campaign Created broadcast + submitter confirmation ───
@@ -233,7 +245,7 @@ export async function editCampaign(
   campaignId: string,
   input: unknown,
 ): Promise<CampaignEditResult> {
-  await assertPermission("campaign_create");
+  await assertPermission("campaign_edit");
 
   const id = (campaignId ?? "").trim();
   if (!id) return { ok: false, error: "Campaign ID is required." };
@@ -368,7 +380,7 @@ export async function fetchCampaignForEdit(campaignId: string): Promise<{
   campaignId: string;
   initial: CampaignCreateInput;
 } | null> {
-  await assertPermission("campaign_create");
+  await assertPermission("campaign_edit");
   const id = (campaignId ?? "").trim();
   if (!id) return null;
 
@@ -423,4 +435,56 @@ export async function fetchCampaignForEdit(campaignId: string): Promise<{
   };
 
   return { campaignId: id, initial };
+}
+
+export interface CampaignStatusResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * Manually close a campaign. Campaign Owner + Global Admin only. Sets
+ * status='Closed'. The daily cron also auto-closes campaigns past their
+ * end_date (app/api/cron/notifications/route.ts).
+ */
+export async function closeCampaign(
+  campaignId: string,
+): Promise<CampaignStatusResult> {
+  await assertPermission("campaign_edit");
+  const id = (campaignId ?? "").trim();
+  if (!id) return { ok: false, error: "Campaign ID is required." };
+
+  const supabase = createServiceClient();
+  const { error } = await (supabase as any)
+    .from("campaigns")
+    .update({ status: "Closed", updated_at: new Date().toISOString() })
+    .eq("campaign_id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/campaigns");
+  return { ok: true };
+}
+
+/**
+ * Reopen a closed campaign. Campaign Owner + Global Admin only. Sets
+ * status='Active' and stamps auto_closed_at so the daily end-date auto-close
+ * never re-closes a deliberately reopened campaign.
+ */
+export async function reopenCampaign(
+  campaignId: string,
+): Promise<CampaignStatusResult> {
+  await assertPermission("campaign_edit");
+  const id = (campaignId ?? "").trim();
+  if (!id) return { ok: false, error: "Campaign ID is required." };
+
+  const supabase = createServiceClient();
+  const now = new Date().toISOString();
+  const { error } = await (supabase as any)
+    .from("campaigns")
+    .update({ status: "Active", auto_closed_at: now, updated_at: now })
+    .eq("campaign_id", id);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/campaigns");
+  return { ok: true };
 }

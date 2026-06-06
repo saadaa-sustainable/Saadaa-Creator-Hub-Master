@@ -4,11 +4,16 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ExistingCampaigns } from "@/features/campaigns/existing-campaigns";
 import { fetchCampaigns } from "@/features/campaigns/queries";
 import { assertPermission } from "@/lib/rbac.server";
+import { hasPermission } from "@/lib/rbac";
 
 export const metadata = { title: "Campaigns" };
 
 export default async function CampaignsPage() {
-  await assertPermission("reachout_outbound");
+  const actor = await assertPermission("reachout_outbound");
+  // Campaign create/edit/close/reopen is Campaign Owner + Global Admin only.
+  const canManage =
+    hasPermission(actor, "campaign_create") ||
+    hasPermission(actor, "campaign_edit");
   const campaigns = await fetchCampaigns();
 
   return (
@@ -19,16 +24,22 @@ export default async function CampaignsPage() {
           Server-generated IFC IDs, tracker budget lines, and campaign briefs
           for downstream Reach Out and Onboarding.
         </p>
-        <Link
-          href="/campaigns/new"
-          className="btn btn-primary campaign-list-new"
-        >
-          <Plus size={14} />
-          New Campaign
-        </Link>
+        {canManage && (
+          <Link
+            href="/campaigns/new"
+            className="btn btn-primary campaign-list-new"
+          >
+            <Plus size={14} />
+            New Campaign
+          </Link>
+        )}
       </div>
 
-      <ExistingCampaigns campaigns={campaigns} showCreateAction />
+      <ExistingCampaigns
+        campaigns={campaigns}
+        showCreateAction={canManage}
+        canManage={canManage}
+      />
     </div>
   );
 }

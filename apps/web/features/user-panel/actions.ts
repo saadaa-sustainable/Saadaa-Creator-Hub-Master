@@ -7,7 +7,12 @@ import { NOTIFICATION_TYPES, sendNotification } from "@/lib/notifications";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { UserFormPayload } from "./types";
 
-const VALID_ROLES = new Set(["Global Admin", "User", "Accounts Team"]);
+const VALID_ROLES = new Set([
+  "Global Admin",
+  "User",
+  "Accounts Team",
+  "Campaign Owner",
+]);
 
 function escapeHtml(s: string): string {
   return s
@@ -284,7 +289,10 @@ export async function toggleUserActive(email: string, active: boolean) {
   return { ok: true };
 }
 
-const CSV_ROLE_ALIASES: Record<string, "Global Admin" | "User" | "Accounts Team"> = {
+const CSV_ROLE_ALIASES: Record<
+  string,
+  "Global Admin" | "User" | "Accounts Team" | "Campaign Owner"
+> = {
   admin: "Global Admin",
   "global admin": "Global Admin",
   owner: "Global Admin",
@@ -294,6 +302,8 @@ const CSV_ROLE_ALIASES: Record<string, "Global Admin" | "User" | "Accounts Team"
   accounts: "Accounts Team",
   "accounts team": "Accounts Team",
   finance: "Accounts Team",
+  "campaign owner": "Campaign Owner",
+  campaign: "Campaign Owner",
 };
 
 export interface BulkInviteResult {

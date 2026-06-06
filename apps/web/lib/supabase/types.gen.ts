@@ -146,8 +146,9 @@ export interface CampaignsRow {
   no_of_creators: number | null;
   budget: number | null;
   total_budget: number | null;
-  status: "Active" | "Completed" | "Paused" | "Draft" | null;
+  status: "Active" | "Closed" | "Completed" | "Paused" | "Draft" | null;
   created_by: string | null;
+  auto_closed_at: string | null;
   created_at: string;
   updated_at: string;
 }

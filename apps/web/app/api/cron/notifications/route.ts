@@ -128,6 +128,7 @@ interface CampaignRow {
   campaign_id: string | null;
   campaign_name: string | null;
   end_date: string | null;
+  created_by: string | null;
 }
 
 // ─── Recipient resolution ─────────────────────────────────────────────────────
@@ -202,6 +203,7 @@ export async function GET(req: NextRequest) {
     payment_eligible: 0,
     payment_sla_breach: 0,
     campaign_ending: 0,
+    campaign_closed: 0,
   };
 
   // Resolve shared recipient sets / lookups once.
@@ -432,43 +434,67 @@ export async function GET(req: NextRequest) {
 
   // ── 6. Campaign Ending Soon ──────────────────────────────────────────────────
   // Campaigns whose end_date is within the window (future) AND not yet alerted.
-  // → campaign owner. campaigns has no creator/owner column, so we fall back to
-  // active Global Admins. Stamp ending_alert_sent=true.
+  // → the campaign OWNER (campaigns.created_by, an email). Falls back to active
+  // Global Admins for legacy campaigns with no owner. Stamp ending_alert_sent.
   try {
     const today = isoDateOffset(0);
     const within = isoDateOffset(CAMPAIGN_ENDING_WITHIN_DAYS);
     const { data } = await (supabase as any)
       .from("campaigns")
-      .select("id, campaign_id, campaign_name, end_date")
+      .select("id, campaign_id, campaign_name, end_date, created_by")
       .not("end_date", "is", null)
       .gte("end_date", today)
       .lte("end_date", within)
       .eq("ending_alert_sent", false);
     const rows = (data ?? []) as CampaignRow[];
-    if (rows.length && globalAdmins.length) {
-      for (const c of rows) {
+    for (const c of rows) {
+      const owner = (c.created_by ?? "").trim().toLowerCase();
+      const to = owner && owner.includes("@") ? [owner] : globalAdmins;
+      if (to.length) {
         const r = await sendNotification({
           type: NOTIFICATION_TYPES.CAMPAIGN_ENDING,
-          to: globalAdmins,
+          to,
           subject: `Campaign ending soon: ${c.campaign_name ?? c.campaign_id ?? "campaign"}`,
           title: "A campaign is ending soon",
           subtitle: c.campaign_id ? `CAMPAIGN: ${c.campaign_id}` : undefined,
-          htmlBody: `<p style="margin:0 0 12px;">This campaign ends within ${CAMPAIGN_ENDING_WITHIN_DAYS} days.</p>
+          htmlBody: `<p style="margin:0 0 12px;">This campaign ends within ${CAMPAIGN_ENDING_WITHIN_DAYS} days, after which it closes automatically.</p>
 <ul style="margin:0 0 12px;padding-left:18px;">
 <li><strong>Campaign:</strong> ${c.campaign_name ?? "—"} (${c.campaign_id ?? "—"})</li>
 <li><strong>End date:</strong> ${c.end_date ?? "—"}</li>
 </ul>
-<p style="margin:0;">Please review outstanding deliverables before it closes.</p>`,
+<p style="margin:0;">Please review outstanding deliverables before it closes. You can reopen it later from the Campaigns page if needed.</p>`,
         });
         if (r.ok) sent.campaign_ending++;
-        await (supabase as any)
-          .from("campaigns")
-          .update({ ending_alert_sent: true })
-          .eq("id", c.id);
       }
+      await (supabase as any)
+        .from("campaigns")
+        .update({ ending_alert_sent: true })
+        .eq("id", c.id);
     }
   } catch (err) {
     console.error("[cron/notifications] campaign_ending check failed:", err);
+  }
+
+  // ── 7. Auto-close campaigns past their end_date ─────────────────────────────
+  // Once end_date is in the past, flip status → 'Closed' and stamp auto_closed_at
+  // (one-shot). A campaign reopened by an owner/admin gets auto_closed_at set, so
+  // this never re-closes it. Owner-facing notice already went out in check 6.
+  try {
+    const today = isoDateOffset(0);
+    const { data, error } = await (supabase as any)
+      .from("campaigns")
+      .update({ status: "Closed", auto_closed_at: nowIso() })
+      .lt("end_date", today)
+      .is("auto_closed_at", null)
+      .not("status", "ilike", "closed")
+      .select("id");
+    if (error) {
+      console.error("[cron/notifications] campaign auto-close failed:", error.message);
+    } else {
+      sent.campaign_closed = (data ?? []).length;
+    }
+  } catch (err) {
+    console.error("[cron/notifications] campaign auto-close check failed:", err);
   }
 
   return NextResponse.json({ ran: true, sent });

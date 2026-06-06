@@ -10,6 +10,7 @@ import { formatDate, formatRupees } from "@/lib/formatters";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
+  sendNotification,
 } from "@/lib/notifications";
 import { OnboardingSchema, applyBarterLock } from "./schema";
 
@@ -186,6 +187,33 @@ export async function submitOnboarding(
 
   if (orderErr) return { ok: false, error: orderErr.message };
   if (!order) {
+    // Spec: Shopify Validation Failed → Assigned User. The submitter (the actor
+    // onboarding this collab) is the assigned user; alert them that the entered
+    // Order ID was not found in the synced shopify_orders. Best-effort + non-
+    // blocking via after(); logged to email_logs. Fires only on a SAVED submit,
+    // not the inline preview lookup.
+    const assignee = (actor.email ?? "").trim();
+    if (assignee.includes("@")) {
+      const esc = (s: string) =>
+        s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      after(async () => {
+        await sendNotification({
+          type: NOTIFICATION_TYPES.SHOPIFY_VALIDATION_FAILED,
+          to: assignee,
+          subject: `Shopify order ${v.orderId} not found — onboarding blocked`,
+          title: "Shopify order validation failed",
+          subtitle: `POST ID: ${v.postId}`,
+          htmlBody: `<p style="margin:0 0 12px;">The Shopify Order ID entered while onboarding could not be validated — it was not found in the synced order data.</p>
+<table style="width:100%;border-collapse:collapse;font-size:0.86rem;margin:0 0 14px;">
+<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;width:34%;">Post ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(v.postId)}</td></tr>
+<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Order ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(v.orderId)}</td></tr>
+<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Reason</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">Order not found in sync</td></tr>
+</table>
+<p style="margin:0;color:#6E695E;font-size:0.82rem;">The Shopify sync runs every few hours. If the order is recent, retry onboarding in ~5 minutes. Double-check the Order ID if it persists.</p>`,
+          postId: v.postId,
+        });
+      });
+    }
     return {
       ok: false,
       error: `Shopify order ${v.orderId} not found in sync. Try again in 5 min.`,

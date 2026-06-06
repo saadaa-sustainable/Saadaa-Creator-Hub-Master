@@ -50,6 +50,8 @@ export const NOTIFICATION_TYPES = {
   CAMPAIGN_CONFIRMATION: "campaign_confirmation",
   POSTING_CONFIRMATION: "posting_confirmation",
   PAYMENT_CONFIRMATION: "payment_confirmation",
+  // ── event-driven alert ──
+  SHOPIFY_VALIDATION_FAILED: "shopify_validation_failed",
   // ── deferred (cron) ──
   PENDING_ONBOARDING: "pending_onboarding",
   POSTING_PENDING: "posting_pending",

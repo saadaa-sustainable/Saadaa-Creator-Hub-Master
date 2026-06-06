@@ -13,6 +13,7 @@ import type { UserAccessRow } from "./supabase/types.gen";
 
 export type PermissionKey =
   | "campaign_create"
+  | "campaign_edit"
   | "reachout_outbound"
   | "reachout_inbound"
   | "onboarding_write"
@@ -28,7 +29,8 @@ export type PermissionKey =
 
 export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
   admin: "Full administrative access — invite users, manage roles, edit everything",
-  campaign_create: "Create + edit Campaigns",
+  campaign_create: "Create campaigns",
+  campaign_edit: "Edit, close + reopen campaigns",
   reachout_outbound: "Submit Outbound Reach Out form",
   reachout_inbound: "Submit Inbound Reach Out batch + CSV",
   onboarding_write: "Submit onboarding form + create Shopify order",
@@ -60,17 +62,18 @@ function isAdminEmail(email: string): boolean {
 
 function normalizeRole(
   role: string | null | undefined,
-): "Global Admin" | "User" | "Accounts Team" | "custom" {
+): "Global Admin" | "User" | "Accounts Team" | "Campaign Owner" | "custom" {
   const r = (role ?? "").toLowerCase();
   if (["global admin", "owner level", "owner", "admin"].includes(r))
     return "Global Admin";
   if (r === "accounts team") return "Accounts Team";
+  if (r === "campaign owner") return "Campaign Owner";
   if (r === "user" || r === "team" || r === "member") return "User";
   return "custom";
 }
 
 const STATIC_GRANTS: Record<
-  "Global Admin" | "User" | "Accounts Team",
+  "Global Admin" | "User" | "Accounts Team" | "Campaign Owner",
   ReadonlySet<PermissionKey>
 > = {
   // Global Admin = ALL scopes. `admin` already implies every non-admin key via
@@ -78,6 +81,7 @@ const STATIC_GRANTS: Record<
   "Global Admin": new Set<PermissionKey>([
     "admin",
     "campaign_create",
+    "campaign_edit",
     "reachout_outbound",
     "reachout_inbound",
     "onboarding_write",
@@ -90,10 +94,9 @@ const STATIC_GRANTS: Record<
     "system_config",
     "role_mgmt",
   ]),
-  // User = create/edit on the core workflow + read on order status / sheet /
-  // analytics. NO admin, accounts, offboarding, system_config, role_mgmt.
+  // User = the core workflow + read on order status / sheet / analytics.
+  // Campaign create/edit is now Campaign Owner + Global Admin ONLY (2026-06-07).
   User: new Set<PermissionKey>([
-    "campaign_create",
     "reachout_outbound",
     "reachout_inbound",
     "onboarding_write",
@@ -105,6 +108,14 @@ const STATIC_GRANTS: Record<
   // Accounts Team = payments/accounts + analytics + order status / sheet read.
   "Accounts Team": new Set<PermissionKey>([
     "accounts_write",
+    "performance_view",
+    "order_status_view",
+    "sheet_view",
+  ]),
+  // Campaign Owner = create/edit/close/reopen campaigns + base reads.
+  "Campaign Owner": new Set<PermissionKey>([
+    "campaign_create",
+    "campaign_edit",
     "performance_view",
     "order_status_view",
     "sheet_view",
