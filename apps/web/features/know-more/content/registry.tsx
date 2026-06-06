@@ -15,6 +15,7 @@ import FunnelKM from "./funnel";
 import InternalDashboardKM from "./internal-dashboard";
 import JourneyKM from "./journey";
 import MyDashboardKM from "./my-dashboard";
+import OffboardingKM from "./offboarding";
 import OnboardingKM from "./onboarding";
 import OrdersKM from "./orders";
 import OrderStatusKM from "./order-status";
@@ -31,6 +32,7 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   "reach-out-outbound": ReachOutOutboundKM,
   "reach-out-inbound": ReachOutInboundKM,
   onboarding: OnboardingKM,
+  offboarding: OffboardingKM,
   posting: PostingKM,
   "order-status": OrderStatusKM,
   "accounts-hub": AccountsHubKM,

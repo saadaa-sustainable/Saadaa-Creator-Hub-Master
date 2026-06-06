@@ -1,0 +1,130 @@
+"use client";
+import { useCallback, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import type { OffboardingFilterOptions, OffboardingFilters } from "./types";
+
+const FILTER_KEYS = [
+  "search",
+  "campaign",
+  "paymentStatus",
+] as const satisfies readonly (keyof OffboardingFilters)[];
+
+export function OffboardingFiltersBar({
+  initial,
+  options,
+}: {
+  initial: OffboardingFilters;
+  options: OffboardingFilterOptions;
+}) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [pending, startTransition] = useTransition();
+
+  const setParam = useCallback(
+    (key: keyof OffboardingFilters, value: string | undefined) => {
+      const next = new URLSearchParams(params.toString());
+      if (!value) next.delete(key);
+      else next.set(key, value);
+      startTransition(() =>
+        router.replace(`?${next.toString()}`, { scroll: false }),
+      );
+    },
+    [params, router, startTransition],
+  );
+
+  const clearAll = () => {
+    const next = new URLSearchParams(params.toString());
+    FILTER_KEYS.forEach((k) => next.delete(k));
+    startTransition(() =>
+      router.replace(`?${next.toString()}`, { scroll: false }),
+    );
+  };
+
+  const hasAny = FILTER_KEYS.some((k) => params.get(k));
+
+  return (
+    <div className="onboarding-filter-card" aria-busy={pending}>
+      <div className="onboarding-filter-grid">
+        <label className="onboarding-filter-field">
+          <span>Search</span>
+          <div className="relative">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary"
+              aria-hidden
+            />
+            <input
+              type="search"
+              defaultValue={initial.search ?? ""}
+              placeholder="Name, handle, order ID…"
+              onChange={(e) => setParam("search", e.target.value || undefined)}
+              className="onboarding-filter-select pl-8"
+            />
+          </div>
+        </label>
+        <FilterSelect
+          label="Campaign"
+          value={initial.campaign ?? ""}
+          onChange={(v) => setParam("campaign", v)}
+          options={[
+            { label: "All campaigns", value: "" },
+            ...options.campaigns.map((c) => ({
+              label: `${c.id}${c.name && c.name !== c.id ? ` · ${c.name}` : ""}`,
+              value: c.id,
+            })),
+          ]}
+        />
+        <FilterSelect
+          label="Payment"
+          value={initial.paymentStatus ?? ""}
+          onChange={(v) => setParam("paymentStatus", v)}
+          options={[
+            { label: "All payments", value: "" },
+            { label: "Paid", value: "Done" },
+            { label: "Due", value: "Due" },
+            { label: "Not Due", value: "Not Due" },
+          ]}
+        />
+        <div className="onboarding-filter-actions">
+          {hasAny && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearAll}
+              className="gap-1.5"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden /> Clear filters
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface FilterSelectProps {
+  label: string;
+  value: string;
+  onChange: (value: string | undefined) => void;
+  options: { label: string; value: string }[];
+}
+
+function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
+  return (
+    <label className="onboarding-filter-field">
+      <span>{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value || undefined)}
+        className="onboarding-filter-select"
+      >
+        {options.map((o) => (
+          <option key={o.value || "__all"} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}

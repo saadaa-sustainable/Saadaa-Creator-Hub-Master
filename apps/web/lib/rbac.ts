@@ -19,6 +19,11 @@ export type PermissionKey =
   | "posting_submit"
   | "accounts_write"
   | "performance_view"
+  | "order_status_view"
+  | "sheet_view"
+  | "offboarding_write"
+  | "system_config"
+  | "role_mgmt"
   | "admin";
 
 export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
@@ -30,6 +35,12 @@ export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
   posting_submit: "Mark a collab as Posted",
   accounts_write: "Log payments + edit Accounts Hub records",
   performance_view: "Read access to Cost Analytics, Compliance, Funnel, Internal Dashboard",
+  order_status_view: "Read access to the Order Status fulfillment ledger",
+  sheet_view: "Read access to the Sheet View tabs",
+  offboarding_write:
+    "Move a collab to the terminal Offboarding stage (admins only by default)",
+  system_config: "Edit system configuration — admin only",
+  role_mgmt: "Create + edit access roles and assign permissions — admin only",
 };
 
 export const PERMISSION_KEYS: PermissionKey[] = Object.keys(
@@ -62,6 +73,8 @@ const STATIC_GRANTS: Record<
   "Global Admin" | "User" | "Accounts Team",
   ReadonlySet<PermissionKey>
 > = {
+  // Global Admin = ALL scopes. `admin` already implies every non-admin key via
+  // hasPermission(), but we enumerate them so the static fallback is explicit.
   "Global Admin": new Set<PermissionKey>([
     "admin",
     "campaign_create",
@@ -71,7 +84,14 @@ const STATIC_GRANTS: Record<
     "posting_submit",
     "accounts_write",
     "performance_view",
+    "order_status_view",
+    "sheet_view",
+    "offboarding_write",
+    "system_config",
+    "role_mgmt",
   ]),
+  // User = create/edit on the core workflow + read on order status / sheet /
+  // analytics. NO admin, accounts, offboarding, system_config, role_mgmt.
   User: new Set<PermissionKey>([
     "campaign_create",
     "reachout_outbound",
@@ -79,10 +99,15 @@ const STATIC_GRANTS: Record<
     "onboarding_write",
     "posting_submit",
     "performance_view",
+    "order_status_view",
+    "sheet_view",
   ]),
+  // Accounts Team = payments/accounts + analytics + order status / sheet read.
   "Accounts Team": new Set<PermissionKey>([
     "accounts_write",
     "performance_view",
+    "order_status_view",
+    "sheet_view",
   ]),
 };
 
