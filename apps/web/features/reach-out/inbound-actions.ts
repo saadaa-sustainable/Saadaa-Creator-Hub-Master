@@ -74,6 +74,37 @@ export async function submitInboundBatch(
   }[] = [];
   const failures: RowFailure[] = [];
 
+  // Creator cap (decision 2026-06-07): the campaign accepts at most its
+  // allocated creator count (Σ num_influencers across budget tiers). Seed a
+  // running slot count with the campaign's existing active (non-Cancelled)
+  // creators; each committed row consumes a slot. Rows beyond the cap are
+  // skipped as failures. cap=0 (no budget rows) ⇒ no cap.
+  const [capBudgetRes, capPostsRes] = await Promise.all([
+    (supabase as any)
+      .from("campaign_budget")
+      .select("num_influencers")
+      .eq("campaign_id", campaignId),
+    (supabase as any)
+      .from("posts")
+      .select("username, workflow_status")
+      .eq("campaign_id", campaignId)
+      .limit(5000),
+  ]);
+  const creatorCap = (
+    (capBudgetRes.data ?? []) as Array<{ num_influencers: number | null }>
+  ).reduce((sum, r) => sum + (Number(r.num_influencers ?? 0) || 0), 0);
+  let slotsUsed = new Set(
+    (
+      (capPostsRes.data ?? []) as Array<{
+        username: string | null;
+        workflow_status: string | null;
+      }>
+    )
+      .filter((p) => String(p.workflow_status ?? "") !== "Cancelled")
+      .map((p) => (p.username ?? "").trim().toLowerCase())
+      .filter(Boolean),
+  ).size;
+
   for (let i = 0; i < rows.length; i++) {
     const r = applyInboundBarterLock(rows[i]);
     const username = inboundUsernameFromUrl(r.instagramLink);
@@ -99,6 +130,16 @@ export async function submitInboundBatch(
     ).some((p) => String(p.workflow_status ?? "") !== "Cancelled");
     if (activeDup) {
       failures.push({ row: i + 1, error: "Already in this campaign" });
+      continue;
+    }
+
+    // Cap guard — this row is a new creator (passed the dup guard); reject once
+    // the campaign is full. Raise the budget allocation to add more.
+    if (creatorCap > 0 && slotsUsed >= creatorCap) {
+      failures.push({
+        row: i + 1,
+        error: `Campaign at creator cap (${slotsUsed}/${creatorCap}) — raise the allocation to add more`,
+      });
       continue;
     }
 
@@ -161,6 +202,7 @@ export async function submitInboundBatch(
       username,
       contentName,
     });
+    slotsUsed++; // consumed one creator slot
   }
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.

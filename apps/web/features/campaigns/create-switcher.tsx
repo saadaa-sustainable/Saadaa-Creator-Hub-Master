@@ -8,10 +8,13 @@ import { ExistingCampaigns } from "./existing-campaigns";
 
 interface CampaignCreateSwitcherProps {
   campaigns: CampaignListRow[];
+  /** Campaign Owner + Global Admin: may edit / close / reopen. */
+  canManage?: boolean;
 }
 
 export function CampaignCreateSwitcher({
   campaigns,
+  canManage = false,
 }: CampaignCreateSwitcherProps) {
   const [mode, setMode] = useState<"create" | "existing">("create");
 
@@ -48,7 +51,7 @@ export function CampaignCreateSwitcher({
       {mode === "create" ? (
         <CampaignCreateForm />
       ) : (
-        <ExistingCampaigns campaigns={campaigns} />
+        <ExistingCampaigns campaigns={campaigns} canManage={canManage} />
       )}
     </div>
   );

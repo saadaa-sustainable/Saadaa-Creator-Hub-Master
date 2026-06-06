@@ -97,6 +97,14 @@ export default function ReachOutOutboundKM() {
             <KMCode>Cancelled</KMCode> (which frees the handle to be re-added).
           </li>
           <li>
+            <strong>Creator cap</strong> — a campaign accepts at most its
+            allocated creator count (the sum of <KMCode>num_influencers</KMCode>{" "}
+            across its budget tiers). Once full, new reach-outs are blocked with
+            a <KMCode>X/Y</KMCode> message. A Campaign Owner / Global Admin
+            raises the allocation (which also raises the budget) to add more.
+            Cancelled collabs free a slot.
+          </li>
+          <li>
             Red <KMCode>MissingFieldsAlert</KMCode> renders above the submit
             button listing every empty required field at once (Zod{" "}
             <KMCode>safeParse(watch())</KMCode>), so the operator fixes all

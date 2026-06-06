@@ -64,6 +64,13 @@ export default function CampaignsKM() {
             roll up into <KMCode>campaign_budget_monthly</KMCode> view for
             trend charts (auto-regenerated, don&apos;t edit directly).
           </li>
+          <li>
+            <strong>Creator cap</strong> — the sum of{" "}
+            <KMCode>num_influencers</KMCode> across these rows is the campaign&apos;s
+            creator cap: Reach Out blocks new creators once the campaign is full.
+            Raising a row&apos;s count raises both the cap and the budget. Edit the
+            rows (Campaign Owner / Global Admin) to widen or narrow it.
+          </li>
         </KMList>
       </KMSection>
 
