@@ -5,10 +5,48 @@ export default function DashboardKM() {
     <>
       <KMHeader
         title="Dashboard"
-        subtitle="Managerial command centre — bento grid of pulse · stage snapshot · action triggers · pipeline KPIs · trend + breakdown analytics · campaign spend rollups. One Supabase pull powers every block."
+        subtitle="Tabbed command centre — an Overview tab of cross-system headline KPIs plus the full bento grid, followed by one tab per workflow view (Reach Out · Onboarding · Order Status · Posting · Ad Status · Payments · Cost · TAT · Journey). Each tab reuses that view's own KPI aggregate. Only the active tab fetches data."
       />
 
-      <KMSection tag="Page layout (bento, top → bottom)">
+      <KMSection tag="Tabbed layout">
+        <KMList>
+          <li>
+            <strong>Underline-active tab bar</strong> · horizontal, scrolls on
+            mobile, keyboard-navigable (Arrow / Home / End). The active tab is
+            stored in the <KMCode>?tab=</KMCode> URL param so a tab is
+            linkable + server-rendered (default <KMCode>overview</KMCode>).
+          </li>
+          <li>
+            <strong>Streaming</strong> · each tab body is its own async server
+            component inside a keyed <KMCode>&lt;Suspense&gt;</KMCode>. Only
+            the selected tab runs its query — inactive tabs cost nothing.
+          </li>
+          <li>
+            <strong>Overview tab</strong> · cross-system headline strip
+            (Active Campaigns · Creators in Pipeline · Total Collabs · Total
+            Spend · per-stage counts · pending onboardings / posts / payments /
+            paid) on top of the full bento command centre described below.
+          </li>
+          <li>
+            <strong>View tabs</strong> · each renders that feature&apos;s
+            exported KPI strip from its own global aggregate — Onboarding
+            (<KMCode>OnboardingKpiStrip</KMCode>), Posting
+            (<KMCode>PostingKpiStrip</KMCode>), Payments
+            (<KMCode>AccountsKpiStrip</KMCode>), Ad Status
+            (<KMCode>AdStatusKpiStrip</KMCode>), Order Status (Order Volume +
+            Commerce Intel strips), TAT (<KMCode>TatKpiStrip</KMCode>), Journey
+            (KPI + funnel strips). Cost + Reach Out have no exported strip, so
+            the Dashboard composes a compact <KMCode>.acc-kpi</KMCode> grid
+            from their query / the dashboard aggregate.
+          </li>
+          <li>
+            <strong>Filters</strong> · the Campaign / Date / Content / Tier /
+            Status filter bar applies to the Overview tab only.
+          </li>
+        </KMList>
+      </KMSection>
+
+      <KMSection tag="Overview bento layout (top → bottom)">
         <KMList>
           <li>
             <strong>1. PageHeader</strong> — Dashboard icon · title · Know More.
