@@ -83,13 +83,11 @@ export function DashboardTabs({ active }: { active: DashboardTab }) {
             onKeyDown={(e) => onKeyDown(e, i)}
             data-active={isActive ? "true" : undefined}
             className={cn(
-              "dash-tab-pill shrink-0 whitespace-nowrap rounded-full",
-              "px-3.5 py-2 text-[0.78rem] font-semibold transition-colors",
+              "dash-tab-pill shrink-0 whitespace-nowrap rounded-[7px]",
+              "px-3 py-1.5 text-[0.74rem] font-semibold transition-colors",
               "focus-visible:outline-none focus-visible:ring-2",
               "focus-visible:ring-accent/60",
-              isActive
-                ? "text-text-primary"
-                : "text-text-secondary hover:text-text-primary",
+              !isActive && "text-text-secondary hover:text-text-primary",
             )}
           >
             {TAB_LABELS[tab]}

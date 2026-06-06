@@ -12,13 +12,6 @@ import {
   Package,
   Instagram,
   UserSquare,
-  Map,
-  Timer,
-  Megaphone,
-  ClipboardCheck,
-  IndianRupee,
-  Filter,
-  Gauge,
   Users,
   UserMinus,
   ShieldAlert,
@@ -110,18 +103,10 @@ const NAV: NavSection[] = [
   {
     label: "System",
     items: [
-      { label: "Influencer Journey", href: "/journey", icon: Map },
-      { label: "TAT Analytics", href: "/tat", icon: Timer },
-      {
-        label: "Ad Status",
-        href: "/performance/ad-run-status",
-        icon: Megaphone,
-        show: (a) => hasPermission(a, "performance_view"),
-      },
-      { label: "Compliance KPIs", href: "/compliance", icon: ClipboardCheck },
-      { label: "Cost Analytics", href: "/cost-analytics", icon: IndianRupee },
-      { label: "Funnel View", href: "/funnel", icon: Filter },
-      { label: "Internal Dashboard", href: "/internal-dashboard", icon: Gauge },
+      // Influencer Journey, TAT, Ad Status, Compliance, Cost, Funnel, and
+      // Internal Dashboard now live as tabs inside the main Dashboard, so their
+      // sidebar entries are removed (the routes still exist + are reachable from
+      // the Dashboard tabs / direct URL).
       { label: "Sheet View", href: "/sheets", icon: Sheet },
       {
         label: "User Panel",

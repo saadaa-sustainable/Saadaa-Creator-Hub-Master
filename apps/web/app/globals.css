@@ -7999,8 +7999,8 @@ body:has(.km-backdrop) {
    are plain text with a faint hover wash. No underline indicator. A thin,
    unobtrusive horizontal scrollbar lets the rail overflow on mobile. */
 .dash-tabbar {
-  padding: 4px;
-  border-radius: 999px;
+  padding: 3px;
+  border-radius: 10px;
   background: var(--color-bg-surface, #f5f1ec);
   border: 1px solid var(--color-border, #e7e2d2);
   scrollbar-width: thin;
@@ -8025,36 +8025,46 @@ body:has(.km-backdrop) {
   background: rgba(255, 255, 255, 0.5);
 }
 .dash-tab-pill[data-active] {
-  background: var(--color-bg-white, #ffffff);
-  box-shadow:
-    0 1px 2px rgba(22, 21, 19, 0.08),
-    0 1px 1px rgba(22, 21, 19, 0.04);
+  /* Match the sidebar active nav item: dark fill + light text. */
+  background: var(--color-sidebar-active-bg, #161513);
+  color: var(--color-sidebar-active-text, #ffffff);
 }
 /* ≥40px touch target for the scrollable tabs (≥44px on phones), while the rail
    stays visually light. A subtle right-edge fade hints there is more to scroll. */
 .dash-tabbar [role="tab"] {
-  min-height: 40px;
+  min-height: 32px;
 }
 @media (max-width: 640px) {
   .dash-tabbar [role="tab"] {
-    min-height: 44px;
+    min-height: 38px;
   }
 }
 /* Right-edge scroll-hint fade on the tab rail (mobile + narrow desktop). The
    fade rides the rail's rounded right edge so it blends into the ecru trough. */
 .dash-tabbar-wrap {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--color-bg-base, #faf8f5);
+  padding-top: 0.35rem;
+  padding-bottom: 0.5rem;
+}
+@media (max-width: 1023px) {
+  /* Sit just below the 60px sticky mobile topbar. */
+  .dash-tabbar-wrap {
+    top: 60px;
+  }
 }
 .dash-tabbar-wrap::after {
   content: "";
   position: absolute;
-  top: 1px;
-  right: 1px;
-  bottom: 7px;
+  top: 0.35rem;
+  right: 0;
+  bottom: calc(0.5rem + 6px);
   width: 28px;
   pointer-events: none;
-  border-top-right-radius: 999px;
-  border-bottom-right-radius: 999px;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
   background: linear-gradient(
     to right,
     rgba(245, 241, 236, 0),
