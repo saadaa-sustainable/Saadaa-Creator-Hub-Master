@@ -221,7 +221,11 @@
     padding: 2.5rem 3rem;
     min-height: 100vh;
     box-sizing: border-box;
-    overflow-x: hidden;
+    /* `clip` (not `hidden`) prevents horizontal overflow WITHOUT making
+       .main-content a scroll container — otherwise `position: sticky`
+       descendants (e.g. the Dashboard tab rail) never stick because the
+       window scrolls, not main-content. */
+    overflow-x: clip;
   }
   @media (max-width: 1023px) {
     /* Content-dense mobile — minimal outer chrome, max usable area */
