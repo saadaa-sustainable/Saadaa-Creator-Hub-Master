@@ -13,39 +13,24 @@ import { createServiceClient } from "./supabase/server";
  * action.
  *
  * Reply-to-email only (D16 — no creator portal exists), so emails carry no
- * action links the recipient can click to a CreatorHub page; they reply.
+ * action links the recipient can click to a CreatorHub page; they reply. (The
+ * one exception is the User Invitation, which links to /login so the invitee
+ * can sign in with Google — see below.)
  *
- * ─── TODO(cron) ──────────────────────────────────────────────────────────────
- * The TIME-BASED notifications below are intentionally NOT built here. They
- * need pg_cron + per-row idempotency sent-flags (added additively in
- * supabase/migrations/2026_06_06_notification_flags.sql, NOT YET APPLIED) and
- * are a focused follow-up. Planned wiring — a single edge function (or an
- * extension of scrape-pending-apify) runs daily, queries the relevant rows,
- * calls sendNotification(...) once per row, then stamps the sent-flag so it
- * never re-fires:
+ * The six TIME-BASED notifications (Pending Onboarding, Posting Pending, Content
+ * Reminder, Payment Eligibility, Payment SLA breach, Campaign Ending) are now
+ * BUILT — a daily Vercel Cron at app/api/cron/notifications/route.ts runs each
+ * idempotent check and stamps a per-row sent-flag so it fires once.
  *
- *   • Pending Onboarding      → assigned user. posts.workflow_status='Reach Out'
- *                               older than N days. (no flag column yet — reuse a
- *                               reach_out_followup_sent_at if added.)
- *   • Posting Pending         → assigned user. posts.workflow_status='On Board'
- *                               past est_delivery + buffer. Flag:
- *                               posts.posting_pending_sent_at.
- *   • Content Submission      → creator. posts on 'On Board' approaching the
- *     Reminder                  10-day-after-product content deadline. Flag:
- *                               posts.content_reminder_sent_at.
- *   • Payment Eligibility      → accounts team. payments flip Not Due→Due
- *     Achieved                  (recomputePaymentStates). Flag:
- *                               payments.eligibility_email_sent.
- *   • Payment Pending / SLA    → accounts team / global admins. payments Due
- *     breach                    past estimated_payable_date + grace. Flag:
- *                               payments.sla_breach_alert_sent.
- *   • Campaign Ending Soon     → creating user + global admins. campaigns with
- *                               end_date within N days. Flag:
- *                               campaigns.ending_alert_sent.
- *   • User Invitation          → invited user. Needs an invite-token table +
- *                               an /auth/accept route — separate work item.
+ * The seventh, USER_INVITATION, is EVENT-DRIVEN (not cron): it is sent from the
+ * user-panel invite action (features/user-panel/actions.ts) the moment an admin
+ * invites someone. CreatorHub is Google-OAuth-only (passwordless), so there is
+ * NO invite-token table, NO /auth/accept route and NO password to set — the
+ * invited user's user_access row is already inserted (active), and they become
+ * live the instant they sign in with the matching Google account. The invite
+ * email therefore just points them to /login.
  *
- * Each cron type should reuse sendNotification() with its own NOTIFICATION_TYPES
+ * Each notification reuses sendNotification() with its own NOTIFICATION_TYPES
  * email_type so the Error Portal / email_logs audit stays consistent.
  * ─────────────────────────────────────────────────────────────────────────────
  */

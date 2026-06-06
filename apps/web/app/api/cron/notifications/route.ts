@@ -23,17 +23,14 @@ import {
  * CRON_SECRET is set) and/or the `x-vercel-cron` header. We accept either; any
  * other request is 401. This stops the public internet from triggering sends.
  *
- * KNOWN BLOCKER (intentionally not fixed here): EMAIL_USER / EMAIL_PASS are not
- * yet set in Vercel prod, so sendMail() returns ok:false and each attempt is
- * logged to email_logs with status='failed'. The flags are STILL stamped (we
- * fire-once by design, not retry-until-delivered), so once the SMTP creds are
- * set the next day's newly-eligible rows email cleanly. Code + logging are
- * correct now.
+ * SMTP: EMAIL_USER / EMAIL_PASS / EMAIL_FROM_NAME are set in Vercel prod, so
+ * sendMail() delivers (every attempt is still logged to email_logs). Flags are
+ * stamped once (fire-once by design, not retry-until-delivered).
  *
- * TODO(user-invitation): the 7th Wave-7 notification (User Invitation) is NOT
- * built here — it needs an invite-token table + an /auth/accept route so the
- * invited user can set a password. That is a separate work item; this route
- * deliberately omits it.
+ * USER_INVITATION (the 7th Wave-7 notification) is NOT here — it is event-driven,
+ * sent from the user-panel invite action the moment an admin invites someone.
+ * CreatorHub is Google-OAuth-only, so it needs no invite-token table, no
+ * /auth/accept route and no password; the invite email just links to /login.
  *
  * Supabase only. Flag columns are not in the generated types yet, so reads /
  * writes that touch them use `(supabase as any)`.

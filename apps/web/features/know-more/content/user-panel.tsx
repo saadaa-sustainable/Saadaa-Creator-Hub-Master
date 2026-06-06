@@ -171,6 +171,36 @@ export default function UserPanelKM() {
             Whole batch logged as a{" "}
             <KMCode>csv_invite_batch</KMCode> audit event.
           </li>
+          <li>
+            New + active rows also trigger the invitation email (below); the
+            summary reports an <KMCode>emailed</KMCode> count.
+          </li>
+        </KMList>
+      </KMSection>
+
+      <KMSection tag="Invitation email">
+        <KMList>
+          <li>
+            Inviting a <strong>new, active</strong> user (single or CSV) sends a
+            branded email to that address, logged to{" "}
+            <KMCode>email_logs</KMCode> as <KMCode>user_invitation</KMCode>.
+          </li>
+          <li>
+            CreatorHub is <strong>Google sign-in only</strong> — there is no
+            password and no accept link. The email tells the invitee to sign in
+            with the Google account for their address at{" "}
+            <KMCode>/login</KMCode>.
+          </li>
+          <li>
+            Access is already live the moment they sign in: the OAuth callback
+            matches their Google email to their (active) <KMCode>user_access</KMCode>{" "}
+            row. No token, no provisioning step.
+          </li>
+          <li>
+            Best-effort: a failed send never blocks the invite (the row is still
+            created); the failure is recorded in <KMCode>email_logs</KMCode>.
+            Requires the <KMCode>EMAIL_*</KMCode> SMTP env.
+          </li>
         </KMList>
       </KMSection>
 
