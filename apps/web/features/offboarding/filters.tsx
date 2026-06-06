@@ -47,19 +47,16 @@ export function OffboardingFiltersBar({
   return (
     <div className="onboarding-filter-card" aria-busy={pending}>
       <div className="onboarding-filter-grid">
-        <label className="onboarding-filter-field">
+        <label className="onboarding-filter-field acc-filter-search">
           <span>Search</span>
-          <div className="relative">
-            <Search
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-tertiary"
-              aria-hidden
-            />
+          <div className="acc-search-input">
+            <Search size={13} aria-hidden />
             <input
               type="search"
               defaultValue={initial.search ?? ""}
               placeholder="Name, handle, order ID…"
               onChange={(e) => setParam("search", e.target.value || undefined)}
-              className="onboarding-filter-select pl-8"
+              className="onboarding-filter-select"
             />
           </div>
         </label>

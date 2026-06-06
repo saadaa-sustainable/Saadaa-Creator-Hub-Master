@@ -67,7 +67,7 @@ export function MyDashboardBody({
     <>
       <section className="onboarding-filter-card">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 items-end">
-          <label className="onboarding-filter-field">
+          <label className="onboarding-filter-field acc-filter-search">
             <span>Search my posts</span>
             <div className="relative flex items-center">
               <Search

@@ -154,7 +154,10 @@ export function SheetGrid({
   );
 
   const loadRecentEdits = useCallback(async () => {
-    const res = await fetchRecentCellEdits({ tableId: table.id, withinDays: 7 });
+    const res = await fetchRecentCellEdits({
+      tableId: table.id,
+      withinDays: 7,
+    });
     if (!res.ok) return;
     setRecentEdits(new Map(Object.entries(res.edits)));
   }, [table.id]);
@@ -162,7 +165,10 @@ export function SheetGrid({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await fetchRecentCellEdits({ tableId: table.id, withinDays: 7 });
+      const res = await fetchRecentCellEdits({
+        tableId: table.id,
+        withinDays: 7,
+      });
       if (cancelled || !res.ok) return;
       setRecentEdits(new Map(Object.entries(res.edits)));
     })();
@@ -331,10 +337,7 @@ export function SheetGrid({
         row += 1;
       } else if (e.key === "ArrowLeft" && col > 0) {
         col -= 1;
-      } else if (
-        (e.key === "ArrowRight" || e.key === "Tab") &&
-        col < lastCol
-      ) {
+      } else if ((e.key === "ArrowRight" || e.key === "Tab") && col < lastCol) {
         col += 1;
         if (e.key === "Tab") e.preventDefault();
       } else if (e.key === "Enter") {
@@ -349,7 +352,9 @@ export function SheetGrid({
         if (r && c) {
           const v = String(resolveValue(c, r) ?? "");
           navigator.clipboard?.writeText(v);
-          toast.success(`Copied "${v.slice(0, 24)}${v.length > 24 ? "…" : ""}"`);
+          toast.success(
+            `Copied "${v.slice(0, 24)}${v.length > 24 ? "…" : ""}"`,
+          );
         }
         return;
       } else {
@@ -369,7 +374,8 @@ export function SheetGrid({
   const editableCount = cols.filter((c) => c.editable).length;
 
   const rowPadY = density === "compact" ? "py-1" : "py-1.5";
-  const cellTextSize = density === "compact" ? "text-[0.65rem]" : "text-[0.7rem]";
+  const cellTextSize =
+    density === "compact" ? "text-[0.65rem]" : "text-[0.7rem]";
 
   return (
     <section className="rounded-2xl bg-bg-white border border-border flex flex-col min-w-0 overflow-hidden shadow-sm relative">
@@ -391,7 +397,7 @@ export function SheetGrid({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <span
             className={cn(
               "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.55rem] font-extrabold border whitespace-nowrap transition-all",
@@ -407,7 +413,7 @@ export function SheetGrid({
             )}
             {canEdit ? "Edit mode" : "Read only"}
           </span>
-          <label className="relative inline-flex items-center">
+          <label className="relative inline-flex flex-1 items-center min-w-[180px] sm:flex-none">
             <Search
               size={11}
               aria-hidden
@@ -418,7 +424,7 @@ export function SheetGrid({
               value={search}
               placeholder="Search…"
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-7 pr-2.5 rounded-lg border border-border bg-bg-white text-[0.72rem] font-bold text-text-primary min-w-[160px] focus:outline-none focus:border-[--accent] focus:ring-2 focus:ring-[--accent]/20 transition-all"
+              className="h-8 w-full pl-8 pr-2.5 rounded-lg border border-border bg-bg-white text-[0.72rem] font-bold text-text-primary min-w-0 sm:min-w-[160px] focus:outline-none focus:border-[--accent] focus:ring-2 focus:ring-[--accent]/20 transition-all"
             />
             {search && (
               <button
@@ -437,10 +443,13 @@ export function SheetGrid({
             onClick={() =>
               setDensity((d) => (d === "compact" ? "cozy" : "compact"))
             }
-            title={density === "compact" ? "Switch to cozy" : "Switch to compact"}
+            title={
+              density === "compact" ? "Switch to cozy" : "Switch to compact"
+            }
             className="inline-flex items-center gap-1 px-2 h-8 rounded-lg border border-border bg-bg-white text-text-secondary text-[0.62rem] font-extrabold hover:bg-bg-muted/40 hover:border-[--accent]/40 transition-colors"
           >
-            <Rows3 size={11} aria-hidden /> {density === "compact" ? "Cozy" : "Compact"}
+            <Rows3 size={11} aria-hidden />{" "}
+            {density === "compact" ? "Cozy" : "Compact"}
           </button>
 
           {/* Column visibility menu */}
@@ -450,7 +459,8 @@ export function SheetGrid({
               onClick={() => setShowColsMenu((s) => !s)}
               className="inline-flex items-center gap-1 px-2 h-8 rounded-lg border border-border bg-bg-white text-text-secondary text-[0.62rem] font-extrabold hover:bg-bg-muted/40 hover:border-[--accent]/40 transition-colors"
             >
-              <Columns3 size={11} aria-hidden /> {presentCols.length - hiddenCols.size}/{presentCols.length}
+              <Columns3 size={11} aria-hidden />{" "}
+              {presentCols.length - hiddenCols.size}/{presentCols.length}
             </button>
             {showColsMenu && (
               <div className="absolute right-0 top-9 z-30 w-56 max-h-[60vh] overflow-y-auto rounded-xl border border-border bg-bg-white shadow-xl p-1 text-[0.7rem]">
@@ -467,7 +477,11 @@ export function SheetGrid({
                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-bg-muted/50 text-left"
                     >
                       {hidden ? (
-                        <EyeOff size={11} className="text-text-tertiary" aria-hidden />
+                        <EyeOff
+                          size={11}
+                          className="text-text-tertiary"
+                          aria-hidden
+                        />
                       ) : (
                         <Eye size={11} className="text-success" aria-hidden />
                       )}
@@ -512,7 +526,8 @@ export function SheetGrid({
           <>
             <span>·</span>
             <span>
-              <span className="text-warning tabular">{editableCount}</span> editable
+              <span className="text-warning tabular">{editableCount}</span>{" "}
+              editable
             </span>
           </>
         )}
@@ -565,7 +580,8 @@ export function SheetGrid({
                 <th
                   className={cn(
                     "bg-bg-surface text-center px-2 py-2 border-r border-border w-10 min-w-[40px]",
-                    pinnedCols.length > 0 && "shadow-[2px_0_0_var(--accent)_inset]",
+                    pinnedCols.length > 0 &&
+                      "shadow-[2px_0_0_var(--accent)_inset]",
                   )}
                   style={
                     pinnedCols.length > 0
@@ -677,9 +693,7 @@ export function SheetGrid({
                     key={`${rowKey}-${rowIdx}`}
                     className={cn(
                       "transition-colors border-b border-border/50 last:border-b-0 group",
-                      rowIdx % 2 === 0
-                        ? "bg-bg-white"
-                        : "bg-bg-surface/20",
+                      rowIdx % 2 === 0 ? "bg-bg-white" : "bg-bg-surface/20",
                       isRowSelected
                         ? "!bg-[--accent]/10"
                         : "hover:bg-bg-muted/40",
@@ -689,9 +703,7 @@ export function SheetGrid({
                       className={cn(
                         "text-center px-2 border-r border-border text-text-tertiary text-[0.62rem] font-extrabold tabular select-none cursor-pointer transition-colors",
                         rowPadY,
-                        rowIdx % 2 === 0
-                          ? "bg-bg-white"
-                          : "bg-bg-surface/20",
+                        rowIdx % 2 === 0 ? "bg-bg-white" : "bg-bg-surface/20",
                         isRowSelected && "!bg-[--accent]/15 text-text-primary",
                         "group-hover:bg-bg-muted/40",
                         pinnedCols.length > 0 &&
@@ -702,9 +714,7 @@ export function SheetGrid({
                           ? { position: "sticky", left: 0, zIndex: 16 }
                           : undefined
                       }
-                      onClick={() =>
-                        setSelected({ row: rowIdx, col: -1 })
-                      }
+                      onClick={() => setSelected({ row: rowIdx, col: -1 })}
                     >
                       {rowIdx + 1}
                     </td>
@@ -740,7 +750,9 @@ export function SheetGrid({
                             isPinned ? (pinnedLeft ?? 0) + 40 : undefined
                           }
                           rowStripeBg={
-                            rowIdx % 2 === 0 ? "bg-bg-white" : "bg-bg-surface/20"
+                            rowIdx % 2 === 0
+                              ? "bg-bg-white"
+                              : "bg-bg-surface/20"
                           }
                           commentCount={cellComments.length}
                           openComments={
@@ -782,14 +794,16 @@ export function SheetGrid({
           {selected && selected.col >= 0 && (
             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[--accent]/15 text-text-primary font-extrabold border border-[--accent]/30 tabular">
               <Sparkles size={9} aria-hidden /> R{selected.row + 1} ·{" "}
-              {colLetter(selected.col)} ·{" "}
-              {cols[selected.col]?.label}
+              {colLetter(selected.col)} · {cols[selected.col]?.label}
             </span>
           )}
         </div>
         <span className="inline-flex items-center gap-1.5 text-[0.58rem]">
           <Keyboard size={9} aria-hidden />
-          <kbd className="font-mono">↑↓←→</kbd> nav · <kbd className="font-mono">Enter</kbd> edit · <kbd className="font-mono">⌘C</kbd> copy · <kbd className="font-mono">Esc</kbd> close
+          <kbd className="font-mono">↑↓←→</kbd> nav ·{" "}
+          <kbd className="font-mono">Enter</kbd> edit ·{" "}
+          <kbd className="font-mono">⌘C</kbd> copy ·{" "}
+          <kbd className="font-mono">Esc</kbd> close
         </span>
       </footer>
 
@@ -824,11 +838,7 @@ export function SheetGrid({
 function ColIcon({ type }: { type: ColType }) {
   const Icon = TYPE_ICON[type] ?? TypeIcon;
   return (
-    <Icon
-      size={9}
-      aria-hidden
-      className="text-text-tertiary opacity-70"
-    />
+    <Icon size={9} aria-hidden className="text-text-tertiary opacity-70" />
   );
 }
 
@@ -934,8 +944,7 @@ function Cell({
     canEdit && !isEditing && "cursor-pointer",
     isSelected && "ring-2 ring-[--accent] ring-inset z-[5]",
     isFlashed && "bg-success-bg/70",
-    isPinned &&
-      "shadow-[2px_0_0_var(--accent)_inset]",
+    isPinned && "shadow-[2px_0_0_var(--accent)_inset]",
     isPinned && (rowStripeBg ?? "bg-bg-white"),
   );
 
@@ -1078,7 +1087,9 @@ function EmptyState() {
           <Database size={22} className="text-text-secondary" aria-hidden />
         </span>
       </div>
-      <h4 className="text-sm font-extrabold text-text-primary">No rows here yet</h4>
+      <h4 className="text-sm font-extrabold text-text-primary">
+        No rows here yet
+      </h4>
       <p className="text-[0.7rem] text-text-tertiary text-center max-w-xs">
         Either the table is empty, the column you searched doesn't match, or the
         schema migration hasn't applied yet on this environment.

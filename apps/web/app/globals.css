@@ -4362,6 +4362,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.38rem;
+    width: 100%;
     min-width: 0;
   }
 
@@ -8574,18 +8575,47 @@ body:has(.km-backdrop) {
   display: flex;
   align-items: center;
   width: 100%;
+  min-width: 0;
 }
 .acc-search-input svg {
   position: absolute;
   left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--color-text-tertiary, #9a9384);
   pointer-events: none;
 }
 .acc-search-input .onboarding-filter-select {
-  padding-left: 30px;
+  padding-left: 34px;
   flex: 1 1 auto;
   width: 100%;
   min-width: 0;
+}
+
+.onboarding-filter-field > .relative,
+.onboarding-filter-field > [class*="relative"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.onboarding-filter-field > .relative:has(svg) .onboarding-filter-select,
+.onboarding-filter-field > .relative:has(svg) input,
+.onboarding-filter-field
+  > [class*="relative"]:has(svg)
+  .onboarding-filter-select,
+.onboarding-filter-field > [class*="relative"]:has(svg) input {
+  padding-left: 2.15rem;
+}
+
+@media (max-width: 767px) {
+  .onboarding-filter-card
+    :is(.onboarding-filter-grid, .grid)
+    > .onboarding-filter-field:has(input[type="search"]),
+  .onboarding-filter-card
+    :is(.onboarding-filter-grid, .grid)
+    > .onboarding-filter-field:has(.acc-search-input) {
+    grid-column: 1 / -1;
+  }
 }
 
 .funnel-filter-grid {
