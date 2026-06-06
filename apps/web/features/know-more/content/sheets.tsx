@@ -132,6 +132,43 @@ export default function SheetsKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Edited badge + revised-details email">
+        <KMList>
+          <li>
+            <strong>Edit audit</strong> · every successful cell write logs a row
+            to <KMCode>cell_edits</KMCode> (sheet, row, column, old → new value,
+            editor, timestamp). Logging fails soft — if the table isn&apos;t
+            migrated yet the edit still saves.
+          </li>
+          <li>
+            <strong>&quot;edited&quot; badge</strong> · cells changed in the
+            last <strong>7 days</strong> show a small amber badge (bottom-left)
+            with a tooltip of <KMCode>editor · timestamp</KMCode>. Older edits
+            drop out of the query, so the badge fades automatically after 7
+            days.
+          </li>
+          <li>
+            <strong>Revised-details email</strong> · editing a critical column
+            (<KMCode>order_status</KMCode>, <KMCode>delivery_date</KMCode>,{" "}
+            <KMCode>est_delivery</KMCode>, <KMCode>delivered_date</KMCode>,{" "}
+            <KMCode>commercial_amount</KMCode>, <KMCode>email</KMCode>,{" "}
+            <KMCode>bank_name</KMCode>, <KMCode>bank_number</KMCode>,{" "}
+            <KMCode>ifsc</KMCode>, <KMCode>order_id</KMCode>) sends an
+            old → new diff email to the creator + the row&apos;s{" "}
+            <KMCode>onboarded_by</KMCode> user. Best-effort: a missing recipient
+            is skipped. Non-critical edits get the badge only — no email.
+          </li>
+          <li>
+            <strong>Non-blocking + logged</strong> · the email fires via
+            Next.js <KMCode>after()</KMCode> (same as the collab brief) so the
+            cell update stays fast; each send is recorded in{" "}
+            <KMCode>email_logs</KMCode> with{" "}
+            <KMCode>email_type=&apos;sheet_revision&apos;</KMCode> and failures
+            land in <KMCode>system_errors</KMCode>.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Edge cases handled">
         <KMList>
           <li>

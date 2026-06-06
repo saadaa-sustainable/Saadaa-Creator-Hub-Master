@@ -1,13 +1,33 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { sendMail } from "@/lib/email";
 import { logSystemError } from "@/lib/system-errors";
 import { createServiceClient } from "@/lib/supabase/server";
 import { serverEnv } from "@/lib/env.server";
 import { getSheetTableById } from "./queries";
-import type { ColType } from "./types";
+import type { ColType, SheetTable } from "./types";
+
+/**
+ * Columns whose change is material enough to notify the creator + the
+ * assigned/onboarding team member with a "revised details" email. Keyed on
+ * the Supabase column key (matches across the posts / payments / creators
+ * sheets). Non-critical edits get the "edited" badge only — no email.
+ */
+const CRITICAL_COLUMNS = new Set<string>([
+  "order_status",
+  "delivery_date",
+  "est_delivery",
+  "delivered_date",
+  "commercial_amount",
+  "email",
+  "bank_name",
+  "bank_number",
+  "ifsc",
+  "order_id",
+]);
 
 /**
  * Server action — writes a single cell back to Supabase. Admin-only.
@@ -48,7 +68,7 @@ export async function updateSheetCell(args: {
   column: string;
   value: string;
 }) {
-  await assertPermission("admin");
+  const actor = await assertPermission("admin");
 
   const tbl = getSheetTableById(args.tableId);
   if (!tbl) return { ok: false, error: "Unknown table" };
@@ -66,6 +86,21 @@ export async function updateSheetCell(args: {
   if (!args.rowKey) return { ok: false, error: "Row key missing" };
 
   const supabase = createServiceClient();
+
+  // Snapshot the prior value (best-effort) so we can log the before/after and
+  // skip a no-op email when nothing actually changed.
+  let oldValue: unknown = null;
+  try {
+    const { data: before } = await (supabase as any)
+      .from(tbl.table)
+      .select(args.column)
+      .eq(tbl.pk, args.rowKey)
+      .maybeSingle();
+    oldValue = before ? (before as Record<string, unknown>)[args.column] : null;
+  } catch {
+    // ignore — the edit still proceeds, we just won't have an old value
+  }
+
   const payload: Record<string, unknown> = { [args.column]: coerced };
 
   const { error } = await (supabase as any)
@@ -78,8 +113,328 @@ export async function updateSheetCell(args: {
     return { ok: false, error: error.message };
   }
 
+  const changed = String(oldValue ?? "") !== String(coerced ?? "");
+
+  // Record the edit for the "edited" badge. Fails soft — if the cell_edits
+  // table doesn't exist yet (migration not applied), we log + swallow so the
+  // cell write still succeeds.
+  if (changed) {
+    await recordCellEdit({
+      sheetKey: args.tableId,
+      tableName: tbl.table,
+      rowPk: args.rowKey,
+      columnKey: args.column,
+      oldValue,
+      newValue: coerced,
+      editedBy: actor.email,
+    });
+  }
+
+  // Revised-details email — only for critical columns that actually changed.
+  // Fired non-blocking via after() so the cell update stays fast.
+  if (changed && CRITICAL_COLUMNS.has(args.column)) {
+    const editorName = actor.name ?? actor.email;
+    const editorEmail = actor.email;
+    after(async () => {
+      await sendRevisedDetailsEmail({
+        tbl,
+        rowKey: args.rowKey,
+        column: args.column,
+        columnLabel: col.label,
+        oldValue,
+        newValue: coerced,
+        editorName,
+        editorEmail,
+      });
+    });
+  }
+
   revalidatePath("/sheets");
   return { ok: true, value: coerced };
+}
+
+/**
+ * Insert one audit row into cell_edits. Wrapped so a missing table (migration
+ * not yet applied) or any insert error never throws into the edit path.
+ */
+async function recordCellEdit(args: {
+  sheetKey: string;
+  tableName: string;
+  rowPk: string;
+  columnKey: string;
+  oldValue: unknown;
+  newValue: unknown;
+  editedBy: string;
+}): Promise<void> {
+  try {
+    const supabase = createServiceClient();
+    const toText = (v: unknown) =>
+      v == null ? null : typeof v === "string" ? v : String(v);
+    const { error } = await (supabase as any).from("cell_edits").insert({
+      sheet_key: args.sheetKey,
+      table_name: args.tableName,
+      row_pk: args.rowPk,
+      column_key: args.columnKey,
+      old_value: toText(args.oldValue),
+      new_value: toText(args.newValue),
+      edited_by: args.editedBy,
+    });
+    if (error) {
+      // 42P01 = undefined_table (migration not applied) — silent, expected.
+      if (error.code !== "42P01") {
+        console.warn(`[sheets] cell_edits insert soft-failed:`, error.message);
+      }
+    }
+  } catch (err) {
+    console.warn(
+      `[sheets] cell_edits insert threw:`,
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+}
+
+/**
+ * Recent edits (default last 7 days) for a sheet, keyed `${rowPk}::${column}`.
+ * Returns the LATEST edit per cell. Fails soft to an empty map when the table
+ * is missing — the grid simply shows no badges.
+ */
+export interface RecentEdit {
+  rowPk: string;
+  columnKey: string;
+  editedBy: string | null;
+  editedAt: string;
+}
+
+export async function fetchRecentCellEdits(args: {
+  tableId: string;
+  withinDays?: number;
+}): Promise<{ ok: true; edits: Record<string, RecentEdit> } | { ok: false; error: string }> {
+  await assertPermission("admin");
+  const days = args.withinDays ?? 7;
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await (supabase as any)
+      .from("cell_edits")
+      .select("row_pk, column_key, edited_by, edited_at")
+      .eq("sheet_key", args.tableId)
+      .gte("edited_at", since)
+      .order("edited_at", { ascending: false });
+
+    if (error) {
+      // Missing table or any read error → no badges, app keeps working.
+      return { ok: true, edits: {} };
+    }
+
+    const out: Record<string, RecentEdit> = {};
+    for (const r of (data ?? []) as Array<{
+      row_pk: string;
+      column_key: string;
+      edited_by: string | null;
+      edited_at: string;
+    }>) {
+      const key = `${r.row_pk}::${r.column_key}`;
+      // First seen wins because the query is ordered newest-first.
+      if (!out[key]) {
+        out[key] = {
+          rowPk: r.row_pk,
+          columnKey: r.column_key,
+          editedBy: r.edited_by,
+          editedAt: r.edited_at,
+        };
+      }
+    }
+    return { ok: true, edits: out };
+  } catch {
+    return { ok: true, edits: {} };
+  }
+}
+
+/**
+ * Resolve recipients + send the "revised details" email. Recipients are the
+ * creator's email and the post's onboarded_by user. Both are best-effort: a
+ * missing recipient is skipped, never fatal. Reuses the same sendMail Gmail
+ * SMTP path as the comment-mention fanout and logs to email_logs.
+ */
+async function sendRevisedDetailsEmail(args: {
+  tbl: SheetTable;
+  rowKey: string;
+  column: string;
+  columnLabel: string;
+  oldValue: unknown;
+  newValue: unknown;
+  editorName: string;
+  editorEmail: string;
+}): Promise<void> {
+  const source = `sheets/${args.tbl.id}/${args.rowKey}/${args.column}`;
+
+  if (!serverEnv.EMAIL_USER || !serverEnv.EMAIL_PASS) {
+    await logSystemError({
+      type: "sheet_revision_email",
+      key: args.rowKey,
+      message: "EMAIL_USER/EMAIL_PASS not configured — revised-details email skipped",
+      source,
+    });
+    return;
+  }
+
+  let supabase: ReturnType<typeof createServiceClient>;
+  try {
+    supabase = createServiceClient();
+  } catch {
+    return;
+  }
+
+  // Resolve the underlying row to find the creator + assigned user. The link
+  // path depends on which sheet was edited; we read whatever identifiers the
+  // row carries (username / inf_id / onboarded_by) and look up the creator.
+  let creatorEmail: string | null = null;
+  let assignedEmail: string | null = null;
+  let creatorName: string | null = null;
+  let postId: string | null = null;
+  let collabId: string | null = null;
+
+  try {
+    const { data: row } = await (supabase as any)
+      .from(args.tbl.table)
+      .select("*")
+      .eq(args.tbl.pk, args.rowKey)
+      .maybeSingle();
+
+    const r = (row ?? {}) as Record<string, unknown>;
+    const asStr = (v: unknown) =>
+      typeof v === "string" && v.trim() ? v.trim() : null;
+
+    // Direct email column (creators sheet, or any row carrying email).
+    creatorEmail = asStr(r["email"]);
+    assignedEmail = asStr(r["onboarded_by"]);
+    postId = asStr(r["post_id"]);
+    collabId = asStr(r["partnership_id"]);
+
+    // If no direct email, resolve the creator via username / inf_id.
+    if (!creatorEmail || !creatorName) {
+      const username = asStr(r["username"]);
+      const infId = asStr(r["inf_id"]);
+      if (username || infId) {
+        let cq = (supabase as any).from("creators").select("email, inf_name");
+        cq = username ? cq.eq("username", username) : cq.eq("inf_id", infId);
+        const { data: creator } = await cq.maybeSingle();
+        const cr = (creator ?? {}) as Record<string, unknown>;
+        creatorEmail = creatorEmail ?? asStr(cr["email"]);
+        creatorName = asStr(cr["inf_name"]);
+      }
+    }
+  } catch {
+    // best-effort — fall through with whatever we resolved
+  }
+
+  const recipients = Array.from(
+    new Set(
+      [creatorEmail, assignedEmail]
+        .filter((e): e is string => !!e && e.includes("@"))
+        .map((e) => e.toLowerCase()),
+    ),
+  );
+
+  if (recipients.length === 0) {
+    await logSystemError({
+      type: "sheet_revision_email",
+      key: args.rowKey,
+      message: `No resolvable recipient for revised ${args.column} on ${args.tbl.id}`,
+      source,
+    });
+    return;
+  }
+
+  const subject = `Updated details · ${args.columnLabel}${
+    collabId ? ` · ${collabId}` : postId ? ` · ${postId}` : ""
+  }`;
+  const linkPath = `/sheets?tab=${encodeURIComponent(args.tbl.id)}`;
+  const safeLabel = escapeHtml(args.columnLabel);
+  const safeOld = escapeHtml(String(args.oldValue ?? "—"));
+  const safeNew = escapeHtml(String(args.newValue ?? "—"));
+  const safeEditor = escapeHtml(args.editorName);
+  const safeGreeting = escapeHtml(creatorName ?? "there");
+
+  const htmlBody = `
+    <div style="font-family:Inter,Arial,sans-serif;color:#161513;background:#FAF8F5;padding:24px;">
+      <div style="max-width:560px;margin:0 auto;background:#FFFFFF;border:1px solid #E7E2D2;border-radius:14px;padding:24px;">
+        <p style="margin:0 0 6px 0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#9A9384;font-weight:800;">
+          Revised Details
+        </p>
+        <h2 style="margin:0 0 16px 0;font-size:18px;font-weight:800;color:#161513;">
+          Hi ${safeGreeting}, a detail on your collaboration was updated
+        </h2>
+        <p style="margin:0 0 12px 0;font-size:14px;color:#6E695E;">
+          The following has been revised by our team:
+        </p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 14px 0;">
+          <tr>
+            <td style="padding:8px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-radius:8px 0 0 8px;font-weight:800;color:#161513;width:40%;">
+              ${safeLabel}
+            </td>
+            <td style="padding:8px 10px;border:1px solid #E7E2D2;border-left:0;border-radius:0 8px 8px 0;color:#161513;">
+              <span style="color:#9A9384;text-decoration:line-through;">${safeOld}</span>
+              &nbsp;→&nbsp;
+              <strong style="color:#4F7C4D;">${safeNew}</strong>
+            </td>
+          </tr>
+        </table>
+        <p style="margin:14px 0 0 0;font-size:12px;color:#9A9384;">
+          Updated by ${safeEditor}. If this looks wrong, just reply to this email.
+        </p>
+        <p style="margin:14px 0 0 0;font-size:11px;color:#9A9384;">
+          CreatorHub Sheet View · path
+          <code style="background:#F5F1EC;padding:2px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;">${linkPath}</code>
+        </p>
+      </div>
+    </div>
+  `;
+
+  const plainBody =
+    `Hi ${creatorName ?? "there"},\n\n` +
+    `A detail on your collaboration was revised by our team:\n\n` +
+    `${args.columnLabel}: ${String(args.oldValue ?? "—")} -> ${String(args.newValue ?? "—")}\n\n` +
+    `Updated by ${args.editorName}. If this looks wrong, just reply to this email.`;
+
+  await Promise.all(
+    recipients.map(async (to) => {
+      try {
+        const res = await sendMail({
+          to,
+          subject,
+          htmlBody,
+          plainBody,
+          replyTo: args.editorEmail,
+        });
+        await (supabase as any).from("email_logs").insert({
+          post_id: postId,
+          collab_id: collabId,
+          sent_to: to,
+          subject,
+          email_type: "sheet_revision",
+          status: res.ok ? "sent" : "failed",
+          error: res.ok ? null : (res.error ?? "unknown"),
+        });
+        if (!res.ok) {
+          await logSystemError({
+            type: "sheet_revision_email",
+            key: to,
+            message: res.error ?? "sendMail returned ok:false",
+            source,
+          });
+        }
+      } catch (err) {
+        await logSystemError({
+          type: "sheet_revision_email",
+          key: to,
+          message: err instanceof Error ? err.message : String(err),
+          source,
+        });
+      }
+    }),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

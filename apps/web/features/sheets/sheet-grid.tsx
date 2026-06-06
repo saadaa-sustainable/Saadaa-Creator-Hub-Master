@@ -22,6 +22,7 @@ import {
   Eye,
   EyeOff,
   Hash,
+  History,
   Keyboard,
   ListChecks,
   Lock,
@@ -42,8 +43,10 @@ import { cn } from "@/lib/cn";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import {
   fetchCellComments,
+  fetchRecentCellEdits,
   updateSheetCell,
   type CellCommentRow,
+  type RecentEdit,
 } from "./actions";
 import { CellCommentThread } from "./cell-comment-thread";
 import {
@@ -142,6 +145,31 @@ export function SheetGrid({
         next.get(key)!.push(c);
       }
       setCommentsByCell(next);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [table.id]);
+
+  // Recent edits — keyed `${rowPk}::${columnKey}` → latest edit (last 7 days).
+  // Drives the "edited" badge + tooltip; entries older than 7 days are never
+  // returned by the action so the badge fades out automatically.
+  const [recentEdits, setRecentEdits] = useState<Map<string, RecentEdit>>(
+    new Map(),
+  );
+
+  const loadRecentEdits = useCallback(async () => {
+    const res = await fetchRecentCellEdits({ tableId: table.id, withinDays: 7 });
+    if (!res.ok) return;
+    setRecentEdits(new Map(Object.entries(res.edits)));
+  }, [table.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetchRecentCellEdits({ tableId: table.id, withinDays: 7 });
+      if (cancelled || !res.ok) return;
+      setRecentEdits(new Map(Object.entries(res.edits)));
     })();
     return () => {
       cancelled = true;
@@ -696,6 +724,7 @@ export function SheetGrid({
                       const cellCommentKey = `${rowKey}::${c.key}`;
                       const cellComments =
                         commentsByCell.get(cellCommentKey) ?? [];
+                      const recentEdit = recentEdits.get(cellCommentKey);
                       return (
                         <Cell
                           key={c.key}
@@ -710,6 +739,7 @@ export function SheetGrid({
                           padY={rowPadY}
                           textSize={cellTextSize}
                           search={normalizedQuery}
+                          recentEdit={recentEdit}
                           isPinned={isPinned}
                           pinnedLeft={
                             isPinned ? (pinnedLeft ?? 0) + 40 : undefined
@@ -737,6 +767,7 @@ export function SheetGrid({
                           onStopEdit={() => setEditing(null)}
                           onSaved={() => {
                             flashCell(cellId);
+                            void loadRecentEdits();
                             router.refresh();
                           }}
                         />
@@ -818,6 +849,7 @@ function Cell({
   padY,
   textSize,
   search,
+  recentEdit,
   isPinned,
   pinnedLeft,
   rowStripeBg,
@@ -839,6 +871,7 @@ function Cell({
   padY: string;
   textSize: string;
   search: string;
+  recentEdit?: RecentEdit;
   isPinned?: boolean;
   pinnedLeft?: number;
   rowStripeBg?: string;
@@ -1006,7 +1039,36 @@ function Cell({
           <MessageSquareIcon size={9} aria-hidden />
         </button>
       )}
+      {recentEdit && <EditedBadge edit={recentEdit} />}
     </td>
+  );
+}
+
+/**
+ * "edited" indicator — shown on cells changed within the last 7 days. The
+ * server action only returns edits inside that window, so the badge fades out
+ * on its own once the edit ages past 7 days. Tooltip shows editor + timestamp.
+ */
+function EditedBadge({ edit }: { edit: RecentEdit }) {
+  const when = (() => {
+    const d = new Date(edit.editedAt);
+    if (Number.isNaN(d.getTime())) return edit.editedAt;
+    return d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  })();
+  const who = edit.editedBy ?? "unknown";
+  return (
+    <span
+      className="absolute bottom-0 left-0 inline-flex items-center gap-0.5 px-1 h-3.5 text-[0.5rem] font-extrabold rounded-tr-md bg-warning-bg text-warning border-t border-r border-warning/25 select-none"
+      title={`Edited by ${who} · ${when}`}
+    >
+      <History size={7} aria-hidden />
+      edited
+    </span>
   );
 }
 
