@@ -6,6 +6,7 @@ import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
   NOTIFICATION_TYPES,
+  notifyActorConfirmation,
   resolveGlobalAdminEmails,
   sendNotification,
 } from "@/lib/notifications";
@@ -117,26 +118,33 @@ export async function submitCampaign(
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 
-  // ── Notification: Campaign Created (Wave 7) ──────────────────────────────
-  // Recipients: the creating user + active Global Admins. Fire-and-forget via
-  // after() so the create stays fast; best-effort, never blocks the response.
+  // ── Notifications: Campaign Created broadcast + submitter confirmation ───
+  // Two distinct emails, deduped so the actor is never double-mailed:
+  //   1. Wave 7 "Campaign Created" broadcast → active Global Admins ONLY
+  //      (the actor is excluded here — they get the dedicated confirmation
+  //      below instead, so they receive exactly one campaign email).
+  //   2. Submitter confirmation (campaign_confirmation) → the actor.
+  // Both fire-and-forget via after(); best-effort, never block the response.
   const createdById = row.campaign_id;
   const createdName = v.campaignName;
   const creatorEmail = (actor.email ?? "").trim().toLowerCase();
   const creatorName = actor.name ?? actor.email ?? "a team member";
   const budgetForEmail = new Intl.NumberFormat("en-IN").format(row.total_budget);
   after(async () => {
+    // 1. Admin broadcast — actor excluded to avoid double-emailing them.
     const admins = await resolveGlobalAdminEmails();
-    const recipients = Array.from(
-      new Set([creatorEmail, ...admins].filter((e) => e && e.includes("@"))),
+    const adminRecipients = Array.from(
+      new Set(
+        admins.filter((e) => e && e.includes("@") && e !== creatorEmail),
+      ),
     );
-    if (recipients.length === 0) return;
-    const esc = (s: string) =>
-      s
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    const bodyHtml = `
+    if (adminRecipients.length > 0) {
+      const esc = (s: string) =>
+        s
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      const bodyHtml = `
       <p style="margin:0 0 12px;">A new campaign was just created in CreatorHub.</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 14px;">
         <tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;font-weight:800;width:40%;">Campaign ID</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;">${esc(createdById)}</td></tr>
@@ -145,16 +153,37 @@ export async function submitCampaign(
         <tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">Created By</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;">${esc(creatorName)}</td></tr>
       </table>
       <p style="margin:0;font-size:12px;color:#9A9384;">Reach-outs can now be allocated against this campaign.</p>`;
-    const plainBody =
-      `A new campaign was created in CreatorHub.\n\n` +
-      `Campaign ID: ${createdById}\nCampaign Name: ${createdName}\n` +
-      `Total Budget: INR ${budgetForEmail}\nCreated By: ${creatorName}`;
-    await sendNotification({
-      type: NOTIFICATION_TYPES.CAMPAIGN_CREATED,
-      to: recipients,
-      subject: `Campaign Created · ${createdById} — ${createdName}`,
-      htmlBody: bodyHtml,
-      plainBody,
+      const plainBody =
+        `A new campaign was created in CreatorHub.\n\n` +
+        `Campaign ID: ${createdById}\nCampaign Name: ${createdName}\n` +
+        `Total Budget: INR ${budgetForEmail}\nCreated By: ${creatorName}`;
+      await sendNotification({
+        type: NOTIFICATION_TYPES.CAMPAIGN_CREATED,
+        to: adminRecipients,
+        subject: `Campaign Created · ${createdById} — ${createdName}`,
+        title: "Campaign Created",
+        subtitle: `CAMPAIGN ID: ${createdById}`,
+        htmlBody: bodyHtml,
+        plainBody,
+        collabId: createdById,
+      });
+    }
+
+    // 2. Submitter confirmation — the actor's own "you created this" email.
+    await notifyActorConfirmation({
+      actor,
+      type: NOTIFICATION_TYPES.CAMPAIGN_CONFIRMATION,
+      subject: `Campaign ${createdById} created`,
+      title: "Campaign created",
+      subtitle: `CAMPAIGN ID: ${createdById}`,
+      summaryLines: [
+        `Your campaign "${createdName}" was created. Reach-outs can now be allocated against it.`,
+      ],
+      rows: [
+        { label: "Campaign ID", value: createdById },
+        { label: "Campaign Name", value: createdName },
+        { label: "Total Budget", value: `INR ${budgetForEmail}` },
+      ],
       collabId: createdById,
     });
   });

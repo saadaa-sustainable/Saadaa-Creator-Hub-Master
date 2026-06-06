@@ -6,6 +6,10 @@ import { readTermsAttachmentFile, TERMS_ATTACHMENT } from "@/lib/attachments";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendMail } from "@/lib/email";
+import {
+  NOTIFICATION_TYPES,
+  notifyActorConfirmation,
+} from "@/lib/notifications";
 import { OnboardingSchema, applyBarterLock } from "./schema";
 
 export type OnboardingResult =
@@ -423,6 +427,47 @@ export async function submitOnboarding(
   }
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
+
+  // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────
+  // Email the actor that onboarding was saved. This is SEPARATE from the
+  // collab email (sendCollabEmail), which goes to the influencer — this one
+  // confirms the actor's own save. Fire-and-forget via after(); best-effort.
+  const creatorHandle = (parent.username as string | null) ?? v.postId;
+  const deliverableSummary =
+    total > 0
+      ? [
+          v.reels > 0 ? `${v.reels} Reel${v.reels > 1 ? "s" : ""}` : "",
+          v.posts > 0 ? `${v.posts} Static Post${v.posts > 1 ? "s" : ""}` : "",
+        ]
+          .filter(Boolean)
+          .join(" + ")
+      : "—";
+  after(async () => {
+    await notifyActorConfirmation({
+      actor,
+      type: NOTIFICATION_TYPES.ONBOARDING_CONFIRMATION,
+      subject: `Onboarding saved — ${creatorHandle} / ${v.postId}`,
+      title: "Onboarding saved",
+      subtitle: `POST ID: ${v.postId}`,
+      summaryLines: [
+        `Onboarding details for @${creatorHandle} have been saved and the collab moved to On Board.`,
+      ],
+      rows: [
+        { label: "Creator", value: `@${creatorHandle}` },
+        { label: "Post ID", value: v.postId },
+        { label: "Order ID", value: v.orderId },
+        { label: "Collab Type", value: v.collabType },
+        { label: "Deliverables", value: deliverableSummary },
+        {
+          label: "Child Deliverables",
+          value: childrenSpawned > 0 ? childrenSpawned : null,
+        },
+      ],
+      footnote:
+        "This confirms your save. The collaboration email to the creator is sent separately.",
+      postId: v.postId,
+    });
+  });
 
   revalidateTag("posts");
   revalidatePath("/onboarding");

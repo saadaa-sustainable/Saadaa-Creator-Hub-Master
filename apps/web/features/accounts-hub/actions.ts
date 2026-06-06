@@ -4,7 +4,11 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { NOTIFICATION_TYPES, sendNotification } from "@/lib/notifications";
+import {
+  NOTIFICATION_TYPES,
+  notifyActorConfirmation,
+  sendNotification,
+} from "@/lib/notifications";
 import { fetchMetaAdsCoveredPostIds } from "@/lib/supabase/meta-ads";
 import { isAdTested, isPostedButNotTested } from "@/lib/ad-tested";
 import {
@@ -622,6 +626,40 @@ export async function submitPayments(
           postId: pp.postId,
         });
       }
+    });
+  }
+
+  // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────
+  // ONE summary email to the actor (the accounts operator) — NOT one per row.
+  // Distinct from the per-creator "Payment Processed" emails above. Fires only
+  // when at least one row was written. Fire-and-forget via after(); best-effort.
+  if (saved > 0) {
+    const savedCount = saved;
+    const paidCount = paid;
+    const dueCount = due;
+    const skippedCount = skipped;
+    after(async () => {
+      await notifyActorConfirmation({
+        actor,
+        type: NOTIFICATION_TYPES.PAYMENT_CONFIRMATION,
+        subject: `${savedCount} payment${
+          savedCount === 1 ? "" : "s"
+        } logged (${paidCount} paid · ${dueCount} due)`,
+        title: "Payments logged",
+        summaryLines: [
+          `Your payment submission was processed — ${savedCount} record${
+            savedCount === 1 ? "" : "s"
+          } logged.`,
+        ],
+        rows: [
+          { label: "Records Logged", value: savedCount },
+          { label: "Marked Paid", value: paidCount },
+          { label: "Marked Due", value: dueCount },
+          { label: "Skipped / Blocked", value: skippedCount > 0 ? skippedCount : null },
+        ],
+        footnote:
+          "Paid records also trigger a separate payment-processed email to each creator.",
+      });
     });
   }
 

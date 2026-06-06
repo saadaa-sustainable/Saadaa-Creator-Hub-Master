@@ -1,8 +1,13 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  NOTIFICATION_TYPES,
+  notifyActorConfirmation,
+} from "@/lib/notifications";
 import { postDateFromUrl } from "@/lib/instagram-shortcode";
 import {
   nextPayableCycleDate,
@@ -30,7 +35,7 @@ function todayIso(): string {
  *   3. Fallback to today
  */
 export async function submitPosting(input: unknown) {
-  await assertPermission("posting_submit");
+  const actor = await assertPermission("posting_submit");
 
   const parsed = PostingSchema.safeParse(input);
   if (!parsed.success) {
@@ -90,6 +95,29 @@ export async function submitPosting(input: unknown) {
   await autoInitDraftPayment(supabase, postId, resolvedDate);
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
+
+  // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────
+  // Email the actor that posting was submitted. Fire-and-forget via after();
+  // best-effort, never throws/blocks.
+  after(async () => {
+    await notifyActorConfirmation({
+      actor,
+      type: NOTIFICATION_TYPES.POSTING_CONFIRMATION,
+      subject: `Posting submitted — ${postId} marked Posted`,
+      title: "Posting submitted",
+      subtitle: `POST ID: ${postId}`,
+      summaryLines: [
+        `Posting details were saved and ${postId} is now marked Posted.`,
+      ],
+      rows: [
+        { label: "Post ID", value: postId },
+        { label: "Post Date", value: resolvedDate },
+        { label: "Post Link", value: postLink },
+        { label: "Partnership ID", value: partnershipId || null },
+      ],
+      postId,
+    });
+  });
 
   revalidateTag("posts");
   revalidateTag("payments");

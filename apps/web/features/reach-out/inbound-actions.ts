@@ -1,8 +1,13 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  NOTIFICATION_TYPES,
+  notifyActorConfirmation,
+} from "@/lib/notifications";
 import {
   InboundBatchSchema,
   applyInboundBarterLock,
@@ -159,6 +164,64 @@ export async function submitInboundBatch(
   }
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
+
+  // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────
+  // ONE summary email to the actor (not one per row). Only when at least one
+  // row committed. Fire-and-forget via after(); best-effort, never throws.
+  if (created.length > 0) {
+    const createdCount = created.length;
+    const failureCount = failures.length;
+    const sampleHandles = created
+      .slice(0, 5)
+      .map((c) => `@${c.username}`)
+      .join(", ");
+    after(async () => {
+      let campaignLabel = campaignId;
+      try {
+        const { data: camp } = await (supabase as any)
+          .from("campaigns")
+          .select("campaign_name")
+          .eq("campaign_id", campaignId)
+          .maybeSingle();
+        const name = (camp?.campaign_name as string | null) ?? null;
+        if (name) campaignLabel = `${campaignId} — ${name}`;
+      } catch {
+        // best-effort — fall back to the bare campaign id.
+      }
+      await notifyActorConfirmation({
+        actor,
+        type: NOTIFICATION_TYPES.INBOUND_CONFIRMATION,
+        subject: `${createdCount} inbound creator${
+          createdCount === 1 ? "" : "s"
+        } added to ${campaignId}`,
+        title: "Inbound creators added",
+        subtitle: `CAMPAIGN: ${campaignId}`,
+        summaryLines: [
+          `Your inbound batch was logged — ${createdCount} creator${
+            createdCount === 1 ? "" : "s"
+          } added to this campaign${
+            failureCount > 0
+              ? `, ${failureCount} row${failureCount === 1 ? "" : "s"} skipped`
+              : ""
+          }.`,
+        ],
+        rows: [
+          { label: "Campaign", value: campaignLabel },
+          { label: "Creators Added", value: createdCount },
+          {
+            label: "Rows Skipped",
+            value: failureCount > 0 ? failureCount : null,
+          },
+          {
+            label: "Handles",
+            value:
+              sampleHandles +
+              (createdCount > 5 ? `, +${createdCount - 5} more` : ""),
+          },
+        ],
+      });
+    });
+  }
 
   revalidateTag("posts");
   revalidateTag("creators");

@@ -2,9 +2,14 @@
 
 import { z } from "zod";
 import { revalidatePath, revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { ReachOutSchema } from "./schema";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  NOTIFICATION_TYPES,
+  notifyActorConfirmation,
+} from "@/lib/notifications";
 
 export type ReachOutResult =
   | {
@@ -172,6 +177,44 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
   // See memory feedback_supabase_only_source_of_truth.md.
+
+  // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────
+  // Email the logged-in actor that their reach-out was logged. Fire-and-forget
+  // via after() so the form stays fast; best-effort, never blocks/throws.
+  const confirmPostId = row.post_id;
+  after(async () => {
+    let campaignLabel = v.campaignId;
+    try {
+      const { data: camp } = await (supabase as any)
+        .from("campaigns")
+        .select("campaign_name")
+        .eq("campaign_id", v.campaignId)
+        .maybeSingle();
+      const name = (camp?.campaign_name as string | null) ?? null;
+      if (name) campaignLabel = `${v.campaignId} — ${name}`;
+    } catch {
+      // best-effort — fall back to the bare campaign id.
+    }
+    await notifyActorConfirmation({
+      actor,
+      type: NOTIFICATION_TYPES.REACHOUT_CONFIRMATION,
+      subject: `Reach-out logged — @${username} added to ${v.campaignId}`,
+      title: "Reach-out logged",
+      subtitle: `POST ID: ${confirmPostId}`,
+      summaryLines: [
+        `@${username} has been added to your campaign as a ${
+          direction === "inbound" ? "inbound" : "outbound"
+        } reach-out.`,
+      ],
+      rows: [
+        { label: "Creator", value: `@${username}` },
+        { label: "Campaign", value: campaignLabel },
+        { label: "Post ID", value: confirmPostId },
+        { label: "Content Type", value: v.contentType },
+      ],
+      postId: confirmPostId,
+    });
+  });
 
   revalidateTag("posts");
   revalidateTag("creators");
