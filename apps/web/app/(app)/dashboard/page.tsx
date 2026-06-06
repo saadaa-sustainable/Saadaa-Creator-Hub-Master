@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { LayoutDashboard } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { KpiStripSkeleton } from "@/components/ui/skeleton";
+import { StageSkeleton } from "@/components/ui/skeleton";
 import { DashboardTabs } from "@/features/dashboard/tabs";
 import {
   resolveTab,
@@ -26,6 +26,20 @@ import type {
 } from "@/features/dashboard/types";
 
 export const metadata = { title: "Dashboard" };
+
+/**
+ * Tabs whose loaded body is chart-heavy (analytics) rather than a table board.
+ * The stage skeleton swaps its third block (charts vs table) accordingly so the
+ * fallback resembles what actually streams in. Everything else (filter bar +
+ * KPI grid) is shared across both kinds.
+ */
+const CHART_TABS = new Set<DashboardTab>([
+  "tat",
+  "cost",
+  "funnel",
+  "compliance",
+  "internal",
+]);
 
 /**
  * Tabbed command-centre Dashboard.
@@ -91,7 +105,12 @@ export default async function DashboardPage({
       >
         <Suspense
           key={`${tab}:${JSON.stringify(rest)}`}
-          fallback={<KpiStripSkeleton count={4} />}
+          fallback={
+            <StageSkeleton
+              kind={CHART_TABS.has(tab) ? "chart" : "board"}
+              kpiCount={4}
+            />
+          }
         >
           <TabBody
             tab={tab}

@@ -8106,6 +8106,15 @@ body:has(.km-backdrop) {
   }
 }
 
+/* Stage-shaped loading skeleton (<StageSkeleton/>). Reproduces the
+   `.onboarding-stage` grid rhythm (filter → KPI → board, gap 1.25rem) so the
+   Suspense fallback resembles the stage that is loading. Scoped to the skeleton
+   only — does not touch the shared `.onboarding-stage` component CSS. */
+.dash-stage-skeleton {
+  display: grid;
+  gap: 1.25rem;
+}
+
 /* Dashboard-style kanban shared by main-adjacent workflow pages.
    Matches the main dashboard: horizontal rail on mobile and desktop. */
 .dashboard-kanban-scroll {

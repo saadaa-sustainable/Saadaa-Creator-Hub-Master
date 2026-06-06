@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { Filter } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { StageSkeleton } from "@/components/ui/skeleton";
 import { fetchFunnelData } from "@/features/funnel/queries";
 import { FunnelBody } from "@/features/funnel/page-client";
 
@@ -11,7 +11,7 @@ export default async function FunnelPage() {
   return (
     <div className="onboarding-stage funnel-stage">
       <PageHeader icon={Filter} title="Funnel View" knowMore="funnel" />
-      <Suspense fallback={<TableSkeleton rows={6} />}>
+      <Suspense fallback={<StageSkeleton kind="chart" kpiCount={5} />}>
         <FunnelData />
       </Suspense>
     </div>

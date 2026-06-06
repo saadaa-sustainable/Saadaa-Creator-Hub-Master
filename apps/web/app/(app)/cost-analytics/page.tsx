@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { IndianRupee } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { StageSkeleton } from "@/components/ui/skeleton";
 import { fetchCostAnalyticsData } from "@/features/cost-analytics/queries";
 import { CostAnalyticsBody } from "@/features/cost-analytics/page-client";
 
@@ -15,7 +15,7 @@ export default async function CostAnalyticsPage() {
         title="Cost Analytics"
         knowMore="cost-analytics"
       />
-      <Suspense fallback={<TableSkeleton rows={6} />}>
+      <Suspense fallback={<StageSkeleton kind="chart" kpiCount={5} />}>
         <CostData />
       </Suspense>
     </div>

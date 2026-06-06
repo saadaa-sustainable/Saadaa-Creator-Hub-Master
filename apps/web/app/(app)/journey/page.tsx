@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { Route } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { StageSkeleton } from "@/components/ui/skeleton";
 import { JourneyPageClient } from "@/features/journey/page-client";
 import {
   fetchJourneyData,
@@ -23,7 +23,7 @@ export default async function JourneyPage({
       <PageHeader icon={Route} title="Influencer Journey" knowMore="journey" />
       <Suspense
         key={JSON.stringify(params)}
-        fallback={<TableSkeleton rows={8} />}
+        fallback={<StageSkeleton kind="board" />}
       >
         <JourneyBody params={params} />
       </Suspense>

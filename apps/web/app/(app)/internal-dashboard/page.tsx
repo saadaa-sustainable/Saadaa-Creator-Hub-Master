@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { Building2 } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { StageSkeleton } from "@/components/ui/skeleton";
 import { fetchInternalDashboardData } from "@/features/internal-dashboard/queries";
 import { InternalDashboardBody } from "@/features/internal-dashboard/page-client";
 
@@ -15,7 +15,7 @@ export default async function InternalDashboardPage() {
         title="Internal Dashboard"
         knowMore="internal-dashboard"
       />
-      <Suspense fallback={<TableSkeleton rows={6} />}>
+      <Suspense fallback={<StageSkeleton kind="chart" kpiCount={5} />}>
         <InternalData />
       </Suspense>
     </div>

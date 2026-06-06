@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { Clock } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { StageSkeleton } from "@/components/ui/skeleton";
 import { TatFiltersBar } from "@/features/tat/filters";
 import { TatPageClient } from "@/features/tat/page-client";
 import { fetchTatData, fetchTatFilterOptions } from "@/features/tat/queries";
@@ -21,7 +21,10 @@ export default async function TatPage({
     <div className="onboarding-stage">
       <PageHeader icon={Clock} title="TAT Analytics" knowMore="tat" />
       <TatFiltersBar initial={params} options={options} />
-      <Suspense key={JSON.stringify(params)} fallback={<TableSkeleton rows={8} />}>
+      <Suspense
+        key={JSON.stringify(params)}
+        fallback={<StageSkeleton kind="chart" filter={false} />}
+      >
         <TatBody params={params} />
       </Suspense>
     </div>

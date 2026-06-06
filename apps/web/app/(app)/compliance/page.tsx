@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { StageSkeleton } from "@/components/ui/skeleton";
 import { fetchComplianceData } from "@/features/compliance/queries";
 import { ComplianceBody } from "@/features/compliance/page-client";
 
@@ -15,7 +15,7 @@ export default async function CompliancePage() {
         title="Compliance KPIs"
         knowMore="compliance"
       />
-      <Suspense fallback={<TableSkeleton rows={6} />}>
+      <Suspense fallback={<StageSkeleton kind="chart" kpiCount={5} />}>
         <ComplianceData />
       </Suspense>
     </div>

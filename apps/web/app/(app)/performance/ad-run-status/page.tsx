@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { Megaphone } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
-import { TableSkeleton } from "@/components/ui/skeleton";
+import { StageSkeleton } from "@/components/ui/skeleton";
 import { AdStatusFiltersBar } from "@/features/ad-status/filters";
 import { AdStatusBoard } from "@/features/ad-status/ad-board";
 import { AdStatusKpiStrip } from "@/features/ad-status/kpi-strip";
@@ -25,7 +25,10 @@ export default async function AdStatusPage({
     <div className="onboarding-stage ad-status-stage">
       <PageHeader icon={Megaphone} title="Ad Status" knowMore="ad-status" />
       <AdStatusFiltersBar initial={params} options={options} />
-      <Suspense key={JSON.stringify(params)} fallback={<TableSkeleton rows={6} />}>
+      <Suspense
+        key={JSON.stringify(params)}
+        fallback={<StageSkeleton kind="board" filter={false} />}
+      >
         <AdStatusBody params={params} />
       </Suspense>
     </div>
