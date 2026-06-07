@@ -31,7 +31,10 @@ export default function OffboardingKM() {
           </li>
           <li>
             <strong>5. Board</strong> — list table or cards grid (mobile auto-
-            switches to Cards) of every collab currently in Offboarding.
+            switches to Cards) of every offboarded collab. Click any card or row
+            to open the <strong>Offboarding Overview</strong> popup with the full
+            collab detail (deliverables as <KMCode>1P : 1R</KMCode>, dates,
+            order, payment, links).
           </li>
         </KMList>
       </KMSection>

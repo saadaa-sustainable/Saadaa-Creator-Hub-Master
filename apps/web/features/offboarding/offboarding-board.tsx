@@ -1,11 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Grid3X3, List as ListIcon, UserMinus } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Eye, Grid3X3, List as ListIcon, UserMinus, X } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import type { OffboardingFilters, OffboardingRow } from "./types";
+
+/** "1P : 1R" — Static Posts : Reels (: Stories only when present). */
+function deliverablesLabel(r: OffboardingRow): string {
+  return `${r.staticPosts}P : ${r.reels}R${r.stories > 0 ? ` : ${r.stories}S` : ""}`;
+}
 
 /**
  * Offboarding board — view toggle + List / Cards. Reuses the shared
@@ -23,6 +29,7 @@ export function OffboardingBoard({
   filters: OffboardingFilters;
 }) {
   const [view, setView] = useState<"list" | "cards">(initialView);
+  const [selected, setSelected] = useState<OffboardingRow | null>(null);
 
   useEffect(() => {
     const mobileQuery = window.matchMedia("(max-width: 767px)");
@@ -84,12 +91,19 @@ export function OffboardingBoard({
         </div>
       ) : view === "list" ? (
         <div className="order-status-list-panel">
-          <OffboardingListTable rows={filtered} />
+          <OffboardingListTable rows={filtered} onOpen={setSelected} />
         </div>
       ) : (
         <div className="order-status-cards-panel">
-          <OffboardingCardsGrid rows={filtered} />
+          <OffboardingCardsGrid rows={filtered} onOpen={setSelected} />
         </div>
+      )}
+
+      {selected && (
+        <OffboardingDetailModal
+          row={selected}
+          onClose={() => setSelected(null)}
+        />
       )}
     </section>
   );
@@ -126,7 +140,13 @@ function PaymentPill({ status }: { status: string }) {
   );
 }
 
-function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
+function OffboardingListTable({
+  rows,
+  onOpen,
+}: {
+  rows: OffboardingRow[];
+  onOpen: (row: OffboardingRow) => void;
+}) {
   return (
     <div className="ob-list-wrap">
       <table className="ob-list-table">
@@ -137,6 +157,7 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
             <th>Collab ID</th>
             <th>INF ID</th>
             <th>Campaign</th>
+            <th>Deliverables</th>
             <th>Order ID</th>
             <th>Collab</th>
             <th>Payment</th>
@@ -146,7 +167,19 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.postId}>
+            <tr
+              key={r.postId}
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer"
+              onClick={() => onOpen(r)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpen(r);
+                }
+              }}
+            >
               <td>
                 <div className="flex items-center gap-2 min-w-0">
                   <Avatar
@@ -186,6 +219,9 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
               <td>
                 <span className="campaign-chip">{r.campaign || "—"}</span>
               </td>
+              <td className="tabular whitespace-nowrap text-text-secondary">
+                {deliverablesLabel(r)}
+              </td>
               <td className="tabular whitespace-nowrap">{r.orderId || "—"}</td>
               <td>{r.collabType || "—"}</td>
               <td>
@@ -203,11 +239,30 @@ function OffboardingListTable({ rows }: { rows: OffboardingRow[] }) {
   );
 }
 
-function OffboardingCardsGrid({ rows }: { rows: OffboardingRow[] }) {
+function OffboardingCardsGrid({
+  rows,
+  onOpen,
+}: {
+  rows: OffboardingRow[];
+  onOpen: (row: OffboardingRow) => void;
+}) {
   return (
     <div className="ob-card-grid">
       {rows.map((r) => (
-        <article key={r.postId} className="ob-card">
+        <article
+          key={r.postId}
+          className="ob-card cursor-pointer"
+          role="button"
+          tabIndex={0}
+          aria-label={`View details for ${r.postId}`}
+          onClick={() => onOpen(r)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen(r);
+            }
+          }}
+        >
           <div className="ob-card-head">
             <Avatar
               src={r.profilePicUrl}
@@ -242,6 +297,12 @@ function OffboardingCardsGrid({ rows }: { rows: OffboardingRow[] }) {
 
           <dl className="ob-card-meta-grid">
             <div className="ob-card-meta">
+              <span className="ob-card-meta-label">Deliverables</span>
+              <span className="ob-card-meta-val tabular">
+                {deliverablesLabel(r)}
+              </span>
+            </div>
+            <div className="ob-card-meta">
               <span className="ob-card-meta-label">Order ID</span>
               <span className="ob-card-meta-val tabular">
                 {r.orderId || "—"}
@@ -269,5 +330,124 @@ function OffboardingCardsGrid({ rows }: { rows: OffboardingRow[] }) {
         </article>
       ))}
     </div>
+  );
+}
+
+function OffboardingDetailModal({
+  row,
+  onClose,
+}: {
+  row: OffboardingRow;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  const collabId = collabIdOf(row);
+  const items: Array<[string, ReactNode]> = [
+    ["Post ID", row.postId || "—"],
+    ["Collab ID", collabId || "—"],
+    ["INF ID", row.infId || "—"],
+    ["Campaign", row.campaign || "—"],
+    ["Collab Type", row.collabType || "—"],
+    ["Deliverables", deliverablesLabel(row)],
+    ["Ads Usage Rights", row.adsUsageRights || "—"],
+    ["Commercials", row.commercials > 0 ? formatRupees(row.commercials) : "—"],
+    ["Order ID", row.orderId || "—"],
+    ["Order Status", row.orderStatus || "—"],
+    ["Tracking ID", row.trackingId || "—"],
+    ["Payment", row.paymentStatus || "—"],
+    ["Onboarded", formatDate(row.onboardDate)],
+    ["Est. Delivery", formatDate(row.estDelivery)],
+    ["Reached Out", formatDate(row.reachoutDate)],
+    [
+      "Followers",
+      row.followers ? row.followers.toLocaleString("en-IN") : "—",
+    ],
+    ["Category", row.category || "—"],
+    [
+      "Post Link",
+      row.postLink ? (
+        <a
+          href={row.postLink}
+          target="_blank"
+          rel="noopener"
+          className="text-link"
+        >
+          Open
+        </a>
+      ) : (
+        "—"
+      ),
+    ],
+  ];
+
+  return createPortal(
+    <div className="modal-backdrop modal-backdrop--onboarding" onClick={onClose}>
+      <div
+        className="modal-panel modal-panel--lg modal-panel--onboarding ob-overview-modal"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-head">
+          <div className="flex items-center gap-2 min-w-0">
+            <Eye size={16} aria-hidden />
+            <h2 className="font-semibold">Offboarding Overview</h2>
+            <span className="chip text-[10px] tabular">{row.postId}</span>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+
+        <div className="modal-body ob-overview-body">
+          <section className="ob-overview-card">
+            <div className="ob-overview-head">
+              <Avatar
+                src={row.profilePicUrl}
+                username={row.username}
+                name={row.name}
+                size={48}
+              />
+              <div className="ob-overview-identity">
+                <strong>{row.name || row.username || "—"}</strong>
+                <span>@{row.username || "—"}</span>
+              </div>
+              <PaymentPill status={row.paymentStatus} />
+            </div>
+            <div className="ob-overview-pills">
+              {collabId && (
+                <span className="campaign-chip tabular" title="Collab ID">
+                  {collabId}
+                </span>
+              )}
+              <span className="campaign-chip">{row.campaign || "—"}</span>
+              <span className="pill pill--muted">Offboarded</span>
+            </div>
+          </section>
+
+          <section className="ob-overview-grid">
+            {items.map(([label, value]) => (
+              <div className="ob-overview-item" key={label}>
+                <span>{label}</span>
+                <strong className="tabular">{value}</strong>
+              </div>
+            ))}
+          </section>
+        </div>
+
+        <footer className="modal-foot ob-overview-footer">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body,
   );
 }

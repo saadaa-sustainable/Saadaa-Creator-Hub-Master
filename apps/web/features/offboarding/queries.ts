@@ -25,8 +25,17 @@ const POSTS_COLS = [
   "collab_number",
   "commercial_amount",
   "order_id",
+  "order_status",
+  "tracking_id",
   "payment_status",
   "reach_out_date",
+  "onboard_date",
+  "est_delivery",
+  "post_link",
+  "ads_usage_rights",
+  "reels",
+  "static_posts",
+  "stories",
   "deliverable_index",
 ].join(",");
 
@@ -88,7 +97,7 @@ export async function fetchOffboardingData(
       .limit(5000),
     (supabase as any)
       .from("posts")
-      .select("inf_id, collab_number, commercial_amount")
+      .select("inf_id, collab_number, commercial_amount, reels, static_posts, stories")
       .not("inf_id", "is", null)
       .not("collab_number", "is", null)
       .limit(20000),
@@ -105,12 +114,21 @@ export async function fetchOffboardingData(
   }
 
   const siblingSumMap = new Map<string, number>();
+  const deliverableSumMap = new Map<
+    string,
+    { reels: number; posts: number; stories: number }
+  >();
   for (const s of (siblingRes.data ?? []) as Array<Record<string, unknown>>) {
     const key = `${s.inf_id}::${s.collab_number}`;
     siblingSumMap.set(
       key,
       (siblingSumMap.get(key) ?? 0) + Number(s.commercial_amount ?? 0),
     );
+    const d = deliverableSumMap.get(key) ?? { reels: 0, posts: 0, stories: 0 };
+    d.reels += Number(s.reels ?? 0) || 0;
+    d.posts += Number(s.static_posts ?? 0) || 0;
+    d.stories += Number(s.stories ?? 0) || 0;
+    deliverableSumMap.set(key, d);
   }
 
   const creatorMap = new Map<string, Record<string, unknown>>();
@@ -166,9 +184,24 @@ export async function fetchOffboardingData(
       collabType: (p.collab_type as string | null) ?? null,
       commercials,
       orderId: String(p.order_id ?? "").trim(),
+      orderStatus: (p.order_status as string | null) ?? null,
+      trackingId: (p.tracking_id as string | null) ?? null,
       paymentStatus,
       workflowStatus: String(p.workflow_status ?? ""),
       reachoutDate: p.reach_out_date ? String(p.reach_out_date).slice(0, 10) : null,
+      onboardDate: p.onboard_date ? String(p.onboard_date).slice(0, 10) : null,
+      estDelivery: p.est_delivery ? String(p.est_delivery).slice(0, 10) : null,
+      postLink: (p.post_link as string | null) ?? null,
+      adsUsageRights: (p.ads_usage_rights as string | null) ?? null,
+      reels:
+        deliverableSumMap.get(`${p.inf_id}::${p.collab_number}`)?.reels ??
+        (Number(p.reels ?? 0) || 0),
+      staticPosts:
+        deliverableSumMap.get(`${p.inf_id}::${p.collab_number}`)?.posts ??
+        (Number(p.static_posts ?? 0) || 0),
+      stories:
+        deliverableSumMap.get(`${p.inf_id}::${p.collab_number}`)?.stories ??
+        (Number(p.stories ?? 0) || 0),
     });
 
     kpi.total++;

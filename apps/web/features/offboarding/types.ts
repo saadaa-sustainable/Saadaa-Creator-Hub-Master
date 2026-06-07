@@ -20,9 +20,19 @@ export interface OffboardingRow {
   collabType: string | null;
   commercials: number;
   orderId: string;
+  orderStatus: string | null;
+  trackingId: string | null;
   paymentStatus: string;
   workflowStatus: string;
   reachoutDate: string | null;
+  onboardDate: string | null;
+  estDelivery: string | null;
+  postLink: string | null;
+  adsUsageRights: string | null;
+  /** Collab-level deliverable totals (summed across siblings). */
+  reels: number;
+  staticPosts: number;
+  stories: number;
 }
 
 export interface OffboardingKpi {
