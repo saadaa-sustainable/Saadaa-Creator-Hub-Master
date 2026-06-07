@@ -6,6 +6,7 @@ import { readTermsAttachmentFile, TERMS_ATTACHMENT } from "@/lib/attachments";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sendMail } from "@/lib/email";
+import { serverEnv } from "@/lib/env.server";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import {
   NOTIFICATION_TYPES,
@@ -176,16 +177,50 @@ export async function submitOnboarding(
   const v = applyBarterLock(parsed.data);
   const supabase = createServiceClient();
 
-  // 1. Shopify order lookup
-  const { data: order, error: orderErr } = await supabase
+  // 1. Shopify order lookup (synced table first).
+  const SHOPIFY_ORDER_SELECT =
+    "order_id, email, tracking_id, tracking_status, fulfillment, order_date, address, customer_name, garments_sent, line_skus, delivery_date, order_placed_date";
+  const firstLookup = await supabase
     .from("shopify_orders")
-    .select(
-      "order_id, email, tracking_id, tracking_status, fulfillment, order_date, address, customer_name, garments_sent, line_skus, delivery_date, order_placed_date",
-    )
+    .select(SHOPIFY_ORDER_SELECT)
     .eq("order_id", v.orderId)
     .maybeSingle();
+  if (firstLookup.error) return { ok: false, error: firstLookup.error.message };
+  let order = firstLookup.data;
 
-  if (orderErr) return { ok: false, error: orderErr.message };
+  // On miss, try an on-demand live pull. The 3-hr bulk sync may not have a
+  // freshly-placed order yet, so ask the sync-shopify-orders edge function to
+  // fetch THIS order live from Shopify and (Option B) upsert it only if it
+  // carries the INF/IFAD tag. Then re-check. Best-effort — any failure falls
+  // through to the not-found path below.
+  if (
+    !order &&
+    serverEnv.NEXT_PUBLIC_SUPABASE_URL &&
+    serverEnv.SUPABASE_SERVICE_KEY
+  ) {
+    try {
+      await fetch(
+        `${serverEnv.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sync-shopify-orders?order_id=${encodeURIComponent(v.orderId)}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serverEnv.SUPABASE_SERVICE_KEY}`,
+            apikey: serverEnv.SUPABASE_SERVICE_KEY,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    } catch (err) {
+      console.error("[onboarding] on-demand Shopify pull failed:", err);
+    }
+    const retry = await supabase
+      .from("shopify_orders")
+      .select(SHOPIFY_ORDER_SELECT)
+      .eq("order_id", v.orderId)
+      .maybeSingle();
+    order = retry.data;
+  }
+
   if (!order) {
     // Spec: Shopify Validation Failed → Assigned User. The submitter (the actor
     // onboarding this collab) is the assigned user; alert them that the entered
@@ -203,21 +238,21 @@ export async function submitOnboarding(
           subject: `Shopify order ${v.orderId} not found — onboarding blocked`,
           title: "Shopify order validation failed",
           subtitle: `POST ID: ${v.postId}`,
-          htmlBody: `<p style="margin:0 0 12px;">The Shopify Order ID entered while onboarding could not be validated — it was not found in the synced order data.</p>
+          htmlBody: `<p style="margin:0 0 12px;">The Shopify Order ID entered while onboarding could not be validated — it was not in the synced data, and a live check on Shopify also did not return a usable order.</p>
 <table style="width:100%;border-collapse:collapse;font-size:0.86rem;margin:0 0 14px;">
 <tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;width:34%;">Post ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(v.postId)}</td></tr>
 <tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Order ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(v.orderId)}</td></tr>
-<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Reason</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">Order not found in sync</td></tr>
+<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Reason</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">Order not found, or missing the influencer tag (IFAD)</td></tr>
 </table>
-<p style="margin:0;color:#6E695E;font-size:0.82rem;">The Shopify sync runs every few hours. If the order is recent, retry onboarding in ~5 minutes. Double-check the Order ID if it persists.</p>`,
+<p style="margin:0;color:#6E695E;font-size:0.82rem;">Check the Order ID is correct and that the order is tagged for influencer orders (IFAD) on Shopify, then retry onboarding.</p>`,
           postId: v.postId,
         });
       });
     }
     return {
       ok: false,
-      error: `Shopify order ${v.orderId} not found in sync. Try again in 5 min.`,
-      fieldErrors: { orderId: "Order not found" },
+      error: `Shopify order ${v.orderId} could not be validated. Check the Order ID and make sure the order is tagged for influencer orders (IFAD) on Shopify.`,
+      fieldErrors: { orderId: "Order not found / not tagged" },
     };
   }
 

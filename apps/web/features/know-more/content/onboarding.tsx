@@ -123,7 +123,12 @@ export default function OnboardingKM() {
           <li>
             <strong>Order Linkage</strong> — Order ID (Shopify), Order Status,
             Tracking ID, Garments Sent + Garment Qty. Address auto-fills from
-            the Shopify customer if order_id matches.
+            the Shopify customer if order_id matches. On submit, the Order ID is
+            validated against synced Shopify data; if it isn&apos;t there yet
+            (freshly placed), the system does a live Shopify check and pulls it
+            in — but only if the order is tagged for influencer orders{" "}
+            <KMCode>IFAD</KMCode>. Untagged or unknown order ⇒ blocked + the
+            submitter is alerted.
           </li>
           <li>
             <strong>Bank Details</strong> — Bank Name, Bank Number, IFSC.
