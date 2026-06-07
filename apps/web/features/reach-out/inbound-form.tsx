@@ -26,6 +26,7 @@ import {
   ExternalLink,
   Eye,
   Gift,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { isInstagramProfileUrl } from "@/lib/validators";
@@ -55,6 +56,8 @@ interface InboundFormProps {
     status: string | null;
     brief_link: string | null;
     internal_brief_link?: string | null;
+    creator_cap?: number;
+    creators_used?: number;
   }[];
 }
 
@@ -744,6 +747,35 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                 )}
               </div>
             )}
+            {selectedCamp && (selectedCamp.creator_cap ?? 0) > 0
+              ? (() => {
+                  const cap = selectedCamp.creator_cap ?? 0;
+                  const used = selectedCamp.creators_used ?? 0;
+                  const closed =
+                    (selectedCamp.status ?? "").trim().toLowerCase() ===
+                    "closed";
+                  const full = used >= cap;
+                  const tone = closed
+                    ? "pill--danger"
+                    : full
+                      ? "pill--warning"
+                      : "pill--muted";
+                  return (
+                    <span
+                      className={`pill ${tone} mt-2`}
+                      title="Creator slots used / cap for this campaign"
+                    >
+                      <Users size={11} aria-hidden />
+                      {used} / {cap} creators
+                      {closed
+                        ? " · closed — reopen to add"
+                        : full
+                          ? " · full — raise the cap"
+                          : ` · ${cap - used} left`}
+                    </span>
+                  );
+                })()
+              : null}
             <small className="text-muted">
               All rows in this batch will be tagged to the chosen campaign.
             </small>

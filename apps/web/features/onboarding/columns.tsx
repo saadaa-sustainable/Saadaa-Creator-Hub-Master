@@ -82,12 +82,11 @@ export function countCollabDeliverables(
   }
   const siblings = collabSiblings(r, rows);
   const source = siblings.length > 0 ? siblings : [r];
+  // Stories ARE deliverables (they count), they just don't generate a separate
+  // post_id/asset row — so they're included in the count.
   return source.reduce(
     (sum, row) =>
-      sum +
-      (row.reels ?? 0) +
-      (row.static_posts ?? 0) +
-      (row.stories ?? 0),
+      sum + (row.reels ?? 0) + (row.static_posts ?? 0) + (row.stories ?? 0),
     0,
   );
 }
@@ -151,12 +150,13 @@ export function formatDeliverableCount(total: number): string {
   return `${total} deliverables`;
 }
 
-/** Legacy "2R + 1P + 0S" breakdown — kept as a sub-label / tooltip. */
+/** "1P : 1R" breakdown — Static Posts : Reels (: Stories only when present).
+ *  Stories count as deliverables but never generate a post_id/asset row. */
 export function deliverableBreakdown(r: OnboardingRow): string {
   const reels = r.reels ?? 0;
   const posts = r.static_posts ?? 0;
   const stories = r.stories ?? 0;
-  return `${reels}R + ${posts}P + ${stories}S`;
+  return `${posts}P : ${reels}R${stories > 0 ? ` : ${stories}S` : ""}`;
 }
 
 /**
@@ -181,7 +181,9 @@ export function collabDeliverableBreakdown(
     },
     { reels: 0, posts: 0, stories: 0 },
   );
-  return `${totals.reels}R + ${totals.posts}P + ${totals.stories}S`;
+  return `${totals.posts}P : ${totals.reels}R${
+    totals.stories > 0 ? ` : ${totals.stories}S` : ""
+  }`;
 }
 
 export function isOverdue(r: OnboardingRow): boolean {

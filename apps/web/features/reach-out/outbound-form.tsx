@@ -20,6 +20,7 @@ import {
   UserCheck,
   ShieldCheck,
   Layers,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
@@ -46,6 +47,8 @@ interface OutboundFormProps {
     campaign_name: string | null;
     status: string | null;
     brief_link: string | null;
+    creator_cap?: number;
+    creators_used?: number;
   }[];
   /** 'outbound' (we initiate) | 'inbound' (creator initiated). Defaults outbound. */
   direction?: "outbound" | "inbound";
@@ -347,6 +350,35 @@ export function OutboundForm({
                 <span className="brief-label">No brief uploaded yet</span>
               </span>
             ) : null}
+            {selectedCampaign && (selectedCampaign.creator_cap ?? 0) > 0
+              ? (() => {
+                  const cap = selectedCampaign.creator_cap ?? 0;
+                  const used = selectedCampaign.creators_used ?? 0;
+                  const closed =
+                    (selectedCampaign.status ?? "").trim().toLowerCase() ===
+                    "closed";
+                  const full = used >= cap;
+                  const tone = closed
+                    ? "pill--danger"
+                    : full
+                      ? "pill--warning"
+                      : "pill--muted";
+                  return (
+                    <span
+                      className={`pill ${tone} mt-2`}
+                      title="Creator slots used / cap for this campaign"
+                    >
+                      <Users size={11} aria-hidden />
+                      {used} / {cap} creators
+                      {closed
+                        ? " · closed — reopen to add"
+                        : full
+                          ? " · full — raise the cap"
+                          : ` · ${cap - used} left`}
+                    </span>
+                  );
+                })()
+              : null}
             {errors.campaignId && (
               <p className="mt-2 text-[0.75rem] text-danger">
                 {errors.campaignId.message}

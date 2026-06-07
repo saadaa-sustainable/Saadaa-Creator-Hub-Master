@@ -35,12 +35,13 @@ export function collabDeliverableCount(
   return rows.filter((x) => x && collabKeyOf(x) === key).length;
 }
 
-/** "2R + 1P + 0S" — legacy parity. */
+/** "1P : 1R" — Static Posts : Reels (: Stories only when present). Stories
+ *  count as deliverables but never generate a post_id/asset row. */
 export function formatDeliverables(r: PostingRow): string {
   const reels = r.reels ?? 0;
   const posts = r.static_posts ?? 0;
   const stories = r.stories ?? 0;
-  return `${reels}R + ${posts}P + ${stories}S`;
+  return `${posts}P : ${reels}R${stories > 0 ? ` : ${stories}S` : ""}`;
 }
 
 /**
