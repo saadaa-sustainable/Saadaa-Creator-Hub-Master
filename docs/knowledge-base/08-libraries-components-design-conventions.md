@@ -7,7 +7,7 @@
 ### Supabase clients
 - **`lib/supabase/client.ts`** — `createClient()` browser client (`@supabase/ssr createBrowserClient`, anon key only).
 - **`lib/supabase/server.ts`** — `createClient()` (async, cookie-bound RSC/Route client, user-scoped/RLS) and `createServiceClient()` (**privileged service-role**, `persistSession:false`, throws if `SUPABASE_SERVICE_KEY` unset). Doc-mandate: "NEVER ship to the browser. Only use inside server actions / route handlers AFTER calling `assertPermission()`."
-- `lib/supabase/types.gen.ts` — generated `Database` type (note: hand-maintained, can lag the migrations). `lib/supabase/meta-ads.ts` — Meta-Ads warehouse accessor.
+- `lib/supabase/types.gen.ts` — full generated `Database` (regenerated against live DB 2026-06-07: all tables/views/functions) + hand-kept union aliases (`WorkflowStatus`/`PaymentStatus`/`AdResult`/…) and `Row` interfaces on top, because the DB stores enums as TEXT+CHECK (raw generator returns `string`). Regenerate with `npm run db:types`, then re-reconcile the aliases. `lib/supabase/meta-ads.ts` — Meta-Ads warehouse accessor.
 
 ### RBAC
 - **`lib/rbac.ts`** (pure, client-safe): `PermissionKey` union (14 keys); `PERMISSION_DESCRIPTIONS`; `ADMIN_EMAILS` allowlist (devesh/mahesh/tanvi/shrishti @saadaa.in); `normalizeRole` collapses label drift → `Global Admin | User | Accounts Team | Campaign Owner | custom`; `STATIC_GRANTS` fallback (used only when not DB-hydrated — **2026-06-07:** `campaign_create`/`campaign_edit` are now Campaign Owner + Global Admin only; `User` lost them); `hasPermission(actor,key)` — DB-hydrated path wins (grant iff key present OR `admin` present AND key≠`admin`); else `STATIC_GRANTS` by normalized role; `custom` role without hydration → deny-all (fail-closed).

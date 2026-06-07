@@ -60,7 +60,7 @@ export const fetchCampaigns = unstable_cache(
         .select(CAMPAIGN_SELECT_LEGACY)
         .order("campaign_num", { ascending: false })
         .limit(500);
-      data = legacyResult.data;
+      data = legacyResult.data as typeof data;
       error = legacyResult.error;
     }
 

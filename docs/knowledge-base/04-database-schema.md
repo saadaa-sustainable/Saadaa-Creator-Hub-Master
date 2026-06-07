@@ -8,7 +8,7 @@
 > - **Collab ID restructure** (`2026_06_06_collab_id_restructure.sql`) **abandoned the parent/child deliverable model.** `post_id` is now the SHORT deliverable id (`SIF-1-P1`, no `-C` suffix); a new `collab_id` (`SIF-1-C1`) groups all deliverable rows of one collaboration. `deliverable_index` parent/child is **legacy**.
 > - **Partial payments** (`2026_06_06_partial_payments.sql`) replaced `UNIQUE(post_id)` on `payments` with `UNIQUE(post_id, utr)` and added a `Partial` status. "One payment row per post" no longer holds.
 >
-> `types.gen.ts` is a hand-written placeholder and is **stale** relative to these June migrations — trust the migrations where they conflict.
+> `types.gen.ts` was **regenerated against the live DB on 2026-06-07** — the full generated `Database` (all 14 tables + 3 views + functions) with hand-kept union aliases (`WorkflowStatus`, `PaymentStatus`, …) + convenience `Row` interfaces layered on top (the DB models enums as TEXT+CHECK, so the raw generator returns those columns as `string`). It now matches the live schema; regenerate with `npm run db:types`.
 
 ---
 
