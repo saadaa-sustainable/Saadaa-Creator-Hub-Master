@@ -50,7 +50,7 @@ export async function fetchOffboardableCollabs(): Promise<OffboardCollabOption[]
   const { data, error } = await (supabase as any)
     .from("posts")
     .select("post_id, collab_id, inf_id, collab_number, username, workflow_status")
-    .not("workflow_status", "in", "(Offboarding,Cancelled)")
+    .not("workflow_status", "in", "(Offboarded,Offboarding,Cancelled)")
     .order("post_id", { ascending: true })
     .limit(20000);
   if (error) return [];
@@ -83,7 +83,7 @@ export async function fetchOffboardingData(
     (supabase as any)
       .from("posts")
       .select(POSTS_COLS)
-      .eq("workflow_status", "Offboarding")
+      .in("workflow_status", ["Offboarded", "Offboarding"])
       .or("deliverable_index.is.null,deliverable_index.eq.1")
       .limit(5000),
     (supabase as any)

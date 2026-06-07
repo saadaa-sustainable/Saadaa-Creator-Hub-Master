@@ -277,10 +277,6 @@ function ObCard({
   const overdue = isOverdue(r);
   const overdueInfo =
     "Estimated delivery date has passed and this post is not marked Posted yet.";
-  // The board renders one card per collab (parent only). Count the whole
-  // collab's deliverables so a multi-deliverable collab reads as one entity.
-  const deliverableCount = countCollabDeliverables(r, rows);
-  const hasMultiple = deliverableCount > 1;
   const showMissingEmailAlert =
     onboarded && !r.collab_email_sent_at && !r.collab_email_skipped;
 
@@ -329,7 +325,6 @@ function ObCard({
         >
           {collabIdLabel(r)}
         </span>
-        <DeliverablesChip r={r} rows={rows} />
         {(r.nomenclature ?? r.content_type) && (
           <span className="pill pill--muted">
             {r.nomenclature ?? r.content_type}
@@ -364,25 +359,7 @@ function ObCard({
         <div className="ob-card-meta">
           <span className="ob-card-meta-label">Deliverables</span>
           <span className="ob-card-meta-val tabular">
-            {formatDeliverableCount(deliverableCount)}
-            <span className="ob-card-meta-sub">
-              {" · "}
-              {collabDeliverableBreakdown(r, rows)}
-            </span>
-            {hasMultiple && onboarded && (
-              <button
-                type="button"
-                className="ml-1 inline-flex items-center gap-1 rounded-full border border-border bg-bg-surface px-2 py-0.5 text-[0.62rem] font-semibold text-text-secondary transition-colors hover:bg-bg-ecru"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOverview(r);
-                }}
-                title="See each deliverable in this collab"
-              >
-                <Layers size={9} aria-hidden />
-                View {deliverableCount}
-              </button>
-            )}
+            {collabDeliverableBreakdown(r, rows)}
           </span>
         </div>
         <div className="ob-card-meta">

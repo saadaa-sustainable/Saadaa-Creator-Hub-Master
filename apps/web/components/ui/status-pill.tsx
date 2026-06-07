@@ -51,6 +51,7 @@ const workflowToneMap: Record<WorkflowStatus, PillTone> = {
   Cancelled: "danger",
   "Cancelled After RTO": "danger",
   Offboarding: "neutral",
+  Offboarded: "neutral",
   "Awaiting Reply": "warning",
   Declined: "neutral",
 };

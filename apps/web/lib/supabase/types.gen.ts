@@ -21,6 +21,7 @@ export type WorkflowStatus =
   | "Cancelled"
   | "Cancelled After RTO"
   | "Offboarding"
+  | "Offboarded"
   | "Awaiting Reply"
   | "Declined";
 

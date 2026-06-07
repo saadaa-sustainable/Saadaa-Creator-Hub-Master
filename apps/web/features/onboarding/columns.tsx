@@ -419,17 +419,14 @@ export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
   {
     id: "deliverables",
     header: "Deliverables",
-    cell: ({ row, table }) => {
-      const rows = table.options.data as OnboardingRow[];
-      return (
-        <span className="inline-flex flex-col items-start gap-0.5">
-          <DeliverablesChip r={row.original} rows={rows} />
-          <span className="tabular text-[0.66rem] text-text-tertiary whitespace-nowrap">
-            {collabDeliverableBreakdown(row.original, rows)}
-          </span>
-        </span>
-      );
-    },
+    cell: ({ row, table }) => (
+      <span className="text-[0.78rem] text-text-secondary tabular whitespace-nowrap">
+        {collabDeliverableBreakdown(
+          row.original,
+          table.options.data as OnboardingRow[],
+        )}
+      </span>
+    ),
   },
   {
     id: "nomenclature",

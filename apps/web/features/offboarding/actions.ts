@@ -41,7 +41,7 @@ export async function moveToOffboarding(
 
   let updateQuery = (supabase as any)
     .from("posts")
-    .update({ workflow_status: "Offboarding" });
+    .update({ workflow_status: "Offboarded" });
 
   // Prefer grouping by (inf_id, collab_number) when both are present so the
   // whole collab episode moves together; otherwise fall back to the single row.

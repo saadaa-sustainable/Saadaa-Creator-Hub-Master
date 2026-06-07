@@ -40,7 +40,7 @@ export default function OffboardingKM() {
         <KMList>
           <li>
             <strong>posts</strong> · every row with{" "}
-            <KMCode>workflow_status = &apos;Offboarding&apos;</KMCode> AND{" "}
+            <KMCode>workflow_status = &apos;Offboarded&apos;</KMCode> AND{" "}
             <KMCode>deliverable_index</KMCode> in (null, 1). Child deliverables
             are folded into the parent so each card is one collab.
           </li>
@@ -59,7 +59,7 @@ export default function OffboardingKM() {
         <p>
           Use the Move panel: pick the collab from the <strong>Collab ID</strong>{" "}
           dropdown (active collabs only) and confirm. The server action sets{" "}
-          <KMCode>workflow_status = &apos;Offboarding&apos;</KMCode> on every
+          <KMCode>workflow_status = &apos;Offboarded&apos;</KMCode> on every
           deliverable that shares the collab&apos;s{" "}
           <KMCode>(inf_id, collab_number)</KMCode>, so the whole episode moves
           together. Payment status is left untouched — the collab keeps
