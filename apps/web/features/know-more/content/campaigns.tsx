@@ -68,8 +68,10 @@ export default function CampaignsKM() {
             <strong>Creator cap</strong> — the sum of{" "}
             <KMCode>num_influencers</KMCode> across these rows is the campaign&apos;s
             creator cap: Reach Out blocks new creators once the campaign is full.
-            Raising a row&apos;s count raises both the cap and the budget. Edit the
-            rows (Campaign Owner / Global Admin) to widen or narrow it.
+            The campaign card + detail show <strong>used / cap</strong> (distinct
+            active creators ÷ allocation). Raising a row&apos;s count raises both
+            the cap and the budget. Edit the rows (Campaign Owner / Global Admin)
+            to widen or narrow it.
           </li>
         </KMList>
       </KMSection>
@@ -108,6 +110,11 @@ export default function CampaignsKM() {
           <li>
             <strong>Close manually:</strong> the same managers can close an
             Active campaign early via the <strong>Close</strong> button.
+          </li>
+          <li>
+            <strong>Closed = no new reach-outs.</strong> A closed (or
+            auto-closed) campaign rejects new creators in both Outbound and
+            Inbound reach-out — reopen it to add more.
           </li>
         </KMList>
       </KMSection>

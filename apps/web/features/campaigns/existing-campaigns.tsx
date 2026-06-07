@@ -155,6 +155,12 @@ export function ExistingCampaigns({
             (sum, row) => sum + (normalizeNumber(row.total_with_garments) ?? 0),
             0,
           );
+          // Creator cap = Σ budget num_influencers; used = distinct active creators.
+          const creatorCap = budgetRows.reduce(
+            (sum, row) => sum + (normalizeNumber(row.num_influencers) ?? 0),
+            0,
+          );
+          const creatorsUsed = campaign.creators_used ?? 0;
 
           return (
             <article
@@ -195,9 +201,19 @@ export function ExistingCampaigns({
                 <div>
                   <dt>
                     <Target size={12} />
-                    Target
+                    Creators
                   </dt>
-                  <dd>{target ?? "—"}</dd>
+                  <dd
+                    title={
+                      creatorCap > 0
+                        ? `${creatorsUsed} of ${creatorCap} creator slots used`
+                        : undefined
+                    }
+                  >
+                    {creatorCap > 0
+                      ? `${creatorsUsed} / ${creatorCap}`
+                      : (target ?? "—")}
+                  </dd>
                 </div>
                 <div>
                   <dt>
@@ -368,6 +384,11 @@ function CampaignDetailsModal({
     (sum, row) => sum + (normalizeNumber(row.total_with_garments) ?? 0),
     0,
   );
+  const creatorCap = budgetRows.reduce(
+    (sum, row) => sum + (normalizeNumber(row.num_influencers) ?? 0),
+    0,
+  );
+  const creatorsUsed = campaign.creators_used ?? 0;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -419,8 +440,12 @@ function CampaignDetailsModal({
               <dd>{campaign.campaign_id}</dd>
             </div>
             <div>
-              <dt>Target creators</dt>
-              <dd>{target ?? "—"}</dd>
+              <dt>Creators (used / cap)</dt>
+              <dd>
+                {creatorCap > 0
+                  ? `${creatorsUsed} / ${creatorCap}`
+                  : (target ?? "—")}
+              </dd>
             </div>
             <div>
               <dt>Comp budget</dt>

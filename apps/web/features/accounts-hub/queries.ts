@@ -169,7 +169,7 @@ export async function fetchAccountsHubData(
     .map((p) => p.post_id)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
 
-  let paymentsByPostId = new Map<string, PaymentsRow>();
+  const paymentsByPostId = new Map<string, PaymentsRow>();
   // Partial-payments: sum of all installment amounts (UTR-bearing rows) per
   // post_id — the paid-so-far baseline. Drafts (null utr) never count.
   const paidSoFarByPostId = new Map<string, number>();

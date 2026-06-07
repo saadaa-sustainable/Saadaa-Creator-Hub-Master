@@ -105,7 +105,7 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
   ];
 
   // Fetch creators in one batch — username IN (...)
-  let creatorMap = new Map<string, JourneyCreator>();
+  const creatorMap = new Map<string, JourneyCreator>();
   if (usernames.length > 0) {
     const { data: creatorsData, error: creatorsError } = await (supabase as any)
       .from("creators")

@@ -498,7 +498,7 @@ export function CollabEmailPane({
               <label className="ob-form-label">EMAIL PREVIEW</label>
               <div
                 className="collab-email-preview"
-                // eslint-disable-next-line react/no-danger
+                 
                 dangerouslySetInnerHTML={{ __html: previewHtml }}
               />
             </section>

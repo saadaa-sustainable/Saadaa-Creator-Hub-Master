@@ -107,7 +107,7 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
   // (passed the dup guard above), so it would push the count to size+1. Hard
   // block when full; raise the budget allocation to add more (Campaign Owner /
   // Global Admin). cap=0 (no budget rows) ⇒ no cap.
-  const [budgetRes, postsRes] = await Promise.all([
+  const [budgetRes, postsRes, campRes] = await Promise.all([
     (supabase as any)
       .from("campaign_budget")
       .select("num_influencers")
@@ -117,7 +117,20 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
       .select("username, workflow_status")
       .eq("campaign_id", v.campaignId)
       .limit(5000),
+    (supabase as any)
+      .from("campaigns")
+      .select("status")
+      .eq("campaign_id", v.campaignId)
+      .maybeSingle(),
   ]);
+  // Closed (or auto-closed past end date) campaigns don't accept new creators.
+  if (String(campRes.data?.status ?? "").trim().toLowerCase() === "closed") {
+    return {
+      ok: false,
+      error: `Campaign ${v.campaignId} is closed. Reopen it (Campaign Owner / Global Admin) to add creators.`,
+      fieldErrors: { campaignId: "Campaign is closed" },
+    };
+  }
   const cap = ((budgetRes.data ?? []) as Array<{ num_influencers: number | null }>)
     .reduce((sum, r) => sum + (Number(r.num_influencers ?? 0) || 0), 0);
   if (cap > 0) {

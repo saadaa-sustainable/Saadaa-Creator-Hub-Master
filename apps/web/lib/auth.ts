@@ -29,28 +29,50 @@ export const getActor = cache(async (): Promise<ActorPermissions | null> => {
   if (!row || !row.active) return null;
 
   // Hydrate the actor's permission scopes from the access_roles +
-  // access_role_permissions tables. Falls back gracefully when the migration
-  // hasn't applied yet (lookup error → empty array → static-grant fallback
-  // kicks in inside hasPermission).
+  // access_role_permissions tables. On ANY failure we fall back to the static
+  // role map inside hasPermission() — which is fail-CLOSED for unknown custom
+  // roles (deny all). Supabase queries return { error } rather than throwing,
+  // so we capture each error explicitly and log LOUDLY: a silent empty-perms
+  // result would otherwise look identical to a legitimate no-grants role and
+  // mask a real outage (custom-role users silently losing all access).
   let permissions: string[] = [];
   try {
     const service = createServiceClient();
-    const { data: roleRow } = await (service as any)
+    const { data: roleRow, error: roleErr } = await (service as any)
       .from("access_roles")
       .select("id")
       .eq("name", row.role)
       .maybeSingle();
-    if (roleRow?.id) {
-      const { data: perms } = await (service as any)
+    if (roleErr) {
+      console.error(
+        `[auth] access_roles lookup FAILED for role "${row.role}" (${row.email}) — falling back to static grants:`,
+        roleErr.message,
+      );
+    } else if (roleRow?.id) {
+      const { data: perms, error: permsErr } = await (service as any)
         .from("access_role_permissions")
         .select("scope, granted")
         .eq("role_id", roleRow.id);
-      permissions = ((perms ?? []) as Array<{ scope: string; granted: boolean }>)
-        .filter((p) => p.granted)
-        .map((p) => p.scope);
+      if (permsErr) {
+        console.error(
+          `[auth] access_role_permissions lookup FAILED for role "${row.role}" (${row.email}) — falling back to static grants:`,
+          permsErr.message,
+        );
+      } else {
+        permissions = ((perms ?? []) as Array<{ scope: string; granted: boolean }>)
+          .filter((p) => p.granted)
+          .map((p) => p.scope);
+      }
+    } else {
+      // user_access.role has no matching access_roles row (name drift). Known
+      // system roles still resolve via the static map; an unknown custom role
+      // will deny-all — surface it so the drift is visible, not silent.
+      console.error(
+        `[auth] no access_roles row matches user_access.role "${row.role}" (${row.email}); using static grants (custom roles deny-all).`,
+      );
     }
   } catch (err) {
-    console.warn("[auth] permission hydration failed:", err);
+    console.error("[auth] permission hydration threw:", err);
   }
 
   void touchUserActivity(row).catch((err) => {

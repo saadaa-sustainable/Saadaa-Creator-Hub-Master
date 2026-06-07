@@ -98,7 +98,7 @@ export async function GET(
     .map((d) => d.post_id)
     .filter((id): id is string => typeof id === "string");
 
-  let paymentsByPostId = new Map<string, Record<string, unknown>>();
+  const paymentsByPostId = new Map<string, Record<string, unknown>>();
   if (postIds.length > 0) {
     const { data: pays } = await (supabase as any)
       .from("payments")

@@ -79,7 +79,7 @@ export async function submitInboundBatch(
   // running slot count with the campaign's existing active (non-Cancelled)
   // creators; each committed row consumes a slot. Rows beyond the cap are
   // skipped as failures. cap=0 (no budget rows) ⇒ no cap.
-  const [capBudgetRes, capPostsRes] = await Promise.all([
+  const [capBudgetRes, capPostsRes, campRes] = await Promise.all([
     (supabase as any)
       .from("campaign_budget")
       .select("num_influencers")
@@ -89,7 +89,21 @@ export async function submitInboundBatch(
       .select("username, workflow_status")
       .eq("campaign_id", campaignId)
       .limit(5000),
+    (supabase as any)
+      .from("campaigns")
+      .select("status")
+      .eq("campaign_id", campaignId)
+      .maybeSingle(),
   ]);
+  // Closed (or auto-closed) campaigns reject the whole inbound batch.
+  if (String(campRes.data?.status ?? "").trim().toLowerCase() === "closed") {
+    return {
+      ok: false,
+      created: 0,
+      failures: [],
+      error: `Campaign ${campaignId} is closed. Reopen it (Campaign Owner / Global Admin) to add creators.`,
+    };
+  }
   const creatorCap = (
     (capBudgetRes.data ?? []) as Array<{ num_influencers: number | null }>
   ).reduce((sum, r) => sum + (Number(r.num_influencers ?? 0) || 0), 0);

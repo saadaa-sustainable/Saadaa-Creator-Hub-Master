@@ -935,18 +935,45 @@ export async function skipCollabEmail(
  */
 export async function lookupShopifyOrder(orderId: string) {
   await assertPermission("onboarding_write");
-  if (!orderId.trim()) return { found: false } as const;
+  const id = orderId.trim();
+  if (!id) return { found: false } as const;
 
   const supabase = createServiceClient();
-  const { data, error } = await supabase
+  const SELECT =
+    "order_id, email, tracking_id, tracking_status, fulfillment, order_date, address, customer_name, total_price, line_skus, phone, garments_sent, delivery_date";
+  const first = await supabase
     .from("shopify_orders")
-    .select(
-      "order_id, email, tracking_id, tracking_status, fulfillment, order_date, address, customer_name, total_price, line_skus, phone, garments_sent, delivery_date",
-    )
-    .eq("order_id", orderId.trim())
+    .select(SELECT)
+    .eq("order_id", id)
     .maybeSingle();
+  if (first.error) return { found: false, error: first.error.message } as const;
+  if (first.data) return { found: true, order: first.data } as const;
 
-  if (error) return { found: false, error: error.message } as const;
-  if (!data) return { found: false } as const;
-  return { found: true, order: data } as const;
+  // Not synced yet — try the same on-demand live Shopify pull that submit uses
+  // (Option B: only upserts if the order carries the `inf` tag), then re-check.
+  // Keeps the inline preview consistent with what Submit will do.
+  if (serverEnv.NEXT_PUBLIC_SUPABASE_URL && serverEnv.SUPABASE_SERVICE_KEY) {
+    try {
+      await fetch(
+        `${serverEnv.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sync-shopify-orders?order_id=${encodeURIComponent(id)}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serverEnv.SUPABASE_SERVICE_KEY}`,
+            apikey: serverEnv.SUPABASE_SERVICE_KEY,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    } catch (err) {
+      console.error("[onboarding] preview on-demand Shopify pull failed:", err);
+    }
+    const retry = await supabase
+      .from("shopify_orders")
+      .select(SELECT)
+      .eq("order_id", id)
+      .maybeSingle();
+    if (retry.data) return { found: true, order: retry.data } as const;
+  }
+  return { found: false } as const;
 }

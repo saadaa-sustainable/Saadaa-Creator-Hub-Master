@@ -76,7 +76,7 @@ function normalizePastedDate(raw: string): string {
   }
   const parts = s.split(/[/\-.]/);
   if (parts.length === 3) {
-    let [a, b, c] = parts;
+    const [a, b, c] = parts;
     let day: string, mo: string, year: string;
     if (c.length === 4) {
       year = c;

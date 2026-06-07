@@ -16,6 +16,9 @@ export interface CampaignListRow {
   created_at: string | null;
   updated_at?: string | null;
   posts_count?: number;
+  /** Distinct ACTIVE (non-Cancelled) creators currently on the campaign —
+   *  the "used" side of the creator cap (cap = Σ budget num_influencers). */
+  creators_used?: number;
   budget_rows?: CampaignBudgetListRow[];
 }
 
@@ -90,9 +93,34 @@ export const fetchCampaigns = unstable_cache(
       budgetByCampaign.set(row.campaign_id, rows);
     });
 
+    // Distinct active (non-Cancelled) creators per campaign = the "used" side of
+    // the creator cap. Counts by username (deliverable children share it).
+    const { data: postRows } = await (supabase as any)
+      .from("posts")
+      .select("campaign_id, username, workflow_status")
+      .in("campaign_id", ids)
+      .limit(20000);
+    const creatorsByCampaign = new Map<string, Set<string>>();
+    (
+      (postRows ?? []) as Array<{
+        campaign_id: string | null;
+        username: string | null;
+        workflow_status: string | null;
+      }>
+    ).forEach((p) => {
+      if (String(p.workflow_status ?? "") === "Cancelled") return;
+      const cid = p.campaign_id ?? "";
+      const name = (p.username ?? "").trim().toLowerCase();
+      if (!cid || !name) return;
+      const set = creatorsByCampaign.get(cid) ?? new Set<string>();
+      set.add(name);
+      creatorsByCampaign.set(cid, set);
+    });
+
     return campaignRows.map((campaign) => ({
       ...campaign,
       budget_rows: budgetByCampaign.get(campaign.campaign_id) ?? [],
+      creators_used: creatorsByCampaign.get(campaign.campaign_id)?.size ?? 0,
     }));
   },
   ["campaigns-list"],

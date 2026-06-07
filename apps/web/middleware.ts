@@ -3,7 +3,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { publicEnv } from "./lib/env";
 
 export async function middleware(req: NextRequest) {
-  let res = NextResponse.next({ request: req });
+  const res = NextResponse.next({ request: req });
 
   const supabase = createServerClient(
     publicEnv.NEXT_PUBLIC_SUPABASE_URL,
