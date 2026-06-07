@@ -10,6 +10,7 @@ import { OffboardingKpiStrip } from "@/features/offboarding/kpi-strip";
 import { OffboardingBoard } from "@/features/offboarding/offboarding-board";
 import { MoveToOffboardingPanel } from "@/features/offboarding/move-panel";
 import {
+  fetchOffboardableCollabs,
   fetchOffboardingData,
   fetchOffboardingFilterOptions,
 } from "@/features/offboarding/queries";
@@ -27,7 +28,10 @@ export default async function OffboardingPage({
   if (!actor || !hasPermission(actor, "offboarding_write")) redirect("/dashboard");
 
   const params = await searchParams;
-  const options = await fetchOffboardingFilterOptions();
+  const [options, offboardableCollabs] = await Promise.all([
+    fetchOffboardingFilterOptions(),
+    fetchOffboardableCollabs(),
+  ]);
 
   return (
     <div className="onboarding-stage offboarding-stage">
@@ -36,7 +40,7 @@ export default async function OffboardingPage({
       {/* Filter ABOVE KPI — standing layout rule. */}
       <OffboardingFiltersBar initial={params} options={options} />
 
-      <MoveToOffboardingPanel />
+      <MoveToOffboardingPanel collabs={offboardableCollabs} />
 
       <Suspense
         key={JSON.stringify(params)}

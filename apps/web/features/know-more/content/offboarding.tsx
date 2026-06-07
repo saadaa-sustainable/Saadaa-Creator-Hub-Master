@@ -21,8 +21,9 @@ export default function OffboardingKM() {
             once any filter is active.
           </li>
           <li>
-            <strong>3. Move to Offboarding panel</strong> — enter a Post ID and
-            confirm to park the whole collab episode here.
+            <strong>3. Move to Offboarding panel</strong> — pick a collab from
+            the Collab ID dropdown and confirm to park the whole collab episode
+            here.
           </li>
           <li>
             <strong>4. KPI strip</strong> — Offboarding count · Awaiting
@@ -56,9 +57,10 @@ export default function OffboardingKM() {
 
       <KMSection tag="The Offboarding transition">
         <p>
-          Use the Move panel: paste the collab&apos;s Post ID and confirm. The
-          server action sets <KMCode>workflow_status = &apos;Offboarding&apos;</KMCode>{" "}
-          on every deliverable that shares the collab&apos;s{" "}
+          Use the Move panel: pick the collab from the <strong>Collab ID</strong>{" "}
+          dropdown (active collabs only) and confirm. The server action sets{" "}
+          <KMCode>workflow_status = &apos;Offboarding&apos;</KMCode> on every
+          deliverable that shares the collab&apos;s{" "}
           <KMCode>(inf_id, collab_number)</KMCode>, so the whole episode moves
           together. Payment status is left untouched — the collab keeps
           appearing in Accounts Hub until it is paid.

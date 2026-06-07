@@ -32,6 +32,48 @@ const POSTS_COLS = [
 
 const CREATOR_COLS = ["username", "inf_name", "profile_pic", "category", "followers"].join(",");
 
+export interface OffboardCollabOption {
+  /** Representative post_id — fed to moveToOffboarding (it moves the whole collab). */
+  postId: string;
+  collabId: string;
+  label: string;
+}
+
+/**
+ * Active collabs eligible to be moved to Offboarding — one option per collab
+ * (anything not already Offboarding/Cancelled). The dropdown value is the
+ * collab's representative post_id (lowest), which moveToOffboarding resolves
+ * back to the whole collab episode.
+ */
+export async function fetchOffboardableCollabs(): Promise<OffboardCollabOption[]> {
+  const supabase = createServiceClient();
+  const { data, error } = await (supabase as any)
+    .from("posts")
+    .select("post_id, collab_id, inf_id, collab_number, username, workflow_status")
+    .not("workflow_status", "in", "(Offboarding,Cancelled)")
+    .order("post_id", { ascending: true })
+    .limit(20000);
+  if (error) return [];
+  const byCollab = new Map<string, OffboardCollabOption>();
+  for (const p of (data ?? []) as Array<Record<string, unknown>>) {
+    const collabId =
+      (p.collab_id as string | null) ??
+      (p.inf_id
+        ? `${p.inf_id}-C${Number((p.collab_number as number | null) ?? 1)}`
+        : (p.post_id as string));
+    if (!collabId || byCollab.has(collabId)) continue; // first = lowest post_id = representative
+    const handle = p.username ? `@${p.username}` : "";
+    byCollab.set(collabId, {
+      postId: String(p.post_id),
+      collabId,
+      label: handle ? `${collabId} · ${handle}` : collabId,
+    });
+  }
+  return [...byCollab.values()].sort((a, b) =>
+    a.collabId.localeCompare(b.collabId, undefined, { numeric: true }),
+  );
+}
+
 export async function fetchOffboardingData(
   filters: OffboardingFilters,
 ): Promise<{ rows: OffboardingRow[]; kpi: OffboardingKpi }> {

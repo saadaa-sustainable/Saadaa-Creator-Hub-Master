@@ -5,14 +5,20 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, UserMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { moveToOffboarding } from "./actions";
+import type { OffboardCollabOption } from "./queries";
 
 /**
- * Move-to-Offboarding entry point. Operator enters a Post ID (from Order
- * Status / Journey) and confirms; the server action sets the whole collab
- * episode to the terminal 'Offboarding' status. Gated upstream to
- * `offboarding_write` — this panel only renders when the actor holds it.
+ * Move-to-Offboarding entry point. Operator picks a collab from the Collab ID
+ * dropdown and confirms; the server action sets the whole collab episode to the
+ * terminal 'Offboarding' status (the dropdown value is the collab's
+ * representative post_id, which the action resolves to the full collab). Gated
+ * upstream to `offboarding_write` — this panel only renders when held.
  */
-export function MoveToOffboardingPanel() {
+export function MoveToOffboardingPanel({
+  collabs,
+}: {
+  collabs: OffboardCollabOption[];
+}) {
   const router = useRouter();
   const [postId, setPostId] = useState("");
   const [pending, startTransition] = useTransition();
@@ -23,7 +29,7 @@ export function MoveToOffboardingPanel() {
   const submit = () => {
     const id = postId.trim();
     if (!id) {
-      setFeedback({ ok: false, msg: "Enter a Post ID first." });
+      setFeedback({ ok: false, msg: "Pick a collab first." });
       return;
     }
     setFeedback(null);
@@ -55,18 +61,24 @@ export function MoveToOffboardingPanel() {
       </p>
       <div className="flex flex-wrap items-end gap-2">
         <label className="onboarding-filter-field flex-1 min-w-[200px]">
-          <span>Post ID</span>
-          <input
-            type="text"
+          <span>Collab ID</span>
+          <select
             value={postId}
             onChange={(e) => setPostId(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-            }}
-            placeholder="e.g. SIF-123-1"
             className="onboarding-filter-select"
-            disabled={pending}
-          />
+            disabled={pending || collabs.length === 0}
+          >
+            <option value="">
+              {collabs.length === 0
+                ? "No active collabs to offboard"
+                : "Select a collab…"}
+            </option>
+            {collabs.map((c) => (
+              <option key={c.collabId} value={c.postId}>
+                {c.label}
+              </option>
+            ))}
+          </select>
         </label>
         <Button
           variant="danger"
