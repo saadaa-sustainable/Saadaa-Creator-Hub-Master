@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import type {
   ActionCounts,
   BreakdownSlice,
+  ChannelStats,
   DashboardData,
   DashboardFilters,
   DashboardFilterOptions,
@@ -60,6 +61,7 @@ const POSTS_COLS_BASE = [
   "collab_email_skipped",
   "deliverable_index",
   "collab_number",
+  "reachout_direction",
 ].join(",");
 
 // Extended set — adds the ads_status column once the Ad Status stage seeds
@@ -210,6 +212,14 @@ export async function fetchDashboardData(
   const uniqueCampaigns = new Set<string>();
   const contentCounts = new Map<string, number>();
 
+  // Inbound vs outbound reach-out analytics. `reachout_direction` is 'inbound'
+  // only when set by the inbound roster; everything else (explicit 'outbound'
+  // or legacy null) is treated as outbound, the default channel.
+  const channelAgg = {
+    inbound: { reachOut: 0, onboarded: 0, posted: 0, delivered: 0, spend: 0, creators: new Set<string>() },
+    outbound: { reachOut: 0, onboarded: 0, posted: 0, delivered: 0, spend: 0, creators: new Set<string>() },
+  };
+
   const actions: ActionCounts = {
     needsEmail: 0,
     needsOrder: 0,
@@ -287,6 +297,20 @@ export async function fetchDashboardData(
       if (m && monthlyMap.has(m)) monthlyMap.get(m)!.posted++;
     }
 
+    // Channel split — same stage classification, bucketed by reach-out direction.
+    const chan =
+      String(p.reachout_direction ?? "").toLowerCase() === "inbound"
+        ? channelAgg.inbound
+        : channelAgg.outbound;
+    if (statusLow.includes("reach out") || status === "") chan.reachOut++;
+    else if (statusLow.includes("on board")) chan.onboarded++;
+    else if (statusLow.includes("posted") || statusLow.includes("delivered")) {
+      chan.posted++;
+      if (statusLow.includes("delivered")) chan.delivered++;
+    }
+    chan.spend += commercials;
+    if (user) chan.creators.add(user);
+
     // Payment lives on the parent post only — child deliverables share the
      // parent's settlement. Counting children inflates Pending/Paid totals.
     const isChild =
@@ -354,6 +378,30 @@ export async function fetchDashboardData(
     onboardedCount + postedCount > 0
       ? Math.round((postedCount / (onboardedCount + postedCount)) * 100)
       : 0;
+
+  const buildChannel = (a: {
+    reachOut: number;
+    onboarded: number;
+    posted: number;
+    delivered: number;
+    spend: number;
+    creators: Set<string>;
+  }): ChannelStats => {
+    const pipeline = a.reachOut + a.onboarded + a.posted;
+    return {
+      reachOut: a.reachOut,
+      onboarded: a.onboarded,
+      posted: a.posted,
+      delivered: a.delivered,
+      creators: a.creators.size,
+      spend: a.spend,
+      conversionPct: pipeline > 0 ? Math.round((a.posted / pipeline) * 100) : 0,
+    };
+  };
+  const channels = {
+    inbound: buildChannel(channelAgg.inbound),
+    outbound: buildChannel(channelAgg.outbound),
+  };
 
   const pulse = (t: number, y: number): PulseStat => ({
     today: t,
@@ -600,6 +648,7 @@ export async function fetchDashboardData(
       totalSpend,
       paidCount,
     },
+    channels,
     contentBreakdown,
     categoryBreakdown,
     workflowFunnel: {

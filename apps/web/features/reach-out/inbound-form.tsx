@@ -125,7 +125,7 @@ function getRowValidationErrors(r: RowState): RowValidationErrors {
   }
 
   if (!r.contentCode.trim()) {
-    errors.contentCode = "Content Code is required.";
+    errors.contentCode = "Content Type is required.";
   }
 
   if (!r.collabType) {
@@ -202,7 +202,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
   const INBOUND_FIELD_LABELS: Record<string, string> = {
     instagramLink: "Profile URL",
     gender: "Gender",
-    contentCode: "Content Code",
+    contentCode: "Content Type",
     collabType: "Collab Type",
     commercials: "Commercials",
   };
@@ -423,11 +423,11 @@ export function InboundForm({ campaigns }: InboundFormProps) {
     XLSX.utils.book_append_sheet(workbook, rosterSheet, "Inbound Reach Out");
 
     const codeSheet = XLSX.utils.aoa_to_sheet([
-      ["Content Code"],
+      ["Content Type"],
       ...CONTENT_CODES.map((content) => [content.code]),
     ]);
     codeSheet["!cols"] = [{ wch: 18 }];
-    XLSX.utils.book_append_sheet(workbook, codeSheet, "Content Codes");
+    XLSX.utils.book_append_sheet(workbook, codeSheet, "Content Types");
 
     const genderFormula = `"${GENDERS.join(",")}"`;
     const contentCodeFormula = `"${CONTENT_CODES.map((c) => c.code).join(",")}"`;
@@ -522,6 +522,8 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           r,
           "contentCode",
           "content_code",
+          "Content Type",
+          "content_type",
           "Content Code",
         );
         const collabRaw = rosterValue(
@@ -812,7 +814,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               Inbound Roster <span className="req">*</span>
             </h5>
             <small className="text-muted">
-              Profile URL, Gender, Content Code, Collab Type are mandatory.
+              Profile URL, Gender, Content Type, Collab Type are mandatory.
               Commercials only required when Collab Type is{" "}
               <strong>Barter + Paid</strong>. Name + followers auto-fill from
               the 3-hour Instagram trigger. Email auto-fills from the Shopify
@@ -905,7 +907,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                   Gender <span className="req">*</span>
                 </th>
                 <th>
-                  Content Code <span className="req">*</span>
+                  Content Type <span className="req">*</span>
                 </th>
                 <th>
                   Collab Type <span className="req">*</span>
@@ -1275,7 +1277,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                   </label>
                   <label className="form-field block">
                     <span>
-                      Content Code <span className="req">*</span>
+                      Content Type <span className="req">*</span>
                     </span>
                     <select
                       className={cn(

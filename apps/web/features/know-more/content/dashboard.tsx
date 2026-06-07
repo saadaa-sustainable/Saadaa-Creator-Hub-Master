@@ -112,6 +112,15 @@ export default function DashboardKM() {
             largest bucket + 3-line SVG trend (RO / OB / Posted) per month.
           </li>
           <li>
+            <strong>7b. Row E2 — Reach-Out Channels (Inbound vs Outbound)</strong>{" "}
+            · two side-by-side cards split off <KMCode>reachout_direction</KMCode>{" "}
+            (inbound = creators approached us via the inbound roster; outbound =
+            our cold reach-outs, incl. legacy null). Each card shows its
+            conversion %, Creators / Spend / Posted chips, and a 3-step mini
+            funnel sized to its own largest bucket. Respects the dashboard
+            filters (campaign / date / tier).
+          </li>
+          <li>
             <strong>8. Row F — Content Type donut + Creator Tier donut</strong>{" "}
             · 6/6. Inline SVG donuts with center total + legend (brand colour
             palette).

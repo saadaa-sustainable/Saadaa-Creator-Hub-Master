@@ -24,7 +24,7 @@ export const InboundRowSchema = z
       .min(1, "Profile URL required")
       .regex(IG_PROFILE_RE, "Must be a valid Instagram profile URL"),
     gender: z.enum(GENDERS, { message: "Gender required" }),
-    contentCode: z.string().trim().min(1, "Content Code required"),
+    contentCode: z.string().trim().min(1, "Content Type required"),
     collabType: z.enum(INBOUND_COLLAB_TYPES, {
       message: "Collab Type required",
     }),

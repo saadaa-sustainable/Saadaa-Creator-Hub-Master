@@ -13,6 +13,7 @@ import { DashboardStageBoard } from "./widgets/stage-board";
 import { DashboardTeamLeaderboard } from "./widgets/team-leaderboard";
 import { DashboardTopCreators } from "./widgets/top-creators";
 import { DashboardWorkflowFunnel } from "./widgets/workflow-funnel";
+import { DashboardChannelSplit } from "./widgets/channel-split";
 import type { DashboardData } from "./types";
 
 /**
@@ -81,6 +82,11 @@ export function DashboardBento({ data }: { data: DashboardData }) {
       </div>
       <div className="lg:col-span-7">
         <DashboardMonthlyTrend data={data.monthlyFunnel} />
+      </div>
+
+      {/* Row E2 — Inbound vs Outbound reach-out analytics */}
+      <div className="lg:col-span-12">
+        <DashboardChannelSplit channels={data.channels} />
       </div>
 
       {/* Row F */}

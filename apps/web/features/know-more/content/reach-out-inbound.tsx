@@ -21,7 +21,7 @@ export default function ReachOutInboundKM() {
           </li>
           <li>
             <strong>Step 02 — Inbound Roster</strong> · per-row form with
-            Profile URL, Gender, Content Code, <strong>Collab Type</strong>
+            Profile URL, Gender, Content Type, <strong>Collab Type</strong>
             and <strong>Commercials ₹</strong>.
           </li>
         </KMList>
@@ -33,7 +33,7 @@ export default function ReachOutInboundKM() {
             <strong>XLSX template</strong> · click to download a pre-formatted
             workbook with columns{" "}
             <KMCode>instaLink, gender, contentCode, collabType, commercials</KMCode>{" "}
-            + dropdown enums for gender + content code + collab type.
+            + dropdown enums for gender + content type + collab type.
           </li>
           <li>
             <strong>Upload CSV/XLSX</strong> · accepts <KMCode>.csv</KMCode>,{" "}
@@ -57,7 +57,7 @@ export default function ReachOutInboundKM() {
             <strong>Gender</strong> · required. Female / Male / Other.
           </li>
           <li>
-            <strong>Content Code</strong> · required. Maps to{" "}
+            <strong>Content Type</strong> · required. Maps to{" "}
             <KMCode>content_type</KMCode> on the post.
           </li>
           <li>
@@ -123,7 +123,7 @@ export default function ReachOutInboundKM() {
           <li>
             Red <KMCode>MissingFieldsAlert</KMCode> renders above the Submit
             All button listing every distinct missing column across the batch
-            (Campaign ID, Profile URL, Gender, Content Code, Collab Type,
+            (Campaign ID, Profile URL, Gender, Content Type, Collab Type,
             Commercials).
           </li>
           <li>

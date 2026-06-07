@@ -55,6 +55,24 @@ export interface RankedRow {
   value: number;
 }
 
+/**
+ * Per-channel reach-out analytics — one of these for inbound, one for outbound.
+ * Split off `posts.reachout_direction` ('inbound' = creator approached us via the
+ * inbound roster; everything else = outbound, our team reached out). Funnel counts
+ * are per-deliverable row (same basis as the rest of the dashboard); `creators` is
+ * the distinct creator count in the channel.
+ */
+export interface ChannelStats {
+  reachOut: number;
+  onboarded: number;
+  posted: number;
+  delivered: number;
+  creators: number;
+  spend: number;
+  /** posted / (reachOut + onboarded + posted), as a whole percent. */
+  conversionPct: number;
+}
+
 export interface DashboardData {
   filters: DashboardFilters;
   pulse: {
@@ -83,6 +101,11 @@ export interface DashboardData {
     activeCampaigns: number;
     totalSpend: number;
     paidCount: number;
+  };
+  /** Inbound vs outbound reach-out analytics, computed separately. */
+  channels: {
+    inbound: ChannelStats;
+    outbound: ChannelStats;
   };
   /** Donut slices for content_type distribution. */
   contentBreakdown: BreakdownSlice[];

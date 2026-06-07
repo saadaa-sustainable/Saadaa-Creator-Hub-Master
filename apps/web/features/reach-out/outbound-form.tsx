@@ -809,7 +809,7 @@ export function OutboundForm({
                   ))}
                 </select>
                 <label htmlFor="ro_contentCode">
-                  Content Type Code <span className="req">*</span>
+                  Content Type <span className="req">*</span>
                 </label>
               </div>
             )}
