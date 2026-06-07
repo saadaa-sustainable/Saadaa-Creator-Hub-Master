@@ -70,8 +70,8 @@ export const CampaignCreateSchema = z
   .object({
     campaignName: z.string().trim().min(1, "Campaign Name is required"),
     keyMessage: z.string().trim().min(1, "Key Message is required"),
-    startDate: z.string().trim().optional().default(""),
-    endDate: z.string().trim().optional().default(""),
+    startDate: z.string().trim().min(1, "Start Date is required"),
+    endDate: z.string().trim().min(1, "End Date is required"),
     numCreators: z.string().trim().optional().default(""),
     briefLink: urlSchema.refine((v) => v.length > 0, {
       message: "Link to Brief is required",

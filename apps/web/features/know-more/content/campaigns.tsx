@@ -36,8 +36,9 @@ export default function CampaignsKM() {
             Surfaces inside the collab brief email.
           </li>
           <li>
-            <strong>start_date · end_date</strong> · planning window. Drives
-            dashboard active-campaign badge and burn-rate charts.
+            <strong>start_date · end_date</strong> · planning window — both
+            required. Drives dashboard active-campaign badge, burn-rate charts,
+            and the auto-close on end date.
           </li>
           <li>
             <strong>creator_target · brief_link · internal_brief</strong> ·

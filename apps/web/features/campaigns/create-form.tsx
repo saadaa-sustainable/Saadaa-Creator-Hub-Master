@@ -361,7 +361,7 @@ export function CampaignCreateForm({
             )}
           </div>
 
-          {/* Campaign dates — paired, optional planning window */}
+          {/* Campaign dates — paired, required planning window */}
           <div className="form-floating">
             <input
               type="date"
@@ -370,7 +370,12 @@ export function CampaignCreateForm({
               placeholder=" "
               {...register("startDate")}
             />
-            <label htmlFor="camp_start_date">Start Date</label>
+            <label htmlFor="camp_start_date">
+              Start Date <span className="req">*</span>
+            </label>
+            {errors.startDate && (
+              <small className="field-error">{errors.startDate.message}</small>
+            )}
           </div>
 
           <div className="form-floating">
@@ -381,7 +386,9 @@ export function CampaignCreateForm({
               placeholder=" "
               {...register("endDate")}
             />
-            <label htmlFor="camp_end_date">End Date</label>
+            <label htmlFor="camp_end_date">
+              End Date <span className="req">*</span>
+            </label>
             {errors.endDate && (
               <small className="field-error">{errors.endDate.message}</small>
             )}
