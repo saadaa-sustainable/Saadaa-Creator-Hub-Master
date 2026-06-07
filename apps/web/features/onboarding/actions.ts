@@ -191,7 +191,7 @@ export async function submitOnboarding(
   // On miss, try an on-demand live pull. The 3-hr bulk sync may not have a
   // freshly-placed order yet, so ask the sync-shopify-orders edge function to
   // fetch THIS order live from Shopify and (Option B) upsert it only if it
-  // carries the INF/IFAD tag. Then re-check. Best-effort — any failure falls
+  // carries the INF/INF tag. Then re-check. Best-effort — any failure falls
   // through to the not-found path below.
   if (
     !order &&
@@ -242,16 +242,16 @@ export async function submitOnboarding(
 <table style="width:100%;border-collapse:collapse;font-size:0.86rem;margin:0 0 14px;">
 <tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;width:34%;">Post ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(v.postId)}</td></tr>
 <tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Order ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(v.orderId)}</td></tr>
-<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Reason</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">Order not found, or missing the influencer tag (IFAD)</td></tr>
+<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Reason</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">Order not found, or missing the influencer tag (INF)</td></tr>
 </table>
-<p style="margin:0;color:#6E695E;font-size:0.82rem;">Check the Order ID is correct and that the order is tagged for influencer orders (IFAD) on Shopify, then retry onboarding.</p>`,
+<p style="margin:0;color:#6E695E;font-size:0.82rem;">Check the Order ID is correct and that the order is tagged for influencer orders (INF) on Shopify, then retry onboarding.</p>`,
           postId: v.postId,
         });
       });
     }
     return {
       ok: false,
-      error: `Shopify order ${v.orderId} could not be validated. Check the Order ID and make sure the order is tagged for influencer orders (IFAD) on Shopify.`,
+      error: `Shopify order ${v.orderId} could not be validated. Check the Order ID and make sure the order is tagged for influencer orders (INF) on Shopify.`,
       fieldErrors: { orderId: "Order not found / not tagged" },
     };
   }

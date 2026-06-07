@@ -127,7 +127,7 @@ export default function OnboardingKM() {
             validated against synced Shopify data; if it isn&apos;t there yet
             (freshly placed), the system does a live Shopify check and pulls it
             in — but only if the order is tagged for influencer orders{" "}
-            <KMCode>IFAD</KMCode>. Untagged or unknown order ⇒ blocked + the
+            <KMCode>INF</KMCode>. Untagged or unknown order ⇒ blocked + the
             submitter is alerted.
           </li>
           <li>

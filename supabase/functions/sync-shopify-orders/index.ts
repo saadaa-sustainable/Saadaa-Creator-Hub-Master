@@ -2,12 +2,12 @@
 //
 // TWO modes:
 //  1. BULK (no params) — runs every 3 hours via pg_cron. Pulls Shopify Admin
-//     API orders tagged IFAD/inf within the date window and upserts them into
+//     API orders tagged `inf` within the date window and upserts them into
 //     `shopify_orders` (Supabase = sole source of truth).
 //  2. SINGLE-ORDER on-demand (?order_id=X or POST { order_id }) — fetches ONE
 //     order live by its Shopify id, and (Option B) upserts it ONLY if it carries
-//     the influencer tag. Used by onboarding to validate a freshly-placed order
-//     that the 3-hr bulk sync hasn't picked up yet, without waiting.
+//     the `inf` influencer tag. Used by onboarding to validate a freshly-placed
+//     order that the 3-hr bulk sync hasn't picked up yet, without waiting.
 //
 // Env (Supabase Edge secrets):
 //   SUPABASE_URL                — auto-injected by runtime
@@ -26,8 +26,9 @@ const SHOPIFY_ADMIN_API_TOKEN = Deno.env.get("SHOPIFY_ADMIN_API_TOKEN");
 const SHOPIFY_API_VERSION = Deno.env.get("SHOPIFY_API_VERSION") ?? "2024-10";
 const DAYS_BACK = Number(Deno.env.get("SHOPIFY_DAYS_BACK") ?? "14");
 const MAX_PAGES = Number(Deno.env.get("SHOPIFY_MAX_PAGES") ?? "4");
-// Tag(s) marking influencer orders. Comma-separated for OR-match.
-const ORDER_TAGS = (Deno.env.get("SHOPIFY_ORDER_TAGS") ?? "IFAD,inf")
+// Tag(s) marking influencer orders. The live data uses `inf`. Comma-separated
+// for OR-match; override via the SHOPIFY_ORDER_TAGS edge secret if it changes.
+const ORDER_TAGS = (Deno.env.get("SHOPIFY_ORDER_TAGS") ?? "inf")
   .split(",")
   .map((t) => t.trim().toUpperCase())
   .filter(Boolean);
