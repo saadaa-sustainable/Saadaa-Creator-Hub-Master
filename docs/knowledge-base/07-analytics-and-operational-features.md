@@ -1,0 +1,122 @@
+# 07 · Analytics & Operational Features
+
+> Part of the CreatorHub KB. Last verified 2026-06-07. Paths relative to `apps/web`. All analytics fetchers use `createServiceClient()` (page-level RBAC gates access first) and aggregate in-memory in JS rather than via SQL views/RPCs. Each fetcher carries a legacy-GAS parity note in its header.
+
+---
+
+## Dashboard — Tabbed Command Centre
+
+**Purpose:** A single tabbed command centre. Tab 1 is a cross-system "Overview" aggregate (bento mosaic); the remaining tabs each mirror a sidebar feature's full page-view verbatim (minus that page's own `<PageHeader>`).
+**Route:** `/dashboard?tab=<slug>` — active tab in `?tab=` (linkable, server-rendered, default `overview`). Only the active tab fetches data; each tab body is a keyed `<Suspense>` async server component.
+
+**Tab registry** (`features/dashboard/tab-config.ts`): `DASHBOARD_TABS` = `overview, journey, tat, ad-status, compliance, cost, funnel, internal`; `TAB_LABELS`; `TAB_KM_SLUGS` (per-tab Know More); `resolveTab()`. Pill tab bar (`tabs.tsx`) uses Next `<Link prefetch>` per tab (not buttons) for instant RSC switching, ARIA tablist + roving Arrow/Home/End nav.
+
+**Tab bodies** (`tab-bodies.tsx`): each non-Overview body re-creates its standalone route below the title — same outer `<div className="onboarding-stage <name>-stage">` wrapper (load-bearing; scoped CSS keys off it) holding the same filter bar + KPI strips + boards in the same order, reusing the same feature components & fetchers:
+
+| Tab | Reuses |
+|-----|--------|
+| overview | `fetchDashboardData` → `DashboardFiltersBar` + `DashboardOverviewStrip` + `DashboardBento` |
+| journey | `fetchJourneyData` → `JourneyPageClient` |
+| tat | `fetchTatData` → `TatFiltersBar` + `TatPageClient` |
+| ad-status | `fetchAdStatusData` → filters + KPI strip + `AdStatusBoard` |
+| compliance | `fetchComplianceData` → `ComplianceBody` |
+| cost | `fetchCostAnalyticsData` → `CostAnalyticsBody` |
+| funnel | `fetchFunnelData` → `FunnelBody` |
+| internal | `fetchInternalDashboardData` → `InternalDashboardBody` |
+
+### `fetchDashboardData` (Overview aggregate)
+`features/dashboard/queries.ts` — single parallel fetch (posts ≤5000 + creators ≤5000), mirrors legacy `getDashboardStatsFiltered` plus new sparkline + action chips + channel split.
+- **Defensive column fallback:** tries `POSTS_COLS_EXTENDED` (base + `ads_status`); on PostgREST `42703` retries `POSTS_COLS_BASE` (adWinners stays 0).
+- **Server filters:** campaign, content_type (eq), workflow_status (ilike). **Client filters:** influencerType (category substring), dateFrom/dateTo.
+- **Pulse:** today vs yesterday + delta for reachOut/onboarded/posted/delivered.
+- **Spotlight spend:** 30-day commercial-spend sparkline per `post_date` + total.
+- **Pipeline:** reachOut/onboarded/posted, pendingContent, paymentPending, adWinners, conversionPct, postRatePct.
+- **Channel split (`channels`, 2026-06-07 widget):** classifies each row by `posts.reachout_direction` — `'inbound'` (creator approached us) vs everything-else-`outbound`. Per-channel reachOut/onboarded/posted/delivered/creators(distinct)/spend + conversionPct. Type `ChannelStats` in `types.ts`.
+- **Breakdowns:** contentBreakdown (content_type donut), categoryBreakdown (creator tier donut, one creator counted once).
+- **Monthly funnel:** 6 zero-seeded months; reachOut by reach_out_date, onboarded by onboard_date, posted by post_date.
+- **Spends per campaign** (top-8); **postingGoal** (posted ÷ total).
+- **Top creators** (top-6 by followers + post count); **team leaderboard** (grouped by `onboarded_by`, top-6).
+- **StageBoard** (4-col mini-kanban): top-4 latest per stage. Payment lives on the PARENT collab only; commercial total reconstructed by summing equal-split siblings.
+- Action chip → href routing in `ACTION_HREFS` (needsEmail/needsOrder/awaitingPost/noTracking/noPartnership/overdue).
+
+### Bento layout (`dashboard-bento.tsx`)
+12-col mosaic, rows A–J: Hero+Spotlight → Pulse → StageBoard → Action+PostingGoal → WorkflowFunnel+MonthlyTrend → **ChannelSplit (Row E2, full-width)** → Content+Tier donuts → PipelineKpis → TopCreators+TeamLeaderboard → SpendsPerCampaign → CampaignKpis. The **channel-split widget** (`widgets/channel-split.tsx`) renders two `ChannelCard`s (Inbound indigo `#3B6FD4`, Outbound purple `#7B4FBF` — DS "detail panel" accents, off-nav), each with headline conversion %, Creators/Spend/Posted chips, and a 3-step mini funnel sized to the channel's own max bucket.
+
+---
+
+## My Dashboard — Personal Workload Board
+**Route:** `/my-dashboard`, scoped to `posts.onboarded_by = actor.name || actor.email`. Pulls my posts (≤500), joins creators, reconstructs collab totals from equal-split siblings.
+- **KPIs:** myActive, pendingPost, posted, rtos, totalCampaigns, activeCampaigns, totalReachouts.
+- **Pending actions:** "Overdue delivery" (On Board/Order Sent + est_delivery<today) and "Awaiting post" (Delivered + no post_date), sorted by daysOverdue, top-15.
+- **Team leaderboard:** global, score = `posted*5 + paid*8 + active*2`, top-5.
+
+## Internal Dashboard
+**Route:** `/internal-dashboard`. Mirrors legacy `getDashboardMetrics`. `InternalDashboardData extends FunnelData` + per-campaign axis. 8 metrics per bucket: r/o/b/d/p/g/pend/overdue. **Dual-bucketing rule:** reach-cohort metrics are PARENT-ONLY bucketed by `reach_out_date`; `p` (posted) is per-deliverable bucketed by `post_date`. `overdue` = pend & reach >15 days old. Buckets by month + ISO-week + team + campaign.
+
+## Cost Analytics
+**Route:** `/cost-analytics`. Mirrors legacy `getBudgetVsActuals`. Budget from `campaign_budget` (+ `campaigns.total_budget`), actuals from `posts.commercial_amount` (status ∈ on board/order sent/posted/delivered). `actualCost` sums across ALL rows (equal-split); `actualCreators` counts parents only. Rollups keyed `month||campaignId||tier`. `variance = actual−budget`, `utilPct = actual/budget`. Alerts: top-5 overBudget + top-5 underUtilised (<50%).
+
+## Compliance KPIs
+**Route:** `/compliance`. Mirrors legacy `getComplianceKPIs` 1:1, no date filtering. Pipeline (parent-only mutually-exclusive buckets). Conversion rates verbatim: onboardConvRate, postingRate, deliveryRate, paymentRate, rtoRate (each `{pct,num,den}`). TAT averages (roToOb/obToPost/roToPost). Coverage: withOrder/withTracking/withPostLink/withEmail/withBank + email & bank coverage %. Per-campaign + per-team breakdown.
+
+## Funnel View
+**Route:** `/funnel`. Mirrors legacy `getDashboardMetrics`. Same `FunnelMetrics` 8-metric shape + dual-bucketing as Internal Dashboard (Internal = Funnel + campaign axis). `byMonth`/`byWeek` desc + per-team. `isoWeekKey` is a port of legacy `_isoWeek`.
+
+## TAT Analytics
+**Route:** `/tat`. Posts limited to Posted/Delivered (≤2000) + `shopify_orders` for `order_placed_date`. **7 TAT pairs** (each `{avg,min,max,count}`): ro_to_onboard, ro_to_posting, ro_to_order_created, ob_to_delivered, ob_to_posting, order_to_delivered, delivered_to_posting. `daysBetween` floors, rejects negatives/pre-2020. Filters campaign/tier/status/reach-out range (JS). KPI: totalPosts, postsWithOrder, avgEndToEnd, delivered/rto/cancelled (order metrics deduped per order_id). Campaign benchmark chart = per-campaign avg reach→posting days.
+
+## Influencer Journey
+**Route:** `/journey`. 4-stage read-only kanban (Reach Out → Onboard → Posted → Payment) + funnel conversion strip. Columns: Reach Out, Onboard (On Board+Order Sent), Posted (every deliverable), Payment (parent rows only). KPI: inPipeline/active/posted/closed. Funnel is cumulative parent-only (counts each collab at every stage reached, so rates are monotonic): reached→onboarded→posted→paid + the three conversion %.
+
+## Ad Status — Winner / ITE / Discarded + Warehouse Reconciliation
+**Routes:** `/performance/ad-run-status` (full build) + `/performance/untested-ads` (still a placeholder); also the dashboard `ad-status` tab. Posts in Posted/Delivered (≤2000) + creators + `instagram_cache` + Meta Ads warehouse covered-set.
+- **Warehouse reconciliation:** `lib/supabase/meta-ads.ts#fetchMetaAdsCoveredPostIds()` (separate Supabase project, `ad_name ILIKE %IFAD%`, regex-extract `post_id_short`), wrapped in a **5s `Promise.race` timeout**.
+- **Eligibility** (`isEligible`): non-trivial `ads_usage_rights` OR in covered set.
+- **Buckets:** Untested = not classified AND not in warehouse; Ad-Run = classified (`ads_results` non-empty) OR in warehouse.
+- **KPI:** totalEligible, classified, inMetaAds, pendingClassification, winners (`ads_results==="Winner"`), discarded (`Discarded`/`Discarded but analyse`).
+- **Badges:** Winner (green), ITE (amber), "Discarded but analyse"→Analyse (blue), Discarded (red), else Untested.
+- Shared classification source: `lib/ad-tested.ts` (used by both Ad Status + Accounts Hub `posted_but_not_tested` flag so both surfaces agree).
+> The Winner/ITE/Discarded classification LOGIC is owned by Anmol's warehouse (this app only reads `ads_results`/coverage).
+
+## Accounts Hub — Payment Ledger
+**Route:** `/accounts-hub`. Mirrors legacy `getAccountsHubData` + `submitPayments`.
+- **Collab-ID model:** fetches ALL deliverables in stages {Reach Out, On Board, Order Sent, Posted, Delivered}, collapses to ONE representative row per `collab_id` (lowest post_id), summing `commercial_amount` across equal-split siblings. Payment raised per collab_id.
+- **Partial-payments rollup:** `paidSoFar` = sum of UTR-bearing installments, `_remainder` = total − paid, `_isPartial` = 0<paid<total.
+- **Draft backfill:** for Posted/Delivered collabs with no payment row, inserts a "Not Due" draft — only if fully payment-eligible. Sets `due_date = post_date + 30d`, `estimated_payable_date = nextPayableCycleDate(due)`.
+- **Eligible posts** (`/api/accounts/eligible-posts`, `accounts_write`): collab-level gate (all posted + ads→partnership), one representative per ready collab.
+- **Estimated payable date (15th/30th):** `lib/payable-cycle.ts` — `PAYABLE_CYCLE_DAYS=[15,30]`, `PAYMENT_DUE_DAYS=30`. `computeMatchStatus` (entered vs commercial). (Saadaa pays 15th & 30th.)
+- **KPIs:** postsDone + Not Due / Due / Done / **Partial** (count + outstanding) + totalPayable, computed over the FULL corpus BEFORE filters. Outstanding alert banner lists partially-paid collabs + total owed.
+- **Per-deliverable ledger:** `/api/accounts/post-deliverables/[postId]` returns the clicked post + every collab sibling with its payment row.
+- **CSV export:** `/api/accounts/export?mode=due|paid|all`.
+- **`submitPayments`** (`actions.ts`): 3-gate pipeline (stage gate Posted/Delivered; §7.2 collab posting completeness; §8.2 ad-partnership gate). Dedup key `(post_id, lower(utr))`. **Partial-payments engine:** each distinct UTR = a new installment row; Done cascades status to all collab deliverables + deletes stray sibling rows. Stamps `posted_but_not_tested` (warehouse-aware, 5s timeout). Fires per-creator "Payment Processed" emails + actor confirmation. `recomputePaymentStates` is the daily reconciliation cron.
+
+## Creators — `[username]` Overview
+**Route:** `/creators/[username]` (currently a placeholder; full tabbed drill-down pending).
+**API (built):** `GET /api/creators/[username]/overview` (`requireActor`): creator row + last-12 posts + payments. **Backfills** missing creator fields (email/agency/bank/ifsc/state) from the most recent post, and contact/address from `shopify_orders`. Stats: postCount, onboardedCount, paidTotal, payableTotal, paymentCount.
+
+## Sheets — Sheet View Grid
+**Route:** `/sheets?tab=<id>` (`canEdit = hasPermission(actor,"admin")`). Google-Sheets-style read/edit grid over 10 Supabase tables, one tab each.
+- **Catalogue:** `features/sheets/types.ts` `SHEET_TABLES` (posts, creators, campaigns, campaign_budget [special month-block `variant:"budget"`], payments, shopify_orders, system_errors, instagram_cache, inbound_reachout_queue, user_access). Each `ColDef` flags editable/type/options.
+- **Fetch:** `fetchTabCounts` (parallel head counts), `fetchSheetData` (paginates past PostgREST's 1000-row cap up to 50k).
+- **Actions** (all `assertPermission("admin")`): `updateSheetCell` (type-coerces, snapshots old value), **edited badge** (`recordCellEdit` → `cell_edits`, fails soft on missing table; `fetchRecentCellEdits` returns latest edit per cell within N days), **revised-details email** (`sendRevisedDetailsEmail` fires only for `CRITICAL_COLUMNS` that changed — order_status, est_delivery, delivered_date, commercial_amount, email, bank fields, order_id — to creator + onboarded_by, old→new diff, logs `email_logs`), **cell comments** (`cell_comments` threads with @-mention extraction + validation + fanout).
+
+## Errors — Error Portal (`system_errors`)
+**Route:** `/errors`. Mirrors legacy `runErrorAudit` + the `logSystemError_` sink. Parallel pulls posts/payments/shopify_orders/unresolved system_errors/creators-count.
+- **5 audit rules:** INVALID_POST_ID (HIGH), DUPLICATE_UTR (HIGH), PAYMENT_BEFORE_POSTING (MEDIUM), MISSING_BANK_DETAILS (MEDIUM), MISSING_TRACKING (LOW, order >2 days old).
+- **Data health:** stage counts + missing bank/email/tracking/order/postLink + paymentsDue + totalPaidOut + totalCreators.
+- **MISSING_COLLAB_EMAIL** worklist: parent + onboarded/posted/delivered + `collab_email_sent_at IS NULL`.
+- **Summary:** HIGH/MEDIUM/LOW + apiFails (`system_errors` type ig_fetch/apify_fail) + missingEmail.
+
+## User Panel / Admin Users — Invite, Roles, Audit, CSV
+**Routes:** `/admin/users` + `/admin/users/[email]` — both redirect unless `hasPermission(actor,"admin")`.
+- **Fetch:** `fetchUserPanelData` reads `user_access` + a 30-day activity sparkline (posts.onboarded_by / payments.logged_by / cell_comments.author_email). KPIs: total/active/admins/accounts/pendingInvites/lastActiveToday. `fetchUserAuditLog` reads `user_audit_log`.
+- **Actions** (all `assertPermission("admin")`): **invite flow** (`saveUser` upserts `user_access`; new+active users get a branded **Google-OAuth-only** invite email linking to `/login` — passwordless, no accept token); **audit log** (every mutation writes `user_audit_log`); `deleteUser`/`toggleUserActive`/`recordUserActivity`; **CSV invite** (`bulkInviteUsers` — role-alias map, parallel sends, one `csv_invite_batch` audit).
+- **Roles + RBAC:** `roles-actions.ts` CRUD over `access_roles` + `access_role_permissions` (reads `access_role_summary`). `listRoles`/`createRole`/`updateRole` (renames propagate to `user_access.role` + audit each affected user)/`deleteRole` (blocked while users assigned; system roles immutable). Permission model → chapter 08.
+
+---
+
+## Cross-cutting notes
+- **No SQL views/RPCs for analytics** — every fetcher pulls raw rows (`.limit()` 2k–10k) and aggregates in JS; `access_role_summary` is the only DB view used.
+- **Parent/child collab rule is pervasive:** payment lives on the representative; `commercial_amount` is equal-split and re-summed across siblings for any display/KPI.
+- **Defensive EXTENDED→BASE column fallback** (`42703`) in dashboard, tat, ad-status, order-status fetchers — missing prod columns degrade gracefully.
+- **Legacy parity** cited per fetcher header (getDashboardStatsFiltered, getDashboardMetrics, getComplianceKPIs, getBudgetVsActuals, getAccountsHubData/submitPayments, runErrorAudit, getAdStatusData, _isoWeek, _nextPayableCycleDate_).
