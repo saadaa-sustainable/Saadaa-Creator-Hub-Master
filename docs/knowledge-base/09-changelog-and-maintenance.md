@@ -32,6 +32,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-06-09 | **Sheet View row delete + bulk delete** (Global-Admin only; `deletable` operational tabs; hard delete + `row_deletions` restore log; Undo + Trash; FK-guarded) | 04, 07 |
 | 2026-06-07 | **Knowledge base created** (this `docs/knowledge-base/` — the project brain) | all |
 | 2026-06-07 | **Repo reorg:** deleted dead `creatorhub/` (1.9 GB Expo prototype), `Old gas project files/`, `gh-pages-wrapper/`, `config/`; consolidated supabase (42 migrations + `scrape-pending-apify` + `config.toml`) into the repo | 03, 04, 05 |
 | 2026-06-07 | **Full test-data wipe:** `TRUNCATE … RESTART IDENTITY CASCADE` on operational tables (fresh IDs IFC001 / INF-001 / SIF-1); preserved RBAC, users, `shopify_orders` | 04 |

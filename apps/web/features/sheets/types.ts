@@ -49,6 +49,13 @@ export interface SheetTable {
   rowLimit?: number;
   /** Special handler — e.g. campaign_budget uses month-block layout */
   variant?: "budget";
+  /**
+   * Whether Global Admins may hard-delete rows from this tab. Off by default.
+   * Enabled only for operational tables — never for RBAC (user_access) or
+   * cron-synced caches (shopify_orders, instagram_cache) which just re-sync.
+   * Deletes are FK-guarded by Postgres and snapshotted to `row_deletions`.
+   */
+  deletable?: boolean;
 }
 
 /** Column catalogue — single source of truth for the grid renderer. */
@@ -60,6 +67,7 @@ export const SHEET_TABLES: SheetTable[] = [
     pk: "post_id",
     description: "Per-deliverable workflow rows — Reach Out → Posted → Delivered → Paid",
     defaultSort: { col: "reach_out_date", dir: "desc" },
+    deletable: true,
 
     columns: [
       { key: "post_id", label: "Post ID", type: "text", width: 140 },
@@ -110,7 +118,7 @@ export const SHEET_TABLES: SheetTable[] = [
     label: "Creators",
     table: "creators",
     pk: "inf_id",
-    
+    deletable: true,
     columns: [
       { key: "inf_id", label: "Inf ID", type: "text", width: 90 },
       { key: "username", label: "Username", type: "text", width: 140, editable: true },
@@ -130,7 +138,7 @@ export const SHEET_TABLES: SheetTable[] = [
     label: "Campaigns",
     table: "campaigns",
     pk: "campaign_id",
-    
+    deletable: true,
     columns: [
       { key: "campaign_id", label: "Campaign ID", type: "text", width: 110 },
       { key: "campaign_name", label: "Name", type: "text", width: 200, editable: true },
@@ -149,7 +157,7 @@ export const SHEET_TABLES: SheetTable[] = [
     label: "Budget Sheet",
     table: "campaign_budget",
     pk: "id",
-    
+    deletable: true,
     variant: "budget",
     description: "Per-month budget allocations — auto-generated when campaign is submitted",
     columns: [
@@ -172,7 +180,7 @@ export const SHEET_TABLES: SheetTable[] = [
     label: "Payments",
     table: "payments",
     pk: "post_id",
-    
+    deletable: true,
     defaultSort: { col: "created_at", dir: "desc" },
     columns: [
       { key: "post_id", label: "Post ID", type: "text", width: 140 },
@@ -226,7 +234,7 @@ export const SHEET_TABLES: SheetTable[] = [
     label: "System Errors",
     table: "system_errors",
     pk: "id",
-    
+    deletable: true,
     defaultSort: { col: "created_at", dir: "desc" },
     columns: [
       { key: "id", label: "ID", type: "number", width: 70 },
@@ -262,7 +270,7 @@ export const SHEET_TABLES: SheetTable[] = [
     label: "Inbound Queue",
     table: "inbound_reachout_queue",
     pk: "id",
-    
+    deletable: true,
     defaultSort: { col: "created_at", dir: "desc" },
     columns: [
       { key: "id", label: "ID", type: "number", width: 70 },

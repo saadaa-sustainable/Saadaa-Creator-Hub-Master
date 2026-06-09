@@ -5,7 +5,7 @@ export default function SheetsKM() {
     <>
       <KMHeader
         title="Sheet View"
-        subtitle="Google-Sheets-style tabbed grid over every Supabase table. Cell-level edit + comment threads with @-mention email fanout. Admin-only writes."
+        subtitle="Google-Sheets-style tabbed grid over every Supabase table. Cell-level edit, comment threads with @-mention email fanout, and Global-Admin row delete with a restore log. Admin-only writes."
       />
 
       <KMSection tag="Page layout (top → bottom)">
@@ -19,7 +19,10 @@ export default function SheetsKM() {
           </li>
           <li>
             <strong>2. Toolbar</strong> — search, Edit mode toggle, Density
-            (Cozy / Compact), column visibility menu, CSV export.
+            (Cozy / Compact), column visibility menu, CSV export. For Global
+            Admins on operational tabs: a <strong>Trash</strong> (recently
+            deleted) button and a red <strong>Delete N</strong> button that
+            acts on the row checkboxes.
           </li>
           <li>
             <strong>3. Grid</strong> — column letter (A, B, C…), type icon,
@@ -61,9 +64,11 @@ export default function SheetsKM() {
       <KMSection tag="Column features">
         <KMList>
           <li>
-            <strong>Virtual columns</strong> · resolved client-side via{" "}
+            <strong>Virtual columns</strong> · resolved client-side via the{" "}
             <KMCode>VIRTUAL_RESOLVERS</KMCode> map (functions can&apos;t cross the
-            RSC boundary). Today: <KMCode>__lineage</KMCode> → Parent / Child N.
+            RSC boundary). None active today — the old{" "}
+            <KMCode>__lineage</KMCode> column was retired with the collab-id
+            model. The mechanism stays for future derived columns.
           </li>
           <li>
             <strong>Dynamic merge</strong> ·{" "}
@@ -165,6 +170,50 @@ export default function SheetsKM() {
             <KMCode>email_logs</KMCode> with{" "}
             <KMCode>email_type=&apos;sheet_revision&apos;</KMCode> and failures
             land in <KMCode>system_errors</KMCode>.
+          </li>
+        </KMList>
+      </KMSection>
+
+      <KMSection tag="Row delete + restore (Global-Admin only)">
+        <KMList>
+          <li>
+            <strong>Who</strong> · only Global Admins. The grid surfaces
+            checkboxes + Delete only when{" "}
+            <KMCode>hasPermission(actor, &quot;admin&quot;)</KMCode>; the{" "}
+            <KMCode>deleteSheetRows</KMCode> action re-checks via{" "}
+            <KMCode>assertPermission(&quot;admin&quot;)</KMCode>. It is its own
+            gate, decoupled from edit permission.
+          </li>
+          <li>
+            <strong>Where</strong> · operational tabs only —{" "}
+            <KMCode>deletable: true</KMCode> in{" "}
+            <KMCode>types.ts</KMCode> on Posts, Creators, Campaigns, Budget,
+            Payments, Inbound Queue, System Errors. <strong>Not</strong> User
+            Access (manage via Access Hub) or the cron-synced Shopify /
+            Instagram caches (they just re-sync).
+          </li>
+          <li>
+            <strong>Select &amp; delete</strong> · per-row checkbox + a
+            header select-all (visible rows). Delete opens a confirm dialog;
+            bulk deletes of <strong>10+</strong> rows require typing{" "}
+            <KMCode>DELETE</KMCode>.
+          </li>
+          <li>
+            <strong>Hard delete + restore log</strong> · each row is
+            snapshotted (full JSON) into <KMCode>row_deletions</KMCode> before
+            removal, so nothing is silently lost. A toast offers{" "}
+            <strong>Undo</strong> immediately; the <strong>Trash</strong>{" "}
+            button lists the last 30 days per tab with per-row{" "}
+            <strong>Restore</strong>. Restore strips generated columns (e.g.
+            budget <KMCode>total_cost</KMCode>) and re-inserts the original PK.
+          </li>
+          <li>
+            <strong>FK is the guardrail</strong> · Postgres blocks deletes
+            that would orphan data and the action turns the{" "}
+            <KMCode>23503</KMCode> into a friendly &quot;still referenced by
+            payments — delete those first&quot;. Deleting a campaign
+            cascade-removes its budget blocks and nulls{" "}
+            <KMCode>posts.campaign_id</KMCode> (DB rules, not app logic).
           </li>
         </KMList>
       </KMSection>

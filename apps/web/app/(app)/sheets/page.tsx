@@ -22,6 +22,9 @@ export default async function SheetsPage({
   const params = await searchParams;
   const actor = await getActor();
   const canEdit = !!actor && hasPermission(actor, "admin");
+  // Row delete is Global-Admin only — its own gate so it stays restricted even
+  // if edit permission is ever widened to more roles.
+  const canDelete = !!actor && hasPermission(actor, "admin");
   const currentUserEmail = actor?.email ?? null;
 
   const requested = params.tab ?? SHEET_TABLES[0].id;
@@ -34,6 +37,7 @@ export default async function SheetsPage({
         <SheetsData
           tableId={active.id}
           canEdit={canEdit}
+          canDelete={canDelete}
           currentUserEmail={currentUserEmail}
         />
       </Suspense>
@@ -44,10 +48,12 @@ export default async function SheetsPage({
 async function SheetsData({
   tableId,
   canEdit,
+  canDelete,
   currentUserEmail,
 }: {
   tableId: string;
   canEdit: boolean;
+  canDelete: boolean;
   currentUserEmail: string | null;
 }) {
   const active = getSheetTableById(tableId) ?? SHEET_TABLES[0];
@@ -62,6 +68,7 @@ async function SheetsData({
       data={data}
       counts={counts}
       canEdit={canEdit}
+      canDelete={canDelete}
       currentUserEmail={currentUserEmail}
     />
   );

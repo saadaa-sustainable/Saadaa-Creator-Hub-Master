@@ -30,6 +30,7 @@ interface Props {
   data: SheetData;
   counts: Record<string, number>;
   canEdit: boolean;
+  canDelete?: boolean;
   currentUserEmail?: string | null;
 }
 
@@ -52,6 +53,7 @@ export function SheetsBody({
   data,
   counts,
   canEdit,
+  canDelete = false,
   currentUserEmail = null,
 }: Props) {
   const [optimisticActiveId, setOptimisticActiveId] = useState(active.id);
@@ -75,12 +77,18 @@ export function SheetsBody({
         aria-labelledby={`sheets-tab-${active.id}`}
       >
         {active.variant === "budget" ? (
-          <BudgetSheet table={active} rows={data.rows} canEdit={canEdit} />
+          <BudgetSheet
+            table={active}
+            rows={data.rows}
+            canEdit={canEdit}
+            canDelete={canDelete}
+          />
         ) : (
           <SheetGrid
             table={active}
             rows={data.rows}
             canEdit={canEdit}
+            canDelete={canDelete}
             currentUserEmail={currentUserEmail}
           />
         )}

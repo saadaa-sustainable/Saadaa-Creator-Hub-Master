@@ -251,6 +251,291 @@ export async function fetchRecentCellEdits(args: {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Row delete + restore — Global-Admin only, hard delete with a recoverable
+// snapshot written to `row_deletions`. Postgres FK constraints are the
+// integrity guardrail: a delete that would orphan data throws 23503 and is
+// surfaced as a friendly "still referenced by …" message instead of cascading.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Generated columns that cannot be written back on restore (stripped). */
+const NON_RESTORABLE_COLUMNS: Record<string, string[]> = {
+  campaign_budget: ["est_garment_cost", "total_cost", "total_with_garments"],
+};
+
+/** Friendly labels for child tables surfaced in FK-violation messages. */
+const CHILD_TABLE_LABELS: Record<string, string> = {
+  posts: "posts",
+  payments: "payments",
+  campaign_budget: "budget rows",
+  cell_comments: "cell comments",
+};
+
+function friendlyDeleteError(error: {
+  code?: string;
+  message?: string;
+  details?: string;
+}): string {
+  if (error?.code === "23503") {
+    const m = (error.details ?? "").match(/referenced from table "([^"]+)"/);
+    const child = m?.[1];
+    const label = child ? (CHILD_TABLE_LABELS[child] ?? child) : null;
+    return label
+      ? `Still referenced by ${label} — delete those first.`
+      : "Still referenced by other rows — delete those first.";
+  }
+  return error?.message ?? "Delete failed";
+}
+
+export interface DeleteRowsResult {
+  ok: boolean;
+  deleted: string[];
+  /** Deletion-log ids for the rows just removed (drives the Undo toast). */
+  deletionIds: number[];
+  blocked: Array<{ rowKey: string; reason: string }>;
+  error?: string;
+}
+
+/**
+ * Hard-delete one or more rows by primary key. Global-Admin only. Each row is
+ * snapshotted to `row_deletions` before removal so it can be restored. Rows
+ * blocked by FK constraints are reported per-row, never aborting the batch.
+ */
+export async function deleteSheetRows(args: {
+  tableId: string;
+  rowKeys: string[];
+}): Promise<DeleteRowsResult> {
+  const actor = await assertPermission("admin");
+
+  const tbl = getSheetTableById(args.tableId);
+  if (!tbl) {
+    return { ok: false, deleted: [], deletionIds: [], blocked: [], error: "Unknown table" };
+  }
+  if (!tbl.deletable) {
+    return {
+      ok: false,
+      deleted: [],
+      deletionIds: [],
+      blocked: [],
+      error: "Deleting rows is not allowed on this tab",
+    };
+  }
+
+  const keys = Array.from(
+    new Set((args.rowKeys ?? []).map((k) => String(k)).filter((k) => k.length > 0)),
+  );
+  if (keys.length === 0) {
+    return { ok: false, deleted: [], deletionIds: [], blocked: [], error: "No rows selected" };
+  }
+  if (keys.length > 500) {
+    return {
+      ok: false,
+      deleted: [],
+      deletionIds: [],
+      blocked: [],
+      error: "Too many rows in one delete (max 500)",
+    };
+  }
+
+  const supabase = createServiceClient();
+  const deleted: string[] = [];
+  const deletionIds: number[] = [];
+  const blocked: DeleteRowsResult["blocked"] = [];
+
+  for (const rowKey of keys) {
+    // Snapshot first so we can restore, and so a vanished row is reported
+    // rather than silently "succeeding".
+    let snapshot: Record<string, unknown> | null = null;
+    try {
+      const { data } = await (supabase as any)
+        .from(tbl.table)
+        .select("*")
+        .eq(tbl.pk, rowKey)
+        .maybeSingle();
+      snapshot = (data ?? null) as Record<string, unknown> | null;
+    } catch {
+      // fall through — delete still attempted, just without a snapshot
+    }
+
+    if (!snapshot) {
+      blocked.push({ rowKey, reason: "Row no longer exists" });
+      continue;
+    }
+
+    const { error } = await (supabase as any)
+      .from(tbl.table)
+      .delete()
+      .eq(tbl.pk, rowKey);
+
+    if (error) {
+      blocked.push({ rowKey, reason: friendlyDeleteError(error) });
+      continue;
+    }
+
+    deleted.push(rowKey);
+
+    // Write the restore log. Best-effort: a log failure never un-deletes, but
+    // we surface it so a missing audit row is noticed.
+    try {
+      const { data: logRow, error: logErr } = await (supabase as any)
+        .from("row_deletions")
+        .insert({
+          sheet_key: tbl.id,
+          table_name: tbl.table,
+          row_pk: rowKey,
+          pk_column: tbl.pk,
+          row_data: snapshot,
+          deleted_by: actor.email,
+        })
+        .select("id")
+        .single();
+      if (logErr) {
+        console.warn(`[sheets] row_deletions log failed for ${tbl.table}.${rowKey}:`, logErr.message);
+      } else if (logRow?.id != null) {
+        deletionIds.push(Number(logRow.id));
+      }
+    } catch (err) {
+      console.warn(
+        `[sheets] row_deletions log threw for ${tbl.table}.${rowKey}:`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  revalidatePath("/sheets");
+  return { ok: deleted.length > 0, deleted, deletionIds, blocked };
+}
+
+export interface DeletionLogRow {
+  id: number;
+  sheetKey: string;
+  rowPk: string;
+  deletedBy: string;
+  deletedAt: string;
+  restoredAt: string | null;
+  /** A human label for the row — best-guess from common identifier columns. */
+  preview: string;
+}
+
+/**
+ * Recent deletions for a tab (default last 30 days), newest first. Powers the
+ * "Recently deleted" history popover. Restored entries are included but flagged.
+ */
+export async function fetchRecentDeletions(args: {
+  tableId: string;
+  withinDays?: number;
+}): Promise<{ ok: true; deletions: DeletionLogRow[] } | { ok: false; error: string }> {
+  await assertPermission("admin");
+  const days = args.withinDays ?? 30;
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await (supabase as any)
+      .from("row_deletions")
+      .select("id, sheet_key, row_pk, row_data, deleted_by, deleted_at, restored_at")
+      .eq("sheet_key", args.tableId)
+      .gte("deleted_at", since)
+      .order("deleted_at", { ascending: false })
+      .limit(200);
+
+    if (error) return { ok: true, deletions: [] };
+
+    const deletions: DeletionLogRow[] = ((data ?? []) as Array<{
+      id: number;
+      sheet_key: string;
+      row_pk: string;
+      row_data: Record<string, unknown>;
+      deleted_by: string;
+      deleted_at: string;
+      restored_at: string | null;
+    }>).map((r) => ({
+      id: Number(r.id),
+      sheetKey: r.sheet_key,
+      rowPk: r.row_pk,
+      deletedBy: r.deleted_by,
+      deletedAt: r.deleted_at,
+      restoredAt: r.restored_at,
+      preview: previewFromSnapshot(r.row_data, r.row_pk),
+    }));
+    return { ok: true, deletions };
+  } catch {
+    return { ok: true, deletions: [] };
+  }
+}
+
+function previewFromSnapshot(
+  row: Record<string, unknown> | null,
+  fallback: string,
+): string {
+  if (!row) return fallback;
+  const pick = (k: string) => {
+    const v = row[k];
+    return typeof v === "string" && v.trim() ? v.trim() : null;
+  };
+  const name = pick("username") ?? pick("campaign_name") ?? pick("inf_name") ?? pick("name");
+  return name ? `${fallback} · ${name}` : fallback;
+}
+
+/**
+ * Restore previously deleted rows from the log by re-inserting the snapshot.
+ * Generated columns are stripped. Idempotent — already-restored entries skip.
+ */
+export async function restoreDeletedRows(args: {
+  deletionIds: number[];
+}): Promise<{ ok: boolean; restored: number; failed: number; error?: string }> {
+  const actor = await assertPermission("admin");
+
+  const ids = Array.from(
+    new Set((args.deletionIds ?? []).map((n) => Number(n)).filter((n) => Number.isFinite(n))),
+  );
+  if (ids.length === 0) return { ok: false, restored: 0, failed: 0, error: "Nothing to restore" };
+
+  const supabase = createServiceClient();
+  const { data: logs, error } = await (supabase as any)
+    .from("row_deletions")
+    .select("id, table_name, row_data, restored_at")
+    .in("id", ids);
+
+  if (error) return { ok: false, restored: 0, failed: 0, error: error.message };
+
+  let restored = 0;
+  let failed = 0;
+
+  for (const log of (logs ?? []) as Array<{
+    id: number;
+    table_name: string;
+    row_data: Record<string, unknown>;
+    restored_at: string | null;
+  }>) {
+    if (log.restored_at) continue; // already restored — skip
+
+    const strip = NON_RESTORABLE_COLUMNS[log.table_name] ?? [];
+    const payload: Record<string, unknown> = { ...log.row_data };
+    for (const k of strip) delete payload[k];
+
+    // upsert so re-creating the original pk is tolerant of a row that came back
+    const { error: insErr } = await (supabase as any)
+      .from(log.table_name)
+      .upsert(payload);
+
+    if (insErr) {
+      console.warn(`[sheets] restore failed for deletion ${log.id}:`, insErr.message);
+      failed++;
+      continue;
+    }
+
+    await (supabase as any)
+      .from("row_deletions")
+      .update({ restored_at: new Date().toISOString(), restored_by: actor.email })
+      .eq("id", log.id);
+    restored++;
+  }
+
+  revalidatePath("/sheets");
+  return { ok: restored > 0, restored, failed };
+}
+
 /**
  * Resolve recipients + send the "revised details" email. Recipients are the
  * creator's email and the post's onboarded_by user. Both are best-effort: a

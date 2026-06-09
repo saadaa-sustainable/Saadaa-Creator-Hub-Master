@@ -16,10 +16,12 @@ export function BudgetSheet({
   table,
   rows,
   canEdit,
+  canDelete = false,
 }: {
   table: SheetTable;
   rows: SheetRow[];
   canEdit: boolean;
+  canDelete?: boolean;
 }) {
   const months = useMemo(() => {
     const set = new Set<string>();
@@ -134,7 +136,12 @@ export function BudgetSheet({
       </div>
 
       {/* Reuse the standard grid for the rows in this month */}
-      <SheetGrid table={table} rows={monthRows} canEdit={canEdit} />
+      <SheetGrid
+        table={table}
+        rows={monthRows}
+        canEdit={canEdit}
+        canDelete={canDelete}
+      />
     </div>
   );
 }

@@ -216,6 +216,7 @@ Apify profile cache + scrape retry queue. Keyed by `username`.
 | `system_errors` | Generic Error Portal sink | `type`/`key`/`message`/`source`/`resolved`; partial-UNIQUE dedupe `(type, key, source) where not resolved`; SELECT to authenticated |
 | `cell_comments` | Sheet View comment threads + @-mentions | FK to `user_access.email`; GIN on `mentions`; trigger updated_at; RLS service-only |
 | `cell_edits` | Sheet View single-cell audit ("edited" badge + revised-details email) | IDENTITY PK; old/new value; RLS enabled, **no policy** (service-only, PII) |
+| `row_deletions` | Sheet View row-delete restore log | IDENTITY PK; `sheet_key`/`table_name`/`row_pk`/`pk_column`; full `row_data` jsonb snapshot; `deleted_by`/`deleted_at` + `restored_by`/`restored_at`; RLS enabled, **no policy** (service-only). Written by `deleteSheetRows`, read/restored by `restoreDeletedRows` |
 | `email_logs` | Outbound-email sink (collab + notification matrix) | `email_type` matches `NOTIFICATION_TYPES`; RLS enabled, **no policy** (service-only, PII) |
 | `user_audit_log` | Append-only User Panel activity feed | `action` CHECK `in (invite,edit,role_change,activate,deactivate,delete,login,csv_invite_batch)`; before/after jsonb |
 
@@ -280,7 +281,7 @@ Extensions: `pg_cron`, `pg_net`, `supabase_vault`. Bearer JWT read at fire-time 
 
 - Base tables use the **service-role key** everywhere server-side (bypasses RLS).
 - RLS-enabled + service_role-only policy: `access_roles`, `access_role_permissions`, `cell_comments`, `user_audit_log`.
-- RLS-enabled + NO policy (hard lock, PII): `cell_edits`, `email_logs`.
+- RLS-enabled + NO policy (hard lock, PII): `cell_edits`, `email_logs`, `row_deletions`.
 - `system_errors`: SELECT to `authenticated`, full DML to `service_role`.
 
 ## Domain facts (verified)

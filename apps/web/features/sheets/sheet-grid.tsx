@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   Calendar,
@@ -30,10 +31,12 @@ import {
   Pencil,
   Pin,
   PinOff,
+  RotateCcw,
   Rows3,
   Search,
   Sparkles,
   ToggleLeft,
+  Trash2,
   Type as TypeIcon,
   X,
   type LucideIcon,
@@ -42,10 +45,14 @@ import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import {
+  deleteSheetRows,
   fetchCellComments,
   fetchRecentCellEdits,
+  fetchRecentDeletions,
+  restoreDeletedRows,
   updateSheetCell,
   type CellCommentRow,
+  type DeletionLogRow,
   type RecentEdit,
 } from "./actions";
 import { CellCommentThread } from "./cell-comment-thread";
@@ -61,6 +68,8 @@ interface Props {
   table: SheetTable;
   rows: SheetRow[];
   canEdit: boolean;
+  /** Global-Admin-only row delete. Independent of canEdit. */
+  canDelete?: boolean;
   currentUserEmail?: string | null;
 }
 
@@ -94,9 +103,13 @@ export function SheetGrid({
   table,
   rows,
   canEdit,
+  canDelete = false,
   currentUserEmail = null,
 }: Props) {
   const router = useRouter();
+  // Row delete is gated on BOTH the table opting in AND the actor being a
+  // Global Admin (canDelete). Edit permission is intentionally not enough.
+  const rowsDeletable = canDelete && table.deletable === true;
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(
     table.defaultSort?.col ?? null,
@@ -116,6 +129,25 @@ export function SheetGrid({
   const [pinnedCols, setPinnedCols] = useState<string[]>([]); // ordered
   const [showColsMenu, setShowColsMenu] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  // ── Row delete (Global-Admin only) ────────────────────────────────────────
+  // Selection is keyed by primary-key value so it survives sort/filter.
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, startDeleting] = useTransition();
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deletions, setDeletions] = useState<DeletionLogRow[]>([]);
+  const [loadingDeletions, setLoadingDeletions] = useState(false);
+  const [restoring, startRestoring] = useTransition();
+
+  // Reset selection + close panels whenever the active tab changes.
+  useEffect(() => {
+    setSelectedRows(new Set());
+    setConfirmOpen(false);
+    setConfirmText("");
+    setShowDeleted(false);
+  }, [table.id]);
 
   // Comments — keyed `${rowKey}::${columnKey}` → array of comments. Open
   // thread tracks the cell under view; null = drawer closed.
@@ -297,6 +329,120 @@ export function SheetGrid({
     a.click();
     URL.revokeObjectURL(url);
     toast.success(`Exported ${sortedRows.length} rows`);
+  };
+
+  // ── Selection + delete helpers ────────────────────────────────────────────
+  const visibleRowKeys = useMemo(
+    () => sortedRows.map((r) => String(r[table.pk] ?? "")).filter(Boolean),
+    [sortedRows, table.pk],
+  );
+  const allVisibleSelected =
+    visibleRowKeys.length > 0 && visibleRowKeys.every((k) => selectedRows.has(k));
+  const selectedCount = selectedRows.size;
+  const BULK_CONFIRM_THRESHOLD = 10;
+  const needsTypedConfirm = selectedCount >= BULK_CONFIRM_THRESHOLD;
+
+  const toggleRow = (rowKey: string) => {
+    if (!rowKey) return;
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowKey)) next.delete(rowKey);
+      else next.add(rowKey);
+      return next;
+    });
+  };
+
+  const toggleAllVisible = () => {
+    setSelectedRows((prev) => {
+      if (visibleRowKeys.length > 0 && visibleRowKeys.every((k) => prev.has(k))) {
+        const next = new Set(prev);
+        for (const k of visibleRowKeys) next.delete(k);
+        return next;
+      }
+      return new Set([...prev, ...visibleRowKeys]);
+    });
+  };
+
+  const undoDelete = (deletionIds: number[]) => {
+    if (deletionIds.length === 0) return;
+    startRestoring(async () => {
+      const r = await restoreDeletedRows({ deletionIds });
+      if (r.ok) {
+        toast.success(`Restored ${r.restored} row${r.restored === 1 ? "" : "s"}`);
+        router.refresh();
+      } else {
+        toast.error(r.error ?? "Restore failed");
+      }
+    });
+  };
+
+  const runDelete = () => {
+    if (selectedCount === 0) return;
+    if (needsTypedConfirm && confirmText.trim().toUpperCase() !== "DELETE") return;
+    const rowKeys = Array.from(selectedRows);
+    startDeleting(async () => {
+      const res = await deleteSheetRows({ tableId: table.id, rowKeys });
+      if (!res.ok && res.error && res.deleted.length === 0) {
+        toast.error(res.error);
+        return;
+      }
+      if (res.deleted.length > 0) {
+        toast.success(
+          res.blocked.length > 0
+            ? `Deleted ${res.deleted.length} · ${res.blocked.length} blocked`
+            : `Deleted ${res.deleted.length} row${res.deleted.length === 1 ? "" : "s"}`,
+          res.deletionIds.length > 0
+            ? {
+                duration: 8000,
+                action: {
+                  label: "Undo",
+                  onClick: () => undoDelete(res.deletionIds),
+                },
+              }
+            : undefined,
+        );
+      }
+      if (res.blocked.length > 0) {
+        const first = res.blocked[0];
+        toast.error(
+          res.blocked.length === 1
+            ? `${first.rowKey}: ${first.reason}`
+            : `${res.blocked.length} rows blocked — ${first.reason}`,
+          { duration: 6000 },
+        );
+      }
+      setSelectedRows(new Set());
+      setConfirmOpen(false);
+      setConfirmText("");
+      router.refresh();
+    });
+  };
+
+  const openHistory = () => {
+    setShowDeleted(true);
+    setLoadingDeletions(true);
+    void (async () => {
+      const res = await fetchRecentDeletions({ tableId: table.id, withinDays: 30 });
+      setLoadingDeletions(false);
+      if (res.ok) setDeletions(res.deletions);
+    })();
+  };
+
+  const restoreFromHistory = (id: number) => {
+    startRestoring(async () => {
+      const r = await restoreDeletedRows({ deletionIds: [id] });
+      if (r.ok) {
+        toast.success("Row restored");
+        setDeletions((prev) =>
+          prev.map((d) =>
+            d.id === id ? { ...d, restoredAt: new Date().toISOString() } : d,
+          ),
+        );
+        router.refresh();
+      } else {
+        toast.error(r.error ?? "Restore failed");
+      }
+    });
   };
 
   const flashCell = (id: string) => {
@@ -508,6 +654,38 @@ export function SheetGrid({
           >
             <Download size={11} aria-hidden /> CSV
           </button>
+
+          {rowsDeletable && (
+            <>
+              <button
+                type="button"
+                onClick={openHistory}
+                title="Recently deleted rows (restore)"
+                className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-border bg-bg-white text-text-secondary text-[0.65rem] font-extrabold hover:bg-bg-muted/40 hover:border-[--accent] transition-colors"
+              >
+                <RotateCcw size={11} aria-hidden /> Trash
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmOpen(true)}
+                disabled={selectedCount === 0 || deleting}
+                title={
+                  selectedCount === 0
+                    ? "Select rows to delete"
+                    : `Delete ${selectedCount} selected`
+                }
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border text-[0.65rem] font-extrabold transition-colors",
+                  selectedCount === 0 || deleting
+                    ? "border-border bg-bg-muted/40 text-text-tertiary cursor-not-allowed"
+                    : "border-danger/30 bg-danger-bg text-danger hover:brightness-95",
+                )}
+              >
+                <Trash2 size={11} aria-hidden />
+                {selectedCount > 0 ? `Delete ${selectedCount}` : "Delete"}
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -579,7 +757,8 @@ export function SheetGrid({
               <tr className="text-text-tertiary uppercase tracking-[0.06em] text-[0.55rem] font-extrabold">
                 <th
                   className={cn(
-                    "bg-bg-surface text-center px-2 py-2 border-r border-border w-10 min-w-[40px]",
+                    "bg-bg-surface text-center px-2 py-2 border-r border-border",
+                    rowsDeletable ? "w-14 min-w-[56px]" : "w-10 min-w-[40px]",
                     pinnedCols.length > 0 &&
                       "shadow-[2px_0_0_var(--accent)_inset]",
                   )}
@@ -589,7 +768,23 @@ export function SheetGrid({
                       : undefined
                   }
                 >
-                  #
+                  {rowsDeletable ? (
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible rows"
+                      checked={allVisibleSelected}
+                      ref={(el) => {
+                        if (el)
+                          el.indeterminate =
+                            !allVisibleSelected &&
+                            visibleRowKeys.some((k) => selectedRows.has(k));
+                      }}
+                      onChange={toggleAllVisible}
+                      className="h-3.5 w-3.5 cursor-pointer align-middle accent-[--accent]"
+                    />
+                  ) : (
+                    "#"
+                  )}
                 </th>
                 {cols.map((c, idx) => {
                   const isPinned = pinnedCols.includes(c.key);
@@ -687,6 +882,9 @@ export function SheetGrid({
             <tbody>
               {sortedRows.map((row, rowIdx) => {
                 const rowKey = String(row[table.pk] ?? rowIdx);
+                const selectKey =
+                  row[table.pk] == null ? "" : String(row[table.pk]);
+                const isChecked = selectKey !== "" && selectedRows.has(selectKey);
                 const isRowSelected = selected?.row === rowIdx;
                 return (
                   <tr
@@ -694,17 +892,22 @@ export function SheetGrid({
                     className={cn(
                       "transition-colors border-b border-border/50 last:border-b-0 group",
                       rowIdx % 2 === 0 ? "bg-bg-white" : "bg-bg-surface/20",
-                      isRowSelected
-                        ? "!bg-[--accent]/10"
-                        : "hover:bg-bg-muted/40",
+                      isChecked
+                        ? "!bg-danger-bg/50"
+                        : isRowSelected
+                          ? "!bg-[--accent]/10"
+                          : "hover:bg-bg-muted/40",
                     )}
                   >
                     <td
                       className={cn(
-                        "text-center px-2 border-r border-border text-text-tertiary text-[0.62rem] font-extrabold tabular select-none cursor-pointer transition-colors",
+                        "text-center px-2 border-r border-border text-text-tertiary text-[0.62rem] font-extrabold tabular select-none transition-colors",
                         rowPadY,
                         rowIdx % 2 === 0 ? "bg-bg-white" : "bg-bg-surface/20",
-                        isRowSelected && "!bg-[--accent]/15 text-text-primary",
+                        isChecked && "!bg-danger-bg/60",
+                        !isChecked &&
+                          isRowSelected &&
+                          "!bg-[--accent]/15 text-text-primary",
                         "group-hover:bg-bg-muted/40",
                         pinnedCols.length > 0 &&
                           "shadow-[2px_0_0_var(--accent)_inset]",
@@ -714,9 +917,35 @@ export function SheetGrid({
                           ? { position: "sticky", left: 0, zIndex: 16 }
                           : undefined
                       }
-                      onClick={() => setSelected({ row: rowIdx, col: -1 })}
                     >
-                      {rowIdx + 1}
+                      {rowsDeletable ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select row ${rowIdx + 1}`}
+                            checked={isChecked}
+                            disabled={selectKey === ""}
+                            onChange={() => toggleRow(selectKey)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-3.5 w-3.5 cursor-pointer align-middle accent-[--accent]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setSelected({ row: rowIdx, col: -1 })}
+                            className="tabular cursor-pointer hover:text-text-primary"
+                          >
+                            {rowIdx + 1}
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setSelected({ row: rowIdx, col: -1 })}
+                          className="tabular cursor-pointer"
+                        >
+                          {rowIdx + 1}
+                        </button>
+                      )}
                     </td>
                     {cols.map((c, colIdx) => {
                       const cellId = `${rowKey}::${c.key}`;
@@ -829,7 +1058,262 @@ export function SheetGrid({
           }
         />
       )}
+
+      {confirmOpen && (
+        <DeleteConfirm
+          tableLabel={table.label}
+          selectedKeys={Array.from(selectedRows)}
+          needsTypedConfirm={needsTypedConfirm}
+          confirmText={confirmText}
+          onConfirmText={setConfirmText}
+          deleting={deleting}
+          onCancel={() => {
+            setConfirmOpen(false);
+            setConfirmText("");
+          }}
+          onConfirm={runDelete}
+        />
+      )}
+
+      {showDeleted && (
+        <DeletedHistory
+          tableLabel={table.label}
+          deletions={deletions}
+          loading={loadingDeletions}
+          restoring={restoring}
+          onRestore={restoreFromHistory}
+          onClose={() => setShowDeleted(false)}
+        />
+      )}
     </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DeleteConfirm({
+  tableLabel,
+  selectedKeys,
+  needsTypedConfirm,
+  confirmText,
+  onConfirmText,
+  deleting,
+  onCancel,
+  onConfirm,
+}: {
+  tableLabel: string;
+  selectedKeys: string[];
+  needsTypedConfirm: boolean;
+  confirmText: string;
+  onConfirmText: (v: string) => void;
+  deleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const count = selectedKeys.length;
+  const preview = selectedKeys.slice(0, 8);
+  const confirmReady =
+    !deleting && count > 0 && (!needsTypedConfirm || confirmText.trim().toUpperCase() === "DELETE");
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Confirm delete"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl bg-bg-white border border-border shadow-2xl p-5 sm:p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-danger-bg text-danger border border-danger/20">
+            <AlertTriangle size={16} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-extrabold text-text-primary">
+              Delete {count} row{count === 1 ? "" : "s"} from {tableLabel}?
+            </h3>
+            <p className="mt-1 text-[0.72rem] text-text-secondary leading-relaxed">
+              This permanently removes the row{count === 1 ? "" : "s"} from the
+              live table. A snapshot is kept in the deletion log, so you can
+              restore from <strong>Trash</strong> if needed. Rows still
+              referenced elsewhere are blocked automatically.
+            </p>
+          </div>
+        </div>
+
+        {preview.length > 0 && (
+          <div className="mt-3 max-h-32 overflow-y-auto rounded-lg border border-border bg-bg-surface/50 p-2 text-[0.65rem] font-mono text-text-secondary">
+            {preview.map((k) => (
+              <div key={k} className="truncate">
+                {k}
+              </div>
+            ))}
+            {count > preview.length && (
+              <div className="text-text-tertiary">+{count - preview.length} more</div>
+            )}
+          </div>
+        )}
+
+        {needsTypedConfirm && (
+          <label className="mt-3 block">
+            <span className="text-[0.65rem] font-extrabold uppercase tracking-[0.06em] text-text-tertiary">
+              Type DELETE to confirm
+            </span>
+            <input
+              autoFocus
+              type="text"
+              value={confirmText}
+              onChange={(e) => onConfirmText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && confirmReady) onConfirm();
+              }}
+              placeholder="DELETE"
+              className="mt-1 h-9 w-full rounded-lg border border-border bg-bg-white px-2.5 text-[0.78rem] font-bold text-text-primary focus:outline-none focus:border-danger focus:ring-2 focus:ring-danger/20"
+            />
+          </label>
+        )}
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={deleting}
+            className="inline-flex items-center px-3 h-9 rounded-lg border border-border bg-bg-white text-[0.72rem] font-extrabold text-text-secondary hover:bg-bg-muted/40 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!confirmReady}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3.5 h-9 rounded-lg border text-[0.72rem] font-extrabold transition-colors",
+              confirmReady
+                ? "border-danger/30 bg-danger text-white hover:brightness-95"
+                : "border-border bg-bg-muted/50 text-text-tertiary cursor-not-allowed",
+            )}
+          >
+            {deleting ? (
+              <Sparkles size={12} className="animate-spin" aria-hidden />
+            ) : (
+              <Trash2 size={12} aria-hidden />
+            )}
+            {deleting ? "Deleting…" : `Delete ${count}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DeletedHistory({
+  tableLabel,
+  deletions,
+  loading,
+  restoring,
+  onRestore,
+  onClose,
+}: {
+  tableLabel: string;
+  deletions: DeletionLogRow[];
+  loading: boolean;
+  restoring: boolean;
+  onRestore: (id: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Recently deleted rows"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl bg-bg-white border border-border shadow-2xl flex flex-col max-h-[80vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between gap-2 p-4 border-b border-border">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-bg-surface border border-border text-text-secondary">
+              <RotateCcw size={14} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h3 className="text-sm font-extrabold text-text-primary truncate">
+                Recently deleted · {tableLabel}
+              </h3>
+              <p className="text-[0.6rem] text-text-tertiary">Last 30 days · restore any row</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-tertiary hover:bg-bg-muted hover:text-text-primary"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+
+        <div className="overflow-y-auto p-2">
+          {loading ? (
+            <div className="py-10 text-center text-[0.72rem] text-text-tertiary">
+              Loading…
+            </div>
+          ) : deletions.length === 0 ? (
+            <div className="py-10 text-center text-[0.72rem] text-text-tertiary">
+              No deletions in the last 30 days.
+            </div>
+          ) : (
+            deletions.map((d) => {
+              const restored = !!d.restoredAt;
+              const when = (() => {
+                const dt = new Date(d.deletedAt);
+                return Number.isNaN(dt.getTime())
+                  ? d.deletedAt
+                  : dt.toLocaleString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+              })();
+              return (
+                <div
+                  key={d.id}
+                  className="flex items-center justify-between gap-3 px-2.5 py-2 rounded-lg hover:bg-bg-muted/40"
+                >
+                  <div className="min-w-0">
+                    <div className="text-[0.72rem] font-bold text-text-primary truncate font-mono">
+                      {d.preview}
+                    </div>
+                    <div className="text-[0.6rem] text-text-tertiary truncate">
+                      {when} · {d.deletedBy}
+                    </div>
+                  </div>
+                  {restored ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[0.55rem] font-extrabold bg-success-bg text-success border border-success/20 whitespace-nowrap">
+                      <Check size={9} aria-hidden /> Restored
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onRestore(d.id)}
+                      disabled={restoring}
+                      className="inline-flex items-center gap-1 px-2.5 h-7 rounded-lg border border-border bg-bg-white text-[0.62rem] font-extrabold text-text-primary hover:border-[--accent] hover:bg-bg-muted/40 disabled:opacity-60 whitespace-nowrap"
+                    >
+                      <RotateCcw size={10} aria-hidden /> Restore
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
