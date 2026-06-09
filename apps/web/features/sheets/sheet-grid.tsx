@@ -9,6 +9,7 @@ import {
   useTransition,
   type CSSProperties,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -1091,6 +1092,55 @@ export function SheetGrid({
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Renders children inside a full-viewport modal backdrop, portaled to
+ * document.body. Portaling is required — the grid lives inside an
+ * overflow-hidden section, so an in-tree `fixed` overlay gets clipped to the
+ * card instead of covering the page. Uses the shared `.modal-backdrop` (z-240,
+ * blur, fade-in) so it sits above the sidebar like every other app modal.
+ * Locks body scroll and closes on Escape / backdrop click.
+ */
+function ModalPortal({
+  onClose,
+  ariaLabel,
+  children,
+}: {
+  onClose: () => void;
+  ariaLabel: string;
+  children: React.ReactNode;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  if (!mounted) return null;
+  return createPortal(
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={ariaLabel}
+      onClick={onClose}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+const MODAL_PANEL_ANIM = "modalPanelIn 0.22s cubic-bezier(0.22, 1, 0.36, 1)";
+
 function DeleteConfirm({
   tableLabel,
   selectedKeys,
@@ -1116,15 +1166,10 @@ function DeleteConfirm({
     !deleting && count > 0 && (!needsTypedConfirm || confirmText.trim().toUpperCase() === "DELETE");
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Confirm delete"
-      onClick={onCancel}
-    >
+    <ModalPortal onClose={onCancel} ariaLabel="Confirm delete">
       <div
-        className="w-full max-w-md rounded-2xl bg-bg-white border border-border shadow-2xl p-5 sm:p-6"
+        className="w-full max-w-md rounded-2xl bg-bg-white border border-border shadow-[0_30px_80px_-36px_rgba(22,21,19,0.55)] p-5 sm:p-6"
+        style={{ animation: MODAL_PANEL_ANIM }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
@@ -1205,7 +1250,7 @@ function DeleteConfirm({
           </button>
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -1225,15 +1270,10 @@ function DeletedHistory({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Recently deleted rows"
-      onClick={onClose}
-    >
+    <ModalPortal onClose={onClose} ariaLabel="Recently deleted rows">
       <div
-        className="w-full max-w-lg rounded-2xl bg-bg-white border border-border shadow-2xl flex flex-col max-h-[80vh]"
+        className="w-full max-w-lg rounded-2xl bg-bg-white border border-border shadow-[0_30px_80px_-36px_rgba(22,21,19,0.55)] flex flex-col max-h-[80vh]"
+        style={{ animation: MODAL_PANEL_ANIM }}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-center justify-between gap-2 p-4 border-b border-border">
@@ -1313,7 +1353,7 @@ function DeletedHistory({
           )}
         </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
