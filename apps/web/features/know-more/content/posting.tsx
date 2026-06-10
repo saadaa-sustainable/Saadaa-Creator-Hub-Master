@@ -81,9 +81,12 @@ export default function PostingKM() {
             blank.
           </li>
           <li>
-            <strong>Field rows</strong> — Post Link, Post Date, Download
-            Link, Raw Footage Dump (with a Drive info popover explaining
-            folder structure), Partnership Key.
+            <strong>Field rows</strong> — Post Link, Post Date,{" "}
+            <strong>Download Link (mandatory, red *)</strong>, Raw Footage Dump
+            (with a Drive info popover explaining folder structure), Partnership
+            Key. The Drive Download Link is now required on{" "}
+            <strong>every</strong> post (not just ad posts) — the content asset
+            must always be captured.
           </li>
         </KMList>
       </KMSection>
@@ -188,8 +191,8 @@ export default function PostingKM() {
           <li>
             Red <KMCode>MissingFieldsAlert</KMCode> sits above the submit
             button — lists every required field still empty (Post Date, Post
-            Link, Download Link if ads usage rights = Yes, Raw Dump,
-            Partnership Key). Uses Zod{" "}
+            Link, Download Link, Partnership Key when ad usage rights granted).
+            Uses Zod{" "}
             <KMCode>safeParse(watch())</KMCode> so all blockers surface in a
             single pass.
           </li>

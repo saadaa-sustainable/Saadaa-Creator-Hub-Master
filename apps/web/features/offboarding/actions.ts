@@ -9,15 +9,20 @@ export type MoveToOffboardingResult =
   | { ok: false; error: string };
 
 /**
- * Move a collab to the terminal 'Offboarding' workflow stage (Wave 9, D11).
+ * Move a collab to the terminal 'Offboarded' workflow stage (Wave 9, D11).
  *
  * Gated to `offboarding_write` (held by Global Admins, incl. Tanvi). Manual,
  * operator-initiated transition. Updates every deliverable row that shares the
  * collab's (inf_id, collab_number) so parent + child stay consistent — the
  * same grouping key the rest of the app uses for a collab episode.
  *
- * Terminal: we deliberately do NOT touch payment_status here, so the collab
- * stays visible in Accounts Hub until it is fully paid.
+ * VOID semantics: offboarding a collab voids it — we are not continuing with
+ * the creator for that collab. Setting workflow_status='Offboarded' removes it
+ * from every operational + analytics surface (boards, kanban cards, dashboards,
+ * the Accounts Hub Due list) via the shared `isVoidedStatus` filter, so its
+ * leftover balance can never be paid. We do NOT delete or alter payment rows:
+ * money already disbursed is preserved in the DB, the Sheet View Payments tab,
+ * and the Accounts Paid/All CSV exports (which opt in via `includeVoided`).
  */
 export async function moveToOffboarding(
   postId: string,

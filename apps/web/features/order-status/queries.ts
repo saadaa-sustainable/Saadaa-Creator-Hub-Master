@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import {
   bucketStatus,
   type OrderStatusFilterOptions,
@@ -141,7 +142,10 @@ export async function fetchOrderStatusData(
     throw shopifyRes.error;
   }
 
-  const posts = (postsRes.data ?? []) as Array<Record<string, unknown>>;
+  // Voided (offboarded) collabs are removed from the order-status board.
+  const posts = ((postsRes.data ?? []) as Array<Record<string, unknown>>).filter(
+    (p) => !isVoidedStatus(p.workflow_status as string | null),
+  );
   const shopifyRows = (shopifyRes.data ?? []) as Array<Record<string, unknown>>;
   const creatorRows = (creatorsRes.data ?? []) as Array<Record<string, unknown>>;
   const igCacheRows = (igCacheRes.data ?? []) as Array<Record<string, unknown>>;

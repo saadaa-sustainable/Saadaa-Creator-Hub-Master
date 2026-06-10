@@ -437,14 +437,7 @@ export function PostingModal({
               />
               <label htmlFor="pt_downloadLink">
                 <Download size={11} className="inline mr-1" />
-                Drive Link{" "}
-                {requiresDownload ? (
-                  <span className="req">*</span>
-                ) : (
-                  <span className="text-text-tertiary font-normal">
-                    (Optional)
-                  </span>
-                )}
+                Drive Link <span className="req">*</span>
               </label>
               <button
                 ref={driveBtnRef}
@@ -487,7 +480,7 @@ export function PostingModal({
                   </ol>
                   <div className="drive-popover__warn">
                     <AlertTriangle size={11} aria-hidden />
-                    <strong>Mandatory</strong> when Ads Usage Rights = Yes.
+                    <strong>Mandatory</strong> for every post.
                   </div>
                 </div>
               )}

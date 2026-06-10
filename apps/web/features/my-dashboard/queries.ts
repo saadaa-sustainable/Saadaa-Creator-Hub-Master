@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import type {
   MyDashboardFilterOptions,
   MyDashboardKpi,
@@ -76,7 +77,10 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
     throw error;
   }
 
-  const basePosts = (data ?? []) as MyPost[];
+  // Voided (offboarded) collabs are excluded from personal workload stats.
+  const basePosts = ((data ?? []) as MyPost[]).filter(
+    (p) => !isVoidedStatus(p.workflow_status),
+  );
 
   const usernames = [
     ...new Set(

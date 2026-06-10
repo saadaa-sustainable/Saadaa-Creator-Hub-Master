@@ -9,7 +9,7 @@ import { isValidUrl } from "@/lib/validators";
  * - postDate: optional input. Server decodes from postLink shortcode when
  *   blank (instant, no API — see lib/instagram-shortcode.ts). Fallback to today.
  * - postLink: required URL.
- * - downloadLink: MANDATORY when ads_usage_rights = 'Yes' (legacy §7.1).
+ * - downloadLink: MANDATORY for every post (drive link to the content asset).
  * - rawDump: optional raw-footage drive link.
  * - partnershipId: REQUIRED when ad usage rights are granted; when present must
  *   be the numeric Meta partnership code (REQ #9 + D1). Not forced on non-ad
@@ -38,9 +38,8 @@ export const PostingSchema = z
     downloadLink: z
       .string()
       .trim()
-      .optional()
-      .default("")
-      .refine((v) => !v || isValidUrl(v), "Download link must be a valid URL"),
+      .min(1, "Drive Download Link required")
+      .refine((v) => isValidUrl(v), "Download link must be a valid URL"),
     rawDump: z
       .string()
       .trim()
@@ -50,16 +49,6 @@ export const PostingSchema = z
     partnershipId: z.string().trim().optional().default(""),
     adsUsageRights: z.string().trim().optional().default(""),
   })
-  .refine(
-    (v) => {
-      if (v.adsUsageRights === "Yes" && !v.downloadLink) return false;
-      return true;
-    },
-    {
-      message: "Drive Download Link required when Ads Usage Rights = Yes",
-      path: ["downloadLink"],
-    },
-  )
   // REQ #9: Partnership Key required for ad posts (any non-trivial
   // ads_usage_rights), matching the payment-eligibility gate in submitPayments.
   .refine(

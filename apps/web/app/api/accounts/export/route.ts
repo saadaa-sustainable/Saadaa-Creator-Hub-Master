@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
+import { isVoidedStatus } from "@/lib/workflow";
 import { fetchAccountsHubData } from "@/features/accounts-hub/queries";
 
 /**
@@ -35,13 +36,19 @@ export async function GET(request: Request) {
     );
   }
 
-  const { rows } = await fetchAccountsHubData({});
+  // includeVoided so offboarded collabs' already-disbursed money survives in the
+  // Paid / All exports (finance history). The Due worklist still drops them.
+  const { rows } = await fetchAccountsHubData({}, { includeVoided: true });
   const filtered = rows.filter((r) => {
     const status = r.payment?.status ?? "";
     // "due" = the disbursement worklist. Partial collabs carry an outstanding
-    // balance, so they belong in the next run alongside Due / Not Due.
+    // balance, so they belong in the next run alongside Due / Not Due. Voided
+    // (offboarded) collabs can never be paid — never list them here.
     if (mode === "due")
-      return status === "Due" || status === "Not Due" || status === "Partial";
+      return (
+        !isVoidedStatus(r.workflow_status) &&
+        (status === "Due" || status === "Not Due" || status === "Partial")
+      );
     if (mode === "paid") return status === "Done";
     return true;
   });

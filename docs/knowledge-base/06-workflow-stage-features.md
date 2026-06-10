@@ -126,7 +126,7 @@ Records the live post (link, date, download/raw links, partnership key), flips `
 
 ### Validation
 - `postId`, `postLink` (`http(s)://`) required.
-- `downloadLink` MANDATORY when `adsUsageRights === 'Yes'` (legacy §7.1).
+- `downloadLink` (Drive Link) **MANDATORY for every post** (2026-06-10) — red `*`, always required + valid URL, not just ad posts. The content asset must always be captured.
 - **Partnership key (REQ #9):** required when ad usage rights granted (truthiness, since `ads_usage_rights` stores durations); when present must be the numeric Meta partnership code (`/^\d{6,}$/`).
 - **post_date resolution:** form value → decode from IG shortcode (no API) → today. Returns `postDateSource`.
 
@@ -155,12 +155,12 @@ Volume: total, pendingDispatch, inTransit, delivered, rto, cancelled, cancelledR
 ## 6. Offboarding (`features/offboarding/`)
 
 ### Purpose & route
-Manual terminal stage. Moves a whole collab episode to `workflow_status='Offboarded'`, out of the active pipeline but still visible in Accounts Hub until fully paid. Route `/offboarding`, whole page gated `offboarding_write`.
+Manual terminal stage that **VOIDS** a collab (2026-06-10). Moves a whole collab episode to `workflow_status='Offboarded'`, which removes it from **every** other surface — Accounts Hub board + Due CSV, Order Status, Journey, and all dashboards/analytics — via the shared `isVoidedStatus` filter (`lib/workflow.ts`), so its leftover balance can never be paid. Payment rows are never deleted: already-disbursed money is kept in the DB, the Sheet View Payments tab, and the Accounts **Paid/All** CSV (which fetch with `includeVoided`). Route `/offboarding`, whole page gated `offboarding_write`.
 
 ### Server action
 | Action | Gate | Notes |
 |---|---|---|
-| `moveToOffboarding(postId)` | `offboarding_write` | Resolves `(inf_id, collab_number)`, UPDATEs **every** deliverable row sharing that key to `workflow_status='Offboarded'`; single-row fallback if grouping key missing. Deliberately does NOT touch `payment_status` so the collab stays in Accounts Hub |
+| `moveToOffboarding(postId)` | `offboarding_write` | Resolves `(inf_id, collab_number)`, UPDATEs **every** deliverable row sharing that key to `workflow_status='Offboarded'`; single-row fallback if grouping key missing. Voids the collab (removed everywhere via `isVoidedStatus`); does NOT touch `payment_status` or delete payment rows, so disbursed money survives as history |
 
 ### UI
 - **Move panel:** operator picks a collab from the "Collab ID" `<select>` (value = representative post_id, label `{collabId} · @{username}`) and confirms via the danger button. Irreversible from this screen.

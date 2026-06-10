@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import type {
   CampaignTotalsRow,
   CostAnalyticsData,
@@ -172,7 +173,10 @@ export async function fetchCostAnalyticsData(): Promise<CostAnalyticsData> {
     return emptyData();
   }
 
-  const posts = (postsData ?? []) as Array<Record<string, unknown>>;
+  // Voided (offboarded) collabs are excluded from cost analytics.
+  const posts = ((postsData ?? []) as Array<Record<string, unknown>>).filter(
+    (p) => !isVoidedStatus(p.workflow_status as string | null),
+  );
 
   // Pull creators to map inf_id → followers/category for tier resolution.
   const infIds = [

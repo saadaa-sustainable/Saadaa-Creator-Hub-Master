@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import type { FunnelMetrics, FunnelPeriodBucket } from "@/features/funnel/types";
 import type { InternalDashboardData } from "./types";
 
@@ -96,7 +97,10 @@ export async function fetchInternalDashboardData(): Promise<InternalDashboardDat
     return emptyData();
   }
 
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  // Voided (offboarded) collabs are excluded from the internal dashboard.
+  const rows = ((data ?? []) as Array<Record<string, unknown>>).filter(
+    (p) => !isVoidedStatus(p.workflow_status as string | null),
+  );
   const now = Date.now();
 
   const totals = emptyMetrics();

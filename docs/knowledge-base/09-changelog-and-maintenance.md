@@ -32,7 +32,9 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
-| 2026-06-10 | **Accounts Hub Phase 1:** Collab-ID log form + creator name on select; Payment Done kanban lane; Profile URL in CSV exports; CSV template download + upload; monthly payable digest email (12th/27th → Accounts + Admins, full bank sheet) | 07 |
+| 2026-06-10 | **Offboarding = VOID (Phase 3):** offboarded collabs removed from every board/dashboard/Accounts Due via shared `lib/workflow.ts` `isVoidedStatus`; paid history kept (Paid/All CSV `includeVoided`) | 06, 07 |
+| 2026-06-10 | **Posting Phase 2:** Drive Download Link mandatory on every post (red `*`) | 06 |
+| 2026-06-10 | **Accounts Hub Phase 1:** Collab-ID log form + creator name on select; Payment Done kanban lane; Profile URL in CSV exports; CSV template download + upload; monthly payable digest email (12th/27th → Accounts + Admins, full bank sheet). Paste from Excel removed | 07 |
 | 2026-06-09 | **Sheet View row delete + bulk delete** (Global-Admin only; `deletable` operational tabs; hard delete + `row_deletions` restore log; Undo + Trash; FK-guarded) | 04, 07 |
 | 2026-06-07 | **Knowledge base created** (this `docs/knowledge-base/` — the project brain) | all |
 | 2026-06-07 | **Repo reorg:** deleted dead `creatorhub/` (1.9 GB Expo prototype), `Old gas project files/`, `gh-pages-wrapper/`, `config/`; consolidated supabase (42 migrations + `scrape-pending-apify` + `config.toml`) into the repo | 03, 04, 05 |

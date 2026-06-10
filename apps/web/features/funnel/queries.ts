@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import type { FunnelData, FunnelMetrics, FunnelPeriodBucket } from "./types";
 
 const POSTS_SELECT = [
@@ -101,7 +102,10 @@ export async function fetchFunnelData(): Promise<FunnelData> {
     return emptyFunnelData();
   }
 
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  // Voided (offboarded) collabs are excluded from the funnel.
+  const rows = ((data ?? []) as Array<Record<string, unknown>>).filter(
+    (p) => !isVoidedStatus(p.workflow_status as string | null),
+  );
   const now = Date.now();
 
   const totals: FunnelMetrics = emptyMetrics();

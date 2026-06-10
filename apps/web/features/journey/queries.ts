@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import type {
   JourneyCard,
   JourneyColumn,
@@ -93,7 +94,10 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
     throw postsError;
   }
 
-  const posts = (postsData ?? []) as Array<Record<string, unknown>>;
+  // Voided (offboarded) collabs are removed from the journey board + funnel.
+  const posts = ((postsData ?? []) as Array<Record<string, unknown>>).filter(
+    (p) => !isVoidedStatus(p.workflow_status as string | null),
+  );
 
   // Collect unique usernames for creator join.
   const usernames = [

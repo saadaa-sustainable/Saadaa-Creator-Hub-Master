@@ -31,8 +31,16 @@ const KPI_STAGES = new Set(["Posted", "Delivered"]);
 
 export async function fetchAccountsHubData(
   filters: AccountsFilters,
+  opts: { includeVoided?: boolean } = {},
 ): Promise<{ rows: AccountsRow[]; kpi: AccountsKpi }> {
   const supabase = createServiceClient();
+
+  // Voided (offboarded) collabs are excluded from the board / Due list / KPIs by
+  // default — their balance can no longer be paid. The Paid CSV opts in via
+  // `includeVoided` so already-disbursed money still appears in finance history.
+  const stages = opts.includeVoided
+    ? [...PAYABLE_STAGES, "Offboarded", "Offboarding"]
+    : PAYABLE_STAGES;
 
   let postsQuery = (supabase as any)
     .from("posts")
@@ -70,7 +78,7 @@ export async function fetchAccountsHubData(
       creator:creators  ( inf_id, username, inf_name, profile_pic, category, followers, verification )
     `,
     )
-    .in("workflow_status", PAYABLE_STAGES);
+    .in("workflow_status", stages);
   // Collab ID model: fetch ALL deliverables (no parent/child filter). We
   // collapse to ONE representative row per collab_id in JS below, and sum
   // commercial_amount across every deliverable sharing that collab_id. Payment

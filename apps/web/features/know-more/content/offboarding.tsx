@@ -5,7 +5,7 @@ export default function OffboardingKM() {
     <>
       <KMHeader
         title="Offboarding"
-        subtitle="Terminal stage for collabs that have run their course. A parked collab leaves the active pipeline but stays visible in Accounts Hub until the creator is fully paid. Manual, one-way transition gated to authorized operators."
+        subtitle="Terminal stage that VOIDS a collab — we are not continuing with the creator for it. A voided collab is removed from every other surface (boards, kanban cards, dashboards, the Accounts Hub Due list), so its leftover balance can never be paid. Money already disbursed is kept as history. Manual, one-way, gated to authorized operators."
       />
 
       <KMSection tag="Page layout (top → bottom)">
@@ -58,16 +58,31 @@ export default function OffboardingKM() {
         </KMList>
       </KMSection>
 
-      <KMSection tag="The Offboarding transition">
+      <KMSection tag="The Offboarding transition (void)">
         <p>
           Use the Move panel: pick the collab from the <strong>Collab ID</strong>{" "}
           dropdown (active collabs only) and confirm. The server action sets{" "}
           <KMCode>workflow_status = &apos;Offboarded&apos;</KMCode> on every
           deliverable that shares the collab&apos;s{" "}
-          <KMCode>(inf_id, collab_number)</KMCode>, so the whole episode moves
-          together. Payment status is left untouched — the collab keeps
-          appearing in Accounts Hub until it is paid.
+          <KMCode>(inf_id, collab_number)</KMCode>, so the whole episode voids
+          together.
         </p>
+        <KMList>
+          <li>
+            <strong>Removed everywhere</strong> · the shared{" "}
+            <KMCode>isVoidedStatus</KMCode> filter drops the collab from the
+            Accounts Hub board + Due CSV, Order Status, Influencer Journey, and
+            every dashboard / analytics view. Its remaining balance can no longer
+            be paid — exactly the point of voiding.
+          </li>
+          <li>
+            <strong>Paid history kept</strong> · payment rows are never deleted
+            or altered. Money already disbursed (e.g. a partial installment
+            before a dispute) stays in the DB, the Sheet View Payments tab, and
+            the Accounts <KMCode>Paid</KMCode> / <KMCode>All</KMCode> CSV exports
+            (which opt in via <KMCode>includeVoided</KMCode>).
+          </li>
+        </KMList>
       </KMSection>
 
       <KMSection tag="Permissions">
@@ -98,16 +113,20 @@ export default function OffboardingKM() {
             per-row value.
           </li>
           <li>
-            Awaiting Payment counts any collab whose payment_status is not{" "}
-            <KMCode>Done</KMCode>; those rows still surface in Accounts Hub.
+            Awaiting Payment counts any voided collab whose payment_status is
+            not <KMCode>Done</KMCode> — money that was owed but, because the
+            collab is voided, will <strong>not</strong> be paid (it no longer
+            appears on the Accounts Hub Due list). This KPI is a record on the
+            Offboarding page only.
           </li>
         </KMList>
       </KMSection>
 
       <KMCallout tone="info">
-        Offboarding is the end of a creator relationship for a given collab.
-        Settle payments in Accounts Hub first; this stage is the record that
-        the collaboration is closed out.
+        Offboarding voids a collab: it disappears from every active surface and
+        its leftover balance becomes unpayable. If you need to pay part of it
+        first, do that in Accounts Hub <strong>before</strong> voiding — already
+        disbursed money is kept as history afterwards.
       </KMCallout>
     </>
   );

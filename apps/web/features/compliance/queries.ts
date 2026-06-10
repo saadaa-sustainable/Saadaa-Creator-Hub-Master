@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import type {
   CampaignBreakdownRow,
   ComplianceData,
@@ -115,7 +116,10 @@ export async function fetchComplianceData(): Promise<ComplianceData> {
     return emptyComplianceData();
   }
 
-  const rows = (data ?? []) as Array<Record<string, unknown>>;
+  // Voided (offboarded) collabs are excluded from compliance KPIs.
+  const rows = ((data ?? []) as Array<Record<string, unknown>>).filter(
+    (p) => !isVoidedStatus(p.workflow_status as string | null),
+  );
 
   // ── Parent-post pipeline (collab-level counts) ─────────────────────────
   const parents = rows.filter(isParent);

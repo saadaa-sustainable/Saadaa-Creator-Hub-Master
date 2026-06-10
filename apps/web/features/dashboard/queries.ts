@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import type {
   ActionCounts,
   BreakdownSlice,
@@ -163,7 +164,10 @@ export async function fetchDashboardData(
     throw postsRes.error;
   }
 
-  const posts = (postsRes.data ?? []) as Array<Record<string, unknown>>;
+  // Voided (offboarded) collabs are removed from every dashboard metric + card.
+  const posts = ((postsRes.data ?? []) as Array<Record<string, unknown>>).filter(
+    (p) => !isVoidedStatus(p.workflow_status as string | null),
+  );
   const creators = (creatorsRes.data ?? []) as Array<Record<string, unknown>>;
 
   const categoryByUser = new Map<string, string>();
