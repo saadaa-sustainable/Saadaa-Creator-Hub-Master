@@ -99,9 +99,24 @@ export default function CampaignsKM() {
             or <strong>Closed</strong> — shown as a pill on the card + detail.
           </li>
           <li>
-            <strong>Auto-close:</strong> once a campaign&apos;s end date passes,
-            the daily job flips it to <strong>Closed</strong> (one-shot, stamped
-            via <KMCode>auto_closed_at</KMCode>).
+            <strong>Auto-close — two triggers</strong> (both stamp{" "}
+            <KMCode>auto_closed_at</KMCode>, one-shot):
+            <KMList>
+              <li>
+                <strong>1. End date</strong> · once the campaign&apos;s end date
+                passes, the daily job flips it to <strong>Closed</strong>.
+              </li>
+              <li>
+                <strong>2. Allocation posted</strong> · when the full creator
+                allocation has posted — distinct creators with a Posted/Delivered
+                collab reach the creator cap (Σ{" "}
+                <KMCode>num_influencers</KMCode>) — the campaign closes. Fires in
+                real time the moment the last creator&apos;s posting is submitted
+                (the daily cron also sweeps as a backstop). Cancelled / voided
+                (Offboarded) collabs don&apos;t count. If the cap is never
+                filled, only the end-date trigger closes it.
+              </li>
+            </KMList>
           </li>
           <li>
             <strong>Reopen:</strong> a Campaign Owner or Global Admin can reopen

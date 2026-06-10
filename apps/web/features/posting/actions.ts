@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { closeCampaignIfComplete } from "@/lib/campaign-lifecycle";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -95,6 +96,19 @@ export async function submitPosting(input: unknown) {
   await autoInitDraftPayment(supabase, postId, resolvedDate);
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
+
+  // Auto-close the campaign if this posting fills its full creator allocation
+  // (cap creators all Posted/Delivered). Fire-and-forget; the daily cron also
+  // sweeps as a backstop. Best-effort, never blocks the posting response.
+  after(async () => {
+    const { data: campRow } = await (supabase as any)
+      .from("posts")
+      .select("campaign_id")
+      .eq("post_id", postId)
+      .maybeSingle();
+    const cid = (campRow?.campaign_id ?? "").trim();
+    if (cid) await closeCampaignIfComplete(cid);
+  });
 
   // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────
   // Email the actor that posting was submitted. Fire-and-forget via after();

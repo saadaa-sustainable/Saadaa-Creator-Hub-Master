@@ -77,7 +77,10 @@ Creates `campaigns` (`IFC{NNN}`) + `campaign_budget` rows that gate downstream R
 - **Creator cap** = Σ `num_influencers`; "used" = distinct active creators. Surfaced as `creators_used / creator_cap` on cards + the reach-out pill.
 
 ### Lifecycle + edge cases
-- Manual close/reopen; daily cron auto-closes campaigns past `end_date`; reopen stamps `auto_closed_at` to prevent re-close.
+- **Auto-close — two triggers** (both stamp `auto_closed_at`, one-shot; reopen also stamps it to prevent re-close):
+  1. **End date** — daily cron (check #7) flips `status='Closed'` once `end_date < today`.
+  2. **Allocation posted (2026-06-10)** — `closeCampaignIfComplete` (`lib/campaign-lifecycle.ts`): closes when distinct creators with a **Posted/Delivered** collab reach the creator cap (Σ `num_influencers`, cap>0). Cancelled/voided collabs ignored. Fires in **real time** from `submitPosting` (via `after()`, on the campaign of the just-posted deliverable) and as a **daily cron backstop** (check #9 sweeps open campaigns). Skips already-Closed or reopened (`auto_closed_at` set) campaigns. If the cap is never filled, only the end-date trigger applies.
+- Manual `closeCampaign`/`reopenCampaign` (Campaign Owner / Global Admin).
 - **D8:** editing avg_comp/num_influencers does NOT retroactively rewrite existing posts' `commercial_amount`; returns a `warning` with the count of tied reach-outs. Preserves original `month_label`.
 - `submitCampaign` fires CAMPAIGN_CREATED (active Global Admins, actor excluded) + CAMPAIGN_CONFIRMATION (actor) via `after()`.
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { closeCampaignIfComplete } from "@/lib/campaign-lifecycle";
 import {
   NOTIFICATION_TYPES,
   resolveAccountsTeamEmails,
@@ -205,6 +206,7 @@ export async function GET(req: NextRequest) {
     accounts_payable_digest: 0,
     campaign_ending: 0,
     campaign_closed: 0,
+    campaign_completed: 0,
   };
 
   // Resolve shared recipient sets / lookups once.
@@ -637,6 +639,25 @@ export async function GET(req: NextRequest) {
     }
   } catch (err) {
     console.error("[cron/notifications] payable_digest check failed:", err);
+  }
+
+  // ── 9. Auto-close campaigns whose full creator allocation has posted ─────────
+  // Completion close (backstop to the real-time trigger in submitPosting): a
+  // campaign closes once distinct Posted/Delivered creators reach its creator
+  // cap. Skips already-closed + reopened (auto_closed_at set) campaigns.
+  try {
+    const { data: openCamps } = await (supabase as any)
+      .from("campaigns")
+      .select("campaign_id")
+      .is("auto_closed_at", null)
+      .not("status", "ilike", "closed");
+    for (const c of (openCamps ?? []) as Array<{ campaign_id: string | null }>) {
+      if (!c.campaign_id) continue;
+      const closed = await closeCampaignIfComplete(c.campaign_id);
+      if (closed) sent.campaign_completed++;
+    }
+  } catch (err) {
+    console.error("[cron/notifications] campaign completion-close check failed:", err);
   }
 
   return NextResponse.json({ ran: true, sent });
