@@ -16,8 +16,7 @@ export default function AccountsHubKM() {
             (one entry per payable collab); picking one shows the creator&apos;s
             name + handle to its right and auto-fills the agreed amount. Toolbar:
             Add row · <strong>Download CSV template</strong> ·{" "}
-            <strong>Upload CSV</strong> (CSV/XLSX file) · Paste from Excel ·
-            Submit.
+            <strong>Upload CSV</strong> (CSV/XLSX file) · Submit.
           </li>
           <li>
             <strong>2. Filter strip</strong> — search, campaign, payment
@@ -135,7 +134,7 @@ export default function AccountsHubKM() {
         </KMCallout>
       </KMSection>
 
-      <KMSection tag="CSV template · upload · paste">
+      <KMSection tag="CSV template · upload">
         <KMList>
           <li>
             <strong>Download CSV template</strong> · a ready-to-fill{" "}
@@ -146,16 +145,12 @@ export default function AccountsHubKM() {
             <strong>Upload CSV</strong> · pick a <KMCode>.csv</KMCode> or{" "}
             <KMCode>.xlsx</KMCode> file; it parses straight into the form rows.
           </li>
-          <li>
-            <strong>Paste from Excel</strong> · tab- or comma-separated rows
-            pasted directly.
-          </li>
         </KMList>
         <p>
-          All three share one parser: header row (<KMCode>Collab ID</KMCode>{" "}
-          or legacy <KMCode>Post ID</KMCode> · UTR · Date · Amount) is
-          auto-detected; Excel serial dates + dd/mm/yyyy + yyyy-mm-dd all parse;
-          the ID cell is resolved (Collab ID → representative post). A{" "}
+          The parser auto-detects a header row (<KMCode>Collab ID</KMCode> or
+          legacy <KMCode>Post ID</KMCode> · UTR · Date · Amount); Excel serial
+          dates + dd/mm/yyyy + yyyy-mm-dd all parse; the ID cell is resolved
+          (Collab ID → representative post). A{" "}
           <strong>10-row batch limit</strong> applies (extras dropped with a
           toast). Every parsed row runs the same three gates above. The{" "}
           <strong>&quot;Same payment date for all entries&quot;</strong> checkbox

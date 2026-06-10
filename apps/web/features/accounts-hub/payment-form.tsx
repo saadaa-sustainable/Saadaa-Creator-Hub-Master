@@ -15,7 +15,6 @@ import {
   CalendarCheck,
   CheckCircle2,
   CircleDollarSign,
-  ClipboardPaste,
   FileSpreadsheet,
   Hash,
   Layers,
@@ -26,7 +25,6 @@ import {
   Trash2,
   Upload,
   User,
-  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, MissingFieldsAlert } from "@/components/ui";
@@ -159,8 +157,6 @@ export function PaymentEntryPanel() {
   const [eligible, setEligible] = useState<EligiblePost[]>([]);
   const [loadingEligible, setLoadingEligible] = useState(false);
   const [submitting, startSubmit] = useTransition();
-  const [pasteOpen, setPasteOpen] = useState(false);
-  const [pasteText, setPasteText] = useState("");
   const csvInputRef = useRef<HTMLInputElement>(null);
   // REQ #10a: when on, every row uses the first row's payment date.
   const [sameDateForAll, setSameDateForAll] = useState(false);
@@ -295,8 +291,6 @@ export function PaymentEntryPanel() {
   const applyImported = useCallback((parsed: FormRow[]) => {
     const capped = parsed.slice(0, MAX_PAYMENT_ROWS);
     setRows(capped);
-    setPasteOpen(false);
-    setPasteText("");
     if (parsed.length > MAX_PAYMENT_ROWS) {
       toast.warning(
         `Imported the first ${MAX_PAYMENT_ROWS} of ${parsed.length} rows (max ${MAX_PAYMENT_ROWS} per batch).`,
@@ -307,20 +301,6 @@ export function PaymentEntryPanel() {
       );
     }
   }, []);
-
-  const importFromPaste = useCallback(() => {
-    const text = pasteText.trim();
-    if (!text) {
-      toast.error("Paste some rows first.");
-      return;
-    }
-    const parsed = parseDelimited(text);
-    if (parsed.length === 0) {
-      toast.error("Couldn't parse any rows.");
-      return;
-    }
-    applyImported(parsed);
-  }, [pasteText, parseDelimited, applyImported]);
 
   const importFile = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -747,15 +727,6 @@ export function PaymentEntryPanel() {
               <Upload size={13} aria-hidden />
               Upload CSV
             </button>
-            <button
-              type="button"
-              className="acc-entry-add"
-              onClick={() => setPasteOpen((s) => !s)}
-              disabled={submitting}
-            >
-              <ClipboardPaste size={13} aria-hidden />
-              {pasteOpen ? "Hide paste import" : "Paste from Excel"}
-            </button>
             <input
               ref={csvInputRef}
               type="file"
@@ -784,42 +755,6 @@ export function PaymentEntryPanel() {
               )}
             </button>
           </div>
-
-          {pasteOpen && (
-            <div className="acc-entry-paste">
-              <p className="text-xs text-text-secondary">
-                Paste rows from Excel / Sheets. First line can be a header
-                (Collab ID, UTR, Date, Amount) or values directly. Tabs and
-                commas both work.
-              </p>
-              <textarea
-                className="form-control acc-entry-paste__area"
-                rows={6}
-                value={pasteText}
-                onChange={(e) => setPasteText(e.target.value)}
-                placeholder={"SIF-1-C1\tUTRREF123\t2026-05-15\t10000\nSIF-1-C2\t\t2026-05-22\t8500"}
-              />
-              <div className="acc-entry-paste__actions">
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => {
-                    setPasteText("");
-                    setPasteOpen(false);
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary-cta"
-                  onClick={importFromPaste}
-                >
-                  Import
-                </button>
-              </div>
-            </div>
-          )}
       </form>
     </section>
   );
