@@ -158,6 +158,7 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     post_number: number;
     collab_number: number;
     inf_id: string;
+    collab_id: string;
   };
 
   await (supabase as any)
@@ -205,6 +206,9 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
   // Email the logged-in actor that their reach-out was logged. Fire-and-forget
   // via after() so the form stays fast; best-effort, never blocks/throws.
   const confirmPostId = row.post_id;
+  const confirmCollabId =
+    row.collab_id ??
+    (row.inf_id ? `${row.inf_id}-C${row.collab_number}` : confirmPostId);
   after(async () => {
     let campaignLabel = v.campaignId;
     try {
@@ -223,7 +227,7 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
       type: NOTIFICATION_TYPES.REACHOUT_CONFIRMATION,
       subject: `Reach-out logged — @${username} added to ${v.campaignId}`,
       title: "Reach-out logged",
-      subtitle: `POST ID: ${confirmPostId}`,
+      subtitle: `COLLAB ID: ${confirmCollabId}`,
       summaryLines: [
         `@${username} has been added to your campaign as a ${
           direction === "inbound" ? "inbound" : "outbound"
@@ -242,9 +246,11 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
         { label: "Language", value: v.language },
         { label: "Engagement Rate", value: v.er != null ? `${v.er}%` : null },
         { label: "Avg. Likes", value: v.avgLikes ?? null },
-        { label: "Post ID", value: confirmPostId },
+        { label: "Collab ID", value: confirmCollabId },
+        { label: "Post ID (deliverable)", value: confirmPostId },
       ],
       postId: confirmPostId,
+      collabId: confirmCollabId,
     });
   });
 

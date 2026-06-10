@@ -22,6 +22,7 @@
   - `buildConfirmationBody` — greeting → summary → key/value table (auto-drops null/empty rows) → "Thanks, Saadaa CreatorHub". HTML-escaped.
   - `sendNotification` — normalizes/de-dupes recipients, wraps body, sends per-recipient in parallel, logs each to `email_logs`. Triple-guarded against throwing.
   - `notifyActorConfirmation` — emails the logged-in actor a submit confirmation; safe inside `after()`.
+  - **All emails reference Collab ID (`SIF-N-Cn`) as the primary id (2026-06-10):** reach-out / onboarding / posting confirmations + the creator-facing payment-processed email lead with COLLAB ID (the per-deliverable post id, if shown, is a secondary "(deliverable)" row). The collab brief email + cron notifications already used it. Exception: the internal `SHOPIFY_VALIDATION_FAILED` alert keeps Post ID (deliverable-level order failure).
   - `resolveGlobalAdminEmails()` / `resolveAccountsTeamEmails()` — query `user_access` (active, role-filtered).
 
 ### Other libs

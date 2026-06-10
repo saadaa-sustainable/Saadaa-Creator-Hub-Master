@@ -97,34 +97,41 @@ export async function submitPosting(input: unknown) {
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 
+  // Resolve the collab + campaign for this deliverable once — used by the
+  // auto-close sweep and the confirmation email (which references Collab ID).
+  const { data: idRow } = await (supabase as any)
+    .from("posts")
+    .select("collab_id, campaign_id")
+    .eq("post_id", postId)
+    .maybeSingle();
+  const collabId = (idRow?.collab_id as string | null) ?? postId;
+  const campaignIdOfPost = (idRow?.campaign_id as string | null)?.trim() ?? "";
+
   // Auto-close the campaign if this posting fills its full creator allocation
   // (cap creators all Posted/Delivered). Fire-and-forget; the daily cron also
   // sweeps as a backstop. Best-effort, never blocks the posting response.
-  after(async () => {
-    const { data: campRow } = await (supabase as any)
-      .from("posts")
-      .select("campaign_id")
-      .eq("post_id", postId)
-      .maybeSingle();
-    const cid = (campRow?.campaign_id ?? "").trim();
-    if (cid) await closeCampaignIfComplete(cid);
-  });
+  if (campaignIdOfPost) {
+    after(async () => {
+      await closeCampaignIfComplete(campaignIdOfPost);
+    });
+  }
 
   // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────
-  // Email the actor that posting was submitted. Fire-and-forget via after();
-  // best-effort, never throws/blocks.
+  // Email the actor that posting was submitted. Keyed on Collab ID (SIF-N-Cn);
+  // the specific deliverable post id is a secondary detail row. Fire-and-forget.
   after(async () => {
     await notifyActorConfirmation({
       actor,
       type: NOTIFICATION_TYPES.POSTING_CONFIRMATION,
-      subject: `Posting submitted — ${postId} marked Posted`,
+      subject: `Posting submitted — ${collabId} marked Posted`,
       title: "Posting submitted",
-      subtitle: `POST ID: ${postId}`,
+      subtitle: `COLLAB ID: ${collabId}`,
       summaryLines: [
         `Posting details were saved and ${postId} is now marked Posted.`,
       ],
       rows: [
-        { label: "Post ID", value: postId },
+        { label: "Collab ID", value: collabId },
+        { label: "Post ID (deliverable)", value: postId },
         { label: "Post Date", value: resolvedDate },
         { label: "Post Link", value: postLink },
         { label: "Drive / Download Link", value: downloadLink || null },
@@ -132,6 +139,7 @@ export async function submitPosting(input: unknown) {
         { label: "Partnership Key", value: partnershipId || null },
       ],
       postId,
+      collabId,
     });
   });
 

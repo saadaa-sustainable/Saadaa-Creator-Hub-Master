@@ -666,17 +666,20 @@ export async function submitPayments(
       const snapPostIds = paidSnapshot.map((p) => p.postId);
       const { data: postEmailRows } = await (sb as any)
         .from("posts")
-        .select("post_id, email, username")
+        .select("post_id, email, username, collab_id")
         .in("post_id", snapPostIds);
       const emailByPost = new Map<string, string | null>();
       const nameByPost = new Map<string, string | null>();
+      const collabByPost = new Map<string, string | null>();
       for (const pr of (postEmailRows ?? []) as Array<{
         post_id: string;
         email: string | null;
         username: string | null;
+        collab_id: string | null;
       }>) {
         emailByPost.set(pr.post_id, pr.email);
         nameByPost.set(pr.post_id, pr.username);
+        collabByPost.set(pr.post_id, pr.collab_id);
       }
 
       const infIds = Array.from(
@@ -717,10 +720,11 @@ export async function submitPayments(
         if (!to || !to.includes("@")) continue; // skip silently
         const greetName =
           creator?.inf_name ?? nameByPost.get(pp.postId) ?? "there";
+        const collabId = collabByPost.get(pp.postId) ?? pp.postId;
         const amountFmt = new Intl.NumberFormat("en-IN").format(pp.amount);
         const bodyHtml = `
           <p style="margin:0 0 12px;">Hi <strong>${esc(greetName)}</strong>,</p>
-          <p style="margin:0 0 14px;">Your payment for collaboration <strong>${esc(pp.postId)}</strong> has been processed.</p>
+          <p style="margin:0 0 14px;">Your payment for collaboration <strong>${esc(collabId)}</strong> has been processed.</p>
           <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 14px;">
             <tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;font-weight:800;width:40%;">Amount</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;">INR ${amountFmt}</td></tr>
             ${pp.utr ? `<tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">UTR / Reference</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;">${esc(pp.utr)}</td></tr>` : ""}
@@ -729,7 +733,7 @@ export async function submitPayments(
           <p style="margin:0;font-size:13px;color:#6E695E;">If anything looks off, simply reply to this email and our team will help.</p>`;
         const plainBody =
           `Hi ${greetName},\n\n` +
-          `Your payment for collaboration ${pp.postId} has been processed.\n` +
+          `Your payment for collaboration ${collabId} has been processed.\n` +
           `Amount: INR ${amountFmt}` +
           (pp.utr ? `\nUTR/Reference: ${pp.utr}` : "") +
           (pp.paymentDate ? `\nPayment Date: ${pp.paymentDate}` : "") +
@@ -737,10 +741,11 @@ export async function submitPayments(
         await sendNotification({
           type: NOTIFICATION_TYPES.PAYMENT_PROCESSED,
           to,
-          subject: `Payment Processed · ${pp.postId}`,
+          subject: `Payment Processed · ${collabId}`,
           htmlBody: bodyHtml,
           plainBody,
           postId: pp.postId,
+          collabId,
         });
       }
     });

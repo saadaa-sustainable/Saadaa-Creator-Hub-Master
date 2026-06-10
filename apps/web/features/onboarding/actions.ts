@@ -580,15 +580,16 @@ export async function submitOnboarding(
     await notifyActorConfirmation({
       actor,
       type: NOTIFICATION_TYPES.ONBOARDING_CONFIRMATION,
-      subject: `Onboarding saved — ${creatorHandle} / ${v.postId}`,
+      subject: `Onboarding saved — ${creatorHandle} / ${collabId}`,
       title: "Onboarding saved",
-      subtitle: `POST ID: ${v.postId}`,
+      subtitle: `COLLAB ID: ${collabId}`,
       summaryLines: [
         `Onboarding details for @${creatorHandle} have been saved. The collaboration is now in the Posting stage.`,
       ],
       rows: [
         { label: "Creator", value: `@${creatorHandle}` },
-        { label: "Post ID", value: v.postId },
+        { label: "Collab ID", value: collabId },
+        { label: "Post ID (deliverable)", value: v.postId },
         { label: "Order ID", value: v.orderId },
         { label: "Collaboration Type", value: v.collabType },
         { label: "Commercials", value: formatRupees(v.commercials) },
@@ -607,6 +608,7 @@ export async function submitOnboarding(
       footnote:
         "This confirms your save. The collaboration email to the creator is sent separately.",
       postId: v.postId,
+      collabId,
     });
   });
 
