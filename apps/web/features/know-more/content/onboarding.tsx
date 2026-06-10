@@ -25,7 +25,9 @@ export default function OnboardingKM() {
             IG URL, debounced) · campaign · tier · region ·{" "}
             <strong>Reached out by</strong> (the team member who logged the
             reach-out, from the stable <KMCode>logged_by</KMCode> column) ·{" "}
-            <strong>Content Type</strong> · reach-out from/to dates.
+            <strong>Content Type</strong> · reach-out from/to dates. Selecting a{" "}
+            <strong>Reached out by</strong> member also scopes the KPI strip
+            below the filters to that member&apos;s metrics.
           </li>
           <li>
             <strong>Collab ID model — one row per collab</strong> · every

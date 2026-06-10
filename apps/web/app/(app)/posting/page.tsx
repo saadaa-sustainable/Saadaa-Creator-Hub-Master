@@ -30,8 +30,11 @@ export default async function PostingPage({
 
       <PostingFiltersBar initial={params} options={options} />
 
-      <Suspense fallback={<KpiSkeleton />}>
-        <PostingKpiSection />
+      <Suspense
+        key={`kpi-${params.onboardedBy ?? ""}`}
+        fallback={<KpiSkeleton />}
+      >
+        <PostingKpiSection filters={params} />
       </Suspense>
 
       <Suspense
@@ -44,8 +47,8 @@ export default async function PostingPage({
   );
 }
 
-async function PostingKpiSection() {
-  const kpi = await fetchPostingKpis();
+async function PostingKpiSection({ filters }: { filters: PostingFilters }) {
+  const kpi = await fetchPostingKpis(filters);
   return <PostingKpiStrip kpi={kpi} />;
 }
 

@@ -23,7 +23,9 @@ export default function PostingKM() {
             username / IG URL / post link, debounced) · campaign · tier · ads
             rights · <strong>Onboarded by</strong> (the team member who onboarded
             the collab, from <KMCode>onboarded_by</KMCode>) ·{" "}
-            <strong>Content Type</strong> · onboarded from/to dates.
+            <strong>Content Type</strong> · onboarded from/to dates. Selecting an{" "}
+            <strong>Onboarded by</strong> member also scopes the KPI strip below
+            the filters to that member&apos;s metrics.
           </li>
           <li>
             <strong>List / Cards toggle</strong> — both surfaces share the

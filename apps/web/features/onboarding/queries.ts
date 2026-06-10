@@ -254,27 +254,40 @@ export const fetchOnboardingFilterOptions = unstable_cache(
  *                            order_id, the share matched to a shopify_orders
  *                            row (mirrors the order-status validation join).
  */
-export async function fetchOnboardingKpis(): Promise<OnboardingKpi> {
+export async function fetchOnboardingKpis(
+  filters: OnboardingFilters = {},
+): Promise<OnboardingKpi> {
   const supabase = createServiceClient();
 
   const ONBOARDED_SET = ["On Board", "Order Sent", "Posted", "Delivered"];
+
+  // When a "Reached out by" team member is selected, scope every KPI to that
+  // member's reach-outs (logged_by is the stable reach-out logger). Otherwise
+  // the KPIs reflect the whole corpus.
+  const member = (filters.reachedOutBy ?? "").trim();
+  const scope = <T>(q: T): T =>
+    member ? ((q as any).eq("logged_by", member) as T) : q;
 
   // Collab ID model: fetch ALL deliverable rows; we group by collab_id in JS so
   // every KPI counts COLLABS (not individual deliverable rows). Avg deliverable
   // counts sum reels/static/stories across each collab's deliverables.
   const [onboardedRes, pendingRes, shopifyRes] = await Promise.all([
-    (supabase as any)
-      .from("posts")
-      .select(
-        "inf_id, collab_number, collab_id, ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped",
-      )
-      .in("workflow_status", ONBOARDED_SET)
-      .limit(20000),
-    (supabase as any)
-      .from("posts")
-      .select("inf_id, collab_number, collab_id, post_id")
-      .eq("workflow_status", "Reach Out")
-      .limit(20000),
+    scope(
+      (supabase as any)
+        .from("posts")
+        .select(
+          "inf_id, collab_number, collab_id, ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped",
+        )
+        .in("workflow_status", ONBOARDED_SET)
+        .limit(20000),
+    ),
+    scope(
+      (supabase as any)
+        .from("posts")
+        .select("inf_id, collab_number, collab_id, post_id")
+        .eq("workflow_status", "Reach Out")
+        .limit(20000),
+    ),
     (supabase as any).from("shopify_orders").select("order_id").limit(50000),
   ]);
 

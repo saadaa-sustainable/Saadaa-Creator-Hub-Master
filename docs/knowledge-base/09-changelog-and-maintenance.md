@@ -32,6 +32,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-06-10 | **Onboarding/Posting KPI scopes to selected team member** (`logged_by` / `onboarded_by`) | 06 |
 | 2026-06-10 | **Emails reference Collab ID** (SIF-N-Cn), not Post ID — reach-out / onboarding / posting confirmations + creator payment-processed email | 08 |
 | 2026-06-10 | **Fix: Sheet View Inbound Queue tab showed 0 rows** — config (`pk`/sort/columns) was out of sync with the view; not deletable (it's a view) | 04 |
 | 2026-06-10 | **Inbound: removed Collab Type + Commercials** (form + XLSX template); inbound collab type left unset (decided in Onboarding) | 06 |

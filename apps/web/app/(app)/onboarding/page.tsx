@@ -28,8 +28,11 @@ export default async function OnboardingPage({
 
       <OnboardingFiltersBar initial={params} options={options} />
 
-      <Suspense fallback={<KpiSkeleton rows={2} />}>
-        <OnboardingKpiSection />
+      <Suspense
+        key={`kpi-${params.reachedOutBy ?? ""}`}
+        fallback={<KpiSkeleton rows={2} />}
+      >
+        <OnboardingKpiSection filters={params} />
       </Suspense>
 
       <Suspense
@@ -42,8 +45,12 @@ export default async function OnboardingPage({
   );
 }
 
-async function OnboardingKpiSection() {
-  const kpi = await fetchOnboardingKpis();
+async function OnboardingKpiSection({
+  filters,
+}: {
+  filters: OnboardingFilters;
+}) {
+  const kpi = await fetchOnboardingKpis(filters);
   return <OnboardingKpiStrip kpi={kpi} />;
 }
 

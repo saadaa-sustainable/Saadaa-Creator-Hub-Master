@@ -256,18 +256,26 @@ export const fetchPostingFilterOptions = unstable_cache(
  *   - Completion Rate = Submitted ÷ (Submitted + Due) × 100 = Submitted ÷ total.
  *   - Delayed Posts   = submitted post_ids whose post_date > est_delivery.
  */
-export async function fetchPostingKpis(): Promise<PostingKpi> {
+export async function fetchPostingKpis(
+  filters: PostingFilters = {},
+): Promise<PostingKpi> {
   const supabase = createServiceClient();
 
   const PIPELINE_SET = ["On Board", "Order Sent", "Posted"];
 
+  // When an "Onboarded by" team member is selected, scope every KPI to that
+  // member's onboarded collabs. Otherwise the KPIs reflect the whole pipeline.
+  const member = (filters.onboardedBy ?? "").trim();
+
   // One row = one post_id (deliverable). Fetch every pipeline deliverable and
   // count rows by submission state — Posted vs not-yet-Posted.
-  const { data, error } = await (supabase as any)
+  let q = (supabase as any)
     .from("posts")
     .select("workflow_status, post_date, est_delivery")
     .in("workflow_status", PIPELINE_SET)
     .limit(20000);
+  if (member) q = q.eq("onboarded_by", member);
+  const { data, error } = await q;
 
   if (error) throw error;
 
