@@ -154,6 +154,31 @@ export default function OnboardingKM() {
         </KMCallout>
       </KMSection>
 
+      <KMSection tag="Onboarding cap (per campaign)">
+        <KMList>
+          <li>
+            A campaign can ONBOARD at most its allocated creator count — the sum
+            of <KMCode>num_influencers</KMCode> across its budget tiers. Reach-out
+            is unlimited; <strong>this is where the cap bites</strong>. Once the
+            cap is reached, onboarding a new creator is blocked with an{" "}
+            <KMCode>X/cap</KMCode> message.
+          </li>
+          <li>
+            The count is of creators <strong>currently onboarded and active</strong>{" "}
+            (On Board / Order Sent / Posted / Delivered). If an onboarded creator
+            is later <strong>offboarded</strong> (voided), they leave the count
+            and a <strong>slot frees</strong> — a creator who reached out but
+            wasn&apos;t onboarded can then be onboarded in their place.
+          </li>
+          <li>
+            <KMCode>cap = 0</KMCode> (no budget rows) ⇒ no cap. Raise the
+            allocation in <strong>Edit Campaign</strong> (Campaign Owner / Global
+            Admin) to onboard more. Un-onboarded reach-outs are voided
+            (→ Cancelled) when the campaign closes; their data is kept.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Equal-split commercial rule">
         <KMCallout tone="warning">
           <strong>Single agreed total ÷ deliverable count.</strong> The

@@ -1,6 +1,65 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "./supabase/server";
+import { isOnboardedActive, isVoidedStatus } from "./workflow";
+
+/**
+ * Void (→ Cancelled) every reach-out on a campaign that was never onboarded.
+ *
+ * The creator cap is an ONBOARDING cap (2026-06-10), so a campaign can collect
+ * more reach-outs than it onboards. When the campaign CLOSES (end-date,
+ * completion, or manual), the un-onboarded leftovers can no longer proceed, so
+ * we void them. Their data is preserved — Cancelled rows stay in Sheet View and
+ * the per-campaign dashboard metrics. Onboarded-active, already-Cancelled, and
+ * already-voided rows are left untouched. Best-effort; returns the count voided.
+ */
+export async function voidUnonboardedForCampaign(
+  campaignId: string,
+): Promise<number> {
+  const id = (campaignId ?? "").trim();
+  if (!id) return 0;
+  try {
+    const supabase = createServiceClient();
+    const { data: rows } = await (supabase as any)
+      .from("posts")
+      .select("post_id, workflow_status")
+      .eq("campaign_id", id);
+    const toVoid = ((rows ?? []) as Array<{
+      post_id: string;
+      workflow_status: string | null;
+    }>)
+      .filter(
+        (p) =>
+          !isOnboardedActive(p.workflow_status) &&
+          !isVoidedStatus(p.workflow_status) &&
+          String(p.workflow_status ?? "") !== "Cancelled",
+      )
+      .map((p) => p.post_id)
+      .filter(Boolean);
+    if (toVoid.length === 0) return 0;
+
+    const { error } = await (supabase as any)
+      .from("posts")
+      .update({ workflow_status: "Cancelled" })
+      .in("post_id", toVoid);
+    if (error) {
+      console.error(
+        `[campaign-lifecycle] void-unonboarded failed for ${id}:`,
+        error.message,
+      );
+      return 0;
+    }
+    revalidatePath("/reach-out");
+    revalidatePath("/dashboard");
+    return toVoid.length;
+  } catch (err) {
+    console.error(
+      `[campaign-lifecycle] voidUnonboardedForCampaign threw for ${campaignId}:`,
+      err instanceof Error ? err.message : String(err),
+    );
+    return 0;
+  }
+}
 
 /**
  * Auto-close a campaign once its full creator allocation has POSTED.
@@ -75,6 +134,9 @@ export async function closeCampaignIfComplete(
       );
       return false;
     }
+
+    // Void any reach-outs that never onboarded — the campaign is now closed.
+    await voidUnonboardedForCampaign(id);
 
     revalidatePath("/campaigns");
     revalidatePath("/dashboard");

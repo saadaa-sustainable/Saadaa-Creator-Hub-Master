@@ -26,3 +26,28 @@ export function excludeVoided<T extends { workflow_status?: string | null }>(
 ): T[] {
   return rows.filter((r) => !isVoidedStatus(r.workflow_status));
 }
+
+/**
+ * Statuses that count as "onboarded and still active" — a creator who has been
+ * onboarded for a campaign and has NOT been voided/offboarded or cancelled.
+ * This is the set the campaign creator-cap counts against (cap = onboarding
+ * cap, 2026-06-10): reach-out is unlimited, but only `cap` creators can be
+ * onboarded. A creator leaving this set (e.g. offboarded → voided) frees a slot
+ * so a pending reach-out can be onboarded in their place.
+ */
+export const ONBOARDED_ACTIVE_STATUSES = [
+  "On Board",
+  "Order Sent",
+  "Posted",
+  "Delivered",
+] as const;
+
+/** True when a workflow_status counts toward the campaign onboarding cap. */
+export function isOnboardedActive(status: string | null | undefined): boolean {
+  return (
+    status === "On Board" ||
+    status === "Order Sent" ||
+    status === "Posted" ||
+    status === "Delivered"
+  );
+}

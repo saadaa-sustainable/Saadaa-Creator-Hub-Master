@@ -66,13 +66,14 @@ export default function CampaignsKM() {
             trend charts (auto-regenerated, don&apos;t edit directly).
           </li>
           <li>
-            <strong>Creator cap</strong> — the sum of{" "}
-            <KMCode>num_influencers</KMCode> across these rows is the campaign&apos;s
-            creator cap: Reach Out blocks new creators once the campaign is full.
-            The campaign card + detail show <strong>used / cap</strong> (distinct
-            active creators ÷ allocation). Raising a row&apos;s count raises both
-            the cap and the budget. Edit the rows (Campaign Owner / Global Admin)
-            to widen or narrow it.
+            <strong>Creator cap = ONBOARDING cap</strong> (2026-06-10) — the sum
+            of <KMCode>num_influencers</KMCode> across these rows is how many
+            creators can be <strong>onboarded</strong>. Reach-out is unlimited;
+            the cap is enforced at onboarding. The card + detail show{" "}
+            <strong>onboarded / cap</strong> (distinct onboarded-active creators ÷
+            allocation). Raising a row&apos;s count raises both the cap and the
+            budget — and frees more onboarding slots. Un-onboarded reach-outs are
+            voided (→ Cancelled) when the campaign closes; their data is kept.
           </li>
         </KMList>
       </KMSection>

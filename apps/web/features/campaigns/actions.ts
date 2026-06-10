@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { voidUnonboardedForCampaign } from "@/lib/campaign-lifecycle";
 import { formatDate } from "@/lib/formatters";
 import {
   NOTIFICATION_TYPES,
@@ -461,7 +462,11 @@ export async function closeCampaign(
     .eq("campaign_id", id);
   if (error) return { ok: false, error: error.message };
 
+  // Void the un-onboarded reach-out leftovers now that the campaign is closed.
+  await voidUnonboardedForCampaign(id);
+
   revalidatePath("/campaigns");
+  revalidatePath("/reach-out");
   return { ok: true };
 }
 

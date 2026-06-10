@@ -105,60 +105,22 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     };
   }
 
-  // Creator cap (decision 2026-06-07): a campaign accepts at most its allocated
-  // creator count — Σ num_influencers across its budget tiers. Count distinct
-  // ACTIVE creators already on the campaign (non-Cancelled; RTO/Delivered still
-  // count — same "active" rule as the duplicate guard). This creator is new
-  // (passed the dup guard above), so it would push the count to size+1. Hard
-  // block when full; raise the budget allocation to add more (Campaign Owner /
-  // Global Admin). cap=0 (no budget rows) ⇒ no cap.
-  const [budgetRes, postsRes, campRes] = await Promise.all([
-    (supabase as any)
-      .from("campaign_budget")
-      .select("num_influencers")
-      .eq("campaign_id", v.campaignId),
-    (supabase as any)
-      .from("posts")
-      .select("username, workflow_status")
-      .eq("campaign_id", v.campaignId)
-      .limit(5000),
-    (supabase as any)
-      .from("campaigns")
-      .select("status")
-      .eq("campaign_id", v.campaignId)
-      .maybeSingle(),
-  ]);
-  // Closed (or auto-closed past end date) campaigns don't accept new creators.
-  if (String(campRes.data?.status ?? "").trim().toLowerCase() === "closed") {
+  // Reach-out is UNLIMITED per campaign (2026-06-10): the creator cap now applies
+  // at ONBOARDING, not reach-out (see submitOnboarding). A campaign can collect
+  // any number of reach-outs; only `cap` of them can be onboarded, and the
+  // un-onboarded leftovers are voided (→ Cancelled) when the campaign closes.
+  // We still reject reach-outs to a CLOSED campaign.
+  const { data: campRow } = await (supabase as any)
+    .from("campaigns")
+    .select("status")
+    .eq("campaign_id", v.campaignId)
+    .maybeSingle();
+  if (String(campRow?.status ?? "").trim().toLowerCase() === "closed") {
     return {
       ok: false,
       error: `Campaign ${v.campaignId} is closed. Reopen it (Campaign Owner / Global Admin) to add creators.`,
       fieldErrors: { campaignId: "Campaign is closed" },
     };
-  }
-  const cap = ((budgetRes.data ?? []) as Array<{ num_influencers: number | null }>)
-    .reduce((sum, r) => sum + (Number(r.num_influencers ?? 0) || 0), 0);
-  if (cap > 0) {
-    const activeCreators = new Set(
-      ((postsRes.data ?? []) as Array<{
-        username: string | null;
-        workflow_status: string | null;
-      }>)
-        .filter(
-          (p) =>
-            String(p.workflow_status ?? "") !== "Cancelled" &&
-            !isVoidedStatus(p.workflow_status),
-        )
-        .map((p) => (p.username ?? "").trim().toLowerCase())
-        .filter(Boolean),
-    );
-    if (activeCreators.size >= cap) {
-      return {
-        ok: false,
-        error: `Campaign ${v.campaignId} is at its creator cap (${activeCreators.size}/${cap}). Increase the campaign's budget allocation to add more creators.`,
-        fieldErrors: { campaignId: "Campaign is at its creator cap" },
-      };
-    }
   }
 
   const { data, error } = await (supabase as any)

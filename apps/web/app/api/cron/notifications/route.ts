@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
-import { closeCampaignIfComplete } from "@/lib/campaign-lifecycle";
+import {
+  closeCampaignIfComplete,
+  voidUnonboardedForCampaign,
+} from "@/lib/campaign-lifecycle";
 import {
   NOTIFICATION_TYPES,
   resolveAccountsTeamEmails,
@@ -490,11 +493,16 @@ export async function GET(req: NextRequest) {
       .lt("end_date", today)
       .is("auto_closed_at", null)
       .not("status", "ilike", "closed")
-      .select("id");
+      .select("campaign_id");
     if (error) {
       console.error("[cron/notifications] campaign auto-close failed:", error.message);
     } else {
-      sent.campaign_closed = (data ?? []).length;
+      const closed = (data ?? []) as Array<{ campaign_id: string | null }>;
+      sent.campaign_closed = closed.length;
+      // Void the un-onboarded reach-out leftovers of each just-closed campaign.
+      for (const c of closed) {
+        if (c.campaign_id) await voidUnonboardedForCampaign(c.campaign_id);
+      }
     }
   } catch (err) {
     console.error("[cron/notifications] campaign auto-close check failed:", err);

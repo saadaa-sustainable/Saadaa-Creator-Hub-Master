@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { readTermsAttachmentFile, TERMS_ATTACHMENT } from "@/lib/attachments";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isOnboardedActive } from "@/lib/workflow";
 import { sendMail } from "@/lib/email";
 import { serverEnv } from "@/lib/env.server";
 import { formatDate, formatRupees } from "@/lib/formatters";
@@ -176,6 +177,58 @@ export async function submitOnboarding(
 
   const v = applyBarterLock(parsed.data);
   const supabase = createServiceClient();
+
+  // Onboarding cap (2026-06-10): a campaign can ONBOARD at most its allocated
+  // creator count (Σ campaign_budget.num_influencers). Reach-out is unlimited;
+  // the cap bites HERE. We count distinct creators currently onboarded-and-active
+  // (On Board / Order Sent / Posted / Delivered) — a creator who is later
+  // offboarded (voided) leaves this set, freeing a slot for a pending reach-out
+  // to be onboarded in their place. cap=0 (no budget rows) ⇒ no cap.
+  {
+    const { data: thisPost } = await (supabase as any)
+      .from("posts")
+      .select("campaign_id, username, workflow_status")
+      .eq("post_id", v.postId)
+      .maybeSingle();
+    const campaignId = (thisPost?.campaign_id ?? "").trim();
+    const thisUser = (thisPost?.username ?? "").trim().toLowerCase();
+    // Skip the gate if this collab is already onboarded (re-submit / edit) — it
+    // already holds its slot — or if it carries no campaign.
+    if (campaignId && !isOnboardedActive(thisPost?.workflow_status)) {
+      const [capRes, onbRes] = await Promise.all([
+        (supabase as any)
+          .from("campaign_budget")
+          .select("num_influencers")
+          .eq("campaign_id", campaignId),
+        (supabase as any)
+          .from("posts")
+          .select("username, workflow_status")
+          .eq("campaign_id", campaignId)
+          .limit(5000),
+      ]);
+      const cap = ((capRes.data ?? []) as Array<{ num_influencers: number | null }>).reduce(
+        (s, r) => s + (Number(r.num_influencers ?? 0) || 0),
+        0,
+      );
+      if (cap > 0) {
+        const onboarded = new Set(
+          ((onbRes.data ?? []) as Array<{
+            username: string | null;
+            workflow_status: string | null;
+          }>)
+            .filter((p) => isOnboardedActive(p.workflow_status))
+            .map((p) => (p.username ?? "").trim().toLowerCase())
+            .filter(Boolean),
+        );
+        if (!onboarded.has(thisUser) && onboarded.size >= cap) {
+          return {
+            ok: false,
+            error: `Campaign ${campaignId} is at its onboarding cap (${onboarded.size}/${cap}). Raise the allocation in Edit Campaign, or offboard an onboarded creator to free a slot.`,
+          };
+        }
+      }
+    }
+  }
 
   // 1. Shopify order lookup (synced table first).
   const SHOPIFY_ORDER_SELECT =

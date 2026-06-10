@@ -41,7 +41,7 @@ Creates the first `posts` record per collab (`workflow_status='Reach Out'`). Two
 - **Content type** (UI label "Content Type"; field key `contentCode`): 10 hard-coded codes in `content-codes.ts` (UGC, VRP, OFF, BST, EDU, PRC, TBG, MAR, OST, FOU). *(Relabeled from "Content Code" 2026-06-07.)*
 - **Duplicate-creator guard:** blocks re-reaching the same creator in the same campaign unless the prior collab is `Cancelled` **or voided (`Offboarded`/`Offboarding`)** — both free the slot (RTO/Delivered still count as active). Uses `isVoidedStatus` (`lib/workflow.ts`). Inbound checks per-row sequentially (catches intra-batch dupes).
 - **Closed-campaign block:** if `campaigns.status` lowercased = `'closed'`, the whole submit/batch is rejected ("Reopen it — Campaign Owner / Global Admin").
-- **Creator cap (2026-06-07):** cap = Σ `campaign_budget.num_influencers`. "Used" = distinct ACTIVE creators by username (non-Cancelled **and non-voided**; an Offboarded creator frees its cap slot too). A new creator pushes to size+1; hard block when full. `cap=0` ⇒ no cap. The form shows a `used / cap creators · N left` pill (closed/full/left tones).
+- **Creator cap = ONBOARDING cap (2026-06-10):** reach-out is now **unlimited** per campaign — the cap is enforced at **onboarding** (`submitOnboarding`), not reach-out. cap = Σ `campaign_budget.num_influencers`. "Used" = distinct creators **onboarded-and-active** (`isOnboardedActive`: On Board / Order Sent / Posted / Delivered) by username. Onboarding a new creator is blocked once used ≥ cap; an onboarded creator who is later offboarded (voided) leaves the set and frees a slot for a pending reach-out. `cap=0` ⇒ no cap. The reach-out form pill shows `onboarded / cap · N slots left` (informational — does not block reach-out). Un-onboarded leftovers are voided (→ Cancelled) when the campaign closes (`voidUnonboardedForCampaign`).
 - After submit: enqueues IG scrape (`instagram_cache` upsert, insert-only), fires `notifyActorConfirmation` (REACHOUT/INBOUND_CONFIRMATION — one summary email per batch) via `after()`, revalidates tags + routes.
 
 ### IG lookup (`lookupCreator`)
@@ -81,6 +81,7 @@ Creates `campaigns` (`IFC{NNN}`) + `campaign_budget` rows that gate downstream R
   1. **End date** — daily cron (check #7) flips `status='Closed'` once `end_date < today`.
   2. **Allocation posted (2026-06-10)** — `closeCampaignIfComplete` (`lib/campaign-lifecycle.ts`): closes when distinct creators with a **Posted/Delivered** collab reach the creator cap (Σ `num_influencers`, cap>0). Cancelled/voided collabs ignored. Fires in **real time** from `submitPosting` (via `after()`, on the campaign of the just-posted deliverable) and as a **daily cron backstop** (check #9 sweeps open campaigns). Skips already-Closed or reopened (`auto_closed_at` set) campaigns. If the cap is never filled, only the end-date trigger applies.
 - Manual `closeCampaign`/`reopenCampaign` (Campaign Owner / Global Admin).
+- **On close, un-onboarded reach-outs are voided** — `voidUnonboardedForCampaign` (`lib/campaign-lifecycle.ts`) flips every non-onboarded, non-terminal reach-out on the campaign to `Cancelled`. Wired into all three close paths (end-date cron #7, completion close, manual `closeCampaign`). Data is kept (Cancelled rows stay in Sheet View + per-campaign dashboard metrics). Since the onboard cap counts only onboarded-active creators, leftovers stay live as backups until close (so a freed slot from an offboard can still onboard one).
 - **D8:** editing avg_comp/num_influencers does NOT retroactively rewrite existing posts' `commercial_amount`; returns a `warning` with the count of tied reach-outs. Preserves original `month_label`.
 - `submitCampaign` fires CAMPAIGN_CREATED (active Global Admins, actor excluded) + CAMPAIGN_CONFIRMATION (actor) via `after()`.
 
@@ -90,6 +91,9 @@ Creates `campaigns` (`IFC{NNN}`) + `campaign_budget` rows that gate downstream R
 
 ### Purpose & route
 Links the reach-out to a Shopify order, captures deliverables/commercials/bank details, flips `workflow_status='On Board'`, expands deliverables into child rows, sends the collab email. Route `/onboarding`, gate `onboarding_write`.
+
+### Onboarding cap (2026-06-10)
+`submitOnboarding` enforces the campaign creator cap **here** (reach-out is unlimited). Before flipping to On Board it counts distinct creators on the campaign that are **onboarded-active** (`isOnboardedActive`: On Board / Order Sent / Posted / Delivered); if that count ≥ cap (Σ `num_influencers`) and this creator isn't already in the set, the submit is blocked (`"…at its onboarding cap (X/cap)…"`). Because the count excludes voided/offboarded collabs, offboarding an onboarded creator frees a slot so a pending reach-out can be onboarded. `cap=0` ⇒ no cap.
 
 ### Data sources
 Reads `posts` (+`campaigns`/`creators` joins), `instagram_cache` (avatar fallback), `shopify_orders`. Default view = not-yet-onboarded queue (`workflow_status='Reach Out'`); `submitted=yes` → `["On Board","Order Sent","Posted","Delivered"]`.

@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isOnboardedActive } from "@/lib/workflow";
 
 export interface CampaignListRow {
   campaign_id: string;
@@ -93,8 +94,9 @@ export const fetchCampaigns = unstable_cache(
       budgetByCampaign.set(row.campaign_id, rows);
     });
 
-    // Distinct active (non-Cancelled) creators per campaign = the "used" side of
-    // the creator cap. Counts by username (deliverable children share it).
+    // Distinct ONBOARDED-active creators per campaign = the "used" side of the
+    // creator cap (the cap is an ONBOARDING cap, 2026-06-10). Counts by username
+    // (deliverable children share it). Reach-out-only rows don't consume a slot.
     const { data: postRows } = await (supabase as any)
       .from("posts")
       .select("campaign_id, username, workflow_status")
@@ -108,7 +110,7 @@ export const fetchCampaigns = unstable_cache(
         workflow_status: string | null;
       }>
     ).forEach((p) => {
-      if (String(p.workflow_status ?? "") === "Cancelled") return;
+      if (!isOnboardedActive(p.workflow_status)) return;
       const cid = p.campaign_id ?? "";
       const name = (p.username ?? "").trim().toLowerCase();
       if (!cid || !name) return;

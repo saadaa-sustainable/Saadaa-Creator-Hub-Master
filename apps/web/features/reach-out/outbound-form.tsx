@@ -366,15 +366,15 @@ export function OutboundForm({
                   return (
                     <span
                       className={`pill ${tone} mt-2`}
-                      title="Creator slots used / cap for this campaign"
+                      title="Onboarded creators / onboarding cap for this campaign. Reach-out is unlimited — the cap applies at onboarding."
                     >
                       <Users size={11} aria-hidden />
-                      {used} / {cap} creators
+                      {used} / {cap} onboarded
                       {closed
                         ? " · closed — reopen to add"
                         : full
-                          ? " · full — raise the cap"
-                          : ` · ${cap - used} left`}
+                          ? " · onboard cap reached"
+                          : ` · ${cap - used} slot${cap - used === 1 ? "" : "s"} left`}
                     </span>
                   );
                 })()

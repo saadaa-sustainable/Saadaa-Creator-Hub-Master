@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isOnboardedActive } from "@/lib/workflow";
 
 /**
  * Campaigns list for the Reach-Out form dropdown.
@@ -27,8 +28,9 @@ export const fetchCampaignsForSelect = unstable_cache(
     if (ids.length === 0)
       return rows.map((r) => ({ ...r, creator_cap: 0, creators_used: 0 }));
 
-    // Creator cap (Σ budget num_influencers) + used (distinct active creators)
-    // per campaign — so the Reach Out form can show "used / cap" on selection.
+    // Creator cap (Σ budget num_influencers) + used (distinct ONBOARDED creators)
+    // per campaign — the cap is an ONBOARDING cap (2026-06-10), so "used" counts
+    // onboarded-active creators, not reach-outs. Shown as "onboarded / cap".
     const [budgetRes, postsRes] = await Promise.all([
       (supabase as any)
         .from("campaign_budget")
@@ -61,7 +63,7 @@ export const fetchCampaignsForSelect = unstable_cache(
         workflow_status: string | null;
       }>
     ).forEach((p) => {
-      if (String(p.workflow_status ?? "") === "Cancelled") return;
+      if (!isOnboardedActive(p.workflow_status)) return;
       const cid = p.campaign_id ?? "";
       const name = (p.username ?? "").trim().toLowerCase();
       if (!cid || !name) return;

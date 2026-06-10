@@ -98,13 +98,13 @@ export default function ReachOutOutboundKM() {
             either frees the handle to be reached out again for the campaign.
           </li>
           <li>
-            <strong>Creator cap</strong> — a campaign accepts at most its
-            allocated creator count (the sum of <KMCode>num_influencers</KMCode>{" "}
-            across its budget tiers). Once full, new reach-outs are blocked with
-            a <KMCode>X/Y</KMCode> message. A Campaign Owner / Global Admin
-            raises the allocation (which also raises the budget) to add more.
-            Cancelled <strong>and voided (Offboarded)</strong> collabs free a
-            slot.
+            <strong>Reach-out is unlimited; the cap is an ONBOARDING cap</strong>{" "}
+            (2026-06-10) — a campaign can collect any number of reach-outs. The
+            allocated creator count (Σ <KMCode>num_influencers</KMCode>) is
+            enforced at <strong>onboarding</strong> instead (see the Onboarding
+            view). The campaign pill shows <KMCode>onboarded / cap</KMCode> for
+            reference; reaching the cap does NOT block reach-out. Un-onboarded
+            leftovers are voided (→ Cancelled) when the campaign closes.
           </li>
           <li>
             Red <KMCode>MissingFieldsAlert</KMCode> renders above the submit
