@@ -25,7 +25,6 @@ import {
   Loader2,
   ExternalLink,
   Eye,
-  Gift,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -40,11 +39,9 @@ import {
   type CreatorLookupHit,
 } from "./actions";
 import {
-  INBOUND_COLLAB_TYPES,
   INBOUND_MANUAL_CAP,
   inboundUsernameFromUrl,
   makeInboundRow,
-  type InboundCollabType,
   type InboundRowInput,
 } from "./inbound-schema";
 import { submitInboundBatch } from "./inbound-actions";
@@ -97,17 +94,11 @@ function isRowValid(r: RowState): boolean {
   if (!r.instagramLink.trim() || !igUrlRe.test(r.instagramLink)) return false;
   if (!r.gender) return false;
   if (!r.contentCode.trim()) return false;
-  if (!r.collabType) return false;
-  if (r.collabType === "Barter + Paid" && !(r.commercials > 0)) return false;
   return true;
 }
 
 function rowHasEntry(r: RowState): boolean {
-  return Boolean(
-    r.instagramLink.trim() ||
-      r.contentCode.trim() ||
-      (r.commercials != null && r.commercials > 0),
-  );
+  return Boolean(r.instagramLink.trim() || r.contentCode.trim());
 }
 
 function getRowValidationErrors(r: RowState): RowValidationErrors {
@@ -126,14 +117,6 @@ function getRowValidationErrors(r: RowState): RowValidationErrors {
 
   if (!r.contentCode.trim()) {
     errors.contentCode = "Content Type is required.";
-  }
-
-  if (!r.collabType) {
-    errors.collabType = "Collab Type is required.";
-  }
-
-  if (r.collabType === "Barter + Paid" && !(r.commercials > 0)) {
-    errors.commercials = "Commercial amount required for Barter + Paid.";
   }
 
   return errors;
@@ -385,41 +368,17 @@ export function InboundForm({ campaigns }: InboundFormProps) {
   }, []);
 
   const downloadTemplate = async () => {
-    const headers = [
-      "instaLink",
-      "gender",
-      "contentCode",
-      "collabType",
-      "commercials",
-    ];
+    const headers = ["instaLink", "gender", "contentCode"];
 
     const XLSX = await import("xlsx");
     const workbook = XLSX.utils.book_new();
     const rosterSheet = XLSX.utils.aoa_to_sheet([
       headers,
-      [
-        "https://instagram.com/handle",
-        "Female",
-        CONTENT_CODES[0]?.code ?? "",
-        "Barter",
-        0,
-      ],
-      [
-        "https://instagram.com/another",
-        "Female",
-        CONTENT_CODES[0]?.code ?? "",
-        "Barter + Paid",
-        7500,
-      ],
+      ["https://instagram.com/handle", "Female", CONTENT_CODES[0]?.code ?? ""],
+      ["https://instagram.com/another", "Female", CONTENT_CODES[0]?.code ?? ""],
     ]);
-    rosterSheet["!cols"] = [
-      { wch: 34 },
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 18 },
-    ];
-    rosterSheet["!autofilter"] = { ref: "A1:E1" };
+    rosterSheet["!cols"] = [{ wch: 34 }, { wch: 16 }, { wch: 18 }];
+    rosterSheet["!autofilter"] = { ref: "A1:C1" };
     XLSX.utils.book_append_sheet(workbook, rosterSheet, "Inbound Reach Out");
 
     const codeSheet = XLSX.utils.aoa_to_sheet([
@@ -431,12 +390,10 @@ export function InboundForm({ campaigns }: InboundFormProps) {
 
     const genderFormula = `"${GENDERS.join(",")}"`;
     const contentCodeFormula = `"${CONTENT_CODES.map((c) => c.code).join(",")}"`;
-    const collabTypeFormula = `"${INBOUND_COLLAB_TYPES.join(",")}"`;
     const validationXml =
-      '<dataValidations count="3">' +
+      '<dataValidations count="2">' +
       `<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="B2:B201"><formula1>${genderFormula}</formula1></dataValidation>` +
       `<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="C2:C201"><formula1>${contentCodeFormula}</formula1></dataValidation>` +
-      `<dataValidation type="list" allowBlank="1" showErrorMessage="1" sqref="D2:D201"><formula1>${collabTypeFormula}</formula1></dataValidation>` +
       "</dataValidations>";
     const workbookBytes = XLSX.write(workbook, {
       bookType: "xlsx",
@@ -526,24 +483,8 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           "content_type",
           "Content Code",
         );
-        const collabRaw = rosterValue(
-          r,
-          "collabType",
-          "collab_type",
-          "Collab Type",
-        );
-        const collabType: InboundCollabType = INBOUND_COLLAB_TYPES.find(
-          (t) => t.toLowerCase() === collabRaw.toLowerCase(),
-        ) ?? "Barter";
-        const commercialsRaw = Number(
-          rosterValue(r, "commercials", "commercial", "Commercials", "Amount"),
-        );
-        const commercials =
-          collabType === "Barter"
-            ? 0
-            : Number.isFinite(commercialsRaw) && commercialsRaw > 0
-              ? commercialsRaw
-              : 0;
+        // Collab Type + Commercials are no longer collected — inbound is always
+        // Barter / ₹0 (newRow defaults them). Legacy template columns ignored.
         return newRow({
           instagramLink: rosterValue(
             r,
@@ -555,8 +496,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           ),
           gender,
           contentCode,
-          collabType,
-          commercials,
         });
       });
       setRows(next);
@@ -814,11 +753,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               Inbound Roster <span className="req">*</span>
             </h5>
             <small className="text-muted">
-              Profile URL, Gender, Content Type, Collab Type are mandatory.
-              Commercials only required when Collab Type is{" "}
-              <strong>Barter + Paid</strong>. Name + followers auto-fill from
-              the 3-hour Instagram trigger. Email auto-fills from the Shopify
-              order.
+              Profile URL, Gender, Content Type are mandatory. Name + followers
+              auto-fill from the 3-hour Instagram trigger. Email auto-fills from
+              the Shopify order.
             </small>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
@@ -894,8 +831,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               <col style={{ width: 320 }} />
               <col style={{ width: 150 }} />
               <col style={{ width: 280 }} />
-              <col style={{ width: 180 }} />
-              <col style={{ width: 160 }} />
             </colgroup>
             <thead>
               <tr>
@@ -908,13 +843,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                 </th>
                 <th>
                   Content Type <span className="req">*</span>
-                </th>
-                <th>
-                  Collab Type <span className="req">*</span>
-                </th>
-                <th className="right">
-                  Commercials ₹{" "}
-                  <span className="th-cond-note">(Barter + Paid)</span>
                 </th>
               </tr>
             </thead>
@@ -1073,66 +1001,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                       {rowErrors.contentCode && (
                         <small className="field-error">
                           {rowErrors.contentCode}
-                        </small>
-                      )}
-                    </td>
-                    <td>
-                      <select
-                        className={cn(
-                          "form-select",
-                          rowErrors.collabType && "is-invalid-control",
-                        )}
-                        value={r.collabType}
-                        onChange={(e) => {
-                          const next = e.target.value as InboundCollabType;
-                          updateRow(r.id, {
-                            collabType: next,
-                            commercials: next === "Barter" ? 0 : r.commercials,
-                          });
-                        }}
-                      >
-                        {INBOUND_COLLAB_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                      </select>
-                      {rowErrors.collabType && (
-                        <small className="field-error">
-                          {rowErrors.collabType}
-                        </small>
-                      )}
-                    </td>
-                    <td className="right relative">
-                      {r.collabType === "Barter" ? (
-                        <div className="inline-flex items-center gap-1.5 px-3 h-9 rounded-md border border-border bg-bg-ecru text-text-secondary text-[0.78rem] font-bold uppercase tracking-[0.06em] w-full justify-center">
-                          <Gift size={11} className="text-[--accent]" />
-                          <span>Free</span>
-                        </div>
-                      ) : (
-                        <input
-                          type="number"
-                          min={0}
-                          inputMode="numeric"
-                          className={cn(
-                            "form-control",
-                            rowErrors.commercials && "is-invalid-control",
-                          )}
-                          placeholder="e.g. 7500"
-                          value={r.commercials || ""}
-                          onChange={(e) =>
-                            updateRow(r.id, {
-                              commercials:
-                                e.target.value === ""
-                                  ? 0
-                                  : Number(e.target.value),
-                            })
-                          }
-                        />
-                      )}
-                      {rowErrors.commercials && (
-                        <small className="field-error">
-                          {rowErrors.commercials}
                         </small>
                       )}
                     </td>
@@ -1299,70 +1167,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                     {rowErrors.contentCode && (
                       <small className="field-error">
                         {rowErrors.contentCode}
-                      </small>
-                    )}
-                  </label>
-                  <label className="form-field block">
-                    <span>
-                      Collab Type <span className="req">*</span>
-                    </span>
-                    <select
-                      className={cn(
-                        "form-control form-select",
-                        rowErrors.collabType && "is-invalid-control",
-                      )}
-                      value={r.collabType}
-                      onChange={(e) => {
-                        const next = e.target.value as InboundCollabType;
-                        updateRow(r.id, {
-                          collabType: next,
-                          commercials: next === "Barter" ? 0 : r.commercials,
-                        });
-                      }}
-                    >
-                      {INBOUND_COLLAB_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
-                    {rowErrors.collabType && (
-                      <small className="field-error">
-                        {rowErrors.collabType}
-                      </small>
-                    )}
-                  </label>
-                  <label className="form-field block">
-                    <span>Commercials ₹</span>
-                    {r.collabType === "Barter" ? (
-                      <div className="inline-flex items-center gap-1.5 px-3 h-10 mt-1 rounded-md border border-border bg-bg-ecru text-text-secondary text-[0.78rem] font-bold uppercase tracking-[0.06em] w-full justify-center">
-                        <Gift size={12} className="text-[--accent]" />
-                        <span>Free</span>
-                      </div>
-                    ) : (
-                      <input
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
-                        className={cn(
-                          "form-control",
-                          rowErrors.commercials && "is-invalid-control",
-                        )}
-                        placeholder="e.g. 7500"
-                        value={r.commercials || ""}
-                        onChange={(e) =>
-                          updateRow(r.id, {
-                            commercials:
-                              e.target.value === ""
-                                ? 0
-                                : Number(e.target.value),
-                          })
-                        }
-                      />
-                    )}
-                    {rowErrors.commercials && (
-                      <small className="field-error">
-                        {rowErrors.commercials}
                       </small>
                     )}
                   </label>

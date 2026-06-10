@@ -32,6 +32,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-06-10 | **Inbound: removed Collab Type + Commercials** (form + XLSX template); inbound always Barter / ₹0 | 06 |
 | 2026-06-10 | **Onboarding & Posting filters:** Reached-out-by (new `logged_by` col) / Onboarded-by (`onboarded_by`) + Content Type + debounced Search (id/name/username/URL) | 04, 06 |
 | 2026-06-10 | **Dashboard per-campaign focus:** when a campaign is filtered, a Reached-Out / Onboarded-Y/cap / Un-onboarded / Posted strip (`campaignFocus`) | 07 |
 | 2026-06-10 | **Creator cap → ONBOARDING:** reach-out now unlimited; cap (Σ num_influencers) enforced at onboarding; offboarding frees a slot; un-onboarded leftovers void (→Cancelled) on campaign close | 06 |

@@ -21,8 +21,8 @@ export default function ReachOutInboundKM() {
           </li>
           <li>
             <strong>Step 02 — Inbound Roster</strong> · per-row form with
-            Profile URL, Gender, Content Type, <strong>Collab Type</strong>
-            and <strong>Commercials ₹</strong>.
+            Profile URL, Gender, Content Type. (Collab Type + Commercials were
+            removed 2026-06-10 — inbound is always Barter / ₹0.)
           </li>
         </KMList>
       </KMSection>
@@ -32,8 +32,9 @@ export default function ReachOutInboundKM() {
           <li>
             <strong>XLSX template</strong> · click to download a pre-formatted
             workbook with columns{" "}
-            <KMCode>instaLink, gender, contentCode, collabType, commercials</KMCode>{" "}
-            + dropdown enums for gender + content type + collab type.
+            <KMCode>instaLink, gender, contentCode</KMCode>{" "}
+            + dropdown enums for gender + content type. (Collab Type +
+            Commercials columns removed 2026-06-10.)
           </li>
           <li>
             <strong>Upload CSV/XLSX</strong> · accepts <KMCode>.csv</KMCode>,{" "}
@@ -61,13 +62,11 @@ export default function ReachOutInboundKM() {
             <KMCode>content_type</KMCode> on the post.
           </li>
           <li>
-            <strong>Collab Type</strong> · required. <KMCode>Barter</KMCode>{" "}
-            (commercials auto-locked to ₹0, &quot;Free&quot; chip) or{" "}
-            <KMCode>Barter + Paid</KMCode> (commercials &gt; 0 enforced).
-          </li>
-          <li>
-            <strong>Commercials ₹</strong> · single agreed total per collab.
-            Onboarding equal-splits this across all deliverables on submit.
+            <strong>Collab Type + Commercials</strong> · removed from inbound
+            (2026-06-10). Every inbound reach-out is recorded as{" "}
+            <KMCode>Barter</KMCode> with ₹0 (defaulted on submit; the post still
+            carries a <KMCode>collab_type</KMCode> for the RPC). Set commercials
+            later in Onboarding if a paid arrangement is agreed.
           </li>
         </KMList>
       </KMSection>

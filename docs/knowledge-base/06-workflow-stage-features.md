@@ -48,8 +48,8 @@ Creates the first `posts` record per collab (`workflow_status='Reach Out'`). Two
 Cache-first 3-tier: (1) `creators` row → identity locked, metrics editable; (2) `instagram_cache` with meaningful non-pending data; (3) else upsert pending row → `source:'queued'` (3-hr cron fills it).
 
 ### Inbound XLSX bulk import
-- Roster table, manual cap **10** (`INBOUND_MANUAL_CAP`). Per-row required: `instagramLink`, `gender`, `contentCode`, `collabType`; `commercials` required only for "Barter + Paid" (Barter forces 0).
-- **Template** (`downloadTemplate`): 3-sheet workbook (Inbound Reach Out, Content Types, dropdown data validations injected by patching sheet XML). Headers: `instaLink, gender, contentCode, collabType, commercials`.
+- Roster table, manual cap **10** (`INBOUND_MANUAL_CAP`). Per-row required: `instagramLink`, `gender`, `contentCode`. **Collab Type + Commercials removed from inbound (2026-06-10)** — inbound is always Barter / ₹0 (`collabType` defaults to "Barter", `commercials` 0 in the row schema, so `submit_reachout` still gets a collab_type). UI columns + per-row validation for them dropped.
+- **Template** (`downloadTemplate`): 3-sheet workbook (Inbound Reach Out, Content Types, dropdown data validations injected by patching sheet XML). Headers: `instaLink, gender, contentCode` (collabType + commercials columns + the collab-type data-validation removed 2026-06-10).
 - **Import:** parses XLSX/CSV, header-alias-tolerant (`rosterValue` accepts old "Content Code" header too), caps 200 rows, batch-prefills via lookups. Succeeded rows stripped on submit; failed rows kept for fix-and-retry.
 
 ---
