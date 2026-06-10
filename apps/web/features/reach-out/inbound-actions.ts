@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -114,7 +115,11 @@ export async function submitInboundBatch(
         workflow_status: string | null;
       }>
     )
-      .filter((p) => String(p.workflow_status ?? "") !== "Cancelled")
+      .filter(
+        (p) =>
+          String(p.workflow_status ?? "") !== "Cancelled" &&
+          !isVoidedStatus(p.workflow_status),
+      )
       .map((p) => (p.username ?? "").trim().toLowerCase())
       .filter(Boolean),
   ).size;
@@ -130,9 +135,9 @@ export async function submitInboundBatch(
       continue;
     }
 
-    // Shrishti duplicate-creator guard (per-campaign; Cancelled allows re-add).
-    // Sequential loop → a prior row's commit is visible to later rows, so
-    // intra-batch duplicates are caught too.
+    // Shrishti duplicate-creator guard (per-campaign; Cancelled OR voided/
+    // Offboarded allow re-add). Sequential loop → a prior row's commit is
+    // visible to later rows, so intra-batch duplicates are caught too.
     const { data: dupes } = await (supabase as any)
       .from("posts")
       .select("workflow_status")
@@ -141,7 +146,11 @@ export async function submitInboundBatch(
       .limit(10);
     const activeDup = (
       (dupes ?? []) as Array<{ workflow_status: string | null }>
-    ).some((p) => String(p.workflow_status ?? "") !== "Cancelled");
+    ).some(
+      (p) =>
+        String(p.workflow_status ?? "") !== "Cancelled" &&
+        !isVoidedStatus(p.workflow_status),
+    );
     if (activeDup) {
       failures.push({ row: i + 1, error: "Already in this campaign" });
       continue;

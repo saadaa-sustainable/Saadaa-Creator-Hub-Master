@@ -6,6 +6,7 @@ import { after } from "next/server";
 import { ReachOutSchema } from "./schema";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isVoidedStatus } from "@/lib/workflow";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -82,7 +83,9 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
 
   // Shrishti error-handling: duplicate-creator guard. Block re-reaching the
   // same creator within the same campaign unless the prior collab was
-  // Cancelled (per-campaign; RTO/Delivered/etc. still count as active).
+  // Cancelled OR voided/Offboarded (per-campaign; RTO/Delivered/etc. still
+  // count as active). Voiding a collab frees the slot — we're done with that
+  // collab, so the creator can be reached out fresh for the campaign.
   const { data: dupes } = await (supabase as any)
     .from("posts")
     .select("post_id, workflow_status")
@@ -90,7 +93,9 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     .eq("campaign_id", v.campaignId)
     .limit(10);
   const activeDup = ((dupes ?? []) as Array<{ workflow_status: string | null }>).find(
-    (p) => String(p.workflow_status ?? "") !== "Cancelled",
+    (p) =>
+      String(p.workflow_status ?? "") !== "Cancelled" &&
+      !isVoidedStatus(p.workflow_status),
   );
   if (activeDup) {
     return {
@@ -139,7 +144,11 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
         username: string | null;
         workflow_status: string | null;
       }>)
-        .filter((p) => String(p.workflow_status ?? "") !== "Cancelled")
+        .filter(
+          (p) =>
+            String(p.workflow_status ?? "") !== "Cancelled" &&
+            !isVoidedStatus(p.workflow_status),
+        )
         .map((p) => (p.username ?? "").trim().toLowerCase())
         .filter(Boolean),
     );

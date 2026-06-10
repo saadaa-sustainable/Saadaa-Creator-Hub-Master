@@ -118,7 +118,7 @@ export default function ReachOutInboundKM() {
             <strong>Duplicate-creator guard</strong> — a row for a creator
             already in the same campaign fails on submit, while the other rows
             still commit. The block lifts if the prior collab was{" "}
-            <KMCode>Cancelled</KMCode>.
+            <KMCode>Cancelled</KMCode> or <KMCode>Offboarded</KMCode> (voided).
           </li>
           <li>
             Red <KMCode>MissingFieldsAlert</KMCode> renders above the Submit

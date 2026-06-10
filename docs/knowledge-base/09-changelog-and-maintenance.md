@@ -32,6 +32,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-06-10 | **Voided collabs free the reach-out slot:** dup-creator guard + creator-cap treat `Offboarded` like `Cancelled` (outbound + inbound) | 06 |
 | 2026-06-10 | **Offboarding = VOID (Phase 3):** offboarded collabs removed from every board/dashboard/Accounts Due via shared `lib/workflow.ts` `isVoidedStatus`; paid history kept (Paid/All CSV `includeVoided`) | 06, 07 |
 | 2026-06-10 | **Posting Phase 2:** Drive Download Link mandatory on every post (red `*`) | 06 |
 | 2026-06-10 | **Accounts Hub Phase 1:** Collab-ID log form + creator name on select; Payment Done kanban lane; Profile URL in CSV exports; CSV template download + upload; monthly payable digest email (12th/27th → Accounts + Admins, full bank sheet). Paste from Excel removed | 07 |

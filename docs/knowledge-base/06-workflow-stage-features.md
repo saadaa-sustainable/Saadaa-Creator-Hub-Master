@@ -39,9 +39,9 @@ Creates the first `posts` record per collab (`workflow_status='Reach Out'`). Two
 
 ### Key business rules
 - **Content type** (UI label "Content Type"; field key `contentCode`): 10 hard-coded codes in `content-codes.ts` (UGC, VRP, OFF, BST, EDU, PRC, TBG, MAR, OST, FOU). *(Relabeled from "Content Code" 2026-06-07.)*
-- **Duplicate-creator guard:** blocks re-reaching the same creator in the same campaign unless the prior collab is `Cancelled` (RTO/Delivered count as active). Inbound checks per-row sequentially (catches intra-batch dupes).
+- **Duplicate-creator guard:** blocks re-reaching the same creator in the same campaign unless the prior collab is `Cancelled` **or voided (`Offboarded`/`Offboarding`)** — both free the slot (RTO/Delivered still count as active). Uses `isVoidedStatus` (`lib/workflow.ts`). Inbound checks per-row sequentially (catches intra-batch dupes).
 - **Closed-campaign block:** if `campaigns.status` lowercased = `'closed'`, the whole submit/batch is rejected ("Reopen it — Campaign Owner / Global Admin").
-- **Creator cap (2026-06-07):** cap = Σ `campaign_budget.num_influencers`. "Used" = distinct ACTIVE (non-Cancelled) creators by username. A new creator pushes to size+1; hard block when full. `cap=0` ⇒ no cap. The form shows a `used / cap creators · N left` pill (closed/full/left tones).
+- **Creator cap (2026-06-07):** cap = Σ `campaign_budget.num_influencers`. "Used" = distinct ACTIVE creators by username (non-Cancelled **and non-voided**; an Offboarded creator frees its cap slot too). A new creator pushes to size+1; hard block when full. `cap=0` ⇒ no cap. The form shows a `used / cap creators · N left` pill (closed/full/left tones).
 - After submit: enqueues IG scrape (`instagram_cache` upsert, insert-only), fires `notifyActorConfirmation` (REACHOUT/INBOUND_CONFIRMATION — one summary email per batch) via `after()`, revalidates tags + routes.
 
 ### IG lookup (`lookupCreator`)
@@ -170,7 +170,7 @@ Manual terminal stage that **VOIDS** a collab (2026-06-10). Moves a whole collab
 ---
 
 ## Notable edge cases
-- **Duplicate guard treats only `Cancelled` as re-addable** — RTO/Delivered count as active.
+- **Duplicate guard treats `Cancelled` and voided (`Offboarded`) as re-addable** — RTO/Delivered count as active.
 - **Inbound batch** is sequential (intra-batch dup catch); per-row failures isolated.
 - **Onboarding child spawn ignores stories** (stories never get a post_id row) but stories still count in KPIs/breakdowns.
 - **Equal-split commercial** means per-row `commercial_amount` is a fraction; per-collab totals everywhere come from sibling sums.

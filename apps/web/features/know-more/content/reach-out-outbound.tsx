@@ -94,7 +94,8 @@ export default function ReachOutOutboundKM() {
             <strong>Duplicate-creator guard</strong> — submitting a creator
             already in the same campaign is blocked with a field error on the
             Instagram URL, unless the prior collab was{" "}
-            <KMCode>Cancelled</KMCode> (which frees the handle to be re-added).
+            <KMCode>Cancelled</KMCode> or <KMCode>Offboarded</KMCode> (voided) —
+            either frees the handle to be reached out again for the campaign.
           </li>
           <li>
             <strong>Creator cap</strong> — a campaign accepts at most its
@@ -102,7 +103,8 @@ export default function ReachOutOutboundKM() {
             across its budget tiers). Once full, new reach-outs are blocked with
             a <KMCode>X/Y</KMCode> message. A Campaign Owner / Global Admin
             raises the allocation (which also raises the budget) to add more.
-            Cancelled collabs free a slot.
+            Cancelled <strong>and voided (Offboarded)</strong> collabs free a
+            slot.
           </li>
           <li>
             Red <KMCode>MissingFieldsAlert</KMCode> renders above the submit
