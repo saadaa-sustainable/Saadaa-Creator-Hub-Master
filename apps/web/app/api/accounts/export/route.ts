@@ -48,8 +48,10 @@ export async function GET(request: Request) {
 
   const header = [
     "Post ID",
+    "Collab ID",
     "Influencer Name",
     "Username",
+    "Profile URL",
     "Campaign",
     "Amount",
     "Paid So Far",
@@ -80,11 +82,21 @@ export async function GET(request: Request) {
           : "Not Matched with Creator Hub"
         : "Unverified";
 
+    const username = r.creator?.username ?? "";
+    const profileUrl = username
+      ? `https://www.instagram.com/${username.replace(/^@/, "")}/`
+      : "";
+    const collabId =
+      r.collab_id ??
+      (r.inf_id ? `${r.inf_id}-C${Number(r.collab_number ?? 1)}` : "");
+
     lines.push(
       [
         r.post_id_short ?? r.post_id,
+        collabId,
         r.creator?.inf_name ?? "",
-        r.creator?.username ?? "",
+        username,
+        profileUrl,
         r.campaign?.campaign_id ?? "",
         r.commercial_amount ?? r.payment?.amount ?? "",
         paid,

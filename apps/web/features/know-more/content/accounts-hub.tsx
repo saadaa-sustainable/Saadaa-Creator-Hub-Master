@@ -5,14 +5,19 @@ export default function AccountsHubKM() {
     <>
       <KMHeader
         title="Accounts Hub"
-        subtitle="Per-collab payment ledger. Inline log form, kanban + list, Excel paste import, CSV exports, 15th/30th payable cycle."
+        subtitle="Per-collab payment ledger. Inline log form keyed on Collab ID, kanban (incl. a Payment Done lane) + list, CSV template download + upload, CSV exports with creator + profile URL, 15th/30th payable cycle with a monthly accounts digest."
       />
 
       <KMSection tag="Page layout (top → bottom)">
         <KMList>
           <li>
-            <strong>1. Log Payments panel</strong> — always-open inline form
-            with multi-row entry + Paste from Excel + Submit button.
+            <strong>1. Log Payments panel</strong> — always-open inline form,
+            multi-row. The first field is a <strong>Collab ID</strong> dropdown
+            (one entry per payable collab); picking one shows the creator&apos;s
+            name + handle to its right and auto-fills the agreed amount. Toolbar:
+            Add row · <strong>Download CSV template</strong> ·{" "}
+            <strong>Upload CSV</strong> (CSV/XLSX file) · Paste from Excel ·
+            Submit.
           </li>
           <li>
             <strong>2. Filter strip</strong> — search, campaign, payment
@@ -35,8 +40,12 @@ export default function AccountsHubKM() {
             All) on the left, Kanban / List view toggle on the right.
           </li>
           <li>
-            <strong>5. Board</strong> — Kanban (3 columns: Reach Out · On
-            Board · Posted) or List table.
+            <strong>5. Board</strong> — Kanban (4 columns: Reach Out · Onboard ·
+            Posted · <strong>Payment Done</strong>) or List table. A collab whose
+            payment is fully <KMCode>Done</KMCode> leaves the Posted lane and
+            moves to Payment Done (card turns green), so Posted only ever shows
+            collabs still owed money. The Paid CSV is exactly the Payment Done
+            set.
           </li>
         </KMList>
       </KMSection>
@@ -113,7 +122,7 @@ export default function AccountsHubKM() {
         <KMCallout tone="info">
           Above the Submit button a red <KMCode>MissingFieldsAlert</KMCode>{" "}
           lists every empty required column across every row in the batch
-          (Post ID · Payment Date · Amount). The alert refreshes live as
+          (Collab ID · Payment Date · Amount). The alert refreshes live as
           fields are filled; banner disappears once zero blockers remain.
         </KMCallout>
       </KMSection>
@@ -126,16 +135,31 @@ export default function AccountsHubKM() {
         </KMCallout>
       </KMSection>
 
-      <KMSection tag="Excel paste import">
+      <KMSection tag="CSV template · upload · paste">
+        <KMList>
+          <li>
+            <strong>Download CSV template</strong> · a ready-to-fill{" "}
+            <KMCode>Collab ID, UTR, Date, Amount</KMCode> CSV (seeded with one
+            example row from your first payable collab).
+          </li>
+          <li>
+            <strong>Upload CSV</strong> · pick a <KMCode>.csv</KMCode> or{" "}
+            <KMCode>.xlsx</KMCode> file; it parses straight into the form rows.
+          </li>
+          <li>
+            <strong>Paste from Excel</strong> · tab- or comma-separated rows
+            pasted directly.
+          </li>
+        </KMList>
         <p>
-          <KMCode>Paste from Excel</KMCode> accepts tab- or comma-separated
-          rows up to a <strong>10-row batch limit</strong> (extra pasted rows
-          are dropped with a toast; the inline form also caps at 10). Headers
-          (Post ID, UTR, Date, Amount) are auto-detected. Excel serial dates +
-          dd/mm/yyyy + yyyy-mm-dd all parse. Every parsed row runs the same
-          three gates above. A <strong>&quot;Same payment date for all
-          entries&quot;</strong> checkbox copies the first row&apos;s date to
-          every row (later date pickers lock while it&apos;s on).
+          All three share one parser: header row (<KMCode>Collab ID</KMCode>{" "}
+          or legacy <KMCode>Post ID</KMCode> · UTR · Date · Amount) is
+          auto-detected; Excel serial dates + dd/mm/yyyy + yyyy-mm-dd all parse;
+          the ID cell is resolved (Collab ID → representative post). A{" "}
+          <strong>10-row batch limit</strong> applies (extras dropped with a
+          toast). Every parsed row runs the same three gates above. The{" "}
+          <strong>&quot;Same payment date for all entries&quot;</strong> checkbox
+          copies the first row&apos;s date to every row.
         </p>
       </KMSection>
 
@@ -212,15 +236,31 @@ export default function AccountsHubKM() {
       <KMSection tag="Exports + cron">
         <KMList>
           <li>
-            <strong>Due CSV</strong> · everything with status =
-            <KMCode>Due</KMCode> for the next disbursement run.
+            <strong>Due CSV</strong> · Due / Not Due / Partial rows for the next
+            disbursement run.
           </li>
           <li>
             <strong>Paid CSV</strong> · history of <KMCode>Done</KMCode>{" "}
-            rows for finance reconciliation.
+            rows (the Payment Done lane) for finance reconciliation.
           </li>
           <li>
             <strong>All CSV</strong> · full export including drafts.
+          </li>
+          <li>
+            <strong>Every export</strong> now carries Collab ID + creator name +
+            username + <KMCode>Profile URL</KMCode>{" "}
+            (<KMCode>instagram.com/&lt;username&gt;</KMCode>) alongside the
+            amount / paid-so-far / outstanding / UTR / cycle columns.
+          </li>
+          <li>
+            <strong>Monthly payable digest</strong> — the daily cron also sends a
+            single branded digest on the <strong>12th</strong> (this month&apos;s
+            15th payout cycle) and the <strong>27th</strong> (the 30th cycle) to
+            the <strong>Accounts Team + Global Admins</strong>. It lists every
+            still-owed collab in that cycle with creator, handle, Collab ID,
+            amount, due date, status, and full <strong>bank name / account /
+            IFSC</strong> for processing. Fires at most once per day; voided
+            (offboarded) collabs are excluded.
           </li>
           <li>
             <strong>recomputePaymentStates</strong> runs inside the 3-hr cron

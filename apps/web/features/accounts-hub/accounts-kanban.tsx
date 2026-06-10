@@ -31,6 +31,13 @@ export function AccountsKanban({ rows }: { rows: AccountsRow[] }) {
     const map = new Map<string, AccountsRow[]>();
     for (const col of KANBAN_COLUMNS) map.set(col.id, []);
     for (const row of rows) {
+      // A fully-paid collab leaves its workflow lane and lands in Payment Done,
+      // so the Posted column only ever shows collabs still owed money. This is
+      // the same set the Paid CSV exports (payment.status === "Done").
+      if (row.payment?.status === "Done") {
+        map.get("payment-done")!.push(row);
+        continue;
+      }
       const status = String(row.workflow_status ?? "");
       const col = KANBAN_COLUMNS.find((c) =>
         (c.statuses as readonly string[]).includes(status),
@@ -63,7 +70,9 @@ export function AccountsKanban({ rows }: { rows: AccountsRow[] }) {
               <div className="acc-kb-col__body">
                 {items.length === 0 ? (
                   <div className="acc-kb-col__empty">
-                    No posts in this stage.
+                    {col.id === "payment-done"
+                      ? "No paid collabs yet."
+                      : "No posts in this stage."}
                   </div>
                 ) : (
                   items.map((row) => {

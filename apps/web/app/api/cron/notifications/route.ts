@@ -202,6 +202,7 @@ export async function GET(req: NextRequest) {
     content_reminder: 0,
     payment_eligible: 0,
     payment_sla_breach: 0,
+    accounts_payable_digest: 0,
     campaign_ending: 0,
     campaign_closed: 0,
   };
@@ -495,6 +496,147 @@ export async function GET(req: NextRequest) {
     }
   } catch (err) {
     console.error("[cron/notifications] campaign auto-close check failed:", err);
+  }
+
+  // ── 8. Monthly payable-cycle digest ─────────────────────────────────────────
+  // On the 12th: every collab whose payment falls in this month's 15th payout
+  // cycle and still owes money. On the 27th: the 30th cycle. ONE branded digest
+  // (full payable sheet incl. bank details) to the Accounts team + Global Admins.
+  // Idempotent: a digest for the day fires at most once (guarded via email_logs).
+  // Voided/offboarded collabs are excluded — their balance is no longer payable.
+  try {
+    const today = todayUtc();
+    const dom = today.getUTCDate();
+    if (dom === 12 || dom === 27) {
+      const cycleDay = dom === 12 ? 15 : 30;
+      const y = today.getUTCFullYear();
+      const mo = today.getUTCMonth();
+      const lastDay = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
+      const clamped = Math.min(cycleDay, lastDay);
+      const cycleIso = `${y}-${String(mo + 1).padStart(2, "0")}-${String(clamped).padStart(2, "0")}`;
+      const recipients = Array.from(new Set([...accountsTeam, ...globalAdmins]));
+
+      // Fire-once guard: skip if any digest already logged today.
+      const { data: already } = await (supabase as any)
+        .from("email_logs")
+        .select("id")
+        .eq("email_type", NOTIFICATION_TYPES.ACCOUNTS_PAYABLE_DIGEST)
+        .gte("created_at", `${isoDateOffset(0)}T00:00:00.000Z`)
+        .limit(1);
+
+      if (recipients.length > 0 && !(already && already.length > 0)) {
+        const { data: paysRaw } = await (supabase as any)
+          .from("payments")
+          .select(
+            "post_id, collab_id, inf_id, username, amount, status, due_date, estimated_payable_date, bank_name, bank_number, ifsc",
+          )
+          .eq("estimated_payable_date", cycleIso)
+          .in("status", ["Due", "Not Due", "Partial"]);
+        let pays = (paysRaw ?? []) as Array<{
+          post_id: string | null;
+          collab_id: string | null;
+          inf_id: string | null;
+          username: string | null;
+          amount: number | null;
+          status: string | null;
+          due_date: string | null;
+          bank_name: string | null;
+          bank_number: string | null;
+          ifsc: string | null;
+        }>;
+
+        // Drop voided/offboarded collabs — their remaining balance is unpayable.
+        const dPostIds = pays.map((p) => p.post_id).filter((v): v is string => !!v);
+        if (dPostIds.length > 0) {
+          const { data: posts } = await (supabase as any)
+            .from("posts")
+            .select("post_id, workflow_status")
+            .in("post_id", dPostIds);
+          const voided = new Set(
+            ((posts ?? []) as Array<{ post_id: string; workflow_status: string | null }>)
+              .filter((p) => p.workflow_status === "Offboarded" || p.workflow_status === "Offboarding")
+              .map((p) => p.post_id),
+          );
+          pays = pays.filter((p) => !p.post_id || !voided.has(p.post_id));
+        }
+
+        if (pays.length > 0) {
+          // Resolve creator name + handle for each row.
+          const infIds = Array.from(
+            new Set(pays.map((p) => p.inf_id).filter((v): v is string => !!v)),
+          );
+          const creatorByInf = new Map<string, { inf_name: string | null; username: string | null }>();
+          if (infIds.length > 0) {
+            const { data: cr } = await (supabase as any)
+              .from("creators")
+              .select("inf_id, inf_name, username")
+              .in("inf_id", infIds);
+            for (const c of (cr ?? []) as Array<{ inf_id: string; inf_name: string | null; username: string | null }>) {
+              creatorByInf.set(c.inf_id, { inf_name: c.inf_name, username: c.username });
+            }
+          }
+
+          const esc = (s: unknown) =>
+            String(s ?? "")
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;");
+          const inr = (n: number | null) =>
+            n == null ? "—" : `₹${Number(n).toLocaleString("en-IN")}`;
+
+          const built = pays.map((p) => {
+            const c = p.inf_id ? creatorByInf.get(p.inf_id) : undefined;
+            const handle = (c?.username ?? p.username ?? "").replace(/^@/, "");
+            return {
+              name: c?.inf_name ?? handle ?? p.inf_id ?? "—",
+              handle,
+              profile: handle ? `https://www.instagram.com/${handle}/` : "—",
+              collab: p.collab_id ?? "—",
+              amount: Number(p.amount ?? 0),
+              due: p.due_date ?? "—",
+              status: p.status ?? "—",
+              bankName: p.bank_name ?? "—",
+              bankNum: p.bank_number ?? "—",
+              ifsc: p.ifsc ?? "—",
+            };
+          });
+          const total = built.reduce((s, r) => s + r.amount, 0);
+
+          const th = (t: string) =>
+            `<th style="text-align:left;padding:6px 8px;border-bottom:2px solid #E7E2D2;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:#6E695E;">${t}</th>`;
+          const tdc = (v: string) =>
+            `<td style="padding:6px 8px;border-bottom:1px solid #EFEAE0;font-size:12px;color:#161513;">${v}</td>`;
+          const bodyRows = built
+            .map(
+              (r) =>
+                `<tr>${tdc(esc(r.name))}${tdc(r.handle ? `<a href="${r.profile}" style="color:#3B6FD4;">@${esc(r.handle)}</a>` : "—")}${tdc(esc(r.collab))}${tdc(`<strong>${inr(r.amount)}</strong>`)}${tdc(esc(r.due))}${tdc(esc(r.status))}${tdc(esc(r.bankName))}${tdc(esc(r.bankNum))}${tdc(esc(r.ifsc))}</tr>`,
+            )
+            .join("");
+
+          const html = `<p style="margin:0 0 12px;">The following <strong>${built.length}</strong> collab payment${built.length === 1 ? "" : "s"} fall in the <strong>${cycleIso}</strong> payout cycle and still owe money. Please process them on or before the cycle date.</p>
+<div style="overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;margin:0 0 12px;">
+<thead><tr>${th("Creator")}${th("Handle")}${th("Collab ID")}${th("Amount")}${th("Due")}${th("Status")}${th("Bank")}${th("A/C No.")}${th("IFSC")}</tr></thead>
+<tbody>${bodyRows}</tbody>
+</table>
+</div>
+<p style="margin:0 0 4px;font-size:14px;"><strong>Total payable this cycle: ${inr(total)}</strong></p>
+<p style="margin:0;font-size:12px;color:#9A9384;">Bank details are included for processing. Open the Accounts Hub to update each payment once paid.</p>`;
+
+          const r = await sendNotification({
+            type: NOTIFICATION_TYPES.ACCOUNTS_PAYABLE_DIGEST,
+            to: recipients,
+            subject: `Payments due ${cycleIso} — ${built.length} creator${built.length === 1 ? "" : "s"}, ${inr(total)}`,
+            title: `Upcoming payout cycle — ${cycleIso}`,
+            subtitle: `${built.length} payable collab${built.length === 1 ? "" : "s"}`,
+            htmlBody: html,
+          });
+          if (r.ok) sent.accounts_payable_digest = built.length;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[cron/notifications] payable_digest check failed:", err);
   }
 
   return NextResponse.json({ ran: true, sent });

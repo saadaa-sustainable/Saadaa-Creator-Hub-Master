@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -15,12 +16,15 @@ import {
   CheckCircle2,
   CircleDollarSign,
   ClipboardPaste,
+  FileSpreadsheet,
   Hash,
+  Layers,
   Link2,
   Loader2,
   Plus,
   Send,
   Trash2,
+  Upload,
   User,
   X,
 } from "lucide-react";
@@ -157,6 +161,7 @@ export function PaymentEntryPanel() {
   const [submitting, startSubmit] = useTransition();
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const csvInputRef = useRef<HTMLInputElement>(null);
   // REQ #10a: when on, every row uses the first row's payment date.
   const [sameDateForAll, setSameDateForAll] = useState(false);
 
@@ -188,6 +193,23 @@ export function PaymentEntryPanel() {
     return map;
   }, [eligible]);
 
+  // Map any id form (collab_id / short post id / post_id) to the representative
+  // post_id that submit + the dropdown use. Lets a pasted/uploaded sheet key on
+  // Collab ID (the operator-facing id) while the form stays post_id-internal.
+  const resolveToPostId = useCallback(
+    (raw: string): string => {
+      const k = raw.trim().toLowerCase();
+      if (!k) return "";
+      for (const p of eligible) {
+        if (p.post_id.toLowerCase() === k) return p.post_id;
+        if ((p.collab_id ?? "").toLowerCase() === k) return p.post_id;
+        if ((p.post_id_short ?? "").toLowerCase() === k) return p.post_id;
+      }
+      return raw.trim(); // unmatched — submit's gate will surface it
+    },
+    [eligible],
+  );
+
   const addRow = useCallback(() => {
     setRows((cur) =>
       cur.length >= MAX_PAYMENT_ROWS ? cur : [...cur, newRow()],
@@ -216,64 +238,61 @@ export function PaymentEntryPanel() {
     });
   }, [sameDateForAll, rows]);
 
-  const importFromPaste = useCallback(() => {
-    const text = pasteText.trim();
-    if (!text) {
-      toast.error("Paste some rows first.");
-      return;
-    }
-    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-    if (lines.length === 0) {
-      toast.error("No rows detected.");
-      return;
-    }
+  // Shared delimited parser (Excel/CSV). Accepts a header row (Collab ID / Post
+  // ID / UTR / Date / Amount) or bare values, tab- or comma-separated. The id
+  // cell is resolved to the representative post_id so a Collab-ID sheet works.
+  const parseDelimited = useCallback(
+    (text: string): FormRow[] => {
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length === 0) return [];
 
-    const splitRow = (line: string): string[] => {
-      if (line.includes("\t")) return line.split("\t");
-      return line.split(",");
-    };
+      const splitRow = (line: string): string[] =>
+        line.includes("\t") ? line.split("\t") : line.split(",");
 
-    const first = splitRow(lines[0]).map((c) => c.trim().toLowerCase());
-    const hasHeader = first.some(
-      (c) =>
-        c === "post id" ||
-        c === "post_id" ||
-        c === "utr" ||
-        c === "amount" ||
-        c === "date" ||
-        c === "payment date",
-    );
-    const headers = hasHeader ? first : ["post id", "utr", "date", "amount"];
-    const idxOf = (...keys: string[]) =>
-      headers.findIndex((h) => keys.includes(h));
-    const postIdx = idxOf("post id", "post_id", "postid");
-    const utrIdx = idxOf("utr", "reference", "ref", "utr / reference no.");
-    const dateIdx = idxOf("date", "payment date", "payment_date");
-    const amountIdx = idxOf("amount", "amount (₹)", "amount inr", "₹");
+      const first = splitRow(lines[0]).map((c) => c.trim().toLowerCase());
+      const hasHeader = first.some((c) =>
+        [
+          "collab id",
+          "collab_id",
+          "post id",
+          "post_id",
+          "utr",
+          "amount",
+          "date",
+          "payment date",
+        ].includes(c),
+      );
+      const headers = hasHeader ? first : ["collab id", "utr", "date", "amount"];
+      const idxOf = (...keys: string[]) =>
+        headers.findIndex((h) => keys.includes(h));
+      const idIdx = idxOf("collab id", "collab_id", "post id", "post_id", "postid", "id");
+      const utrIdx = idxOf("utr", "reference", "ref", "utr / reference no.");
+      const dateIdx = idxOf("date", "payment date", "payment_date");
+      const amountIdx = idxOf("amount", "amount (₹)", "amount inr", "₹");
 
-    const startAt = hasHeader ? 1 : 0;
-    const parsed: FormRow[] = [];
-    for (let i = startAt; i < lines.length; i++) {
-      const cells = splitRow(lines[i]).map((c) => c.trim());
-      const postId = cells[postIdx >= 0 ? postIdx : 0] ?? "";
-      const utr = cells[utrIdx >= 0 ? utrIdx : 1] ?? "";
-      const rawDate = cells[dateIdx >= 0 ? dateIdx : 2] ?? "";
-      const amount = cells[amountIdx >= 0 ? amountIdx : 3] ?? "";
-      if (!postId && !utr && !amount) continue;
-      parsed.push({
-        key: Math.random().toString(36).slice(2),
-        postId: postId.trim(),
-        utr: utr.trim(),
-        paymentDate: normalizePastedDate(rawDate.trim()) || todayIstIso(),
-        amount: amount.replace(/[^\d.\-]/g, ""),
-      });
-    }
+      const startAt = hasHeader ? 1 : 0;
+      const parsed: FormRow[] = [];
+      for (let i = startAt; i < lines.length; i++) {
+        const cells = splitRow(lines[i]).map((c) => c.trim());
+        const idCell = cells[idIdx >= 0 ? idIdx : 0] ?? "";
+        const utr = cells[utrIdx >= 0 ? utrIdx : 1] ?? "";
+        const rawDate = cells[dateIdx >= 0 ? dateIdx : 2] ?? "";
+        const amount = cells[amountIdx >= 0 ? amountIdx : 3] ?? "";
+        if (!idCell && !utr && !amount) continue;
+        parsed.push({
+          key: Math.random().toString(36).slice(2),
+          postId: idCell ? resolveToPostId(idCell) : "",
+          utr: utr.trim(),
+          paymentDate: normalizePastedDate(rawDate.trim()) || todayIstIso(),
+          amount: amount.replace(/[^\d.\-]/g, ""),
+        });
+      }
+      return parsed;
+    },
+    [resolveToPostId],
+  );
 
-    if (parsed.length === 0) {
-      toast.error("Couldn't parse any rows.");
-      return;
-    }
-
+  const applyImported = useCallback((parsed: FormRow[]) => {
     const capped = parsed.slice(0, MAX_PAYMENT_ROWS);
     setRows(capped);
     setPasteOpen(false);
@@ -287,13 +306,74 @@ export function PaymentEntryPanel() {
         `Imported ${capped.length} row${capped.length === 1 ? "" : "s"}.`,
       );
     }
-  }, [pasteText]);
+  }, []);
+
+  const importFromPaste = useCallback(() => {
+    const text = pasteText.trim();
+    if (!text) {
+      toast.error("Paste some rows first.");
+      return;
+    }
+    const parsed = parseDelimited(text);
+    if (parsed.length === 0) {
+      toast.error("Couldn't parse any rows.");
+      return;
+    }
+    applyImported(parsed);
+  }, [pasteText, parseDelimited, applyImported]);
+
+  const importFile = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const f = e.target.files?.[0];
+      e.target.value = ""; // allow re-uploading the same file
+      if (!f) return;
+      try {
+        let text: string;
+        if (/\.(xlsx|xls)$/i.test(f.name)) {
+          const XLSX = await import("xlsx");
+          const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          text = XLSX.utils.sheet_to_csv(ws);
+        } else {
+          text = await f.text();
+        }
+        const parsed = parseDelimited(text);
+        if (parsed.length === 0) {
+          toast.error("No payment rows found in the file.");
+          return;
+        }
+        applyImported(parsed);
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not read the file.",
+        );
+      }
+    },
+    [parseDelimited, applyImported],
+  );
+
+  const downloadTemplate = useCallback(() => {
+    const sample = eligible[0];
+    const header = "Collab ID,UTR,Date,Amount";
+    const exampleRow = sample
+      ? `${sample.collab_id ?? sample.post_id_short ?? sample.post_id},UTRREF123,${todayIstIso()},${sample.commercial_amount ?? 10000}`
+      : "SIF-1-C1,UTRREF123,2026-06-15,10000";
+    const csv = `${header}\n${exampleRow}\n`;
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "accounts-payment-template.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }, [eligible]);
 
   const missingPaymentFields = useMemo(() => {
     if (!submitAttempted) return [] as string[];
     const labels = new Set<string>();
     rows.forEach((r) => {
-      if (!r.postId.trim()) labels.add("Post ID");
+      if (!r.postId.trim()) labels.add("Collab ID");
       if (!r.paymentDate) labels.add("Payment Date");
       const amt = Number(r.amount);
       if (!r.amount || Number.isNaN(amt) || amt <= 0)
@@ -319,7 +399,7 @@ export function PaymentEntryPanel() {
         r.amount <= 0,
     );
     if (invalid) {
-      toast.error("Each row needs a post, payment date and positive amount.");
+      toast.error("Each row needs a collab, payment date and positive amount.");
       return;
     }
     startSubmit(async () => {
@@ -507,35 +587,48 @@ export function PaymentEntryPanel() {
                       htmlFor={postFieldId}
                       className="acc-field__label"
                     >
-                      <User size={11} aria-hidden /> Post
+                      <Layers size={11} aria-hidden /> Collab ID
                       <span className="req">*</span>
                     </label>
-                    <select
-                      id={postFieldId}
-                      className="acc-field__input acc-field__input--select"
-                      value={row.postId}
-                      onChange={(e) =>
-                        patchRow(row.key, {
-                          postId: e.target.value,
-                          amount:
-                            eligibleById.get(e.target.value)
-                              ?.commercial_amount?.toString() ?? row.amount,
-                        })
-                      }
-                    >
-                      <option value="">
-                        {loadingEligible
-                          ? "Loading posts…"
-                          : "Pick a posted creator"}
-                      </option>
-                      {eligible.map((p) => (
-                        <option key={p.post_id} value={p.post_id}>
-                          {p.post_id_short ?? p.post_id}
-                          {p.collab_id ? ` · ${p.collab_id}` : ""} ·{" "}
-                          {p.inf_name ?? p.username ?? "—"}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <select
+                        id={postFieldId}
+                        className="acc-field__input acc-field__input--select min-w-0"
+                        value={row.postId}
+                        onChange={(e) =>
+                          patchRow(row.key, {
+                            postId: e.target.value,
+                            amount:
+                              eligibleById.get(e.target.value)
+                                ?.commercial_amount?.toString() ?? row.amount,
+                          })
+                        }
+                      >
+                        <option value="">
+                          {loadingEligible ? "Loading collabs…" : "Pick a collab"}
                         </option>
-                      ))}
-                    </select>
+                        {eligible.map((p) => (
+                          <option key={p.post_id} value={p.post_id}>
+                            {p.collab_id ?? p.post_id_short ?? p.post_id} ·{" "}
+                            {p.inf_name ?? p.username ?? "—"}
+                          </option>
+                        ))}
+                      </select>
+                      {linked && (
+                        <span
+                          className="inline-flex items-center gap-1 whitespace-nowrap text-[0.72rem] font-semibold text-text-secondary"
+                          title="Creator for this collab"
+                        >
+                          <User size={11} aria-hidden className="text-text-tertiary" />
+                          {linked.inf_name ?? linked.username ?? "—"}
+                          {linked.username && (
+                            <span className="text-text-tertiary font-normal">
+                              @{linked.username}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="acc-field">
@@ -639,12 +732,37 @@ export function PaymentEntryPanel() {
             <button
               type="button"
               className="acc-entry-add"
+              onClick={downloadTemplate}
+              disabled={submitting}
+            >
+              <FileSpreadsheet size={13} aria-hidden />
+              Download CSV template
+            </button>
+            <button
+              type="button"
+              className="acc-entry-add"
+              onClick={() => csvInputRef.current?.click()}
+              disabled={submitting}
+            >
+              <Upload size={13} aria-hidden />
+              Upload CSV
+            </button>
+            <button
+              type="button"
+              className="acc-entry-add"
               onClick={() => setPasteOpen((s) => !s)}
               disabled={submitting}
             >
               <ClipboardPaste size={13} aria-hidden />
               {pasteOpen ? "Hide paste import" : "Paste from Excel"}
             </button>
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls,text/csv"
+              className="hidden"
+              onChange={importFile}
+            />
             <div className="acc-entry-toolbar__spacer" />
             <MissingFieldsAlert fields={missingPaymentFields} className="w-full" />
             <button
@@ -671,7 +789,7 @@ export function PaymentEntryPanel() {
             <div className="acc-entry-paste">
               <p className="text-xs text-text-secondary">
                 Paste rows from Excel / Sheets. First line can be a header
-                (Post ID, UTR, Date, Amount) or values directly. Tabs and
+                (Collab ID, UTR, Date, Amount) or values directly. Tabs and
                 commas both work.
               </p>
               <textarea
@@ -679,7 +797,7 @@ export function PaymentEntryPanel() {
                 rows={6}
                 value={pasteText}
                 onChange={(e) => setPasteText(e.target.value)}
-                placeholder={"SIF-1-P1\tUTRREF123\t2026-05-15\t10000\nSIF-1-P2\t\t2026-05-22\t8500"}
+                placeholder={"SIF-1-C1\tUTRREF123\t2026-05-15\t10000\nSIF-1-C2\t\t2026-05-22\t8500"}
               />
               <div className="acc-entry-paste__actions">
                 <button

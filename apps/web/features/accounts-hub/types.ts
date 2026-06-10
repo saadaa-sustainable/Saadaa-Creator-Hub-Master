@@ -99,7 +99,13 @@ export interface AccountsFilters {
   view?: "kanban" | "list";
 }
 
-/** Kanban column groupings — legacy parity (Reach Out / On Board / Posted). */
+/**
+ * Kanban column groupings — Reach Out / Onboard / Posted plus a terminal
+ * "Payment Done" lane. The first three bucket by `workflow_status`; Payment
+ * Done is special-cased in the board: any collab whose payment is fully `Done`
+ * moves here regardless of workflow_status (so Posted shows only unpaid
+ * collabs). The Paid CSV is exactly this column's set (payment.status="Done").
+ */
 export const KANBAN_COLUMNS = [
   { id: "reach-out", label: "Reach Out", statuses: ["Reach Out"] as const },
   {
@@ -111,5 +117,11 @@ export const KANBAN_COLUMNS = [
     id: "posted",
     label: "Posted",
     statuses: ["Posted", "Delivered"] as const,
+  },
+  {
+    // Payment-status lane — filled by the board's paid check, not workflow_status.
+    id: "payment-done",
+    label: "Payment Done",
+    statuses: [] as const,
   },
 ] as const;
