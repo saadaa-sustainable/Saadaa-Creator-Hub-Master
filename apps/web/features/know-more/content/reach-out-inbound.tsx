@@ -63,10 +63,12 @@ export default function ReachOutInboundKM() {
           </li>
           <li>
             <strong>Collab Type + Commercials</strong> · removed from inbound
-            (2026-06-10). Every inbound reach-out is recorded as{" "}
-            <KMCode>Barter</KMCode> with ₹0 (defaulted on submit; the post still
-            carries a <KMCode>collab_type</KMCode> for the RPC). Set commercials
-            later in Onboarding if a paid arrangement is agreed.
+            (2026-06-10). Inbound reach-outs leave{" "}
+            <KMCode>collab_type</KMCode> <strong>unset</strong> (null, NOT
+            auto-Barter) and commercial 0 — both are decided in{" "}
+            <strong>Onboarding</strong>, same as outbound. (Leaving it null keeps
+            inbound out of the Barter funnel bucket until a collab type is
+            actually chosen.)
           </li>
         </KMList>
       </KMSection>

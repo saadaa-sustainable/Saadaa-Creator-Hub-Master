@@ -11,7 +11,6 @@ import {
 } from "@/lib/notifications";
 import {
   InboundBatchSchema,
-  applyInboundBarterLock,
   inboundUsernameFromUrl,
 } from "./inbound-schema";
 import { findContentCode } from "./content-codes";
@@ -93,7 +92,7 @@ export async function submitInboundBatch(
   }
 
   for (let i = 0; i < rows.length; i++) {
-    const r = applyInboundBarterLock(rows[i]);
+    const r = rows[i];
     const username = inboundUsernameFromUrl(r.instagramLink);
     if (!username) {
       failures.push({
@@ -144,8 +143,12 @@ export async function submitInboundBatch(
         p_static_posts: 0,
         p_stories: 0,
         p_ads_usage_rights: null,
-        p_collab_type: r.collabType,
-        p_commercial_amount: r.collabType === "Barter" ? 0 : r.commercials ?? 0,
+        // Inbound no longer captures collab type / commercials — those are set
+        // in Onboarding. Leave collab_type unset (null) so the row isn't
+        // auto-marked Barter (which wrongly counted in the Barter funnel
+        // bucket); commercial stays 0 until onboarding.
+        p_collab_type: null,
+        p_commercial_amount: 0,
         p_raw_dump: null,
         p_logged_by_email: actor.name || actor.email,
       })
