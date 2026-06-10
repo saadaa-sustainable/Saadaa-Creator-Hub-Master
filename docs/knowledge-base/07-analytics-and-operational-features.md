@@ -41,6 +41,7 @@
 
 ### Bento layout (`dashboard-bento.tsx`)
 12-col mosaic, rows A–J: Hero+Spotlight → Pulse → StageBoard → Action+PostingGoal → WorkflowFunnel+MonthlyTrend → **ChannelSplit (Row E2, full-width)** → Content+Tier donuts → PipelineKpis → TopCreators+TeamLeaderboard → SpendsPerCampaign → CampaignKpis. The **channel-split widget** (`widgets/channel-split.tsx`) renders two `ChannelCard`s (Inbound indigo `#3B6FD4`, Outbound purple `#7B4FBF` — DS "detail panel" accents, off-nav), each with headline conversion %, Creators/Spend/Posted chips, and a 3-step mini funnel sized to the channel's own max bucket.
+- **Per-campaign focus (2026-06-10):** when exactly one campaign is filtered, `fetchDashboardData` populates `campaignFocus` (a dedicated per-campaign query, independent of date/tier/content filters) and `widgets/campaign-focus.tsx` renders a Row-0 strip: **Reached Out** · **Onboarded Y/cap** (slots-left) · **Un-onboarded** (reached out, never onboarded-active) · **Posted**. Surfaces the onboarding-cap funnel. `null` when no single campaign is selected.
 
 ---
 

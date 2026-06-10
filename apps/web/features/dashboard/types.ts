@@ -73,8 +73,28 @@ export interface ChannelStats {
   conversionPct: number;
 }
 
+/**
+ * Per-campaign focus metrics — populated only when a single campaign is selected
+ * in the dashboard filter. Shows the onboarding-cap funnel for that campaign:
+ * how many creators were reached out, how many of those onboarded (vs the cap),
+ * how many are still un-onboarded, and how many have posted. `unonboarded` =
+ * reachedOut − onboarded (reached out but never onboarded-active; includes
+ * voided/cancelled leftovers since they were still reach-outs).
+ */
+export interface CampaignFocus {
+  campaignId: string;
+  campaignName: string | null;
+  cap: number;
+  reachedOut: number;
+  onboarded: number;
+  unonboarded: number;
+  posted: number;
+}
+
 export interface DashboardData {
   filters: DashboardFilters;
+  /** Set only when exactly one campaign is selected in the filter; else null. */
+  campaignFocus: CampaignFocus | null;
   pulse: {
     reachOut: PulseStat;
     onboarded: PulseStat;

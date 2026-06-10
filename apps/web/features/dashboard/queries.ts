@@ -1,8 +1,9 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { isVoidedStatus } from "@/lib/workflow";
+import { isOnboardedActive, isVoidedStatus } from "@/lib/workflow";
 import type {
   ActionCounts,
   BreakdownSlice,
+  CampaignFocus,
   ChannelStats,
   DashboardData,
   DashboardFilters,
@@ -623,8 +624,63 @@ export async function fetchDashboardData(
     ),
   };
 
+  // Per-campaign focus — only when exactly one campaign is selected. Dedicated
+  // query so the funnel reflects the WHOLE campaign, independent of the
+  // date / tier / content dashboard filters.
+  let campaignFocus: CampaignFocus | null = null;
+  if (filters.campaign) {
+    const cid = filters.campaign;
+    const [budRes, cpRes, nameRes] = await Promise.all([
+      (supabase as any)
+        .from("campaign_budget")
+        .select("num_influencers")
+        .eq("campaign_id", cid),
+      (supabase as any)
+        .from("posts")
+        .select("username, workflow_status")
+        .eq("campaign_id", cid)
+        .limit(20000),
+      (supabase as any)
+        .from("campaigns")
+        .select("campaign_name")
+        .eq("campaign_id", cid)
+        .maybeSingle(),
+    ]);
+    const cap = ((budRes.data ?? []) as Array<{ num_influencers: number | null }>).reduce(
+      (s: number, r: { num_influencers: number | null }) =>
+        s + (Number(r.num_influencers ?? 0) || 0),
+      0,
+    );
+    const reached = new Set<string>();
+    const onboardedSet = new Set<string>();
+    const postedSet = new Set<string>();
+    for (const p of (cpRes.data ?? []) as Array<{
+      username: string | null;
+      workflow_status: string | null;
+    }>) {
+      const u = (p.username ?? "").trim().toLowerCase();
+      if (!u) continue;
+      // "Reached out" = every reach-out for the campaign (incl. voided/cancelled
+      // leftovers — they were still reach-outs). Onboarded = onboarded-active.
+      reached.add(u);
+      if (isOnboardedActive(p.workflow_status)) onboardedSet.add(u);
+      if (p.workflow_status === "Posted" || p.workflow_status === "Delivered")
+        postedSet.add(u);
+    }
+    campaignFocus = {
+      campaignId: cid,
+      campaignName: (nameRes.data?.campaign_name as string | null) ?? null,
+      cap,
+      reachedOut: reached.size,
+      onboarded: onboardedSet.size,
+      unonboarded: Math.max(0, reached.size - onboardedSet.size),
+      posted: postedSet.size,
+    };
+  }
+
   return {
     filters,
+    campaignFocus,
     pulse: {
       reachOut: pulse(reachOutT, reachOutY),
       onboarded: pulse(onboardedT, onboardedY),

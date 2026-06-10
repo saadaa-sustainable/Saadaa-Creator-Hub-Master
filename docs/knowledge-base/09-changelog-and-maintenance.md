@@ -32,6 +32,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-06-10 | **Dashboard per-campaign focus:** when a campaign is filtered, a Reached-Out / Onboarded-Y/cap / Un-onboarded / Posted strip (`campaignFocus`) | 07 |
 | 2026-06-10 | **Creator cap → ONBOARDING:** reach-out now unlimited; cap (Σ num_influencers) enforced at onboarding; offboarding frees a slot; un-onboarded leftovers void (→Cancelled) on campaign close | 06 |
 | 2026-06-10 | **Campaign auto-close #2:** closes when the full creator allocation has posted (cap met by Posted/Delivered) — real-time from `submitPosting` + daily cron backstop (`lib/campaign-lifecycle.ts`) | 06 |
 | 2026-06-10 | **Voided collabs free the reach-out slot:** dup-creator guard + creator-cap treat `Offboarded` like `Cancelled` (outbound + inbound) | 06 |

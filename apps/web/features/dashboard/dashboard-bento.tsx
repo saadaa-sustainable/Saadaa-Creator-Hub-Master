@@ -14,6 +14,7 @@ import { DashboardTeamLeaderboard } from "./widgets/team-leaderboard";
 import { DashboardTopCreators } from "./widgets/top-creators";
 import { DashboardWorkflowFunnel } from "./widgets/workflow-funnel";
 import { DashboardChannelSplit } from "./widgets/channel-split";
+import { DashboardCampaignFocus } from "./widgets/campaign-focus";
 import type { DashboardData } from "./types";
 
 /**
@@ -34,6 +35,13 @@ import type { DashboardData } from "./types";
 export function DashboardBento({ data }: { data: DashboardData }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mt-1">
+      {/* Row 0 — per-campaign focus (only when a single campaign is filtered) */}
+      {data.campaignFocus && (
+        <div className="lg:col-span-12">
+          <DashboardCampaignFocus focus={data.campaignFocus} />
+        </div>
+      )}
+
       {/* Row A */}
       <div className="lg:col-span-8">
         <DashboardHero

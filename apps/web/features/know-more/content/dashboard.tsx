@@ -148,6 +148,23 @@ export default function DashboardKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Per-campaign focus (when filtered)">
+        <p>
+          Select a single campaign in the filter and a{" "}
+          <strong>campaign funnel strip</strong> appears at the top of the
+          Overview: <strong>Reached Out</strong> (distinct creators reached out)
+          · <strong>Onboarded</strong> <KMCode>Y / cap</KMCode> (with slots-left)
+          · <strong>Un-onboarded</strong> (reached out but never onboarded) ·{" "}
+          <strong>Posted</strong>. This makes the onboarding-cap story explicit:
+          a campaign can have many reach-outs but only <KMCode>cap</KMCode>{" "}
+          (Σ <KMCode>num_influencers</KMCode>) onboarded. Computed from a
+          dedicated per-campaign query (<KMCode>campaignFocus</KMCode>) so the
+          numbers reflect the whole campaign regardless of the date / tier /
+          content filters. Un-onboarded leftovers are voided (→ Cancelled) when
+          the campaign closes.
+        </p>
+      </KMSection>
+
       <KMSection tag="Data source — single Supabase fetch">
         <KMList>
           <li>
