@@ -19,8 +19,11 @@ export default function PostingKM() {
             The Stage dropdown still narrows within the chosen side.
           </li>
           <li>
-            <strong>Filter bar</strong> — campaign · stage · tier · ads rights
-            · onboarded from/to dates.
+            <strong>Filter bar</strong> — <strong>search</strong> (id / name /
+            username / IG URL / post link, debounced) · campaign · tier · ads
+            rights · <strong>Onboarded by</strong> (the team member who onboarded
+            the collab, from <KMCode>onboarded_by</KMCode>) ·{" "}
+            <strong>Content Type</strong> · onboarded from/to dates.
           </li>
           <li>
             <strong>List / Cards toggle</strong> — both surfaces share the

@@ -46,6 +46,7 @@ export interface OnboardingRow {
     | "category"
     | "state"
     | "profile_pic"
+    | "instagram_link"
   > | null;
   /**
    * Presentation-only: total deliverables across the whole collab
@@ -91,10 +92,16 @@ export interface OnboardingKpi {
 }
 
 export interface OnboardingFilters {
+  /** Free-text search across post/collab id, name, username, IG URL, email. */
+  q?: string;
   campaign?: string;
   statusFilter?: string;
   creatorTier?: string;
   region?: string;
+  /** Team member who logged the reach-out (posts.logged_by). */
+  reachedOutBy?: string;
+  /** Content type code (posts.content_type). */
+  contentType?: string;
   reachoutDateFrom?: string;
   reachoutDateTo?: string;
   /**

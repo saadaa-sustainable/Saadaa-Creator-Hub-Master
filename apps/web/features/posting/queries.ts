@@ -71,7 +71,7 @@ export async function fetchPostingTable(
       collab_id,
       inf_id,
       campaign:campaigns ( campaign_id, campaign_name ),
-      creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic )
+      creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link )
     `,
     )
     .in("workflow_status", POSTING_STATUS_SET);
@@ -79,6 +79,9 @@ export async function fetchPostingTable(
   if (filters.campaign) q = q.eq("campaign_id", filters.campaign);
   if (filters.statusFilter) q = q.eq("workflow_status", filters.statusFilter);
   if (filters.creatorTier) q = q.eq("creators.category", filters.creatorTier);
+  // Team member who onboarded the collab.
+  if (filters.onboardedBy) q = q.eq("onboarded_by", filters.onboardedBy);
+  if (filters.contentType) q = q.eq("content_type", filters.contentType);
   // Ad-rights filter is applied in JS below (see ADS_YES). ads_usage_rights is
   // free-text and frequently stores a DURATION ("11 months", "12 Months", …)
   // rather than the literal "Yes", so a PostgREST `.eq("ads_usage_rights","Yes")`
@@ -105,6 +108,26 @@ export async function fetchPostingTable(
   } else if (adsFilter === "no") {
     rows = rows.filter((r) => !ADS_YES(r.ads_usage_rights));
   }
+
+  // Free-text search (in-memory) — id / name / username / IG URL / post link.
+  const needle = (filters.q ?? "").trim().toLowerCase();
+  if (needle) {
+    rows = rows.filter((r) => {
+      const fields = [
+        r.post_id,
+        r.post_id_short,
+        r.collab_id,
+        r.campaign?.campaign_id,
+        r.campaign?.campaign_name,
+        r.creator?.inf_name,
+        r.creator?.username,
+        r.creator?.instagram_link,
+        r.post_link,
+      ];
+      return fields.some((f) => String(f ?? "").toLowerCase().includes(needle));
+    });
+  }
+
   const missingProfileUsernames = [
     ...new Set(
       rows
@@ -177,13 +200,18 @@ export async function fetchPostingTable(
 export const fetchPostingFilterOptions = unstable_cache(
   async () => {
     const supabase = createServiceClient();
-    const [campaigns, creators] = await Promise.all([
+    const [campaigns, creators, posts] = await Promise.all([
       supabase
         .from("campaigns")
         .select("campaign_id, campaign_name")
         .order("campaign_id", { ascending: false })
         .limit(200),
       supabase.from("creators").select("category").limit(2000),
+      (supabase as any)
+        .from("posts")
+        .select("onboarded_by, content_type, workflow_status")
+        .in("workflow_status", ["On Board", "Order Sent", "Posted"])
+        .limit(20000),
     ]);
 
     const tiers = new Set<string>();
@@ -191,9 +219,21 @@ export const fetchPostingFilterOptions = unstable_cache(
       if (c.category) tiers.add(c.category);
     });
 
+    // Team members who onboarded + content types among the posting candidates.
+    const teamMembers = new Set<string>();
+    const contentTypes = new Set<string>();
+    ((posts.data ?? []) as any[]).forEach((p) => {
+      const ob = (p.onboarded_by ?? "").trim();
+      if (ob) teamMembers.add(ob);
+      const ct = (p.content_type ?? "").trim();
+      if (ct) contentTypes.add(ct);
+    });
+
     return {
       campaigns: campaigns.data ?? [],
       tiers: [...tiers].sort(),
+      teamMembers: [...teamMembers].sort(),
+      contentTypes: [...contentTypes].sort(),
       statuses: ["On Board", "Order Sent", "Posted"] as const,
       adsRights: ["Yes", "No"] as const,
     };

@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useTransition } from "react";
+import { useCallback, useRef, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubmissionToggle } from "@/components/ui";
 import type { PostingFilters } from "./types";
@@ -12,14 +12,19 @@ interface FilterOptions {
     campaign_name: string | null;
   }[];
   tiers: readonly string[];
+  teamMembers: readonly string[];
+  contentTypes: readonly string[];
   statuses: readonly string[];
   adsRights: readonly string[];
 }
 
 const FILTER_KEYS = [
+  "q",
   "campaign",
   "creatorTier",
   "adsRights",
+  "onboardedBy",
+  "contentType",
   "onboardDateFrom",
   "onboardDateTo",
   "submitted",
@@ -48,6 +53,19 @@ export function PostingFiltersBar({
     [params, router, startTransition],
   );
 
+  // Debounced free-text search → `q` URL param (300ms after the last keystroke).
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSearch = useCallback(
+    (value: string) => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+      searchTimer.current = setTimeout(
+        () => setParam("q", value.trim() || undefined),
+        300,
+      );
+    },
+    [setParam],
+  );
+
   const clearAll = () => {
     const next = new URLSearchParams(params.toString());
     FILTER_KEYS.forEach((k) => next.delete(k));
@@ -68,6 +86,22 @@ export function PostingFiltersBar({
         />
       </div>
       <div className="onboarding-filter-grid">
+        <label className="onboarding-filter-field">
+          <span>Search</span>
+          <span className="relative flex items-center">
+            <Search
+              className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-text-tertiary"
+              aria-hidden
+            />
+            <input
+              type="search"
+              defaultValue={initial.q ?? ""}
+              placeholder="ID, name, username, URL…"
+              onChange={(e) => onSearch(e.target.value)}
+              className="onboarding-filter-select pl-7"
+            />
+          </span>
+        </label>
         <FilterSelect
           label="Campaign"
           value={initial.campaign ?? ""}
@@ -96,6 +130,24 @@ export function PostingFiltersBar({
           options={[
             { label: "All", value: "" },
             ...options.adsRights.map((r) => ({ label: r, value: r })),
+          ]}
+        />
+        <FilterSelect
+          label="Onboarded by"
+          value={initial.onboardedBy ?? ""}
+          onChange={(v) => setParam("onboardedBy", v)}
+          options={[
+            { label: "All team members", value: "" },
+            ...options.teamMembers.map((m) => ({ label: m, value: m })),
+          ]}
+        />
+        <FilterSelect
+          label="Content Type"
+          value={initial.contentType ?? ""}
+          onChange={(v) => setParam("contentType", v)}
+          options={[
+            { label: "All content types", value: "" },
+            ...options.contentTypes.map((c) => ({ label: c, value: c })),
           ]}
         />
         <FilterDate

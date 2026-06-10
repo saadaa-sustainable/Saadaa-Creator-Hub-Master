@@ -33,7 +33,8 @@ The spine of the system. One row per **deliverable** (reel or static post). Ever
 | `reachout_type` | text | yes | — | |
 | `reachout_direction` | text | yes | `'outbound'` | CHECK `in ('inbound','outbound')` |
 | `onboard_date` | date | yes | — | |
-| `onboarded_by` | text | yes | — | actor email |
+| `onboarded_by` | text | yes | — | actor who **last handled** the row: reach-out logger at reach-out, then **overwritten** with the onboarder at onboarding. Posting's "Onboarded by" filter uses this (rows there are already onboarded). |
+| `logged_by` | text | yes | — | **reach-out logger** (actor), written by `submit_reachout`, **never overwritten** (added 2026-06-10, migration `add_logged_by_reachout_logger`). Powers Onboarding's "Reached out by" filter. |
 | `posting_dispatch_date` | date | yes | — | day garment dispatched; drives §5.5 follow-up |
 | `collab_type` | text | yes | — | `Barter` \| `Barter + Paid` |
 | `commercial_amount` | numeric | yes | — | forced to 0 when `collab_type='Barter'`; equal-split per deliverable |

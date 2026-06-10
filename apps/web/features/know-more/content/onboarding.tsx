@@ -21,7 +21,11 @@ export default function OnboardingKM() {
           </li>
           <li>
             <strong>List + cards</strong> · default to canonical onboarding
-            table. Filter by campaign / stage / tier / email-missing.
+            table. Filter bar: <strong>search</strong> (id / name / username /
+            IG URL, debounced) · campaign · tier · region ·{" "}
+            <strong>Reached out by</strong> (the team member who logged the
+            reach-out, from the stable <KMCode>logged_by</KMCode> column) ·{" "}
+            <strong>Content Type</strong> · reach-out from/to dates.
           </li>
           <li>
             <strong>Collab ID model — one row per collab</strong> · every

@@ -61,7 +61,7 @@ export async function fetchOnboardingTable(
       collab_id,
       inf_id,
       campaign:campaigns ( campaign_id, campaign_name ),
-      creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic )
+      creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link )
     `,
     )
     .in("workflow_status", ONBOARDING_STATUS_SET);
@@ -70,6 +70,9 @@ export async function fetchOnboardingTable(
   if (filters.statusFilter) q = q.eq("workflow_status", filters.statusFilter);
   if (filters.creatorTier) q = q.eq("creators.category", filters.creatorTier);
   if (filters.region) q = q.eq("creators.state", filters.region);
+  // Team member who logged the reach-out (stable; never overwritten).
+  if (filters.reachedOutBy) q = q.eq("logged_by", filters.reachedOutBy);
+  if (filters.contentType) q = q.eq("content_type", filters.contentType);
   if (filters.reachoutDateFrom)
     q = q.gte("reach_out_date", filters.reachoutDateFrom);
   if (filters.reachoutDateTo)
@@ -80,7 +83,29 @@ export async function fetchOnboardingTable(
     .limit(500);
   if (error) throw error;
 
-  const rows = (data ?? []) as unknown as OnboardingRow[];
+  let rows = (data ?? []) as unknown as OnboardingRow[];
+
+  // Free-text search (in-memory across the fetched page) — id / name / username
+  // / IG URL / email. Cross-table OR search is awkward in PostgREST, so we filter
+  // the bounded result set here (same pattern as Accounts Hub).
+  const needle = (filters.q ?? "").trim().toLowerCase();
+  if (needle) {
+    rows = rows.filter((r) => {
+      const fields = [
+        r.post_id,
+        r.post_id_short,
+        r.collab_id,
+        r.campaign?.campaign_id,
+        r.campaign?.campaign_name,
+        r.creator?.inf_name,
+        r.creator?.username,
+        r.creator?.instagram_link,
+        r.email,
+      ];
+      return fields.some((f) => String(f ?? "").toLowerCase().includes(needle));
+    });
+  }
+
   const missingProfileUsernames = [
     ...new Set(
       rows
@@ -156,13 +181,17 @@ export async function fetchOnboardingTable(
 export const fetchOnboardingFilterOptions = unstable_cache(
   async () => {
     const supabase = createServiceClient();
-    const [campaigns, creators] = await Promise.all([
+    const [campaigns, creators, posts] = await Promise.all([
       supabase
         .from("campaigns")
         .select("campaign_id, campaign_name")
         .order("campaign_id", { ascending: false })
         .limit(200),
       supabase.from("creators").select("state, category").limit(2000),
+      (supabase as any)
+        .from("posts")
+        .select("logged_by, content_type")
+        .limit(20000),
     ]);
 
     const tiers = new Set<string>();
@@ -172,10 +201,22 @@ export const fetchOnboardingFilterOptions = unstable_cache(
       if (c.state) regions.add(c.state);
     });
 
+    // Team members who logged reach-outs + content types in play.
+    const teamMembers = new Set<string>();
+    const contentTypes = new Set<string>();
+    ((posts.data ?? []) as any[]).forEach((p) => {
+      const lb = (p.logged_by ?? "").trim();
+      if (lb) teamMembers.add(lb);
+      const ct = (p.content_type ?? "").trim();
+      if (ct) contentTypes.add(ct);
+    });
+
     return {
       campaigns: campaigns.data ?? [],
       tiers: [...tiers].sort(),
       regions: [...regions].sort(),
+      teamMembers: [...teamMembers].sort(),
+      contentTypes: [...contentTypes].sort(),
       statuses: [
         "Reach Out",
         "On Board",

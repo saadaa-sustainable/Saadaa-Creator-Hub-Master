@@ -43,6 +43,7 @@ export interface PostingRow {
     | "category"
     | "state"
     | "profile_pic"
+    | "instagram_link"
   > | null;
 }
 
@@ -63,10 +64,16 @@ export interface PostingKpi {
 }
 
 export interface PostingFilters {
+  /** Free-text search across post/collab id, name, username, IG URL, post link. */
+  q?: string;
   campaign?: string;
   statusFilter?: string;
   creatorTier?: string;
   adsRights?: string;
+  /** Team member who onboarded the collab (posts.onboarded_by). */
+  onboardedBy?: string;
+  /** Content type code (posts.content_type). */
+  contentType?: string;
   onboardDateFrom?: string;
   onboardDateTo?: string;
   /**
