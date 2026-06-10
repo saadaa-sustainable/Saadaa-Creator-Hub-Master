@@ -65,7 +65,7 @@ export function DashboardBento({ data }: { data: DashboardData }) {
 
       {/* Row C — Stage Snapshot (managerial mini-kanban) */}
       <div className="lg:col-span-12">
-        <DashboardStageBoard board={data.stageBoard} />
+        <DashboardStageBoard board={data.stageBoard} counts={data.stageCounts} />
       </div>
 
       {/* Row D */}

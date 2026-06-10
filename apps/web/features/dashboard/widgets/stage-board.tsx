@@ -211,8 +211,10 @@ function StageCardItem({ card, stage }: { card: StageCard; stage: StageDef }) {
  */
 export function DashboardStageBoard({
   board,
+  counts,
 }: {
   board: DashboardData["stageBoard"];
+  counts: DashboardData["stageCounts"];
 }) {
   return (
     <article className="rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
@@ -221,7 +223,8 @@ export function DashboardStageBoard({
           Stage Snapshot · Where every collab is stuck
         </span>
         <span className="text-[0.6rem] text-text-tertiary">
-          Tap a column header to drill in →
+          Latest 10 per stage · the badge shows the full count · tap a column
+          header to drill in →
         </span>
       </header>
       <div className="-mx-2 px-2 overflow-x-auto scrollbar-thin">
@@ -231,6 +234,8 @@ export function DashboardStageBoard({
         >
           {STAGES.map((s) => {
             const items = board[s.key];
+            const total = counts[s.key];
+            const moreCount = Math.max(0, total - items.length);
             return (
               <section
                 key={s.key}
@@ -252,7 +257,7 @@ export function DashboardStageBoard({
                     <ArrowRight size={11} className="opacity-50" aria-hidden />
                   </Link>
                   <span className="text-[0.62rem] font-extrabold tabular text-text-secondary bg-bg-white border border-border rounded-full px-2 py-0.5">
-                    {items.length}
+                    {total}
                   </span>
                 </header>
                 <div className="px-2 pb-3 flex flex-col gap-2 min-h-[180px]">
@@ -261,9 +266,19 @@ export function DashboardStageBoard({
                       Nothing here yet
                     </div>
                   ) : (
-                    items.map((card) => (
-                      <StageCardItem key={card.postId} card={card} stage={s} />
-                    ))
+                    <>
+                      {items.map((card) => (
+                        <StageCardItem key={card.postId} card={card} stage={s} />
+                      ))}
+                      {moreCount > 0 && (
+                        <Link
+                          href={s.href as never}
+                          className="text-center text-[0.62rem] font-semibold text-text-tertiary hover:text-accent py-1"
+                        >
+                          +{moreCount} more →
+                        </Link>
+                      )}
+                    </>
                   )}
                 </div>
               </section>

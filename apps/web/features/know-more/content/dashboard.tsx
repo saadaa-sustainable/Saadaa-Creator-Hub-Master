@@ -94,11 +94,14 @@ export default function DashboardKM() {
           </li>
           <li>
             <strong>5. Row C — Stage Snapshot kanban</strong> · 4 horizontal-
-            scroll columns (Reach Out · Onboarding · Posted · Payment). Each
-            column has a tinted body bg + top gradient band + click-through
-            arrow to the full stage. Cards show stuck-state pill, creator
-            avatar + name + handle, post id / campaign / date / amount, and an
-            assignee initials roundel + name in the footer.
+            scroll columns (Reach Out · Onboarding · Posted · Payment). Shows the{" "}
+            <strong>latest 10</strong> cards per stage with a{" "}
+            <KMCode>+N more →</KMCode> drill-in link; the column-header{" "}
+            <strong>badge shows the full bucket total</strong> (not the 10
+            shown). Each column has a tinted body bg + top gradient band +
+            click-through arrow to the full stage. Cards show stuck-state pill,
+            creator avatar + name + handle, post id / campaign / date / amount,
+            and an assignee initials roundel + name in the footer.
           </li>
           <li>
             <strong>6. Row D — Action Strip + Posting Goal</strong> · 8/4

@@ -36,7 +36,7 @@
 - **Monthly funnel:** 6 zero-seeded months; reachOut by reach_out_date, onboarded by onboard_date, posted by post_date.
 - **Spends per campaign** (top-8); **postingGoal** (posted ÷ total).
 - **Top creators** (top-6 by followers + post count); **team leaderboard** (grouped by `onboarded_by`, top-6).
-- **StageBoard** (4-col mini-kanban): top-4 latest per stage. Payment lives on the PARENT collab only; commercial total reconstructed by summing equal-split siblings.
+- **StageBoard** (4-col mini-kanban): latest **10** cards per stage (preview), with a `+N more →` drill-in link. The column-header badge shows the **true bucket total** via `stageCounts` (not the rendered-card count) — fixed 2026-06-10 (was showing the capped count). Payment lives on the PARENT collab only; commercial total reconstructed by summing equal-split siblings.
 - Action chip → href routing in `ACTION_HREFS` (needsEmail/needsOrder/awaitingPost/noTracking/noPartnership/overdue).
 
 ### Bento layout (`dashboard-bento.tsx`)

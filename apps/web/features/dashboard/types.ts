@@ -158,12 +158,23 @@ export interface DashboardData {
   }>;
   /** Onboardings per team member (logged_by). */
   teamLeaderboard: Array<{ name: string; onboardings: number; posts: number }>;
-  /** 4-column mini board — latest 4 cards per stage for managerial scan. */
+  /** 4-column mini board — latest 10 cards per stage for managerial scan. */
   stageBoard: {
     reachOut: StageCard[];
     onBoard: StageCard[];
     posted: StageCard[];
     paid: StageCard[];
+  };
+  /**
+   * TRUE total count per stage bucket (the full count, not the 10-card preview).
+   * Drives the column-header badge so it shows e.g. 14 even though only 10 cards
+   * render. `stageBoard` arrays are capped at 10 for the preview.
+   */
+  stageCounts: {
+    reachOut: number;
+    onBoard: number;
+    posted: number;
+    paid: number;
   };
 }
 

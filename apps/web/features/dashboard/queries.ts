@@ -601,8 +601,33 @@ export async function fetchDashboardData(
         const db = String(b.post_date ?? b.onboard_date ?? b.reach_out_date ?? "");
         return db.localeCompare(da);
       })
-      .slice(0, 4)
+      .slice(0, 10)
       .map((p) => toCard(p, bucketKey));
+
+  // True bucket total (the full count, before the 4-card preview slice) — drives
+  // the column-header badge so it shows the real count, not just the 4 shown.
+  const bucketCount = (
+    cond: (s: string, pay: string, isChild: boolean) => boolean,
+  ) =>
+    posts.filter((p) => {
+      const isChild =
+        p.deliverable_index != null && Number(p.deliverable_index) > 1;
+      return cond(
+        String(p.workflow_status ?? "").toLowerCase(),
+        String(p.payment_status ?? "").toLowerCase(),
+        isChild,
+      );
+    }).length;
+
+  const stageCounts = {
+    reachOut: bucketCount((s) => s.includes("reach out") || s === ""),
+    onBoard: bucketCount((s) => s.includes("on board")),
+    posted: bucketCount((s) => s.includes("posted") || s.includes("delivered")),
+    paid: bucketCount(
+      (s, _pay, isChild) =>
+        !isChild && (s.includes("posted") || s.includes("delivered")),
+    ),
+  };
 
   const stageBoard = {
     reachOut: bucket((s) => s.includes("reach out") || s === "", "reachOut"),
@@ -722,5 +747,6 @@ export async function fetchDashboardData(
     topCreators,
     teamLeaderboard,
     stageBoard,
+    stageCounts,
   };
 }
