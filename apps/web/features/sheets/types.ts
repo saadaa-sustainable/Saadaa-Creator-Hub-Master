@@ -269,17 +269,23 @@ export const SHEET_TABLES: SheetTable[] = [
     id: "inbound_reachout_queue",
     label: "Inbound Queue",
     table: "inbound_reachout_queue",
-    pk: "id",
-    deletable: true,
-    defaultSort: { col: "created_at", dir: "desc" },
+    // `inbound_reachout_queue` is a VIEW over posts (inbound Reach-Out rows), not
+    // a base table — so no synthetic `id`, no `created_at`, and NOT deletable.
+    // Columns + sort must reference columns that actually exist on the view.
+    pk: "post_id",
+    defaultSort: { col: "reach_out_date", dir: "desc" },
     columns: [
-      { key: "id", label: "ID", type: "number", width: 70 },
+      { key: "post_id", label: "Post ID", type: "text", width: 130 },
+      { key: "inf_id", label: "Inf ID", type: "text", width: 90 },
       { key: "username", label: "Username", type: "text", width: 140 },
-      { key: "name", label: "Name", type: "text", width: 160 },
-      { key: "category", label: "Category", type: "text", width: 110 },
+      { key: "inf_name", label: "Name", type: "text", width: 160 },
+      { key: "content_type", label: "Content Type", type: "text", width: 120 },
+      { key: "campaign_id", label: "Campaign", type: "text", width: 100 },
+      { key: "collab_type", label: "Collab Type", type: "text", width: 110 },
+      { key: "commercial_amount", label: "Commercial ₹", type: "currency", width: 120 },
       { key: "followers", label: "Followers", type: "number", width: 100 },
-      { key: "status", label: "Status", type: "text", width: 110 },
-      { key: "created_at", label: "Created", type: "datetime", width: 140 },
+      { key: "reach_out_date", label: "Reach Out", type: "date", width: 110 },
+      { key: "creator_brief_link", label: "Brief", type: "text", width: 200 },
     ],
   },
   {

@@ -225,7 +225,7 @@ Apify profile cache + scrape retry queue. Keyed by `username`.
 
 | View | Purpose |
 |---|---|
-| `inbound_reachout_queue` | Inbound posts in `Reach Out` stage joined to creators (`reachout_direction='inbound' AND workflow_status='Reach Out'`) |
+| `inbound_reachout_queue` | Inbound posts in `Reach Out` stage joined to creators (`reachout_direction='inbound' AND workflow_status='Reach Out'`). Columns: `post_id, inf_id, username, campaign_id, content_type, reach_out_date, collab_type, commercial_amount, creator_brief_link, inf_name, followers` — **no `id`/`created_at`** (its Sheet View tab must sort on `reach_out_date` + key on `post_id`, and is NOT deletable since it's a view). |
 | `campaign_budget_monthly` | Per-month roll-up of `campaign_budget` |
 | `access_role_summary` | Roles + `granted_count` + `user_count` rollup |
 
