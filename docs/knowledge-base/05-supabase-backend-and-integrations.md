@@ -77,7 +77,8 @@ Cron-only: pg_cron `scrape-pending-apify-3h`, `15 */3 * * *`, vault-backed beare
 
 ### 2.4 Queue + table writes — `instagram_cache`
 
-Reads `status='pending'` rows (limit BATCH_SIZE, skip `attempts >= MAX_ATTEMPTS`). **Stale re-queue:** before draining, flips `status='auto'` rows older than 3h back to `pending, attempts:0`.
+Reads `status='pending'` rows ordered **`scraped_at` NULLS FIRST** then username (limit BATCH_SIZE, skip `attempts >= MAX_ATTEMPTS`). The NULLS-FIRST order guarantees never-scraped rows (brand-new CSV/lookup-miss enqueues) are always picked before refreshes — without it, alphabetically-late new usernames starved behind front-of-alphabet refresh churn.
+- **Stale re-queue (budget-gated):** before draining, count never-scraped backlog (`status='pending' AND scraped_at IS NULL`); compute `requeueBudget = max(0, BATCH_SIZE − backlog)`. Only when `requeueBudget > 0` does it flip stale `status='auto'` rows (>3h old) back to `pending, attempts:0`, capped at `requeueBudget`. **Why the gate:** cron runs every 3h and the stale window is also 3h, so every `auto` row is always "stale"; an ungated re-queue floods the 20-row batch with refreshes and never drains genuine new pending (fixed 2026-06-11, fn v12 — see ch09).
 - **On hit:** UPDATE cache (`followers, er, avg_likes, profile_pic(persisted), biography, is_verified, raw_json, status:'auto', attempts:0, scraped_at, updated_at`) + propagate to `creators` (followers, er, avg_likes, profile_pic, verification, category, inf_name) + auto-resolve open `system_errors` (`ig_fetch`/`apify_fail`).
 - **On miss:** `attempts++`; flips to `not_found` at the cap; logs `system_errors` type `apify_fail`.
 

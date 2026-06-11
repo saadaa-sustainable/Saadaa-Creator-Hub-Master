@@ -469,59 +469,83 @@ Deno.serve(async () => {
     });
   }
 
-  // ── Re-queue stale 'auto' rows ──────────────────────────────────────────
+  // ── Initial-scrape backlog takes priority over refresh ──────────────────
+  // Never-scraped rows (scraped_at IS NULL) are brand-new creators queued by a
+  // CSV upload / lookup miss. They MUST drain before we spend Apify budget
+  // re-scraping already-good 'auto' rows. The cron runs every 3h and the stale
+  // window is also 3h, so on each tick EVERY 'auto' row is "stale" — without a
+  // budget gate the re-queue floods the batch with refreshes and the genuine
+  // backlog (especially late-alphabet usernames) starves forever.
+  const { count: backlogCount } = await supabase
+    .from('instagram_cache')
+    .select('username', { count: 'exact', head: true })
+    .eq('status', 'pending')
+    .is('scraped_at', null);
+  const backlog = backlogCount ?? 0;
+  const requeueBudget = Math.max(0, BATCH_SIZE - backlog);
+  console.log(`[backlog] never-scraped pending=${backlog} requeueBudget=${requeueBudget}`);
+
+  // ── Re-queue stale 'auto' rows (only with spare capacity) ───────────────
   // Flip auto rows not refreshed in the last 3 hours back to 'pending' so
   // this same cron tick can pick them up. Oldest-first so no creator starves.
-  // Cap at BATCH_SIZE to avoid a single cron tick overwhelming Apify.
-  const staleThreshold = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  // Capped at requeueBudget so refresh never displaces initial-scrape backlog.
+  if (requeueBudget > 0) {
+    const staleThreshold = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
 
-  // Two separate queries avoid the .or('updated_at.is.null,...') PostgREST null bug.
-  const [{ data: staleByTime, error: staleErrA }, { data: staleByNull, error: staleErrB }] =
-    await Promise.all([
-      supabase
+    // Two separate queries avoid the .or('updated_at.is.null,...') PostgREST null bug.
+    const [{ data: staleByTime, error: staleErrA }, { data: staleByNull, error: staleErrB }] =
+      await Promise.all([
+        supabase
+          .from('instagram_cache')
+          .select('username')
+          .eq('status', 'auto')
+          .lt('updated_at', staleThreshold)
+          .order('updated_at', { ascending: true })
+          .limit(requeueBudget),
+        supabase
+          .from('instagram_cache')
+          .select('username')
+          .eq('status', 'auto')
+          .is('updated_at', null)
+          .limit(requeueBudget),
+      ]);
+
+    const staleErr = staleErrA ?? staleErrB;
+    const staleRows = [
+      ...new Set([
+        ...(staleByTime ?? []).map((r: { username: string }) => r.username),
+        ...(staleByNull ?? []).map((r: { username: string }) => r.username),
+      ]),
+    ]
+      .slice(0, requeueBudget)
+      .map((username) => ({ username }));
+
+    if (staleErr) {
+      console.error(`[requeue] stale select failed: ${staleErr.message}`);
+    } else if ((staleRows ?? []).length > 0) {
+      const staleUsernames = (staleRows ?? []).map((r: { username: string }) => r.username);
+      const { error: requeueErr } = await supabase
         .from('instagram_cache')
-        .select('username')
-        .eq('status', 'auto')
-        .lt('updated_at', staleThreshold)
-        .order('updated_at', { ascending: true })
-        .limit(BATCH_SIZE),
-      supabase
-        .from('instagram_cache')
-        .select('username')
-        .eq('status', 'auto')
-        .is('updated_at', null)
-        .limit(BATCH_SIZE),
-    ]);
-
-  const staleErr = staleErrA ?? staleErrB;
-  const staleRows = [
-    ...new Set([
-      ...(staleByTime ?? []).map((r: { username: string }) => r.username),
-      ...(staleByNull ?? []).map((r: { username: string }) => r.username),
-    ]),
-  ]
-    .slice(0, BATCH_SIZE)
-    .map((username) => ({ username }));
-
-  if (staleErr) {
-    console.error(`[requeue] stale select failed: ${staleErr.message}`);
-  } else if ((staleRows ?? []).length > 0) {
-    const staleUsernames = (staleRows ?? []).map((r: { username: string }) => r.username);
-    const { error: requeueErr } = await supabase
-      .from('instagram_cache')
-      .update({ status: 'pending', attempts: 0 })
-      .in('username', staleUsernames);
-    if (requeueErr) {
-      console.error(`[requeue] update failed: ${requeueErr.message}`);
-    } else {
-      console.log(`[requeue] flipped ${staleUsernames.length} stale rows to pending`);
+        .update({ status: 'pending', attempts: 0 })
+        .in('username', staleUsernames);
+      if (requeueErr) {
+        console.error(`[requeue] update failed: ${requeueErr.message}`);
+      } else {
+        console.log(`[requeue] flipped ${staleUsernames.length} stale rows to pending`);
+      }
     }
+  } else {
+    console.log(`[requeue] skipped — backlog (${backlog}) fills the batch`);
   }
 
+  // Order so NEVER-scraped rows (scraped_at IS NULL) are always picked first,
+  // regardless of username — this is what stops alphabetically-late new rows
+  // from starving behind the front-of-alphabet refresh churn.
   const { data: pending, error: selErr } = await supabase
     .from('instagram_cache')
     .select('username, attempts')
     .eq('status', 'pending')
+    .order('scraped_at', { ascending: true, nullsFirst: true })
     .order('username', { ascending: true })
     .limit(BATCH_SIZE);
 

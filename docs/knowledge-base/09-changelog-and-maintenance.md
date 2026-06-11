@@ -32,6 +32,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-06-11 | **Fix: new Instagram-cache rows stuck "pending"** — scraper starvation (refresh churn + username ordering); backlog gate + `scraped_at` NULLS FIRST (fn v12) | 05 |
 | 2026-06-10 | **Onboarding/Posting KPI scopes to selected team member** (`logged_by` / `onboarded_by`) | 06 |
 | 2026-06-10 | **Emails reference Collab ID** (SIF-N-Cn), not Post ID — reach-out / onboarding / posting confirmations + creator payment-processed email | 08 |
 | 2026-06-10 | **Fix: Sheet View Inbound Queue tab showed 0 rows** — config (`pk`/sort/columns) was out of sync with the view; not deletable (it's a view) | 04 |
