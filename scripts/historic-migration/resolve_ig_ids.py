@@ -23,7 +23,7 @@ CACHE_FILE = "/tmp/ig_id_cache.json"
 IG_APP_ID = "936619743392459"
 PACE = float(os.environ.get("PACE", "25"))            # base sleep between calls (slow-trickle)
 BLOCK_COOLDOWN = int(os.environ.get("BLOCK_COOLDOWN", "900"))  # wait when IG rate-limits the IP
-BLOCK_RETRIES = int(os.environ.get("BLOCK_RETRIES", "6"))      # max cooldown-retries per handle
+BLOCK_RETRIES = int(os.environ.get("BLOCK_RETRIES", "40"))     # cooldown-retries per handle (wait out IP bans)
 
 UAS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
@@ -134,7 +134,9 @@ def main():
     print(f"  {len(handle_rows)} distinct handles to resolve", flush=True)
 
     cache = load_cache()
-    done = set(cache["resolved"]) | set(cache["failed"])
+    # genuine failures (404/bad handle) are skipped; block-giveups are retried next run
+    genuine_fail = {h for h, v in cache["failed"].items() if v != "block"}
+    done = set(cache["resolved"]) | genuine_fail
     todo = [h for h in handle_rows if h not in done]
     limit = int(os.environ.get("LIMIT", "0"))
     if limit:
