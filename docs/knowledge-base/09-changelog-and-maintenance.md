@@ -32,6 +32,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-06-15 | **`historic_creator_data` table** — read-only archive of legacy Influencer Tracker sheet (Creator Data tab, cols A–AV minus AM + CB = 48 text cols); populated by the sheet's "Supabase Sync" menu | 04 |
 | 2026-06-11 | **Fix: new Instagram-cache rows stuck "pending"** — scraper starvation (refresh churn + username ordering); backlog gate + `scraped_at` NULLS FIRST (fn v12) | 05 |
 | 2026-06-10 | **Onboarding/Posting KPI scopes to selected team member** (`logged_by` / `onboarded_by`) | 06 |
 | 2026-06-10 | **Emails reference Collab ID** (SIF-N-Cn), not Post ID — reach-out / onboarding / posting confirmations + creator payment-processed email | 08 |

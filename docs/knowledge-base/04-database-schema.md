@@ -207,6 +207,16 @@ Apify profile cache + scrape retry queue. Keyed by `username`.
 
 ---
 
+## Table: `historic_creator_data`
+
+Read-only **archive** of the legacy "Influencer Tracker" Google Sheet → `Creator Data` tab (a separate, pre-CreatorHub spreadsheet, NOT the operational tables). Populated by that sheet's **"Supabase Sync"** Apps Script menu — not by the app. Added `2026_06_15_historic_creator_data.sql`.
+
+- **Source columns:** sheet cols **A–AV minus AM** ("Blank") **+ CB** ("Historic ReachOut") = 48 source cols, mapped 1:1 to snake_case (`sif_id`, `post_id`, `campaign_id`, `nomenclature`, `entry_date`, `month`, `influencer_name`, `username`, `ig_handle`, `followers`, `gender`, `influencer_category`, `content_name`, `content_type`, `referred_by`, `email_id`, `contact_no`, `address`, `agency_name`, `location`, `language`, `engaged_rate`, `avg_likes`, `reachout_type`, `influencer_callout`, `onboard_date`, `callout_by` [=sheet AA, header "CALLOUT BY"], `collab_type`, `commercials`, `payment_status`, `order_id`, `order_sent_date`, `garments_sent`, `tracking_id`, `order_status`, `order_journey`, `posting_journey`, `content_delivery_date`, `post_date`, `link_to_post`, `collab_duration`, `content_downloaded_link`, `remarks`, `remarks_2`, `raw_dump`, `ad_partnership_status`, `partnership_active_date`, `historic_reachout`).
+- **All columns `text`** — source sheet is dirty/misaligned (dates like `31/12/1899`, mixed types). Raw mirror; cast in views/queries if needed. No parse step → sync never fails on a bad cell.
+- **Keys:** `id` IDENTITY PK; `synced_at timestamptz default now()`. `post_id` is **NOT unique** (historic rows may repeat/blank) — sync should **truncate+load** or upsert on a key it dedupes itself.
+- **Indexes:** `post_id`, `sif_id`, `campaign_id` (btree, non-unique).
+- **RLS:** enabled. `select` to `authenticated`; `all` to `service_role` (the sync key).
+
 ## Other tables (summary)
 
 | Table | Purpose | Notable |
