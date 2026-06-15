@@ -30,6 +30,26 @@ python3 scripts/historic-migration/resolve_ig_ids.py
 # knobs: PACE=25 BLOCK_COOLDOWN=900 BLOCK_RETRIES=6 LIMIT=0
 ```
 
-> Why free endpoint, not Apify: the Apify free account has a $5/mo cap shared
-> with the operational 3-hr scrape cron; a ~7.6k-handle bulk job would blow it
-> (~$20) and starve the cron. See changelog 2026-06-15.
+> Free-endpoint reality: IG hard-throttles a single IP (~85 calls/burst), so the
+> free path is slow (days). It's kept for small/zero-cost top-ups.
+
+## `apify_resolve_ids.py` (the method actually used)
+Same `profile_id` backfill, but via the Apify `instagram-profile-scraper`,
+**rotating across multiple free Apify accounts**. Each free account has ~$5
+(~1,920 profiles); the script uses token #1 until that account's credit is
+exhausted (Apify returns a quota/payment error), then rotates to the next.
+4 accounts ≈ 7,680 profiles → covers the whole historic set fast, no IG throttle.
+
+Tokens live in `apps/web/.env.local` (gitignored) as `APIFY_TOKEN_1..N`
+(or a comma-separated `APIFY_TOKENS=`). Resumable: work-list = rows where
+`profile_id IS NULL`, so a re-run continues. Misses (left NULL) are mangled
+source handles or dead/renamed accounts — neither Apify nor IG can resolve those.
+
+```bash
+python3 scripts/historic-migration/apify_resolve_ids.py
+# knobs: BATCH=50  ACTOR=apify~instagram-profile-scraper  LIMIT=0
+```
+
+> Note: the operational 3-hr scrape cron uses its own separate Apify token
+> (Supabase secret) — this bulk job uses the 4 free-account tokens, so it does
+> not touch the cron's budget.
