@@ -87,11 +87,12 @@ def norm_handle(username, ig_handle):
     return h or None
 
 def fetch_pending():
+    order = os.environ.get("ORDER", "asc")      # 'desc' -> live/recent handles first
     rows, offset, page = [], 0, 1000
     while True:
         req = urllib.request.Request(
             f"{SUPABASE_URL}/rest/v1/{TABLE}?profile_id=is.null&select=id,username,ig_handle"
-            f"&order=id.asc&limit={page}&offset={offset}", headers=SB)
+            f"&order=id.{order}&limit={page}&offset={offset}", headers=SB)
         with urllib.request.urlopen(req) as r:
             batch = json.loads(r.read().decode())
         rows.extend(batch)
@@ -131,6 +132,10 @@ def apify_run(token, handles):
 
 def main():
     tokens = load_tokens()
+    pin = os.environ.get("TOKEN_PIN")          # 1-based index -> use only that account
+    if pin:
+        tokens = [tokens[int(pin) - 1]]
+        print(f"  pinned to token #{pin}", flush=True)
     print("Fetching pending rows …", flush=True)
     rows = fetch_pending()
     handle_rows = {}
@@ -139,12 +144,18 @@ def main():
         if h:
             handle_rows.setdefault(h, []).append(r["id"])
     handles = list(handle_rows.keys())
+    shard = os.environ.get("SHARD")            # "i/n" -> process handles where idx%n==i
+    if shard:
+        si, sn = (int(x) for x in shard.split("/"))
+        handles = [h for idx, h in enumerate(handles) if idx % sn == si]
+        print(f"  shard {shard}: {len(handles)} handles this instance", flush=True)
     lim = int(os.environ.get("LIMIT", "0"))
     if lim:
         handles = handles[:lim]
     print(f"  {len(rows)} null rows, {len(handles)} distinct handles to resolve\n", flush=True)
 
     tok_i, ok, miss, i = 0, 0, 0, 0
+    err_tries = {}
     n = len(handles)
     while i < n:
         if tok_i >= len(tokens):
@@ -158,8 +169,13 @@ def main():
             tok_i += 1
             continue                       # retry SAME batch on next token
         if status == "error":
-            print(f"  batch error (acct #{tok_i+1}) on rows {i}-{i+len(batch)}: "
-                  f"{payload[:120]} — skipping batch", flush=True)
+            err_tries[i] = err_tries.get(i, 0) + 1
+            if err_tries[i] <= 4:
+                print(f"  transient error (acct#{tok_i+1}) rows {i}-{i+len(batch)}: "
+                      f"{payload[:80]} — retry {err_tries[i]}/4", flush=True)
+                time.sleep(4 * err_tries[i])
+                continue                   # retry SAME batch, same token
+            print(f"  giving up rows {i}-{i+len(batch)} after 4 retries (left NULL)", flush=True)
             i += BATCH
             continue
         # ok: map username->id
