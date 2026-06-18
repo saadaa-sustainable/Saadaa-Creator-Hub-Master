@@ -24,6 +24,11 @@ TABLE = "historic_creator_data"
 ACTOR = os.environ.get("ACTOR", "apify~instagram-profile-scraper")
 BATCH = int(os.environ.get("BATCH", "50"))
 HANDLE_RE = re.compile(r'instagram\.com/([^/?#]+)', re.IGNORECASE)
+# IG path keywords that are NOT usernames (reel/post/direct URLs) — reject, fall back to username.
+# Without this, a reel/post LINK in ig_handle resolves the keyword to a real account
+# (@reel=368393670, @direct=3107544244) and poisons many rows onto one wrong id.
+RESERVED = {"reel", "reels", "p", "tv", "stories", "direct", "explore", "accounts",
+            "about", "web", "s", "ar", "challenge", "locations", "directory"}
 
 def load_key():
     for n in ("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY"):
@@ -77,7 +82,7 @@ def norm_handle(username, ig_handle):
     h = None
     if ig_handle:
         m = HANDLE_RE.search(ig_handle)
-        if m:
+        if m and m.group(1).lower() not in RESERVED:   # skip reel/p/direct/etc URLs
             h = m.group(1)
     if not h:
         h = username
