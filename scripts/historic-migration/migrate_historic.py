@@ -87,7 +87,7 @@ COL_MAP = [
     (45, "raw_dump"),
     (46, "ad_partnership_status"),
     (47, "partnership_active_date"),
-    (76, "historic_reachout"),   # BY
+    (76, "historic"),            # BY  (DB column renamed historic_reachout -> historic)
 ]
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
