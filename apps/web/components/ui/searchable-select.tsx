@@ -109,10 +109,10 @@ export function SearchableSelect({
           aria-expanded={open}
           className={cn(
             "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-            "[background:var(--bg-white)] [border:1px_solid_var(--border)]",
-            "hover:[border-color:var(--accent)] focus:outline-none",
-            "focus-visible:[border-color:var(--accent)] focus-visible:[box-shadow:0_0_0_3px_rgba(240,198,30,0.25)]",
-            open && "[border-color:var(--accent)] [box-shadow:0_0_0_3px_rgba(240,198,30,0.25)]",
+            "bg-white border border-[#E7E2D2]",
+            "hover:border-[#F0C61E] focus:outline-none",
+            "focus-visible:border-[#F0C61E] focus-visible:shadow-[0_0_0_3px_rgba(240,198,30,0.25)]",
+            open && "border-[#F0C61E] shadow-[0_0_0_3px_rgba(240,198,30,0.25)]",
             disabled && "cursor-not-allowed opacity-50",
             className,
           )}
@@ -130,12 +130,11 @@ export function SearchableSelect({
           onOpenAutoFocus={(e) => e.preventDefault()}
           className={cn(
             "z-[1200] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-xl",
-            "[background:var(--bg-white)] [border:1px_solid_var(--border)]",
-            "[box-shadow:0_10px_30px_-8px_rgba(44,36,32,0.25)]",
-            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+            "bg-white border border-[#E7E2D2]",
+            "shadow-[0_10px_30px_-8px_rgba(44,36,32,0.25)]",
           )}
         >
-          <div className="flex items-center gap-2 px-3 py-2 [border-bottom:1px_solid_var(--border)]">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-[#E7E2D2]">
             <Search size={13} className="shrink-0 opacity-50" aria-hidden />
             <input
               ref={inputRef}
@@ -177,7 +176,7 @@ export function SearchableSelect({
                   onClick={() => pick(o.value)}
                   className={cn(
                     "flex cursor-pointer items-center justify-between gap-2 px-3 py-2 text-sm",
-                    i === active && "[background:var(--bg-surface)]",
+                    i === active && "bg-[#F5F1EC]",
                     o.value === value && "font-semibold",
                   )}
                 >
@@ -192,7 +191,7 @@ export function SearchableSelect({
                   {o.value === value && (
                     <Check
                       size={13}
-                      className="shrink-0 [color:var(--success-text)]"
+                      className="shrink-0 text-[#4F7C4D]"
                       aria-hidden
                     />
                   )}

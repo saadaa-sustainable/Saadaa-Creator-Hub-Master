@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubmissionToggle } from "@/components/ui";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { PostingFilters } from "./types";
 
 interface FilterOptions {
@@ -188,17 +189,13 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
   return (
     <label className="onboarding-filter-field">
       <span>{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value || undefined)}
-        className="onboarding-filter-select"
-      >
-        {options.map((o) => (
-          <option key={o.value || "__all"} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <SearchableSelect
+        value={value ?? ""}
+        onChange={(v) => onChange(v || undefined)}
+        options={options.map((o) => ({ value: o.value, label: o.label }))}
+        placeholder={`All ${label.toLowerCase()}`}
+        searchPlaceholder={`Search ${label.toLowerCase()}…`}
+      />
     </label>
   );
 }
