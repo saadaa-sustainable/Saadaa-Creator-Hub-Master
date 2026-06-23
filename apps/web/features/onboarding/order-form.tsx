@@ -43,6 +43,7 @@ import {
   type OnboardableCreator,
 } from "./actions";
 import { CONTENT_CODES } from "../reach-out/content-codes";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   CollabEmailPane,
   type CollabEmailDraft,
@@ -417,22 +418,28 @@ export function OrderCreationModal({
           className="modal-body space-y-3"
         >
           <input type="hidden" {...register("orderStatus")} />
-          <div className="text-sm text-text-secondary">
-            {repeatMode ? (
-              <>
-                Start a <strong>new collab</strong> for an existing creator. Pick
-                the creator + campaign; a fresh collab (C2+) is created and
-                onboarded in one step.
-              </>
-            ) : (
-              <>
-                Onboarding{" "}
-                <strong>{creatorName ?? username ?? "creator"}</strong>. Fill
-                collab + Shopify order; deliverable rows auto-spawn from Reels +
-                Posts counts.
-              </>
-            )}
-          </div>
+          {repeatMode ? (
+            <div className="flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-sm text-text-secondary [background:var(--bg-surface)] [border:1px_solid_var(--border)]">
+              <ClipboardCheck
+                size={16}
+                className="mt-0.5 shrink-0 [color:var(--accent)]"
+                aria-hidden
+              />
+              <span>
+                Start a <strong className="text-text-primary">new collab</strong>{" "}
+                for an existing creator — pick the creator + campaign and a fresh
+                collab (<strong className="text-text-primary">C2+</strong>) is
+                created and onboarded in one step.
+              </span>
+            </div>
+          ) : (
+            <div className="text-sm text-text-secondary">
+              Onboarding{" "}
+              <strong>{creatorName ?? username ?? "creator"}</strong>. Fill collab
+              + Shopify order; deliverable rows auto-spawn from Reels + Posts
+              counts.
+            </div>
+          )}
 
           {repeatMode && (
             <section className="ob-form-section">
@@ -441,58 +448,65 @@ export function OrderCreationModal({
                 Creator &amp; Campaign
               </h5>
               <div className="form-grid">
-                <div className="form-floating">
-                  <select
-                    className="form-select"
-                    id="rc_creator"
-                    value={repeatInfId}
-                    onChange={(e) => setRepeatInfId(e.target.value)}
+                <div className="form-grid-full">
+                  <label
+                    htmlFor="rc_creator"
+                    className="mb-1 block text-xs font-medium text-text-secondary"
                   >
-                    <option value="">Select creator…</option>
-                    {repeatCreators.map((c) => (
-                      <option key={c.inf_id} value={c.inf_id}>
-                        {c.inf_id} — {c.inf_name || c.username}
-                      </option>
-                    ))}
-                  </select>
-                  <label htmlFor="rc_creator">
                     Creator <span className="req">*</span>
                   </label>
+                  <SearchableSelect
+                    id="rc_creator"
+                    value={repeatInfId}
+                    onChange={setRepeatInfId}
+                    placeholder="Select creator…"
+                    searchPlaceholder="Search by SIF, name, or @handle…"
+                    options={repeatCreators.map((c) => ({
+                      value: c.inf_id,
+                      label: `${c.inf_id} — ${c.inf_name || c.username}`,
+                      hint: c.username ? `@${c.username}` : undefined,
+                    }))}
+                  />
                 </div>
-                <div className="form-floating">
-                  <select
-                    className="form-select"
-                    id="rc_campaign"
-                    value={repeatCampaignId}
-                    onChange={(e) => setRepeatCampaignId(e.target.value)}
+                <div>
+                  <label
+                    htmlFor="rc_campaign"
+                    className="mb-1 block text-xs font-medium text-text-secondary"
                   >
-                    <option value="">Select campaign…</option>
-                    {repeatCampaigns.map((c) => (
-                      <option key={c.campaign_id} value={c.campaign_id}>
-                        {c.campaign_id}
-                        {c.campaign_name ? ` — ${c.campaign_name}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <label htmlFor="rc_campaign">
                     Campaign <span className="req">*</span>
                   </label>
+                  <SearchableSelect
+                    id="rc_campaign"
+                    value={repeatCampaignId}
+                    onChange={setRepeatCampaignId}
+                    placeholder="Select campaign…"
+                    searchPlaceholder="Search campaign…"
+                    options={repeatCampaigns.map((c) => ({
+                      value: c.campaign_id,
+                      label: c.campaign_name
+                        ? `${c.campaign_id} — ${c.campaign_name}`
+                        : c.campaign_id,
+                    }))}
+                  />
                 </div>
-                <div className="form-floating form-grid-full">
-                  <select
-                    className="form-select"
+                <div>
+                  <label
+                    htmlFor="rc_content"
+                    className="mb-1 block text-xs font-medium text-text-secondary"
+                  >
+                    Content Type
+                  </label>
+                  <SearchableSelect
                     id="rc_content"
                     value={repeatContentType}
-                    onChange={(e) => setRepeatContentType(e.target.value)}
-                  >
-                    <option value="">Select content type…</option>
-                    {CONTENT_CODES.map((c) => (
-                      <option key={c.code} value={c.code}>
-                        {c.code} — {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <label htmlFor="rc_content">Content Type</label>
+                    onChange={setRepeatContentType}
+                    placeholder="Select content type…"
+                    searchPlaceholder="Search content type…"
+                    options={CONTENT_CODES.map((c) => ({
+                      value: c.code,
+                      label: `${c.code} — ${c.name}`,
+                    }))}
+                  />
                 </div>
               </div>
             </section>

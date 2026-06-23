@@ -201,10 +201,10 @@ export function OnboardingTable({
       <div className="flex items-center justify-end mb-2">
         <button
           type="button"
-          className="action-btn"
           onClick={() => setRepeatOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors [background:var(--bg-white)] [border:1px_solid_var(--accent)] [color:var(--text-primary)] hover:[background:var(--accent)]"
         >
-          <Send size={11} aria-hidden />
+          <Send size={13} aria-hidden />
           New collab (existing creator)
         </button>
       </div>
