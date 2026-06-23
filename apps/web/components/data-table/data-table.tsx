@@ -66,11 +66,18 @@ export function DataTable<TData>({
 
   return (
     <>
-      <div className="mb-2 flex items-center justify-between gap-2 text-[0.72rem] font-bold uppercase tracking-[0.04em] text-text-tertiary">
-        <span>
-          Showing {rows.length.toLocaleString("en-IN")} {rowLabel}
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-2 text-[0.82rem] text-text-secondary">
+          <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#F0EAD6] px-1.5 text-[0.72rem] font-semibold tabular-nums text-[#161513]">
+            {rows.length.toLocaleString("en-IN")}
+          </span>
+          {rowLabel}
         </span>
-        {sorting.length > 0 && <span>Sorted</span>}
+        {sorting.length > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#F5F1EC] px-2 py-0.5 text-[0.68rem] font-medium uppercase tracking-wide text-text-tertiary">
+            Sorted
+          </span>
+        )}
       </div>
       {mobileCard && (
         <div className="grid gap-2 md:hidden">

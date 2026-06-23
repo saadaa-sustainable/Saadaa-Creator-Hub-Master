@@ -202,7 +202,7 @@ export function OnboardingTable({
         <button
           type="button"
           onClick={() => setRepeatOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors [background:var(--bg-white)] [border:1px_solid_var(--accent)] [color:var(--text-primary)] hover:[background:var(--accent)]"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#F0C61E] bg-white px-3.5 py-2 text-sm font-semibold text-[#161513] transition-colors hover:bg-[#F0C61E]"
         >
           <Send size={13} aria-hidden />
           New collab (existing creator)
