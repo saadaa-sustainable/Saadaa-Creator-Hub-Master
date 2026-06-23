@@ -12,7 +12,7 @@ Reach Out → On Board → (Order Sent) → Posted → Delivered → RTO / Cance
 ## Cross-cutting conventions
 
 - **Data source:** Supabase only (every Sheet mirror removed 2026-05-21). All server reads use `createServiceClient()` (RLS bypass) gated by page-level `assertPermission`.
-- **ID/collab model (post-2026-06-06):** `post_id` = short id `{inf_id}-P{post_number}` (no `-C`). `collab_id` = `{inf_id}-C{collab_number}`, groups all deliverable rows of one collab. `post_number` is global linear; `collab_number` increments per `inf_id` (first = C1).
+- **ID/collab model (post-2026-06-06):** `post_id` = short id `{inf_id}-P{post_number}` (no `-C`). `collab_id` = `{inf_id}-C{collab_number}`, groups all deliverable rows of one collab. `post_number` is **per-creator** linear (P linear per creator across collabs, 2026-06-24); `collab_number` increments per `inf_id` (C1 at Reach Out for NEW creators; C2+ created at Onboarding for repeat collabs).
 - **Collab grouping key** (`onboarding/columns.tsx`): prefer `collab_id`, fall back `inf_id-C{collab_number}`, then `post_id`. The board renders ONE representative row per collab (lowest `post_id`).
 - **Barter = ₹0 rule** enforced everywhere: reach-out RPC forces `commercial_amount=0` for Barter; onboarding `applyBarterLock`; inbound `applyInboundBarterLock`; campaign-budget Barter rows lock avg comp to 0.
 - **Layout:** every stage uses `PageHeader` + `.onboarding-stage` wrapper, **filter bar ABOVE the KPI strip**, then board/table; `knowMore` slug wired into PageHeader. Mobile forces Cards view.
@@ -35,11 +35,12 @@ Creates the first `posts` record per collab (`workflow_status='Reach Out'`). Two
 | `lookupCreator` / `lookupCreatorsFromDataset` | `reachout_outbound`\|`reachout_inbound` | Cache-first IG lookup |
 
 ### submit_reachout RPC
-`security invoker`, granted to `service_role`. Concurrency via `pg_advisory_xact_lock` on `reachout-user:<username>` (pre-upsert) AND `reachout-inf:<inf_id>` (post-upsert) — prevents duplicate creators + serializes ID assignment (replaces legacy `LockService`). Generates `SIF-N` for new creators; `post_number = MAX+1` global; `collab_number = MAX+1` per inf_id; `post_id = post_id_short = {inf_id}-P{post_number}`; `collab_id = {inf_id}-C{collab_number}`. Auto-attaches `creator_brief_link` from `campaigns.brief_link`.
+`security invoker`, granted to `service_role`. Concurrency via `pg_advisory_xact_lock` on `reachout-user:<username>` (pre-upsert) AND `reachout-inf:<inf_id>` (post-upsert) — prevents duplicate creators + serializes ID assignment (replaces legacy `LockService`). Generates `SIF-N` for new creators; `post_number = MAX+1` **per inf_id** (per-creator P, 2026-06-24); `collab_number = MAX+1` per inf_id; `post_id = post_id_short = {inf_id}-P{post_number}`; `collab_id = {inf_id}-C{collab_number}`. Auto-attaches `creator_brief_link` from `campaigns.brief_link`. **Reach Out is NEW-creators-only (2026-06-24):** `submitReachOut`/`submitInboundBatch` reject an existing creator (`creators` row exists) → use Onboarding for C2+.
 
 ### Key business rules
 - **Content type** (UI label "Content Type"; field key `contentCode`): 10 hard-coded codes in `content-codes.ts` (UGC, VRP, OFF, BST, EDU, PRC, TBG, MAR, OST, FOU). *(Relabeled from "Content Code" 2026-06-07.)*
 - **Duplicate-creator guard:** blocks re-reaching the same creator in the same campaign unless the prior collab is `Cancelled` **or voided (`Offboarded`/`Offboarding`)** — both free the slot (RTO/Delivered still count as active). Uses `isVoidedStatus` (`lib/workflow.ts`). Inbound checks per-row sequentially (catches intra-batch dupes).
+- **Existing-creator block (2026-06-24):** beyond the per-campaign guard, reach-out is rejected for ANY existing creator (a `creators` row exists by username) in both flows. The outbound form disables submit + shows a banner the moment Fetch resolves an existing creator. Existing creators start new collabs (C2+) at Onboarding, so `C1` is only ever minted at reach-out.
 - **Closed-campaign block:** if `campaigns.status` lowercased = `'closed'`, the whole submit/batch is rejected ("Reopen it — Campaign Owner / Global Admin").
 - **Creator cap = ONBOARDING cap (2026-06-10):** reach-out is now **unlimited** per campaign — the cap is enforced at **onboarding** (`submitOnboarding`), not reach-out. cap = Σ `campaign_budget.num_influencers`. "Used" = distinct creators **onboarded-and-active** (`isOnboardedActive`: On Board / Order Sent / Posted / Delivered) by username. Onboarding a new creator is blocked once used ≥ cap; an onboarded creator who is later offboarded (voided) leaves the set and frees a slot for a pending reach-out. `cap=0` ⇒ no cap. The reach-out form pill shows `onboarded / cap · N slots left` (informational — does not block reach-out). Un-onboarded leftovers are voided (→ Cancelled) when the campaign closes (`voidUnonboardedForCampaign`).
 - After submit: enqueues IG scrape (`instagram_cache` upsert, insert-only), fires `notifyActorConfirmation` (REACHOUT/INBOUND_CONFIRMATION — one summary email per batch) via `after()`, revalidates tags + routes.
@@ -107,7 +108,11 @@ Resolves email, address (`parseShopifyAddress` → street/city/state/pincode usi
 ### Deliverable expansion §6.2
 - `total = reels + posts` (static). **Stories count as deliverables for KPIs/breakdown but never spawn a child row.**
 - **Equal-split:** `perDeliverableAmount = round(commercials/total, 2)` stored on every row so `SUM(commercial_amount)` across the collab = the agreed total.
-- Child rows spawned only when `total>1`: each gets next global `post_number`, `post_id = {inf_id}-P{n}` (no `-C`), shared `collab_id`, `deliverable_role='child'`, copies order/address/bank/agency. Parent UPDATE sets `workflow_status='On Board'`, `payment_status=null`, `onboard_date=today`, bank fields, syncs creator-level fields to `creators`.
+- Child rows spawned only when `total>1`: each gets next **per-creator** `post_number` (2026-06-24), `post_id = {inf_id}-P{n}` (no `-C`), shared `collab_id`, `deliverable_role='child'`, copies order/address/bank/agency. Parent UPDATE sets `workflow_status='On Board'`, `payment_status=null`, `onboard_date=today`, bank fields, syncs creator-level fields to `creators`.
+
+### Repeat collab (C2+ for existing creators) — 2026-06-24
+- **Entry:** a "New collab (existing creator)" button on the Onboarding board opens the modal in **repeat mode** (`OrderCreationModal repeatMode`): creator dropdown (`listOnboardableCreators`) + campaign (`listOpenCampaigns`) + content-type (`CONTENT_CODES`) pickers, then the normal onboarding fields.
+- **Flow:** `submitRepeatCollab` → RPC `create_repeat_collab(inf_id, campaign_id, content_type)` mints the C2+ parent (atomic per-creator P/C, `workflow_status='Reach Out'`) → delegates to the untouched `submitOnboarding` (Shopify order validation, On Board, child spawn). On failure the just-created parent is deleted (no orphan). Migration `2026_06_24_phase3_create_repeat_collab.sql`.
 
 ### Collab email
 - **Deliverable breakdown** rendered as `{posts}P : {reels}R[: {stories}S]`; count chip reads "N deliverables" with breakdown tooltip.

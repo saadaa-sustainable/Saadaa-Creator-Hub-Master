@@ -256,6 +256,13 @@ export function OutboundForm({
 
   const onSubmit = (event: React.FormEvent) => {
     setSubmitAttempted(true);
+    if (isExistingCreator) {
+      event.preventDefault();
+      toast.error(
+        "Existing creator — reach-out is for new creators only. Use Onboarding to start a repeat collab (C2+).",
+      );
+      return;
+    }
     handleSubmit(
       (values) => {
         startSubmit(async () => {
@@ -474,7 +481,7 @@ export function OutboundForm({
                     <Layers className="h-3 w-3" aria-hidden />
                   </span>
                   {hit?.source === "creator"
-                    ? "Loaded from Creator Data — identity locked, metrics editable for this collab."
+                    ? "Existing creator — reach-out blocked. Use Onboarding to start a repeat collab (C2+)."
                     : "Loaded from Instagram Cache — metrics filled from latest scrape."}
                 </p>
               )}
@@ -890,13 +897,21 @@ export function OutboundForm({
       <div className="space-y-3">
         <MissingFieldsAlert fields={missingFieldLabels} />
         <div className="text-end">
-          <button type="submit" className="btn-submit" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn-submit"
+            disabled={submitting || isExistingCreator}
+          >
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <CheckCircle2 className="h-4 w-4" />
             )}
-            {submitting ? "Submitting…" : "Create Reach Out"}
+            {submitting
+              ? "Submitting…"
+              : isExistingCreator
+                ? "Existing creator — use Onboarding"
+                : "Create Reach Out"}
           </button>
         </div>
       </div>

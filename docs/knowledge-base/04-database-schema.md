@@ -21,7 +21,7 @@ The spine of the system. One row per **deliverable** (reel or static post). Ever
 | `id` | uuid | no | gen | PK |
 | `post_id` | text | no | — | **UNIQUE.** Since 2026-06-06 = SHORT deliverable id (`SIF-N-PN`), no `-C` suffix |
 | `post_id_short` | text | yes | — | `inf_id-P{post_number}` |
-| `post_number` | int | yes | — | **GLOBAL** linear counter (max+1 across ALL posts) |
+| `post_number` | int | yes | — | **PER-CREATOR** linear P counter (max+1 WHERE inf_id) — C1→P1,P2,P3 · C2→P4,P5,P6 · new creator→P1 (changed from global 2026-06-24) |
 | `collab_number` | int | yes | 1 | Per-creator collab episode counter; CHECK `>= 1` |
 | `collab_id` | text | yes | — | `inf_id-C{collab_number}` (e.g. `SIF-1-C1`). Groups all deliverables of one collab |
 | `deliverable_index` | int | yes | — | **LEGACY** parent/child ordinal (1 = parent). Superseded by `collab_id` |
@@ -265,7 +265,7 @@ All "enums" are **TEXT columns guarded by CHECK constraints**, not Postgres `ENU
 
 | Function | Args | Returns | Behavior |
 |---|---|---|---|
-| `submit_reachout` | 20 params (username, inf_name, instagram_link, followers, gender, state, email, campaign_id, content_type, content_name, reachout_type, reachout_direction, reels, static_posts, stories, ads_usage_rights, collab_type, commercial_amount, raw_dump, logged_by_email) | `post_id, post_id_short, post_number, collab_number, inf_id, collab_id` | Atomic reach-out. Advisory locks on `reachout-user:<username>` + `reachout-inf:<inf_id>`. Upserts `creators` by username (generates `SIF-{MAX+1}` if new). `post_number` = global MAX+1; `collab_number` = per-inf_id MAX+1. **post_id = SHORT id; collab_id = inf_id-C{n}.** Auto-attaches `brief_link`. Barter ⇒ amount 0. Inserts `Reach Out` post. (`2026_06_06_submit_reachout_collab_id.sql`) |
+| `submit_reachout` | 20 params (username, inf_name, instagram_link, followers, gender, state, email, campaign_id, content_type, content_name, reachout_type, reachout_direction, reels, static_posts, stories, ads_usage_rights, collab_type, commercial_amount, raw_dump, logged_by_email) | `post_id, post_id_short, post_number, collab_number, inf_id, collab_id` | Atomic reach-out. Advisory locks on `reachout-user:<username>` + `reachout-inf:<inf_id>`. Upserts `creators` by username (generates `SIF-{MAX+1}` if new). `post_number` = per-creator MAX+1 (P linear per creator, 2026-06-24); `collab_number` = per-inf_id MAX+1 (a NEW creator at reach-out ⇒ C1; reach-out is blocked for existing creators — C2+ created at onboarding via `create_repeat_collab`). **post_id = SHORT id; collab_id = inf_id-C{n}.** Auto-attaches `brief_link`. Barter ⇒ amount 0. Inserts `Reach Out` post. (`2026_06_06_submit_reachout_collab_id.sql`) |
 | `submit_campaign` | `p_form jsonb, p_budget_rows jsonb, p_month_label text` | `campaign_id, campaign_num, total_budget` | Atomic campaign. Validates name/key_message/brief_link/dates/≥1 row. Advisory lock `submit_campaign:counter`. `campaign_num` = MAX+1, `campaign_id = 'IFC'||lpad(num,3,'0')`. `total_budget` = Σ(num×avg_comp) + Σ(num×max_garments×900×0.6). Inserts campaign (`active`) + N budget rows (raw inputs only). (`2026_05_20_submit_campaign_rpc.sql`) |
 | `touch_access_roles_updated_at` / `touch_cell_comments_updated_at` | trigger | trigger | set `updated_at = now()` |
 
@@ -297,6 +297,6 @@ Extensions: `pg_cron`, `pg_net`, `supabase_vault`. Bearer JWT read at fire-time 
 
 ## Domain facts (verified)
 
-- **`inf_id`** = `SIF-N` (RPC, MAX+1). **`post_number`** is global. **`collab_number`** is per-creator. **`collab_id` = `inf_id-C{collab_number}`**; **`post_id` = short `inf_id-P{post_number}`** (no `-C`). **`campaign_id` = `IFC{NNN}`**.
+- **`inf_id`** = `SIF-N` (now the historic SIF per creator, 2026-06-24). **`post_number`** is **per-creator** (P linear per creator across collabs). **`collab_number`** is per-creator (C1 at reach-out for NEW creators; C2+ at onboarding). **`collab_id` = `inf_id-C{collab_number}`**; **`post_id` = short `inf_id-P{post_number}`** (no `-C`). **`campaign_id` = `IFC{NNN}`**.
 - **Deliverable model:** total = `reels + static_posts`. **Stories count as deliverables but never spawn a child row** (`deliverable_type` CHECK only allows `reel`/`post`).
 - **Parent/child (`deliverable_index`)** is legacy — the 2026-06-06 Collab ID restructure replaced grouping with `collab_id`; payment is raised per `collab_id`.

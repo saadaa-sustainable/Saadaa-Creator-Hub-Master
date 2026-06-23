@@ -81,6 +81,23 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     return { ok: false, error: "Could not derive username from URL" };
   }
 
+  // New rule (2026-06-24): Reach Out is for NEW creators only. An existing
+  // creator starts a repeat collab (C2+) via Onboarding, not reach-out — so
+  // C1 is only ever created at reach-out. Block if the creator already exists.
+  const { data: existingCreator } = await (supabase as any)
+    .from("creators")
+    .select("inf_id")
+    .ilike("username", username)
+    .maybeSingle();
+  if (existingCreator) {
+    return {
+      ok: false,
+      error:
+        "Existing creator — reach-out is for new creators only. Use Onboarding to start a repeat collab (C2+).",
+      fieldErrors: { instagramLink: "Existing creator — use Onboarding" },
+    };
+  }
+
   // Shrishti error-handling: duplicate-creator guard. Block re-reaching the
   // same creator within the same campaign unless the prior collab was
   // Cancelled OR voided/Offboarded (per-campaign; RTO/Delivered/etc. still

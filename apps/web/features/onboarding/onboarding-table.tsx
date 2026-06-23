@@ -57,6 +57,7 @@ export function OnboardingTable({
     draft?: CollabEmailDraft;
   } | null>(null);
   const [view, setView] = useState<"list" | "cards">(initialView);
+  const [repeatOpen, setRepeatOpen] = useState(false);
 
   // Collapse the board to ONE row per collab_id: render the collab
   // representative only (lowest post_id within each collab_id group).
@@ -172,6 +173,14 @@ export function OnboardingTable({
           }}
         />
       )}
+      {repeatOpen && (
+        <OrderCreationModal
+          repeatMode
+          open={repeatOpen}
+          onClose={() => setRepeatOpen(false)}
+          postId=""
+        />
+      )}
       {collabEmail && (
         <CollabEmailModal
           postId={collabEmail.postId}
@@ -188,6 +197,17 @@ export function OnboardingTable({
           onEmail={(postId) => setCollabEmail({ postId })}
         />
       )}
+
+      <div className="flex items-center justify-end mb-2">
+        <button
+          type="button"
+          className="action-btn"
+          onClick={() => setRepeatOpen(true)}
+        >
+          <Send size={11} aria-hidden />
+          New collab (existing creator)
+        </button>
+      </div>
 
       {/* View toggle (legacy `.ob-viewtoggle`) */}
       <div className="ob-viewtoggle" role="tablist" aria-label="View mode">

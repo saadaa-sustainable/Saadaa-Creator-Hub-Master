@@ -34,7 +34,15 @@ import {
   ORDER_STATUSES,
   type OnboardingInput,
 } from "./schema";
-import { submitOnboarding, lookupShopifyOrder } from "./actions";
+import {
+  submitOnboarding,
+  submitRepeatCollab,
+  lookupShopifyOrder,
+  listOnboardableCreators,
+  listOpenCampaigns,
+  type OnboardableCreator,
+} from "./actions";
+import { CONTENT_CODES } from "../reach-out/content-codes";
 import {
   CollabEmailPane,
   type CollabEmailDraft,
@@ -48,6 +56,8 @@ interface OnboardingFormProps {
   username?: string | null;
   /** Existing values from posts row (when re-opening a partially-onboarded row). */
   initial?: Partial<OnboardingInput>;
+  /** Repeat-collab mode: pick an existing creator + campaign to start a C2+ collab. */
+  repeatMode?: boolean;
   open: boolean;
   onClose: () => void;
 }
@@ -73,6 +83,7 @@ export function OrderCreationModal({
   creatorName,
   username,
   initial,
+  repeatMode = false,
   open,
   onClose,
 }: OnboardingFormProps) {
@@ -87,6 +98,14 @@ export function OrderCreationModal({
   // collab email inline within this same modal. `emailDraft` holds the draft
   // built from the just-saved values; non-null means we're in the email phase.
   const [emailDraft, setEmailDraft] = useState<CollabEmailDraft | null>(null);
+  // Repeat-collab mode: existing-creator picker + campaign/content-type.
+  const [repeatCreators, setRepeatCreators] = useState<OnboardableCreator[]>([]);
+  const [repeatCampaigns, setRepeatCampaigns] = useState<
+    Array<{ campaign_id: string; campaign_name: string | null }>
+  >([]);
+  const [repeatInfId, setRepeatInfId] = useState("");
+  const [repeatCampaignId, setRepeatCampaignId] = useState("");
+  const [repeatContentType, setRepeatContentType] = useState("");
 
   const {
     register,
@@ -101,7 +120,7 @@ export function OrderCreationModal({
     reValidateMode: "onChange",
     shouldFocusError: true,
     defaultValues: {
-      postId,
+      postId: repeatMode ? "PENDING" : postId,
       agency: initial?.agency ?? "",
       collabType: initial?.collabType ?? "Barter",
       commercials: initial?.commercials ?? 0,
@@ -183,6 +202,24 @@ export function OrderCreationModal({
     };
   }, [open]);
 
+  // Repeat mode: load existing creators + open campaigns for the pickers.
+  useEffect(() => {
+    if (!open || !repeatMode) return;
+    let active = true;
+    (async () => {
+      const [cr, ca] = await Promise.all([
+        listOnboardableCreators(),
+        listOpenCampaigns(),
+      ]);
+      if (!active) return;
+      setRepeatCreators(cr);
+      setRepeatCampaigns(ca);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [open, repeatMode]);
+
   // Lock commercials to 0 when Barter (legacy parity)
   useEffect(() => {
     if (isBarter) setValue("commercials", 0, { shouldDirty: false });
@@ -224,16 +261,28 @@ export function OrderCreationModal({
       toast.error("Set at least one Reel or Static Post.");
       return;
     }
+    if (repeatMode && (!repeatInfId || !repeatCampaignId)) {
+      toast.error("Pick a creator and a campaign for the repeat collab.");
+      return;
+    }
     startSubmit(async () => {
-      const res = await submitOnboarding({ ...values, postId });
+      const res = repeatMode
+        ? await submitRepeatCollab({
+            ...values,
+            infId: repeatInfId,
+            campaignId: repeatCampaignId,
+            contentType: repeatContentType,
+          })
+        : await submitOnboarding({ ...values, postId });
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
+      const label = res.postId;
       const msg =
         res.childrenSpawned > 0
-          ? `${postIdShort ?? postId} onboarded. ${res.childrenSpawned} deliverable row(s) spawned.`
-          : `${postIdShort ?? postId} onboarded.`;
+          ? `${label} onboarded. ${res.childrenSpawned} deliverable row(s) spawned.`
+          : `${label} onboarded.`;
       toast.success(msg);
       // Refresh so the board reflects the new On Board state, then surface the
       // inline collab-email review pane in this same modal. The onboarding is
@@ -331,10 +380,16 @@ export function OrderCreationModal({
         <header className="modal-head">
           <div className="flex items-center gap-2 min-w-0">
             <ClipboardCheck size={16} />
-            <h2 className="font-semibold">Onboarding Configuration</h2>
-            <span className="chip text-[10px] tabular">
-              {postIdShort ?? postId}
-            </span>
+            <h2 className="font-semibold">
+              {repeatMode
+                ? "New Collab — Existing Creator"
+                : "Onboarding Configuration"}
+            </h2>
+            {!repeatMode && (
+              <span className="chip text-[10px] tabular">
+                {postIdShort ?? postId}
+              </span>
+            )}
             {collabId && (
               <span
                 className="tabular text-[0.66rem] text-text-tertiary"
@@ -363,10 +418,85 @@ export function OrderCreationModal({
         >
           <input type="hidden" {...register("orderStatus")} />
           <div className="text-sm text-text-secondary">
-            Onboarding <strong>{creatorName ?? username ?? "creator"}</strong>.
-            Fill collab + Shopify order; deliverable rows auto-spawn from Reels
-            + Posts counts.
+            {repeatMode ? (
+              <>
+                Start a <strong>new collab</strong> for an existing creator. Pick
+                the creator + campaign; a fresh collab (C2+) is created and
+                onboarded in one step.
+              </>
+            ) : (
+              <>
+                Onboarding{" "}
+                <strong>{creatorName ?? username ?? "creator"}</strong>. Fill
+                collab + Shopify order; deliverable rows auto-spawn from Reels +
+                Posts counts.
+              </>
+            )}
           </div>
+
+          {repeatMode && (
+            <section className="ob-form-section">
+              <h5 className="section-title">
+                <ClipboardCheck size={13} className="inline mr-2" />
+                Creator &amp; Campaign
+              </h5>
+              <div className="form-grid">
+                <div className="form-floating">
+                  <select
+                    className="form-select"
+                    id="rc_creator"
+                    value={repeatInfId}
+                    onChange={(e) => setRepeatInfId(e.target.value)}
+                  >
+                    <option value="">Select creator…</option>
+                    {repeatCreators.map((c) => (
+                      <option key={c.inf_id} value={c.inf_id}>
+                        {c.inf_id} — {c.inf_name || c.username}
+                      </option>
+                    ))}
+                  </select>
+                  <label htmlFor="rc_creator">
+                    Creator <span className="req">*</span>
+                  </label>
+                </div>
+                <div className="form-floating">
+                  <select
+                    className="form-select"
+                    id="rc_campaign"
+                    value={repeatCampaignId}
+                    onChange={(e) => setRepeatCampaignId(e.target.value)}
+                  >
+                    <option value="">Select campaign…</option>
+                    {repeatCampaigns.map((c) => (
+                      <option key={c.campaign_id} value={c.campaign_id}>
+                        {c.campaign_id}
+                        {c.campaign_name ? ` — ${c.campaign_name}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <label htmlFor="rc_campaign">
+                    Campaign <span className="req">*</span>
+                  </label>
+                </div>
+                <div className="form-floating form-grid-full">
+                  <select
+                    className="form-select"
+                    id="rc_content"
+                    value={repeatContentType}
+                    onChange={(e) => setRepeatContentType(e.target.value)}
+                  >
+                    <option value="">Select content type…</option>
+                    {CONTENT_CODES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.code} — {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <label htmlFor="rc_content">Content Type</label>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* ── Collaboration Configuration ─────────────────────────── */}
           <section className="ob-form-section">

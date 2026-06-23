@@ -459,8 +459,9 @@ export async function submitOnboarding(
   }
 
   // 4. Spawn child deliverable rows (only when total > 1)
-  // Each child gets next available global post_number (atomic via RPC ideally,
-  // but for now a sequential read + insert pattern). Falls back gracefully.
+  // Each child gets next available PER-CREATOR post_number (P is linear per
+  // creator across collabs). Sequential read + insert pattern; falls back
+  // gracefully.
   let childrenSpawned = 0;
   if (total > 1) {
     const remainingReels = firstType === "reel" ? v.reels - 1 : v.reels;
@@ -469,6 +470,7 @@ export async function submitOnboarding(
     const { data: maxRow } = await supabase
       .from("posts")
       .select("post_number")
+      .eq("inf_id", parent.inf_id as string)
       .order("post_number", { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle();
@@ -619,6 +621,118 @@ export async function submitOnboarding(
   revalidatePath("/posting");
 
   return { ok: true, postId: v.postId, childrenSpawned };
+}
+
+// ─── Repeat Collab (C2+ for an existing creator, started at Onboarding) ───────
+
+export interface OnboardableCreator {
+  inf_id: string;
+  username: string;
+  inf_name: string | null;
+}
+
+/** Existing creators, for the Onboarding "repeat collab" creator dropdown. */
+export async function listOnboardableCreators(): Promise<OnboardableCreator[]> {
+  await assertPermission("onboarding_write");
+  const supabase = createServiceClient();
+  const { data } = await (supabase as any)
+    .from("creators")
+    .select("inf_id, username, inf_name")
+    .order("inf_id");
+  return ((data ?? []) as OnboardableCreator[]).filter((c) => c.inf_id);
+}
+
+/** Open (non-closed) campaigns, for the repeat-collab campaign dropdown. */
+export async function listOpenCampaigns(): Promise<
+  Array<{ campaign_id: string; campaign_name: string | null }>
+> {
+  await assertPermission("onboarding_write");
+  const supabase = createServiceClient();
+  const { data } = await (supabase as any)
+    .from("campaigns")
+    .select("campaign_id, campaign_name, status")
+    .order("campaign_id", { ascending: false });
+  return (
+    (data ?? []) as Array<{
+      campaign_id: string;
+      campaign_name: string | null;
+      status: string | null;
+    }>
+  )
+    .filter(
+      (c) => c.campaign_id && String(c.status ?? "").toLowerCase() !== "closed",
+    )
+    .map((c) => ({ campaign_id: c.campaign_id, campaign_name: c.campaign_name }));
+}
+
+/**
+ * Start a NEW collab (C2+) for an EXISTING creator and onboard it in one step.
+ * Reach Out only creates C1 (new creators); repeat collabs begin here. We create
+ * the C2+ parent post (atomic per-creator P/C via create_repeat_collab) then
+ * delegate to the normal submitOnboarding flow. If onboarding fails validation
+ * or the order check, the just-created parent is removed (no orphan).
+ */
+export async function submitRepeatCollab(
+  input: unknown,
+): Promise<OnboardingResult> {
+  await assertPermission("onboarding_write");
+  const obj = (input ?? {}) as Record<string, unknown>;
+  const infId = String(obj.infId ?? "").trim();
+  const campaignId = String(obj.campaignId ?? "").trim();
+  const contentType = String(obj.contentType ?? "").trim();
+  if (!infId)
+    return {
+      ok: false,
+      error: "Select an existing creator",
+      fieldErrors: { infId: "Creator required" },
+    };
+  if (!campaignId)
+    return {
+      ok: false,
+      error: "Campaign required",
+      fieldErrors: { campaignId: "Campaign required" },
+    };
+
+  const { infId: _i, campaignId: _c, contentType: _ct, ...onboardingFields } =
+    obj;
+
+  // Pre-validate onboarding fields (dummy postId) so we never create an orphan
+  // C2 post when the form data is invalid.
+  const pre = OnboardingSchema.safeParse({
+    ...onboardingFields,
+    postId: "PENDING",
+  });
+  if (!pre.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of pre.error.issues) {
+      const path = issue.path.join(".");
+      if (path !== "postId" && !fieldErrors[path])
+        fieldErrors[path] = issue.message;
+    }
+    return { ok: false, error: "Validation failed", fieldErrors };
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await (supabase as any).rpc("create_repeat_collab", {
+    p_inf_id: infId,
+    p_campaign_id: campaignId,
+    p_content_type: contentType || null,
+  });
+  if (error) return { ok: false, error: error.message };
+  const row = Array.isArray(data) ? data[0] : data;
+  const newPostId = (row?.post_id as string | undefined) ?? undefined;
+  if (!newPostId)
+    return { ok: false, error: "Could not create the repeat collab." };
+
+  const result = await submitOnboarding({
+    ...onboardingFields,
+    postId: newPostId,
+  });
+  if (!result.ok) {
+    // Failed onboard → remove the just-created C2 parent so no orphan remains.
+    await (supabase as any).from("posts").delete().eq("post_id", newPostId);
+  }
+  return result;
 }
 
 // ─── Collab Email ─────────────────────────────────────────────────────────────
