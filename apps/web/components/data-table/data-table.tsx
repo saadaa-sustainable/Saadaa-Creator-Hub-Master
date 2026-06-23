@@ -66,7 +66,7 @@ export function DataTable<TData>({
 
   return (
     <>
-      <div className="mb-2.5 flex items-center justify-between gap-2">
+      <div className="mb-2.5 flex items-center justify-between gap-2 px-3.5 pt-3.5">
         <span className="inline-flex items-center gap-2 text-[0.82rem] text-text-secondary">
           <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-[#F0EAD6] px-1.5 text-[0.72rem] font-semibold tabular-nums text-[#161513]">
             {rows.length.toLocaleString("en-IN")}
