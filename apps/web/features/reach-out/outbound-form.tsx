@@ -41,6 +41,7 @@ import {
   submitReachOut,
   type CreatorLookupHit,
 } from "./actions";
+import { HistoricCreatorButton } from "./historic-creator-modal";
 
 interface OutboundFormProps {
   campaigns: {
@@ -336,6 +337,11 @@ export function OutboundForm({
 
   return (
     <form className="reachout-form" onSubmit={onSubmit}>
+      {/* Reference: browse prior creators (historic + new) before reaching out. */}
+      <div className="flex justify-end">
+        <HistoricCreatorButton />
+      </div>
+
       {/* ============ STEP 1 — Campaign Assignment =========================== */}
       <section
         className="glass-card reachout-step-card"

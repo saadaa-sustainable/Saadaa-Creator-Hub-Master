@@ -8,6 +8,27 @@ export default function ReachOutOutboundKM() {
         subtitle="We initiate. Live IG lookup + profile preview + one-click submit creates the collab and queues enrichment."
       />
 
+      <KMSection tag="Historic Creator picker">
+        <KMList>
+          <li>
+            A <strong>Historic Creator</strong> button (top of the form, both
+            Outbound + Inbound) opens a modal to browse the full creator
+            registry. Filters: <strong>Search</strong> (handle/name/SIF),{" "}
+            <strong>Content type</strong>, <strong>Category tier</strong>,{" "}
+            <strong>Campaign</strong>, <strong>Team member</strong>. Each row =
+            avatar + name + <KMCode>@handle · tier</KMCode> + a{" "}
+            <strong>Historic</strong>/<strong>New</strong> chip + follower count
+            (same row UI as the Dashboard Top Creators).
+          </li>
+          <li>
+            Backed by the <KMCode>list_historic_creators</KMCode> RPC — filters
+            span creators-level (search/tier) + collab-level (content/campaign/
+            team) joined on <KMCode>inf_id = sif_id</KMCode> across posts +
+            cleaned_data. Paginated 60/page by followers desc. View-only browser.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Page layout">
         <KMList>
           <li>
