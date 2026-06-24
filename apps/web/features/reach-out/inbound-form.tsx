@@ -26,6 +26,7 @@ import {
   ExternalLink,
   Eye,
   Users,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { isInstagramProfileUrl } from "@/lib/validators";
@@ -36,6 +37,7 @@ import { CONTENT_CODES } from "./content-codes";
 import {
   lookupCreator,
   lookupCreatorsFromDataset,
+  lookupCreatorsBatch,
   type CreatorLookupHit,
 } from "./actions";
 import {
@@ -60,7 +62,7 @@ interface InboundFormProps {
 
 const igUrlRe = /^https?:\/\/(www\.)?instagram\.com\/[A-Za-z0-9._]+/i;
 
-type RowLookupStatus = "idle" | "loading" | "found" | "queued" | "error";
+type RowLookupStatus = "idle" | "loading" | "found" | "error";
 
 type RowLookup = {
   username: string;
@@ -72,6 +74,7 @@ type RowLookup = {
   category: string | null;
   profilePic: string | null;
   verification: CreatorLookupHit["verification"] | null;
+  profileId?: string | null;
   error?: string;
 };
 
@@ -136,10 +139,20 @@ function lookupStatusText(lookup?: RowLookup): string {
   if (!lookup) return "Waiting";
   if (lookup.status === "loading") return "Checking";
   if (lookup.status === "found") {
-    return lookup.source === "creator" ? "Creator Data" : "IG Cache";
+    switch (lookup.source) {
+      case "creator":
+        return "Creator Data";
+      case "meta":
+        return "Live";
+      case "historic":
+        return "Last known";
+      default:
+        return "Fetched";
+    }
   }
-  if (lookup.status === "queued") return "Queued";
-  if (lookup.status === "error") return "No match";
+  if (lookup.status === "error") {
+    return lookup.source === "deactivated" ? "Not fetchable" : "Fetch failed";
+  }
   return "Waiting";
 }
 
@@ -162,6 +175,7 @@ function rosterValue(row: Record<string, string>, ...keys: string[]): string {
 export function InboundForm({ campaigns }: InboundFormProps) {
   const router = useRouter();
   const [submitting, startSubmit] = useTransition();
+  const [fetchingAll, startFetchAll] = useTransition();
   const [campaignId, setCampaignId] = useState("");
   const [rows, setRows] = useState<RowState[]>([newRow()]);
   const [failures, setFailures] = useState<{ row: number; error: string }[]>(
@@ -255,8 +269,12 @@ export function InboundForm({ campaigns }: InboundFormProps) {
             lookup: {
               username: result.username,
               source: result.source,
-              status: result.source === "queued" ? "queued" : "found",
+              status:
+                result.source === "deactivated" || result.source === "error"
+                  ? "error"
+                  : "found",
               name: result.inf_name,
+              profileId: result.profile_id ?? null,
               followers: result.followers,
               gender,
               category: result.category,
@@ -340,6 +358,86 @@ export function InboundForm({ campaigns }: InboundFormProps) {
     },
     [applyLookupResult, updateRow],
   );
+
+  // Rows that carry a valid IG URL but haven't been fetched yet (no lookup, or it
+  // hasn't resolved). Used to gate submit and to label the Fetch-all button.
+  const unfetchedRows = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          igUrlRe.test(r.instagramLink.trim()) &&
+          (!r.lookup ||
+            r.lookup.status === "idle" ||
+            r.lookup.status === "loading"),
+      ),
+    [rows],
+  );
+
+  // Fetch every unresolved row in ONE Meta Batch call (≤50 sub-requests, the
+  // ig_fetching.py model). Each batch consumes a window of the rolling rate gate;
+  // after 50 (or when Meta's X-App-Usage is high) the server opens a cooldown.
+  const META_BATCH = 50;
+  const fetchAllRows = () => {
+    const targets = rows.filter(
+      (r) =>
+        igUrlRe.test(r.instagramLink.trim()) &&
+        r.lookup?.status !== "found" &&
+        r.lookup?.status !== "loading",
+    );
+    if (targets.length === 0) {
+      toast.info("Nothing to fetch — add Instagram profile URLs first.");
+      return;
+    }
+    const slice = targets.slice(0, META_BATCH);
+    startFetchAll(async () => {
+      // Mark the sliced rows as loading up-front.
+      const sliceIds = new Set(slice.map((r) => r.id));
+      setRows((prev) =>
+        prev.map((row) =>
+          sliceIds.has(row.id)
+            ? {
+                ...row,
+                lookup: {
+                  username: inboundUsernameFromUrl(row.instagramLink),
+                  source: row.lookup?.source ?? "unknown",
+                  status: "loading",
+                  name: row.lookup?.name ?? null,
+                  followers: row.lookup?.followers ?? null,
+                  gender: row.lookup?.gender ?? null,
+                  category: row.lookup?.category ?? null,
+                  profilePic: row.lookup?.profilePic ?? null,
+                  verification: row.lookup?.verification ?? null,
+                },
+              }
+            : row,
+        ),
+      );
+
+      const res = await lookupCreatorsBatch(
+        slice.map((r) => r.instagramLink),
+        "reachout_inbound",
+      );
+      slice.forEach((r) => {
+        const u = inboundUsernameFromUrl(r.instagramLink);
+        const hit = res.hits[u] ?? null;
+        lookupCache.current[u] = hit;
+        applyLookupResult(r.id, u, hit);
+      });
+
+      if (res.coolingDown) {
+        toast.warning(
+          `Fetched ${res.fetched}. Rate-limit cooldown — wait ${res.retryAfterSec}s before fetching more.`,
+        );
+      } else {
+        toast.success(`Fetched ${slice.length} profile(s).`);
+      }
+      if (targets.length > slice.length) {
+        toast.info(
+          `${targets.length - slice.length} more row(s) — click Fetch again for the next batch of ${META_BATCH}.`,
+        );
+      }
+    });
+  };
 
   const handleInstagramChange = (id: string, value: string) => {
     const username = inboundUsernameFromUrl(value);
@@ -542,6 +640,19 @@ export function InboundForm({ campaigns }: InboundFormProps) {
       Object.values(errors).forEach((message) => {
         messages.push(`Row ${originalIndex + 1}: ${message}`);
       });
+      // Fetch-before-submit rule: a row with a valid URL must have been fetched
+      // (Meta/historic resolved, or a definitive not-fetchable result). Block a
+      // row that was never fetched or is still loading.
+      if (
+        igUrlRe.test(row.instagramLink.trim()) &&
+        (!row.lookup ||
+          row.lookup.status === "idle" ||
+          row.lookup.status === "loading")
+      ) {
+        messages.push(
+          `Row ${originalIndex + 1}: fetch the profile before submitting.`,
+        );
+      }
     });
 
     if (messages.length > 0) {
@@ -569,6 +680,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           contentCode: v.contentCode,
           collabType: v.collabType,
           commercials: v.collabType === "Barter" ? 0 : v.commercials ?? 0,
+          profileId: v.lookup?.profileId ?? undefined,
         })),
       });
       if (!res.ok) {
@@ -593,7 +705,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
       if (res.created > 0) {
         setSubmitAttempted(false);
         toast.success(
-          `${res.created} inbound reach out(s) created. Followers + verification auto-fill in the next 3hr Instagram cycle.`,
+          `${res.created} inbound reach out(s) created.`,
         );
         if (res.failures.length === 0) {
           setCampaignId("");
@@ -735,7 +847,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
             </small>
             <small className="cap-card__hint">
               <Sparkles size={11} />
-              Followers + verification auto-fill in ≤3 hrs from Instagram.
+              Click Fetch to pull followers + profile data live from Instagram.
             </small>
           </div>
         </div>
@@ -753,9 +865,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               Inbound Roster <span className="req">*</span>
             </h5>
             <small className="text-muted">
-              Profile URL, Gender, Content Type are mandatory. Name + followers
-              auto-fill from the 3-hour Instagram trigger. Email auto-fills from
-              the Shopify order.
+              Profile URL, Gender, Content Type are mandatory. Click{" "}
+              <strong>Fetch</strong> to pull name + followers live from Instagram
+              (required before submit). Email auto-fills from the Shopify order.
             </small>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
@@ -790,6 +902,22 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               hidden
               onChange={(event) => void importRosterFile(event)}
             />
+            <button
+              type="button"
+              className="btn-toolbar"
+              onClick={fetchAllRows}
+              disabled={fetchingAll || unfetchedRows.length === 0}
+              title="Fetch profiles live from Instagram (one batch of 50 per click)"
+            >
+              {fetchingAll ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <Zap size={12} />
+              )}
+              {unfetchedRows.length > 0
+                ? `Fetch (${unfetchedRows.length})`
+                : "Fetch all"}
+            </button>
             <button
               type="button"
               className="btn-accent btn-sm"
@@ -1077,9 +1205,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                     <div className="inbound-mobile-identity__copy">
                       <strong>
                         {r.lookup?.name ??
-                          (r.lookup?.status === "queued"
-                            ? "Queued for fetch"
-                            : `@${inboundUsernameFromUrl(r.instagramLink)}`)}
+                          `@${inboundUsernameFromUrl(r.instagramLink)}`}
                       </strong>
                       <span>@{inboundUsernameFromUrl(r.instagramLink)}</span>
                     </div>

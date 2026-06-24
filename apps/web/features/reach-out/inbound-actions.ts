@@ -194,6 +194,15 @@ export async function submitInboundBatch(
       })
       .eq("post_id", row.post_id);
 
+    // Persist the legacy profile_id from the Meta/historic Fetch onto the new
+    // creator (lets a returning handle be recognised later). Best-effort.
+    if (r.profileId && row.inf_id) {
+      await (supabase as any)
+        .from("creators")
+        .update({ profile_id: r.profileId })
+        .eq("inf_id", row.inf_id);
+    }
+
     created.push({
       postId: row.post_id,
       postIdShort: row.post_id_short,

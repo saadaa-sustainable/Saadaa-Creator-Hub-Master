@@ -25,22 +25,47 @@ export default function ReachOutOutboundKM() {
         </KMList>
       </KMSection>
 
-      <KMSection tag="Lookup pipeline (lookupCreator action)">
+      <KMSection tag="Lookup pipeline (lookupCreator action) — INSTANT via Meta">
         <KMList>
           <li>
-            <strong>1. creators</strong> — existing row wins (no re-fetch,
-            keeps audit history intact).
+            <strong>1. creators</strong> — existing row wins (no re-fetch). Also
+            caught by legacy <KMCode>profile_id</KMCode> even if the handle
+            changed → submit blocked, guided to Onboarding for a repeat collab.
           </li>
           <li>
-            <strong>2. instagram_cache</strong> — last Apify scrape (≤ 3 hrs
-            old). Returns followers + verification + profile_pic + ER.
+            <strong>2. Meta business_discovery</strong> — LIVE fetch on the
+            Fetch click (no Apify, no wait, no cost). Returns followers, profile
+            pic, avg likes, ER, and the legacy numeric{" "}
+            <KMCode>profile_id</KMCode> (Meta <KMCode>ig_id</KMCode>). Badge:
+            &quot;Live&quot;.
           </li>
           <li>
-            <strong>3. queue</strong> — upserts a{" "}
-            <KMCode>status=pending</KMCode> row; the 3-hr Apify cron fills it
-            on the next tick. Preview shows a yellow &quot;Queued&quot; chip.
+            <strong>3. historic</strong> — Meta missed but the handle is in{" "}
+            <KMCode>ig_data_historic</KMCode> → cached metrics. Badge: &quot;Last
+            known&quot;.
+          </li>
+          <li>
+            <strong>4. deactivated / error</strong> — Meta &quot;Cannot find
+            User&quot; (personal/dead) + no archive ⇒ <strong>deactivated</strong>{" "}
+            (manual entry still allowed); a transient Meta failure ⇒{" "}
+            <strong>error</strong> (retry). Badge: &quot;Not fetchable&quot; /
+            &quot;Fetch failed&quot;.
           </li>
         </KMList>
+      </KMSection>
+
+      <KMSection tag="Rate gate (batch of 50 + cooldown)">
+        <KMCallout tone="info">
+          Each outbound Fetch is <strong>1 call drawn from a rolling window of
+          50</strong> (shared with the inbound batch Fetch). After 50 calls — or
+          when Meta&apos;s X-App-Usage crosses 75% — the server opens a{" "}
+          <strong>cooldown</strong> and further fetches are paused with a retry
+          countdown. State lives in{" "}
+          <KMCode>app_settings.meta_fetch_window</KMCode>; logic in{" "}
+          <KMCode>lib/meta-rate-limit.ts</KMCode> (mirrors{" "}
+          <KMCode>ig_fetching.py</KMCode>). The token is READ-ONLY — we never
+          write to Meta.
+        </KMCallout>
       </KMSection>
 
       <KMSection tag="Fields written (submit)">

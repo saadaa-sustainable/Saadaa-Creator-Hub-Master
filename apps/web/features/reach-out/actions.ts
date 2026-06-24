@@ -7,6 +7,13 @@ import { ReachOutSchema } from "./schema";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
+import {
+  fetchBusinessDiscovery,
+  fetchBusinessDiscoveryBatch,
+  META_BATCH_SIZE,
+  type MetaDiscoveryResult,
+} from "@/lib/meta-graph";
+import { checkMetaGate, recordMetaUsage } from "@/lib/meta-rate-limit";
 import { isVoidedStatus } from "@/lib/workflow";
 import {
   NOTIFICATION_TYPES,
@@ -200,6 +207,9 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
         avg_likes: v.avgLikes ?? null,
         language: v.language ?? null,
         verification: v.verification === "Pending" ? null : v.verification,
+        // Legacy IG numeric profile id from the Meta/historic lookup — lets a
+        // returning handle be recognised even if it changes username later.
+        ...(v.profileId ? { profile_id: v.profileId } : {}),
       })
       .eq("inf_id", row.inf_id);
   }
@@ -454,13 +464,22 @@ export async function editReachOut(
 
 export interface CreatorLookupHit {
   /**
-   * creator         — row already in `creators`
-   * instagram_cache — row in `instagram_cache` (populated by Apify 3-hr cron)
-   * queued          — fresh handle, no cache hit yet; Apify 3-hr cron will fetch
+   * creator     — row already in `creators` (existing relationship → submit blocked,
+   *               guided to Onboarding for a repeat collab)
+   * meta        — live Meta business_discovery hit (instant; the normal new-creator path)
+   * historic    — Meta failed but we have the handle in ig_data_historic (cached metrics)
+   * deactivated — Meta says "Cannot find User" (personal/dead) and no historic data;
+   *               not fetchable → label deactivated, manual entry still allowed
+   * error       — transient Meta failure (rate-block/token/network) with no historic
+   *               fallback; let the user retry or enter manually
    */
-  source: "creator" | "instagram_cache" | "queued";
+  source: "creator" | "meta" | "historic" | "deactivated" | "error";
   username: string;
   inf_id?: string;
+  /** Legacy IG numeric profile id (Meta `ig_id` / historic). Persisted on submit. */
+  profile_id?: string | null;
+  /** Historic legacy SIF for this handle (from cleaned_data), if any. */
+  historic_sif?: string | null;
   inf_name: string | null;
   instagram_link: string | null;
   followers: number | null;
@@ -471,6 +490,8 @@ export interface CreatorLookupHit {
   language: string | null;
   profile_pic: string | null;
   verification: "Yes" | "No" | null;
+  /** Optional human note for non-data tiers (deactivated/error). */
+  note?: string | null;
 }
 
 /** Derive Nano/Micro/Mid-tier/Macro/Mega from follower count (matches creators.category). */
@@ -506,6 +527,8 @@ function creatorLookupFromRow(
     username: String(creatorRow.username ?? username),
     inf_id:
       typeof creatorRow.inf_id === "string" ? creatorRow.inf_id : undefined,
+    profile_id: str("profile_id"),
+    historic_sif: str("historic_sif"),
     inf_name: str("inf_name") ?? str("full_name"),
     instagram_link:
       str("instagram_link") ?? `https://www.instagram.com/${username}/`,
@@ -525,13 +548,131 @@ function creatorLookupFromRow(
   };
 }
 
+interface HistRow {
+  profile_id: string | null;
+  followers: number | null;
+  avg_likes: number | null;
+  image_url: string | null;
+}
+interface CleanRow {
+  sif_id: string | null;
+  gender: string | null;
+  profile_id: string | null;
+  profile_status: string | null;
+}
+
+/**
+ * Build a non-creator lookup hit from a Meta result + historic fallback rows.
+ * Shared by the single (outbound) and batch (inbound) lookups so both tier the
+ * same way: meta → historic → deactivated (Meta not-found) → error (transient).
+ * Does NOT touch the creators table — the caller handles existing-creator checks.
+ */
+function assembleNonCreatorHit(
+  username: string,
+  link: string,
+  meta: MetaDiscoveryResult,
+  hist: HistRow | null,
+  clean: CleanRow | null,
+): CreatorLookupHit {
+  const historicSif = clean?.sif_id ?? null;
+  const historicGender = clean?.gender ?? null;
+
+  if (meta.status === "ok" && meta.node) {
+    const n = meta.node;
+    const followers = n.followers ?? hist?.followers ?? null;
+    return {
+      source: "meta",
+      username,
+      profile_id: n.ig_id ?? hist?.profile_id ?? clean?.profile_id ?? null,
+      historic_sif: historicSif,
+      inf_name: n.name,
+      instagram_link: link,
+      followers,
+      gender: historicGender,
+      category: tierFor(followers),
+      er: n.er,
+      avg_likes: n.avg_likes ?? hist?.avg_likes ?? null,
+      language: null,
+      profile_pic: n.profile_pic ?? hist?.image_url ?? null,
+      verification: null,
+    };
+  }
+
+  // Meta missed but we have archived data → serve cached legacy metrics.
+  if (hist?.profile_id || hist?.followers != null || hist?.image_url) {
+    return {
+      source: "historic",
+      username,
+      profile_id: hist.profile_id ?? clean?.profile_id ?? null,
+      historic_sif: historicSif,
+      inf_name: null,
+      instagram_link: link,
+      followers: hist.followers ?? null,
+      gender: historicGender,
+      category: tierFor(hist.followers ?? null),
+      er: null,
+      avg_likes: hist.avg_likes ?? null,
+      language: null,
+      profile_pic: hist.image_url ?? null,
+      verification: null,
+      note:
+        meta.status === "notfound"
+          ? "Live fetch unavailable (private/personal account) — showing last known data."
+          : "Live fetch failed — showing last known data. You can retry.",
+    };
+  }
+
+  // No data anywhere. Meta not-found ⇒ deactivated (manual entry ok). Transient
+  // error ⇒ error (never mark a possibly-live account deactivated on a hiccup).
+  if (meta.status === "notfound") {
+    return {
+      source: "deactivated",
+      username,
+      profile_id: clean?.profile_id ?? null,
+      historic_sif: historicSif,
+      inf_name: null,
+      instagram_link: link,
+      followers: null,
+      gender: historicGender,
+      category: null,
+      er: null,
+      avg_likes: null,
+      language: null,
+      profile_pic: null,
+      verification: null,
+      note: "Couldn’t fetch this profile (private, personal, or deactivated). Enter details manually to continue.",
+    };
+  }
+
+  return {
+    source: "error",
+    username,
+    profile_id: clean?.profile_id ?? null,
+    historic_sif: historicSif,
+    inf_name: null,
+    instagram_link: link,
+    followers: null,
+    gender: historicGender,
+    category: null,
+    er: null,
+    avg_likes: null,
+    language: null,
+    profile_pic: null,
+    verification: null,
+    note: meta.error
+      ? `Live fetch failed (${meta.error}). Retry, or enter details manually.`
+      : "Live fetch failed. Retry, or enter details manually.",
+  };
+}
+
 /**
  * Cache-first lookup using service-role (bypasses RLS — already gated by
- * assertPermission). Mirrors legacy `fetchInstagramDataForReachOut`:
- *   1. creators (existing relationship) → return
- *   2. instagram_cache (Apify 3-hr sync) → return
- *   3. otherwise queue: insert empty cache row with ig_status='pending'
- *      so the next 3-hr trigger picks it up.
+ * assertPermission). INSTANT — no Apify wait:
+ *   1. creators (existing relationship) → return source "creator" (submit blocked)
+ *   2. Meta business_discovery (live) → source "meta" (+ historic/cleaned_data enrich)
+ *   3. Meta missed but archived → source "historic" (cached legacy metrics)
+ *   4. Meta "Cannot find User" + no archive → source "deactivated" (manual entry ok);
+ *      transient Meta error + no archive → source "error" (retry / manual).
  */
 export async function lookupCreator(
   usernameOrUrl: string,
@@ -562,121 +703,72 @@ export async function lookupCreator(
     );
   }
 
-  // 2. instagram_cache — supports both flat columns (legacy mirror) and
-  //    profile_data jsonb (KB-spec). Read everything, prefer flat values.
-  const { data: cachedAny } = await supabase
-    .from("instagram_cache")
-    .select("*")
-    .eq("username", username)
-    .maybeSingle();
+  // Historic fallback data for this handle (used by every tier below). One read
+  // each: ig_data_historic (legacy profile_id + cached followers/avg_likes/pic)
+  // and cleaned_data (the legacy SIF, skipping SIF_ERROR audit markers + gender).
+  const link = `https://www.instagram.com/${username}/`;
+  const [{ data: histRow }, { data: cleanRow }] = await Promise.all([
+    supabase
+      .from("ig_data_historic")
+      .select("profile_id, followers, avg_likes, image_url")
+      .eq("username", username)
+      .maybeSingle(),
+    supabase
+      .from("cleaned_data")
+      .select("sif_id, gender, profile_id, profile_status")
+      .eq("username", username)
+      .neq("sif_id", "SIF_ERROR")
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const hist = histRow as {
+    profile_id: string | null;
+    followers: number | null;
+    avg_likes: number | null;
+    image_url: string | null;
+  } | null;
+  const clean = cleanRow as {
+    sif_id: string | null;
+    gender: string | null;
+    profile_id: string | null;
+    profile_status: string | null;
+  } | null;
+  const historicSif = clean?.sif_id ?? null;
+  const historicGender = clean?.gender ?? null;
 
-  const cached = cachedAny as Record<string, unknown> | null;
-
-  if (cached) {
-    // jsonb fallback — actual live column is `raw_json` (Apify response);
-    // KB-spec also mentioned `profile_data` and `ig_data`. Read whichever exists.
-    const p = (cached.raw_json ??
-      cached.profile_data ??
-      cached.ig_data ??
-      {}) as Record<string, unknown>;
-    const num = (...keys: string[]): number | null => {
-      for (const k of keys) {
-        const v = cached[k] ?? p[k];
-        if (v == null) continue;
-        if (typeof v === "number") return v;
-        const n = Number(v);
-        if (!Number.isNaN(n)) return n;
-      }
-      return null;
+  // 2. Meta business_discovery — INSTANT live fetch (replaces the Apify 3-hr path),
+  //    gated by the rolling batch-of-50 cooldown. When cooling down we DON'T hit
+  //    Meta — historic / deactivated / error tiers cover the request.
+  const gate = await checkMetaGate();
+  let meta: MetaDiscoveryResult;
+  if (gate.coolingDown) {
+    meta = {
+      status: "error",
+      error: `rate-limit cooldown — retry in ${gate.retryAfterSec}s`,
     };
-    const str = (...keys: string[]): string | null => {
-      for (const k of keys) {
-        const v = cached[k] ?? p[k];
-        if (typeof v === "string" && v.length > 0) return v;
-      }
-      return null;
-    };
-    const bool = (...keys: string[]): boolean | null => {
-      for (const k of keys) {
-        const v = cached[k] ?? p[k];
-        if (v === true || v === "Yes" || v === "true" || v === 1 || v === "1")
-          return true;
-        if (v === false || v === "No" || v === "false" || v === 0 || v === "0")
-          return false;
-      }
-      return null;
-    };
+  } else {
+    meta = await fetchBusinessDiscovery(username);
+    await recordMetaUsage(1, meta.usagePct ?? 0);
+  }
 
-    const followers = num("followers", "followersCount", "followers_count");
-    const profilePic = str(
-      "profile_pic",
-      "pic",
-      "profilePicUrl",
-      "profile_pic_url",
-      "profilePicUrlHD",
-    );
-    const cachedStatus =
-      typeof cached.status === "string"
-        ? (cached.status as string).toLowerCase()
-        : "";
-    const name = str("name", "fullName", "inf_name", "full_name");
-
-    const hasMeaningfulData =
-      followers != null || profilePic != null || name != null;
-
-    if (hasMeaningfulData && cachedStatus !== "pending") {
-      const verified = bool("is_verified", "verified", "isVerified");
-      return {
-        source: "instagram_cache",
-        username,
-        inf_name: name,
-        instagram_link:
-          str("insta_link", "instagram_link", "url") ??
-          `https://www.instagram.com/${username}/`,
-        followers,
-        gender: null,
-        category: tierFor(followers),
-        er: num("er", "engagementRate", "engagement_rate"),
-        avg_likes: num(
-          "avg_likes",
-          "averageLikes",
-          "avgLikes",
-          "average_likes",
-        ),
-        language: null,
-        profile_pic: profilePic,
-        verification:
-          verified === true ? "Yes" : verified === false ? "No" : null,
-      };
+  // Returning creator who CHANGED their handle: username missed tier 1, but the
+  // legacy profile_id matches → treat as an existing creator (submit blocked).
+  if (meta.status === "ok" && meta.node?.ig_id) {
+    const { data: byPid } = await supabase
+      .from("creators")
+      .select("*")
+      .eq("profile_id", meta.node.ig_id)
+      .maybeSingle();
+    if (byPid) {
+      const r = byPid as Record<string, unknown>;
+      return creatorLookupFromRow(
+        typeof r.username === "string" ? r.username : username,
+        r,
+      );
     }
   }
 
-  // 3. QUEUE — fresh handle, no cache hit yet. Upsert a pending row; the
-  //    `scrape-pending-apify` Supabase Edge Function picks these up on a
-  //    3-hour cron, calls Apify, and writes the result back. If Apify itself
-  //    exhausts retries, that Edge Function logs an `apify_fail` entry to
-  //    `system_errors`, which surfaces in the Error Portal.
-  await (supabase as any)
-    .from("instagram_cache")
-    .upsert(
-      { username, status: "pending", scraped_at: null },
-      { onConflict: "username" },
-    );
-
-  return {
-    source: "queued",
-    username,
-    inf_name: null,
-    instagram_link: `https://www.instagram.com/${username}/`,
-    followers: null,
-    gender: null,
-    category: null,
-    er: null,
-    avg_likes: null,
-    language: null,
-    profile_pic: null,
-    verification: null,
-  };
+  return assembleNonCreatorHit(username, link, meta, hist, clean);
 }
 
 export async function lookupCreatorsFromDataset(
@@ -719,4 +811,151 @@ export async function lookupCreatorsFromDataset(
   }
 
   return hits;
+}
+
+export interface BatchLookupResult {
+  /** keyed by lowercased handle. */
+  hits: Record<string, CreatorLookupHit>;
+  /** the rate gate opened a cooldown (or was already cooling). */
+  coolingDown: boolean;
+  retryAfterSec: number;
+  /** how many handles were actually sent to Meta in this call. */
+  fetched: number;
+}
+
+/**
+ * Bulk Reach Out lookup — ONE Meta Batch POST for up to 50 handles (the inbound
+ * Fetch-all button). Mirrors ig_fetching.py's batch model: each call consumes one
+ * batch worth of the rolling rate window, then the gate may open a cooldown.
+ *
+ * Per handle, tiers identically to the single lookupCreator:
+ *   creators (by username, then by Meta profile_id) → meta → historic → deactivated/error.
+ * The caller (inbound form) should pass at most META_BATCH_SIZE (50) handles; any
+ * beyond 50 are NOT Meta-fetched this call (they fall to historic/error) so the
+ * form can chunk + respect the cooldown between chunks.
+ */
+export async function lookupCreatorsBatch(
+  usernameOrUrls: string[],
+  permission: "reachout_outbound" | "reachout_inbound" = "reachout_inbound",
+): Promise<BatchLookupResult> {
+  await assertPermission(permission);
+
+  const handles = Array.from(
+    new Set(usernameOrUrls.map(extractUsernameFromInput).filter(Boolean)),
+  );
+  if (handles.length === 0) {
+    return { hits: {}, coolingDown: false, retryAfterSec: 0, fetched: 0 };
+  }
+
+  const supabase = createServiceClient();
+  const hits: Record<string, CreatorLookupHit> = {};
+
+  // Tier 1 — existing creators by username (one query).
+  const { data: creatorRows } = await supabase
+    .from("creators")
+    .select("*")
+    .in("username", handles);
+  const creatorByUser = new Map<string, Record<string, unknown>>();
+  for (const row of (creatorRows ?? []) as Record<string, unknown>[]) {
+    const u =
+      typeof row.username === "string" ? row.username.toLowerCase() : "";
+    if (u) creatorByUser.set(u, row);
+  }
+  for (const h of handles) {
+    const row = creatorByUser.get(h);
+    if (row) hits[h] = creatorLookupFromRow(h, row);
+  }
+
+  const remaining = handles.filter((h) => !creatorByUser.has(h));
+  if (remaining.length === 0) {
+    return { hits, coolingDown: false, retryAfterSec: 0, fetched: 0 };
+  }
+
+  // Historic fallback rows (bulk) for the remaining handles.
+  const [{ data: histRows }, { data: cleanRows }] = await Promise.all([
+    supabase
+      .from("ig_data_historic")
+      .select("username, profile_id, followers, avg_likes, image_url")
+      .in("username", remaining),
+    supabase
+      .from("cleaned_data")
+      .select("username, sif_id, gender, profile_id, profile_status")
+      .neq("sif_id", "SIF_ERROR")
+      .in("username", remaining),
+  ]);
+  const histByUser = new Map<string, HistRow>();
+  for (const r of (histRows ?? []) as (HistRow & { username: string })[]) {
+    const u = (r.username ?? "").toLowerCase();
+    if (u && !histByUser.has(u)) histByUser.set(u, r);
+  }
+  const cleanByUser = new Map<string, CleanRow>();
+  for (const r of (cleanRows ?? []) as (CleanRow & { username: string })[]) {
+    const u = (r.username ?? "").toLowerCase();
+    if (u && !cleanByUser.has(u)) cleanByUser.set(u, r);
+  }
+
+  // Tier 2 — ONE Meta batch (≤50), gated by the rolling cooldown.
+  const gate = await checkMetaGate();
+  const metaByUser = new Map<string, MetaDiscoveryResult>();
+  let coolingDown = gate.coolingDown;
+  let retryAfterSec = gate.retryAfterSec;
+  let fetched = 0;
+  if (!gate.coolingDown) {
+    const batch = remaining.slice(0, META_BATCH_SIZE);
+    const { results, usagePct } = await fetchBusinessDiscoveryBatch(batch);
+    batch.forEach((h, i) => metaByUser.set(h, results[i]));
+    fetched = batch.length;
+    const after = await recordMetaUsage(batch.length, usagePct);
+    coolingDown = after.coolingDown;
+    retryAfterSec = after.retryAfterSec;
+  }
+
+  // Changed-handle existing-creator check: bulk creators by Meta profile_id.
+  const pids = Array.from(metaByUser.values())
+    .map((m) => m.node?.ig_id)
+    .filter((p): p is string => Boolean(p));
+  const creatorByPid = new Map<string, Record<string, unknown>>();
+  if (pids.length > 0) {
+    const { data: pidRows } = await supabase
+      .from("creators")
+      .select("*")
+      .in("profile_id", pids);
+    for (const row of (pidRows ?? []) as Record<string, unknown>[]) {
+      const p = row.profile_id;
+      if (typeof p === "string") creatorByPid.set(p, row);
+    }
+  }
+
+  for (const h of remaining) {
+    if (hits[h]) continue;
+    const meta = metaByUser.get(h);
+    if (meta?.status === "ok" && meta.node?.ig_id) {
+      const row = creatorByPid.get(meta.node.ig_id);
+      if (row) {
+        hits[h] = creatorLookupFromRow(
+          typeof row.username === "string" ? row.username : h,
+          row,
+        );
+        continue;
+      }
+    }
+    const link = `https://www.instagram.com/${h}/`;
+    const effMeta: MetaDiscoveryResult =
+      meta ??
+      (gate.coolingDown
+        ? {
+            status: "error",
+            error: `rate-limit cooldown — retry in ${gate.retryAfterSec}s`,
+          }
+        : { status: "error", error: "not fetched in this batch (over 50)" });
+    hits[h] = assembleNonCreatorHit(
+      h,
+      link,
+      effMeta,
+      histByUser.get(h) ?? null,
+      cleanByUser.get(h) ?? null,
+    );
+  }
+
+  return { hits, coolingDown, retryAfterSec, fetched };
 }

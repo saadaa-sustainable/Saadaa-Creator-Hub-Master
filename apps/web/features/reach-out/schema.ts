@@ -65,6 +65,9 @@ export const ReachOutSchema = z.object({
   language: z.enum(LANGUAGES),
   er: z.coerce.number().nonnegative().optional(),
   avgLikes: z.coerce.number().nonnegative().optional(),
+  // Legacy IG numeric profile id from the Meta/historic lookup. Hidden field —
+  // persisted onto the new creators row so a returning handle is recognisable.
+  profileId: z.string().trim().optional(),
 });
 
 export type ReachOutInput = z.infer<typeof ReachOutSchema>;
@@ -82,4 +85,5 @@ export const REACHOUT_DEFAULTS: ReachOutInput = {
   language: "English",
   er: undefined,
   avgLikes: undefined,
+  profileId: undefined,
 };

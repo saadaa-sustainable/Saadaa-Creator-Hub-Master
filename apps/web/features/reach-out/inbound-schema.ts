@@ -28,6 +28,9 @@ export const InboundRowSchema = z.object({
   // Inbound is always Barter / ₹0 — defaulted, not collected in the UI.
   collabType: z.enum(INBOUND_COLLAB_TYPES).default("Barter"),
   commercials: z.coerce.number().min(0).default(0),
+  // Legacy IG numeric profile id from the Meta/historic Fetch — persisted on the
+  // new creators row. Optional (a not-fetchable handle may have none).
+  profileId: z.string().trim().optional(),
 });
 export type InboundRowInput = z.infer<typeof InboundRowSchema>;
 
@@ -51,6 +54,7 @@ export function makeInboundRow(
       prefill.commercials != null && !Number.isNaN(prefill.commercials)
         ? prefill.commercials
         : 0,
+    profileId: prefill.profileId,
   };
 }
 

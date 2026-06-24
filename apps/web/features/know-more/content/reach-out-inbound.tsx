@@ -97,8 +97,31 @@ export default function ReachOutInboundKM() {
             content_type, campaign_id, nomenclature, all per-row fields above.
           </li>
           <li>
-            <strong>instagram_cache</strong> · pending row enqueued per row
-            for the 3-hr Apify cron (idempotent upsert).
+            <strong>profile_id</strong> · the legacy IG numeric id from the
+            Meta/historic Fetch is stored on each new creator (recognises a
+            returning handle later).
+          </li>
+        </KMList>
+      </KMSection>
+
+      <KMSection tag="Fetch (bulk, Meta batch of 50)">
+        <KMList>
+          <li>
+            <strong>Fetch button</strong> pulls every unresolved row live from
+            Instagram in ONE Meta Batch call (≤50 sub-requests — the{" "}
+            <KMCode>ig_fetching.py</KMCode> model). More than 50 rows? Click
+            Fetch again for the next batch.
+          </li>
+          <li>
+            <strong>Fetch-before-submit is a validation rule</strong> — a row
+            with a profile URL must be fetched (live, cached, or a definitive
+            not-fetchable result) before the batch will submit.
+          </li>
+          <li>
+            <strong>Rate gate</strong> — the 50-call window is shared with the
+            outbound Fetch; after 50 calls (or X-App-Usage ≥ 75%) a cooldown
+            pauses fetching with a retry countdown.{" "}
+            <KMCode>lib/meta-rate-limit.ts</KMCode>.
           </li>
         </KMList>
       </KMSection>

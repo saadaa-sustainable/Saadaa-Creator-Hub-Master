@@ -56,7 +56,7 @@ interface OutboundFormProps {
   initialCampaignId?: string;
 }
 
-type LookupState = "idle" | "loading" | "found" | "queued";
+type LookupState = "idle" | "loading" | "found";
 
 export function OutboundForm({
   campaigns,
@@ -108,18 +108,23 @@ export function OutboundForm({
   const contentType = watch("contentType");
 
   const categoryTier = tierFromFollowers(followers) ?? hit?.category ?? "";
+  // A resolved profile = live Meta hit or cached historic data (fields prefilled).
   const hasResolvedProfile =
-    lookupState === "found" && hit && hit.source !== "queued";
-  const isQueued = lookupState === "queued";
-  // Existing creator — identity-level fields lock (gender, language, name).
-  // Metrics that drift over time (followers, ER, avg likes) ONLY lock when
-  // the lookup actually returned a value (cache hit). Creators rows never
-  // return these any more, so existing-creator forms keep them editable.
+    lookupState === "found" &&
+    !!hit &&
+    (hit.source === "meta" || hit.source === "historic");
+  // Not fetchable — personal/deactivated or a transient fetch error. Manual entry
+  // is allowed; nothing is locked and a note is shown.
+  const isNotFetchable =
+    hit?.source === "deactivated" || hit?.source === "error";
+  // Existing creator (by username OR legacy profile_id) — submit is blocked and
+  // the user is guided to Onboarding for a repeat collab.
   const isExistingCreator = hit?.source === "creator";
-  const lockName = !!(hasResolvedProfile && hit?.inf_name != null) || isQueued;
-  const lockFollowers = !!(hasResolvedProfile && hit?.followers != null) || isQueued;
-  const lockEr = !!(hasResolvedProfile && hit?.er != null) || isQueued;
-  const lockAvgLikes = !!(hasResolvedProfile && hit?.avg_likes != null) || isQueued;
+  // Fetched metrics lock only when the lookup actually returned a value.
+  const lockName = !!(hasResolvedProfile && hit?.inf_name != null);
+  const lockFollowers = !!(hasResolvedProfile && hit?.followers != null);
+  const lockEr = !!(hasResolvedProfile && hit?.er != null);
+  const lockAvgLikes = !!(hasResolvedProfile && hit?.avg_likes != null);
   const isAutoDetected =
     hasResolvedProfile && hit?.verification != null && !verificationOverridden;
 
@@ -150,7 +155,7 @@ export function OutboundForm({
         return;
       }
       setHit(result);
-      setLookupState(result.source === "queued" ? "queued" : "found");
+      setLookupState("found");
 
       // Reset auto-fillable fields before applying new lookup — stops stale
       // data from a prior fetch (e.g. previous creator's name) from sticking.
@@ -185,10 +190,19 @@ export function OutboundForm({
       setValue("instagramLink", result.instagram_link ?? cleaned, {
         shouldDirty: true,
       });
-      if (result.source === "queued") {
-        // Queued — metrics will arrive via 3-hr cron. Pre-fill name with
-        // username so schema validation passes; all metric fields are disabled.
+
+      // Carry the legacy profile_id through to submit (hidden field) so the new
+      // creators row stores it. Always set (clears stale value on a fresh fetch).
+      setValue("profileId", result.profile_id ?? "", { shouldDirty: false });
+
+      if (result.source === "deactivated" || result.source === "error") {
+        // Personal/deactivated or a transient error — seed name with the handle
+        // so the form is usable; the user fills the rest manually.
         setValue("influencerName", result.username ?? "", { shouldDirty: true });
+        if (result.gender) {
+          const g = result.gender as ReachOutInput["gender"];
+          if (GENDERS.includes(g)) set("gender", g);
+        }
       } else {
         set("influencerName", result.inf_name);
         if (result.followers != null) set("followers", result.followers as never);
@@ -212,10 +226,14 @@ export function OutboundForm({
       else setValue("verification", "Pending", { shouldDirty: true });
 
       if (result.source === "creator")
-        toast.success("Loaded from Creator Data");
-      else if (result.source === "instagram_cache")
-        toast.success("Loaded from Instagram Cache");
-      else toast.info("Queued for the 3-hour Instagram trigger");
+        toast.success("Loaded from Creator Data — existing creator");
+      else if (result.source === "meta")
+        toast.success("Fetched live from Instagram");
+      else if (result.source === "historic")
+        toast.success("Loaded last known data");
+      else if (result.source === "deactivated")
+        toast.warning(result.note ?? "Couldn’t fetch — enter details manually");
+      else toast.error(result.note ?? "Fetch failed — retry or enter manually");
     });
   };
 
@@ -232,6 +250,7 @@ export function OutboundForm({
     language: "Primary Language",
     er: "Engagement Rate",
     avgLikes: "Avg Likes",
+    profileId: "Profile ID",
   };
 
   // Schema-driven missing-fields scan. Runs ReachOutSchema.safeParse against
@@ -460,16 +479,16 @@ export function OutboundForm({
               <p className="mt-1 text-[0.72rem] text-text-tertiary flex items-center gap-1">
                 <AlertCircle className="h-3 w-3 shrink-0" aria-hidden />
                 <span className="hidden sm:inline">
-                  Creator Data is checked first, then Instagram Cache/API. Full
-                  name, followers, ER, category, and profile image auto-fill
-                  when available.
+                  Existing creators are checked first, then fetched live from
+                  Instagram. Full name, followers, ER, category, and profile
+                  image auto-fill when available.
                 </span>
                 <span className="sm:hidden">Auto-fills when available.</span>
                 <button
                   type="button"
                   className="mobile-field-tooltip sm:hidden"
                   aria-label="Instagram lookup details"
-                  title="Creator Data is checked first, then Instagram Cache/API. Full name, followers, ER, category, and profile image auto-fill when available."
+                  title="Existing creators are checked first, then fetched live from Instagram. Full name, followers, ER, category, and profile image auto-fill when available."
                 >
                   <Info aria-hidden />
                 </button>
@@ -480,18 +499,18 @@ export function OutboundForm({
                   <span className="icon-disc">
                     <Layers className="h-3 w-3" aria-hidden />
                   </span>
-                  {hit?.source === "creator"
-                    ? "Existing creator — reach-out blocked. Use Onboarding to start a repeat collab (C2+)."
-                    : "Loaded from Instagram Cache — metrics filled from latest scrape."}
+                  {hit?.source === "meta"
+                    ? "Fetched live from Instagram — metrics filled from the latest data."
+                    : "Loaded last known data — live fetch unavailable, showing the most recent archived metrics."}
                 </p>
               )}
-              {isQueued && (
+              {isNotFetchable && (
                 <p className="loaded-from-line queued">
                   <span className="icon-disc">
-                    <Clock className="h-3 w-3" aria-hidden />
+                    <AlertCircle className="h-3 w-3" aria-hidden />
                   </span>
-                  Queued for the 3-hour Instagram trigger. Fill the fields below
-                  manually for now.
+                  {hit?.note ??
+                    "Couldn’t fetch this profile (private, personal, or deactivated). Fill the fields below manually to continue."}
                 </p>
               )}
               {errors.instagramLink && (
@@ -513,7 +532,7 @@ export function OutboundForm({
                 <label htmlFor="ro_name">
                   Full Name <span className="req">*</span>
                 </label>
-                {lockName && <span className="autofill-badge">{isQueued ? "PENDING" : "AUTO"}</span>}
+                {lockName && <span className="autofill-badge">"AUTO"</span>}
               </div>
 
               <div className="form-floating relative">
@@ -529,7 +548,7 @@ export function OutboundForm({
                 <label htmlFor="ro_followers">
                   Followers <span className="req">*</span>
                 </label>
-                {lockFollowers && <span className="autofill-badge">{isQueued ? "PENDING" : "AUTO"}</span>}
+                {lockFollowers && <span className="autofill-badge">"AUTO"</span>}
               </div>
 
               <div className="form-floating sm:col-span-2">
@@ -577,23 +596,29 @@ export function OutboundForm({
                         "ig-source-badge",
                         hit.source === "creator"
                           ? "ig-source-creator"
-                          : hit.source === "instagram_cache"
+                          : hit.source === "meta" || hit.source === "historic"
                             ? "ig-source-cache"
                             : "ig-source-queued",
                       )}
                     >
                       {hit.source === "creator" ? (
                         <Layers className="h-3 w-3" />
-                      ) : hit.source === "instagram_cache" ? (
+                      ) : hit.source === "meta" ? (
+                        <InstagramIcon className="h-3 w-3" />
+                      ) : hit.source === "historic" ? (
                         <Database className="h-3 w-3" />
                       ) : (
-                        <Clock className="h-3 w-3" />
+                        <AlertCircle className="h-3 w-3" />
                       )}
                       {hit.source === "creator"
                         ? "From Records"
-                        : hit.source === "instagram_cache"
-                          ? "From Cache"
-                          : "Queued · 3hr"}
+                        : hit.source === "meta"
+                          ? "Live"
+                          : hit.source === "historic"
+                            ? "Last known"
+                            : hit.source === "deactivated"
+                              ? "Not fetchable"
+                              : "Fetch failed"}
                     </span>
                     <div className="ig-card-name">
                       {hit.inf_name ?? hit.username}
@@ -751,23 +776,21 @@ export function OutboundForm({
                       <Clock className="h-3.5 w-3.5" aria-hidden />
                     </span>
                     <div className="label-stack">
-                      <div className="primary">Auto-Detect Pending</div>
+                      <div className="primary">Verification Pending</div>
                       <div className="meta">
-                        3-hour trigger will fetch from Instagram
+                        Set manually or mark verified
                       </div>
                     </div>
-                    {!isQueued && (
-                      <button
-                        type="button"
-                        className="override-btn"
-                        onClick={() => {
-                          setVerificationOverridden(true);
-                          field.onChange("Verified");
-                        }}
-                      >
-                        Override
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className="override-btn"
+                      onClick={() => {
+                        setVerificationOverridden(true);
+                        field.onChange("Verified");
+                      }}
+                    >
+                      Override
+                    </button>
                   </div>
                 ) : (
                   <div className="verification-toggle-wrap">
@@ -876,7 +899,7 @@ export function OutboundForm({
                 readOnly={lockEr}
               />
               <label htmlFor="ro_er">Eng. Rate %</label>
-              {lockEr && <span className="autofill-badge">{isQueued ? "PENDING" : "AUTO"}</span>}
+              {lockEr && <span className="autofill-badge">"AUTO"</span>}
             </div>
             <div className="form-floating relative">
               <input
@@ -888,7 +911,7 @@ export function OutboundForm({
                 readOnly={lockAvgLikes}
               />
               <label htmlFor="ro_likes">Avg Likes</label>
-              {lockAvgLikes && <span className="autofill-badge">{isQueued ? "PENDING" : "AUTO"}</span>}
+              {lockAvgLikes && <span className="autofill-badge">"AUTO"</span>}
             </div>
           </div>
         </div>
