@@ -75,3 +75,13 @@ create unique index if not exists creators_sif_number_unique on creators (sif_nu
 -- 4. submit_reachout: next SIF = max(sif_number)+1, and stamp sif_number on new creators.
 --    (Full function body in submit_reachout_use_sif_number_counter — only the SIF-gen +
 --    creator insert changed; the rest is identical to 2026_06_06_submit_reachout_collab_id.)
+
+-- 5. (REVERTED) A contiguous renumber of inf_id to SIF-1..N was briefly applied then
+--    REVERTED — the user clarified they did NOT want the SIFs renumbered, only the
+--    table VIEW sorted ascending. So inf_id KEEPS the historic SIF. NET STATE after
+--    migrations creators_renumber_inf_id_contiguous + creators_revert_renumber_restore_
+--    historic_sif: inf_id = historic SIF (gappy, frozen for ad-name matching),
+--    sif_number = its numeric part. Sorting creators by sif_number ASC reads
+--    SIF-1, SIF-2, SIF-3, ... (low end is contiguous) — a Table-Editor view setting,
+--    not a data change. Next new creator = SIF-{max(sif_number)+1} = SIF-9633.
+
