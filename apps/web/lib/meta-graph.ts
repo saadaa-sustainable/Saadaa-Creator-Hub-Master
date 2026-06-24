@@ -200,7 +200,7 @@ export async function fetchIgVerified(handle: string): Promise<boolean | null> {
   if (!clean) return null;
   try {
     const res = await fetch(
-      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(clean)}`,
+      `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(clean)}`,
       {
         headers: {
           "x-ig-app-id": "936619743392459",
@@ -209,16 +209,24 @@ export async function fetchIgVerified(handle: string): Promise<boolean | null> {
           accept: "*/*",
         },
         cache: "no-store",
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(6000),
       },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Almost always IG blocking the server's data-center IP (401/429). Logged so
+      // it's visible in the Vercel runtime logs; caller falls back to manual.
+      console.warn(`[fetchIgVerified] ${clean} HTTP ${res.status} (likely IP block)`);
+      return null;
+    }
     const j = (await res.json()) as {
       data?: { user?: { is_verified?: boolean } };
     };
     const v = j?.data?.user?.is_verified;
     return typeof v === "boolean" ? v : null;
-  } catch {
+  } catch (e) {
+    console.warn(
+      `[fetchIgVerified] ${clean} failed: ${e instanceof Error ? e.name : "err"}`,
+    );
     return null;
   }
 }
