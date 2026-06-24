@@ -58,9 +58,18 @@ Mode decided in `Deno.serve`: reads `searchParams.get("order_id")`, falls back t
 
 ---
 
-## 2. Edge Function — `scrape-pending-apify`
+## 2. Edge Function — `scrape-pending-apify` — ⚠️ REMOVED 2026-06-24
 
-`supabase/functions/scrape-pending-apify/index.ts`
+**RIPPED OUT.** Reach Out now fetches LIVE via Meta `business_discovery` on the
+Fetch click (`apps/web/lib/meta-graph.ts` + `lib/meta-rate-limit.ts`). Removed: the
+edge function (repo dir deleted), the pg_cron `scrape-apify-every-3h`, the
+`submitReachOut` `instagram_cache` enqueue, and `APIFY_TOKEN`/`APIFY_ACTOR_ID`.
+KEPT: the `instagram_cache` table (still read as an avatar fallback by 5 views — now
+static), the `avatars` bucket + `trg_sync_creator_avatar` (existing avatars persist;
+new creators get avatars from Meta; the 3-hr *refresh* is gone). Full restore steps:
+**`docs/APIFY-REVERT.md`**. The original section below is retained for reference.
+
+`supabase/functions/scrape-pending-apify/index.ts` (deleted — see git history)
 
 ### 2.1 Trigger mode
 

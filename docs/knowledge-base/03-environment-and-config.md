@@ -27,8 +27,8 @@ Set in **Vercel project env** (prod) and `apps/web/.env.local` (dev).
 | `GAS_MIRROR_SECRET` | `lib/sheet-mirror.ts` | HMAC-SHA256 shared secret for mirror | Optional |
 | `META_ADS_SUPABASE_URL` | `lib/supabase/meta-ads.ts` | Meta Ads warehouse (separate Supabase) URL | Optional |
 | `META_ADS_SUPABASE_SERVICE_KEY` | `lib/supabase/meta-ads.ts` | Meta Ads warehouse service key | Optional |
-| `APIFY_TOKEN` | declared `lib/env.server.ts` | Apify API token | Optional in app (actual use is the edge fn) |
-| `APIFY_ACTOR_ID` | declared `lib/env.server.ts` | Apify actor (default `apify/instagram-profile-scraper`) | Optional |
+| ~~`APIFY_TOKEN`~~ / ~~`APIFY_ACTOR_ID`~~ | **REMOVED 2026-06-24** | Apify ripped out — Reach Out fetches live via Meta `business_discovery` (`META_GRAPH_API_TOKEN` + `ID`). See `docs/APIFY-REVERT.md` |
+| `META_GRAPH_API_TOKEN` / `ID` | read via `process.env` (`lib/meta-graph.ts`) | Meta Graph token (READ-ONLY business_discovery) + own IG business id (`17841412619002528`) | Powers the Reach Out Fetch |
 | `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` | declared `lib/env.server.ts` | Google Sheets service account JSON | Optional/legacy |
 | `SPREADSHEET_ID` | declared `lib/env.server.ts` | Legacy spreadsheet id | Optional/legacy |
 

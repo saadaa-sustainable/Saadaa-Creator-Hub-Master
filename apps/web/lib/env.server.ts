@@ -23,18 +23,9 @@ const ServerEnvSchema = z.object({
   EMAIL_PASS: z.string().min(1).optional(),
   EMAIL_FROM_NAME: z.string().min(1).optional(),
 
-  /**
-   * Instagram scraping — Apify only, 3-hour cron pattern.
-   * Fresh handles in `lookupCreator` get UPSERTed into `instagram_cache`
-   * with status='pending'. The `scrape-pending-apify` Supabase Edge Function
-   * runs every 3 hours, calls Apify, and writes the result back. Apify
-   * failures land in `system_errors` (type='apify_fail') for Error Portal.
-   *
-   *  APIFY_TOKEN    = Apify API token (reuse from legacy GAS Script Properties)
-   *  APIFY_ACTOR_ID = Apify actor (e.g. apify/instagram-profile-scraper)
-   */
-  APIFY_TOKEN: z.string().min(1).optional(),
-  APIFY_ACTOR_ID: z.string().min(1).optional(),
+  // Instagram fetching is now LIVE via Meta business_discovery on the Reach Out
+  // Fetch click (lib/meta-graph.ts). The Apify 3-hr scrape path was ripped out
+  // 2026-06-24 — APIFY_TOKEN / APIFY_ACTOR_ID removed. See REVERT.md to restore.
 
   GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: z.string().min(1).optional(),
   SPREADSHEET_ID: z.string().min(1).optional(),

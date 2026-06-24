@@ -222,18 +222,8 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     { scope: "collab", table: "posts", idColumn: "post_id", ids: [row.post_id] },
   ]);
 
-  // Queue Instagram profile fetch for the 3-hr scrape-pending-apify cron.
-  // Without this enqueue, a submit that bypasses the live IG lookup widget
-  // (e.g. inbound paste-and-submit) leaves the creator with NULL followers /
-  // verification / category forever. Insert-only — never demote a row that
-  // already has scraped data back to 'pending'. The cron's stale-refresh
-  // sweep handles refreshing 'auto' rows older than 3 hours.
-  await (supabase as any)
-    .from("instagram_cache")
-    .upsert(
-      { username, status: "pending", attempts: 0, scraped_at: null },
-      { onConflict: "username", ignoreDuplicates: true },
-    );
+  // (Apify enqueue removed 2026-06-24 — Reach Out now fetches live via Meta
+  // business_discovery on the Fetch click. See REVERT.md to restore.)
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
   // See memory feedback_supabase_only_source_of_truth.md.
