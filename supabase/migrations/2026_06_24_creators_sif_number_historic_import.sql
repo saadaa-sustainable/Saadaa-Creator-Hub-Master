@@ -85,3 +85,9 @@ create unique index if not exists creators_sif_number_unique on creators (sif_nu
 --    SIF-1, SIF-2, SIF-3, ... (low end is contiguous) — a Table-Editor view setting,
 --    not a data change. Next new creator = SIF-{max(sif_number)+1} = SIF-9633.
 
+
+-- 6. Reorder the surrogate id PK so id-order == sif_number-order (lowest SIF = id 1),
+--    so the Table Editor's default (id-ordered) view reads SIF-1, SIF-2, SIF-3...
+--    inf_id UNTOUCHED. id is a plain serial w/ no FK + no app refs. Migration
+--    creators_reorder_id_by_sif_number (offset +1e8 then row_number() over sif_number;
+--    setval creators_id_seq to max). Refresh the editor to see the new order.
