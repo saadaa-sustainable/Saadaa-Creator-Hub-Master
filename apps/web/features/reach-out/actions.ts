@@ -576,6 +576,47 @@ function reportLookupIssue(hit: CreatorLookupHit): void {
   );
 }
 
+/**
+ * Persist a fetch result into instagram_cache (the "instagram fetch" record + the
+ * app's avatar fallback). Only meta/historic hits (rows that carry real data) are
+ * written — a transient error / not-found must NEVER overwrite a good cached row
+ * with nulls. Upsert by username; fire-and-forget (after()) so it never adds to
+ * the fetch latency.
+ */
+function persistFetches(
+  supabase: ReturnType<typeof createServiceClient>,
+  hits: CreatorLookupHit[],
+): void {
+  const rows = hits
+    .filter((h) => h.source === "meta" || h.source === "historic")
+    .map((h) => ({
+      username: h.username,
+      followers: h.followers,
+      er: h.er,
+      avg_likes: h.avg_likes,
+      profile_pic: h.profile_pic,
+      profile_id: h.profile_id ?? null,
+      is_verified:
+        h.verification === "Yes"
+          ? true
+          : h.verification === "No"
+            ? false
+            : null,
+      status: h.source,
+      scraped_at: new Date().toISOString(),
+    }));
+  if (rows.length === 0) return;
+  after(async () => {
+    try {
+      await (supabase as any)
+        .from("instagram_cache")
+        .upsert(rows, { onConflict: "username" });
+    } catch (e) {
+      console.error("[persistFetches]", e);
+    }
+  });
+}
+
 interface HistRow {
   profile_id: string | null;
   followers: number | null;
@@ -799,6 +840,7 @@ export async function lookupCreator(
   const hit = assembleNonCreatorHit(username, link, meta, hist, clean);
   // Only report genuine fetch attempts — a cooldown defer isn't a real failure.
   if (!gate.coolingDown) reportLookupIssue(hit);
+  persistFetches(supabase, [hit]);
   return hit;
 }
 
@@ -990,6 +1032,8 @@ export async function lookupCreatorsBatch(
     // and cooldown cases — those aren't real failures).
     if (meta) reportLookupIssue(hits[h]);
   }
+
+  persistFetches(supabase, Object.values(hits));
 
   return { hits, coolingDown, retryAfterSec, fetched };
 }

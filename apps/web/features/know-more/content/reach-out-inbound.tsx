@@ -108,9 +108,13 @@ export default function ReachOutInboundKM() {
         <KMList>
           <li>
             <strong>Fetch button</strong> pulls every unresolved row live from
-            Instagram in ONE Meta Batch call (≤50 sub-requests — the{" "}
-            <KMCode>ig_fetching.py</KMCode> model). More than 50 rows? Click
-            Fetch again for the next batch.
+            Instagram via Meta Batch calls (≤50 sub-requests each — the{" "}
+            <KMCode>ig_fetching.py</KMCode> model). It <strong>auto-loops</strong>{" "}
+            in batches of 50: e.g. 70 rows → fetch 50, cool down, fetch 20 — no
+            re-click. A live progress chip shows{" "}
+            <KMCode>Fetching done/total</KMCode> + the cooldown countdown, with a{" "}
+            <strong>Stop</strong> button. Each row shows its own spinner →
+            Live / Last known / Not fetchable.
           </li>
           <li>
             <strong>Fetch-before-submit is a validation rule</strong> — a row
@@ -122,6 +126,13 @@ export default function ReachOutInboundKM() {
             outbound Fetch; after 50 calls (or X-App-Usage ≥ 75%) a cooldown
             pauses fetching with a retry countdown.{" "}
             <KMCode>lib/meta-rate-limit.ts</KMCode>.
+          </li>
+          <li>
+            <strong>Every fetch is persisted</strong> to{" "}
+            <KMCode>instagram_cache</KMCode> (followers / ER / avg likes /
+            profile_pic / profile_id / status) — the app&apos;s avatar fallback,
+            now Meta-sourced. Only meta/historic hits are written (a transient
+            error never overwrites good cached data).
           </li>
         </KMList>
       </KMSection>

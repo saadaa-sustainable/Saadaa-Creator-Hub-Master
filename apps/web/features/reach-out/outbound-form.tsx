@@ -566,7 +566,18 @@ export function OutboundForm({
           {/* RIGHT — profile preview */}
           <div className="lg:col-span-1">
             <div className="ig-profile-preview-wrap">
-              {!hit ? (
+              {lookupState === "loading" ? (
+                <div className="ig-profile-placeholder">
+                  <Loader2 className="animate-spin" aria-hidden />
+                  <p>
+                    <strong>Fetching live from Instagram…</strong>
+                  </p>
+                  <small>
+                    Takes a few seconds — Meta is pulling followers + recent
+                    posts to compute ER.
+                  </small>
+                </div>
+              ) : !hit ? (
                 <div className="ig-profile-placeholder">
                   <InstagramIcon aria-hidden />
                   <p>

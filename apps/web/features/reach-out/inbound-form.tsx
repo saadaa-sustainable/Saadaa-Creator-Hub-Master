@@ -27,6 +27,7 @@ import {
   Eye,
   Users,
   Zap,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { isInstagramProfileUrl } from "@/lib/validators";
@@ -184,6 +185,14 @@ export function InboundForm({ campaigns }: InboundFormProps) {
   );
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [profilePreview, setProfilePreview] = useState<RowLookup | null>(null);
+  // Bulk-fetch progress: how many done / total this run, the live cooldown
+  // countdown, and a cancel flag the loop checks between batches.
+  const [fetchProgress, setFetchProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const [cooldownLeft, setCooldownLeft] = useState(0);
+  const cancelFetchRef = useRef(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const lookupTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>(
     {},
@@ -378,6 +387,44 @@ export function InboundForm({ campaigns }: InboundFormProps) {
   // ig_fetching.py model). Each batch consumes a window of the rolling rate gate;
   // after 50 (or when Meta's X-App-Usage is high) the server opens a cooldown.
   const META_BATCH = 50;
+
+  // Mark a set of row ids as "loading" so they show a spinner up-front.
+  const markRowsLoading = (ids: Set<string>) => {
+    setRows((prev) =>
+      prev.map((row) =>
+        ids.has(row.id)
+          ? {
+              ...row,
+              lookup: {
+                username: inboundUsernameFromUrl(row.instagramLink),
+                source: row.lookup?.source ?? "unknown",
+                status: "loading",
+                name: row.lookup?.name ?? null,
+                followers: row.lookup?.followers ?? null,
+                gender: row.lookup?.gender ?? null,
+                category: row.lookup?.category ?? null,
+                profilePic: row.lookup?.profilePic ?? null,
+                verification: row.lookup?.verification ?? null,
+              },
+            }
+          : row,
+      ),
+    );
+  };
+
+  // Visible cooldown countdown between batches (ig_fetching.py style). Resolves
+  // early if the user cancels.
+  const countdown = async (secs: number) => {
+    for (let s = secs; s > 0; s--) {
+      if (cancelFetchRef.current) break;
+      setCooldownLeft(s);
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    setCooldownLeft(0);
+  };
+
+  // Fetch EVERY unresolved row, auto-looping in batches of 50 with the rate-gate
+  // cooldown between batches (e.g. 70 rows → fetch 50, cool down, fetch 20).
   const fetchAllRows = () => {
     const targets = rows.filter(
       (r) =>
@@ -389,55 +436,48 @@ export function InboundForm({ campaigns }: InboundFormProps) {
       toast.info("Nothing to fetch — add Instagram profile URLs first.");
       return;
     }
-    const slice = targets.slice(0, META_BATCH);
+    cancelFetchRef.current = false;
+    const total = targets.length;
     startFetchAll(async () => {
-      // Mark the sliced rows as loading up-front.
-      const sliceIds = new Set(slice.map((r) => r.id));
-      setRows((prev) =>
-        prev.map((row) =>
-          sliceIds.has(row.id)
-            ? {
-                ...row,
-                lookup: {
-                  username: inboundUsernameFromUrl(row.instagramLink),
-                  source: row.lookup?.source ?? "unknown",
-                  status: "loading",
-                  name: row.lookup?.name ?? null,
-                  followers: row.lookup?.followers ?? null,
-                  gender: row.lookup?.gender ?? null,
-                  category: row.lookup?.category ?? null,
-                  profilePic: row.lookup?.profilePic ?? null,
-                  verification: row.lookup?.verification ?? null,
-                },
-              }
-            : row,
-        ),
-      );
-
-      const res = await lookupCreatorsBatch(
-        slice.map((r) => r.instagramLink),
-        "reachout_inbound",
-      );
-      slice.forEach((r) => {
-        const u = inboundUsernameFromUrl(r.instagramLink);
-        const hit = res.hits[u] ?? null;
-        lookupCache.current[u] = hit;
-        applyLookupResult(r.id, u, hit);
-      });
-
-      if (res.coolingDown) {
-        toast.warning(
-          `Fetched ${res.fetched}. Rate-limit cooldown — wait ${res.retryAfterSec}s before fetching more.`,
+      let remaining = [...targets];
+      let done = 0;
+      setFetchProgress({ done: 0, total });
+      let guard = 0;
+      while (remaining.length && !cancelFetchRef.current && guard++ < 50) {
+        const chunk = remaining.slice(0, META_BATCH);
+        markRowsLoading(new Set(chunk.map((r) => r.id)));
+        const res = await lookupCreatorsBatch(
+          chunk.map((r) => r.instagramLink),
+          "reachout_inbound",
         );
-      } else {
-        toast.success(`Fetched ${slice.length} profile(s).`);
+        if (res.fetched > 0) {
+          chunk.forEach((r) => {
+            const u = inboundUsernameFromUrl(r.instagramLink);
+            const hit = res.hits[u] ?? null;
+            lookupCache.current[u] = hit;
+            applyLookupResult(r.id, u, hit);
+          });
+          done += res.fetched;
+          remaining = remaining.slice(chunk.length);
+          setFetchProgress({ done, total });
+        }
+        // More to go AND the gate opened a cooldown → wait it out, then continue
+        // (also covers the "already cooling, fetched 0" case → retry same chunk).
+        if (remaining.length && res.coolingDown && !cancelFetchRef.current) {
+          await countdown(res.retryAfterSec);
+        } else if (res.fetched === 0 && !res.coolingDown) {
+          break; // nothing fetched and not cooling — avoid a tight loop
+        }
       }
-      if (targets.length > slice.length) {
-        toast.info(
-          `${targets.length - slice.length} more row(s) — click Fetch again for the next batch of ${META_BATCH}.`,
-        );
-      }
+      setFetchProgress(null);
+      setCooldownLeft(0);
+      if (cancelFetchRef.current) toast.info(`Stopped. Fetched ${done}/${total}.`);
+      else toast.success(`Fetched ${done} profile(s).`);
     });
+  };
+
+  const cancelFetchAll = () => {
+    cancelFetchRef.current = true;
   };
 
   const handleInstagramChange = (id: string, value: string) => {
@@ -902,7 +942,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               className="btn-toolbar"
               onClick={fetchAllRows}
               disabled={fetchingAll || unfetchedRows.length === 0}
-              title="Fetch profiles live from Instagram (one batch of 50 per click)"
+              title="Fetch all profiles live from Instagram — auto-batches of 50 with a cooldown between"
             >
               {fetchingAll ? (
                 <Loader2 size={12} className="animate-spin" />
@@ -913,6 +953,29 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                 ? `Fetch (${unfetchedRows.length})`
                 : "Fetch all"}
             </button>
+            {fetchingAll && fetchProgress && (
+              <span className="inline-flex items-center gap-2 rounded-full bg-[#F5F1EC] px-3 py-1 text-[0.72rem] font-semibold text-[#161513]">
+                {cooldownLeft > 0 ? (
+                  <>
+                    <Clock size={11} className="text-[#B57514]" />
+                    Cooling down {cooldownLeft}s · {fetchProgress.done}/
+                    {fetchProgress.total}
+                  </>
+                ) : (
+                  <>
+                    <Loader2 size={11} className="animate-spin" />
+                    Fetching {fetchProgress.done}/{fetchProgress.total}
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={cancelFetchAll}
+                  className="ml-1 text-[#C0392B] hover:underline"
+                >
+                  Stop
+                </button>
+              </span>
+            )}
             <button
               type="button"
               className="btn-accent btn-sm"
