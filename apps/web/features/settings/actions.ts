@@ -1,0 +1,296 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { createServiceClient } from "@/lib/supabase/server";
+import { assertPermission } from "@/lib/rbac.server";
+import {
+  TEST_MODE_SCOPES_KEY,
+  CAMPAIGN_AUTO_CLOSE_KEY,
+  SCOPE_TABLE,
+  SCOPE_PREVIEW,
+  TEST_SCOPE_LABELS,
+  PURGE_ORDER,
+  PREVIEW_ITEMS_CAP,
+  isTestScope,
+  type TestScope,
+  type SaadaaTable,
+  type TestEntriesPreview,
+  type TestEntryPreviewGroup,
+} from "./test-scopes";
+
+// Admin-only gate for every config write/read here. `system_config` is admin-only
+// (see lib/rbac.ts) and returns the actor (email recorded on archive rows).
+const CONFIG_PERMISSION = "system_config" as const;
+
+// Surfaces that read the four scoped entities — refreshed after a purge so test
+// rows vanish/appear immediately.
+const REVALIDATE_PATHS = [
+  "/",
+  "/dashboard",
+  "/campaigns",
+  "/creators",
+  "/reach-out",
+  "/onboarding",
+  "/posting",
+  "/order-status",
+  "/orders",
+  "/offboarding",
+  "/accounts-hub",
+  "/journey",
+  "/sheets",
+  "/settings",
+];
+
+/**
+ * Read the active Test Mode scopes. Stored as a JSON array string in the TEXT
+ * `app_settings.value` column (e.g. '["creator"]'; '[]' = off). Service client so
+ * it works in every context, including create actions running under caller RLS.
+ */
+export async function getTestModeScopes(): Promise<TestScope[]> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("app_settings")
+    .select("value")
+    .eq("key", TEST_MODE_SCOPES_KEY)
+    .maybeSingle();
+  const raw = (data as { value: unknown } | null)?.value;
+  if (typeof raw !== "string") return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (s): s is TestScope => typeof s === "string" && isTestScope(s),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Is a specific scope currently in Test Mode? Used by create paths to stamp is_test. */
+export async function isScopeTest(scope: TestScope): Promise<boolean> {
+  const scopes = await getTestModeScopes();
+  return scopes.includes(scope);
+}
+
+export interface TestStamp {
+  scope: TestScope;
+  table: SaadaaTable;
+  // The column to match the freshly-created rows by (e.g. "post_id", "inf_id",
+  // "campaign_id", or the bigint "id").
+  idColumn: string;
+  ids: (string | number)[];
+}
+
+/**
+ * Stamp newly-created rows as is_test=true when their scope is currently in Test
+ * Mode. No-op (one cheap app_settings read) when no scope is active, so create
+ * paths can call this unconditionally after a successful insert. Runs via the
+ * service client so it works regardless of the caller's RLS.
+ *
+ * Each entity is stamped by ITS OWN scope (creators→creator, posts→collab,
+ * campaigns→campaign, payments→payment) so the FK-safe purge on turn-off removes a
+ * consistent set when scopes are toggled together (the normal admin flow).
+ */
+export async function stampTestRows(stamps: TestStamp[]): Promise<void> {
+  const withIds = stamps.filter((s) => s.ids.length > 0);
+  if (withIds.length === 0) return;
+  const active = await getTestModeScopes();
+  const toStamp = withIds.filter((s) => active.includes(s.scope));
+  if (toStamp.length === 0) return;
+  const svc = createServiceClient();
+  for (const s of toStamp) {
+    await svc
+      .from(s.table)
+      .update({ is_test: true })
+      .in(s.idColumn, s.ids as never[]);
+  }
+}
+
+/**
+ * Preview the test entries that WOULD be deleted if the requested scope set were
+ * saved (admin only — same gate as setTestMode). Read-only: deletes nothing. The UI
+ * calls this first and shows an itemised confirm popup before the destructive save.
+ *
+ * "Turned off" = in the CURRENT active set but not in the requested `scopes`. For
+ * each such scope we read its is_test=true rows (service client, bypassing RLS) and
+ * build a label per row. Items capped at PREVIEW_ITEMS_CAP per scope; `count` is the
+ * true total (cheap COUNT(*)) so the UI can show "+N more".
+ */
+export async function previewTestEntries(
+  scopes: string[],
+): Promise<TestEntriesPreview> {
+  await assertPermission(CONFIG_PERMISSION);
+
+  const next = Array.from(
+    new Set((scopes ?? []).filter(isTestScope)),
+  ) as TestScope[];
+  const current = await getTestModeScopes();
+  const turnedOff = current.filter((s) => !next.includes(s));
+
+  if (turnedOff.length === 0) return { groups: [], total: 0 };
+
+  const svc = createServiceClient();
+  const groups: TestEntryPreviewGroup[] = [];
+  let total = 0;
+
+  for (const scope of turnedOff) {
+    const cfg = SCOPE_PREVIEW[scope];
+    const { data, error } = await svc
+      .from(cfg.table)
+      .select(["id", ...cfg.columns].join(","))
+      .eq("is_test", true)
+      .order(cfg.orderBy, { ascending: true })
+      .limit(PREVIEW_ITEMS_CAP);
+
+    if (error) {
+      throw new Error(`Failed to read ${cfg.table}: ${error.message}`);
+    }
+
+    const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    const items = rows.map((row) => ({
+      id: String(row.id),
+      label: cfg.label(row),
+    }));
+
+    // Exact count (cheap head COUNT) so "+N more" is accurate when capped.
+    const { count } = await svc
+      .from(cfg.table)
+      .select("id", { count: "exact", head: true })
+      .eq("is_test", true);
+    const trueCount = typeof count === "number" ? count : items.length;
+
+    groups.push({
+      scope,
+      label: TEST_SCOPE_LABELS[scope],
+      count: trueCount,
+      items,
+    });
+    total += trueCount;
+  }
+
+  return { groups, total };
+}
+
+export interface SetTestModeResult {
+  success: boolean;
+  error?: string;
+  scopes?: TestScope[];
+  // Per-table count of test rows deleted (only for scopes turned OFF this call).
+  deleted?: Record<string, number>;
+  deletedTotal?: number;
+}
+
+/**
+ * Set the active Test Mode scopes (admin only — enforced here AND in the UI).
+ *
+ * Diff against the current scopes:
+ *  - scope turned ON  → just enabled; subsequent admin creates in that view get
+ *    is_test=true.
+ *  - scope turned OFF → DESTRUCTIVE: archive then delete every is_test row of that
+ *    scope's table via purge_test_rows() (SECURITY DEFINER: copies each row into
+ *    test_mode_archive as jsonb, then deletes; archive→delete order keeps source
+ *    data intact if archiving breaks). Purges in FK-safe order (PURGE_ORDER:
+ *    payments → posts → creators → campaigns) so child rows go before parents.
+ *
+ * No id-counter reset: Saadaa IDs are derived max+1 from the data, so the next id
+ * auto-continues from the remaining real rows after a purge.
+ */
+export async function setTestMode(
+  scopes: string[],
+): Promise<SetTestModeResult> {
+  const actor = await assertPermission(CONFIG_PERMISSION);
+  // RPC param p_deleted_by is non-null in the generated types; actor.email is always
+  // present (requireActor), so coerce to "" defensively rather than null.
+  const deletedBy: string = actor.email ?? "";
+
+  const next = Array.from(
+    new Set((scopes ?? []).filter(isTestScope)),
+  ) as TestScope[];
+
+  const svc = createServiceClient();
+  const current = await getTestModeScopes();
+
+  // 1. Persist the new scope set FIRST so no fresh test rows can be created in a
+  //    scope we are about to clean up.
+  const { error: flagErr } = await svc.from("app_settings").upsert(
+    {
+      key: TEST_MODE_SCOPES_KEY,
+      value: JSON.stringify(next),
+      updated_at: new Date().toISOString(),
+      updated_by: deletedBy,
+    },
+    { onConflict: "key" },
+  );
+  if (flagErr) return { success: false, error: flagErr.message };
+
+  // 2. Scopes turned OFF (in old, not in new) are purged — in FK-safe order.
+  const turnedOff = current.filter((s) => !next.includes(s));
+  let deleted: Record<string, number> | undefined;
+  let deletedTotal = 0;
+
+  if (turnedOff.length > 0) {
+    deleted = {};
+    const ordered = PURGE_ORDER.filter((s) => turnedOff.includes(s));
+    for (const scope of ordered) {
+      const table = SCOPE_TABLE[scope];
+      const { data, error } = await svc.rpc("purge_test_rows", {
+        p_source_table: table,
+        p_scope: scope,
+        p_deleted_by: deletedBy,
+      });
+      if (error) {
+        return {
+          success: false,
+          error: `Failed to purge ${table}: ${error.message}`,
+        };
+      }
+      const n = typeof data === "number" ? data : 0;
+      deleted[table] = (deleted[table] ?? 0) + n;
+      deletedTotal += n;
+    }
+  }
+
+  // 3. Refresh every surface that reads the scoped entities.
+  for (const p of REVALIDATE_PATHS) revalidatePath(p);
+
+  return { success: true, scopes: next, deleted, deletedTotal };
+}
+
+// ── Campaign auto-close toggle ───────────────────────────────────────────────────
+// Saadaa runs a daily cron that auto-closes campaigns past their end. This flag lets
+// an admin pause that automation (stored as 'true'/'false' string in app_settings).
+
+/** Read the campaign auto-close flag (default ON when unset). */
+export async function getCampaignAutoCloseEnabled(): Promise<boolean> {
+  const svc = createServiceClient();
+  const { data } = await svc
+    .from("app_settings")
+    .select("value")
+    .eq("key", CAMPAIGN_AUTO_CLOSE_KEY)
+    .maybeSingle();
+  const raw = (data as { value: unknown } | null)?.value;
+  // Default ON: only an explicit 'false' disables it.
+  if (typeof raw !== "string") return true;
+  return raw.trim().toLowerCase() !== "false";
+}
+
+/** Toggle campaign auto-close (admin only). */
+export async function setCampaignAutoCloseEnabled(
+  enabled: boolean,
+): Promise<{ success: boolean; error?: string; enabled?: boolean }> {
+  const actor = await assertPermission(CONFIG_PERMISSION);
+  const svc = createServiceClient();
+  const { error } = await svc.from("app_settings").upsert(
+    {
+      key: CAMPAIGN_AUTO_CLOSE_KEY,
+      value: enabled ? "true" : "false",
+      updated_at: new Date().toISOString(),
+      updated_by: actor.email ?? null,
+    },
+    { onConflict: "key" },
+  );
+  if (error) return { success: false, error: error.message };
+  revalidatePath("/campaigns");
+  revalidatePath("/settings");
+  return { success: true, enabled };
+}

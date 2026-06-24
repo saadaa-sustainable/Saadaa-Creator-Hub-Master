@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { readTermsAttachmentFile, TERMS_ATTACHMENT } from "@/lib/attachments";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { stampTestRows } from "@/features/settings/actions";
 import { isOnboardedActive } from "@/lib/workflow";
 import { sendMail } from "@/lib/email";
 import { serverEnv } from "@/lib/env.server";
@@ -463,6 +464,9 @@ export async function submitOnboarding(
   // creator across collabs). Sequential read + insert pattern; falls back
   // gracefully.
   let childrenSpawned = 0;
+  // Test Mode: collect every post in this collab (the onboarded parent + any
+  // spawned children) so they can be stamped is_test=true when Collab scope is on.
+  const testCollabPostIds: string[] = [v.postId];
   if (total > 1) {
     const remainingReels = firstType === "reel" ? v.reels - 1 : v.reels;
     const remainingPosts = firstType === "post" ? v.posts - 1 : v.posts;
@@ -560,7 +564,22 @@ export async function submitOnboarding(
       if (!childErr) childrenSpawned = children.length;
       else console.error("[onboarding] child spawn failed:", childErr.message);
     }
+    // Test Mode: stamp the spawned child deliverable rows when Collab scope is on.
+    if (children.length > 0) {
+      testCollabPostIds.push(...children.map((c) => c.post_id as string));
+    }
   }
+
+  // Test Mode: when the Collab scope is on, mark this collab's posts is_test=true —
+  // the onboarded parent post plus any spawned child deliverable rows. No-op off.
+  await stampTestRows([
+    {
+      scope: "collab",
+      table: "posts",
+      idColumn: "post_id",
+      ids: testCollabPostIds,
+    },
+  ]);
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 

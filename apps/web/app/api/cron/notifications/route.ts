@@ -4,6 +4,7 @@ import {
   closeCampaignIfComplete,
   voidUnonboardedForCampaign,
 } from "@/lib/campaign-lifecycle";
+import { getCampaignAutoCloseEnabled } from "@/features/settings/actions";
 import {
   NOTIFICATION_TYPES,
   resolveAccountsTeamEmails,
@@ -481,31 +482,38 @@ export async function GET(req: NextRequest) {
     console.error("[cron/notifications] campaign_ending check failed:", err);
   }
 
+  // Campaign auto-close master switch (Settings → Workflow preferences). When off
+  // (backlog mode) BOTH auto-close checks below (date-based #7 + completion #9) are
+  // skipped so campaigns stay open for backfilling. Default ON. Read once.
+  const autoCloseEnabled = await getCampaignAutoCloseEnabled();
+
   // ── 7. Auto-close campaigns past their end_date ─────────────────────────────
   // Once end_date is in the past, flip status → 'Closed' and stamp auto_closed_at
   // (one-shot). A campaign reopened by an owner/admin gets auto_closed_at set, so
   // this never re-closes it. Owner-facing notice already went out in check 6.
-  try {
-    const today = isoDateOffset(0);
-    const { data, error } = await (supabase as any)
-      .from("campaigns")
-      .update({ status: "Closed", auto_closed_at: nowIso() })
-      .lt("end_date", today)
-      .is("auto_closed_at", null)
-      .not("status", "ilike", "closed")
-      .select("campaign_id");
-    if (error) {
-      console.error("[cron/notifications] campaign auto-close failed:", error.message);
-    } else {
-      const closed = (data ?? []) as Array<{ campaign_id: string | null }>;
-      sent.campaign_closed = closed.length;
-      // Void the un-onboarded reach-out leftovers of each just-closed campaign.
-      for (const c of closed) {
-        if (c.campaign_id) await voidUnonboardedForCampaign(c.campaign_id);
+  if (autoCloseEnabled) {
+    try {
+      const today = isoDateOffset(0);
+      const { data, error } = await (supabase as any)
+        .from("campaigns")
+        .update({ status: "Closed", auto_closed_at: nowIso() })
+        .lt("end_date", today)
+        .is("auto_closed_at", null)
+        .not("status", "ilike", "closed")
+        .select("campaign_id");
+      if (error) {
+        console.error("[cron/notifications] campaign auto-close failed:", error.message);
+      } else {
+        const closed = (data ?? []) as Array<{ campaign_id: string | null }>;
+        sent.campaign_closed = closed.length;
+        // Void the un-onboarded reach-out leftovers of each just-closed campaign.
+        for (const c of closed) {
+          if (c.campaign_id) await voidUnonboardedForCampaign(c.campaign_id);
+        }
       }
+    } catch (err) {
+      console.error("[cron/notifications] campaign auto-close check failed:", err);
     }
-  } catch (err) {
-    console.error("[cron/notifications] campaign auto-close check failed:", err);
   }
 
   // ── 8. Monthly payable-cycle digest ─────────────────────────────────────────
@@ -652,20 +660,23 @@ export async function GET(req: NextRequest) {
   // ── 9. Auto-close campaigns whose full creator allocation has posted ─────────
   // Completion close (backstop to the real-time trigger in submitPosting): a
   // campaign closes once distinct Posted/Delivered creators reach its creator
-  // cap. Skips already-closed + reopened (auto_closed_at set) campaigns.
-  try {
-    const { data: openCamps } = await (supabase as any)
-      .from("campaigns")
-      .select("campaign_id")
-      .is("auto_closed_at", null)
-      .not("status", "ilike", "closed");
-    for (const c of (openCamps ?? []) as Array<{ campaign_id: string | null }>) {
-      if (!c.campaign_id) continue;
-      const closed = await closeCampaignIfComplete(c.campaign_id);
-      if (closed) sent.campaign_completed++;
+  // cap. Skips already-closed + reopened (auto_closed_at set) campaigns. Gated by
+  // the same auto-close master switch as #7.
+  if (autoCloseEnabled) {
+    try {
+      const { data: openCamps } = await (supabase as any)
+        .from("campaigns")
+        .select("campaign_id")
+        .is("auto_closed_at", null)
+        .not("status", "ilike", "closed");
+      for (const c of (openCamps ?? []) as Array<{ campaign_id: string | null }>) {
+        if (!c.campaign_id) continue;
+        const closed = await closeCampaignIfComplete(c.campaign_id);
+        if (closed) sent.campaign_completed++;
+      }
+    } catch (err) {
+      console.error("[cron/notifications] campaign completion-close check failed:", err);
     }
-  } catch (err) {
-    console.error("[cron/notifications] campaign completion-close check failed:", err);
   }
 
   return NextResponse.json({ ran: true, sent });

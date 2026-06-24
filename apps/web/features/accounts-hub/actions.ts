@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { stampTestRows } from "@/features/settings/actions";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -133,6 +134,10 @@ export async function submitPayments(
 
   const rows = parsed.data.rows;
   const supabase = createServiceClient();
+
+  // Test Mode: ids of payment rows created in this submit, stamped is_test=true at
+  // the end when the Payment scope is on (no-op otherwise).
+  const testPaymentIds: number[] = [];
 
   // Pre-fetch all referenced posts in one query for gate checks.
   const postIds = [...new Set(rows.map((r) => r.postId))];
@@ -470,7 +475,7 @@ export async function submitPayments(
       const collabStatus: "Done" | "Partial" = fullyPaid ? "Done" : "Partial";
 
       // Insert the installment row (distinct UTR → distinct row).
-      const { error: insErr } = await (supabase as any)
+      const { data: insRow, error: insErr } = await (supabase as any)
         .from("payments")
         .insert({
           post_id: r.postId,
@@ -493,7 +498,9 @@ export async function submitPayments(
           collab_number: post.collab_number ?? null,
           deliverable_index: post.deliverable_index ?? null,
           posted_but_not_tested: postedNotTested,
-        });
+        })
+        .select("id")
+        .single();
       if (insErr) {
         console.error(`[submitPayments] insert ${r.postId}: ${insErr.message}`);
         duplicates.push(r.postId);
@@ -505,6 +512,7 @@ export async function submitPayments(
         continue;
       }
       runningPaidByPost.set(r.postId, newPaid);
+      if (insRow?.id != null) testPaymentIds.push(insRow.id as number);
       saved++;
 
       // Retire the lone null-utr DRAFT row for this post (if any) — it has been
@@ -619,14 +627,21 @@ export async function submitPayments(
         .eq("id", existingDraft.id);
       writeErr = error;
     } else {
-      const { error } = await (supabase as any).from("payments").insert({
-        ...draftPayload,
-        post_id: r.postId,
-        deliverable_post_id: r.postId,
-        inf_id: post.inf_id || null,
-        username: post.username || null,
-      });
+      const { data: draftRow, error } = await (supabase as any)
+        .from("payments")
+        .insert({
+          ...draftPayload,
+          post_id: r.postId,
+          deliverable_post_id: r.postId,
+          inf_id: post.inf_id || null,
+          username: post.username || null,
+        })
+        .select("id")
+        .single();
       writeErr = error;
+      if (!error && draftRow?.id != null) {
+        testPaymentIds.push(draftRow.id as number);
+      }
     }
     if (writeErr) {
       console.error(`[submitPayments] draft ${r.postId}: ${writeErr.message}`);
@@ -786,6 +801,12 @@ export async function submitPayments(
       });
     });
   }
+
+  // Test Mode: stamp the payment rows created in this submit when the Payment
+  // scope is on. No-op when Test Mode is off.
+  await stampTestRows([
+    { scope: "payment", table: "payments", idColumn: "id", ids: testPaymentIds },
+  ]);
 
   // Cache invalidation — every Accounts read tag.
   revalidateTag("payments");

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { voidUnonboardedForCampaign } from "@/lib/campaign-lifecycle";
+import { stampTestRows } from "@/features/settings/actions";
 import { formatDate } from "@/lib/formatters";
 import {
   NOTIFICATION_TYPES,
@@ -129,6 +130,17 @@ export async function submitCampaign(
   if (ownerErr) {
     console.error("[campaigns] created_by stamp failed:", ownerErr.message);
   }
+
+  // Test Mode: when the Campaigns scope is on, mark this new campaign is_test=true
+  // so it never pollutes real reporting (no-op when Test Mode is off).
+  await stampTestRows([
+    {
+      scope: "campaign",
+      table: "campaigns",
+      idColumn: "campaign_id",
+      ids: [row.campaign_id],
+    },
+  ]);
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 

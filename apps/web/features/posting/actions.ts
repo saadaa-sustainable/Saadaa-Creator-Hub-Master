@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { closeCampaignIfComplete } from "@/lib/campaign-lifecycle";
+import { getCampaignAutoCloseEnabled } from "@/features/settings/actions";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -110,9 +111,13 @@ export async function submitPosting(input: unknown) {
   // Auto-close the campaign if this posting fills its full creator allocation
   // (cap creators all Posted/Delivered). Fire-and-forget; the daily cron also
   // sweeps as a backstop. Best-effort, never blocks the posting response.
+  // Respects the campaign auto-close master switch (Settings) — when off (backlog
+  // mode) campaigns stay open even when complete.
   if (campaignIdOfPost) {
     after(async () => {
-      await closeCampaignIfComplete(campaignIdOfPost);
+      if (await getCampaignAutoCloseEnabled()) {
+        await closeCampaignIfComplete(campaignIdOfPost);
+      }
     });
   }
 

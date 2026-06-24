@@ -17,6 +17,7 @@ import {
   UserMinus,
   ShieldAlert,
   Sheet,
+  Settings,
   LogOut,
   X,
   type LucideIcon,
@@ -116,6 +117,12 @@ const NAV: NavSection[] = [
         show: (a) => hasPermission(a, "admin"),
       },
       { label: "Error Portal", href: "/errors", icon: ShieldAlert },
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: Settings,
+        show: (a) => hasPermission(a, "admin"),
+      },
     ],
   },
 ];

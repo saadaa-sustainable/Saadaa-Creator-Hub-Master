@@ -120,6 +120,23 @@
 
 ---
 
+## Settings — Account, Admin Shortcuts, Workflow Prefs, Test Mode (`/settings`)
+**Route:** `/settings` (sidebar System group, admin-gated via `hasPermission(actor,"admin")`; page renders for any actor but the admin controls are isolated). Know More slug `settings`. Ported from Workflow Optimizer's Settings tab, adapted to Saadaa's 4 entities + data-derived IDs.
+- **Layout:** Account card (read-only identity from `user_access` — name/email/role/department) + Administration shortcuts (User Panel / Sheet View / Error Portal, each permission-gated). Admin-only below: Workflow Preferences + Test Mode danger zone.
+- **Feature dir:** `features/settings/` — `test-scopes.ts` (plain module: 4 scopes + labels + `SCOPE_PREVIEW` + keys), `actions.ts` (`'use server'`), `test-mode-settings.tsx` + `campaign-auto-close-card.tsx` (client). KM content `features/know-more/content/settings.tsx`.
+
+### Campaign auto-close switch
+- `getCampaignAutoCloseEnabled()` (default **ON** — only explicit `'false'` disables) / `setCampaignAutoCloseEnabled(bool)` (admin). Stored in `app_settings.campaign_auto_close_enabled` (TEXT `'true'`/`'false'`).
+- **Honored in 3 places** (all skip close when OFF = backlog mode): cron `#7` date-based auto-close + cron `#9` completion close (`app/api/cron/notifications/route.ts`), and the real-time completion close in `submitPosting` (`features/posting/actions.ts`).
+
+### Test Mode (danger zone)
+- **4 independent scopes** → table: `campaign`→`campaigns`, `creator`→`creators`, `collab`→`posts`, `payment`→`payments`. Each table has `is_test boolean default false` + a partial index.
+- **Scope ON** → new rows in that entity are stamped `is_test=true` via `stampTestRows()` (service-client `update`, no-op when off; called from `submitCampaign`, `submitReachOut`, `submitInboundBatch`, `submitOnboarding` (parent+children), repeat-collab via delegation, `submitPayments` (captures inserted ids)). Each entity stamped by **its own** scope.
+- **Scope OFF = destructive**: itemised preview (`previewTestEntries`) then archive→delete via `purge_test_rows(p_source_table,p_scope,p_deleted_by)` RPC (SECURITY DEFINER, allowlist 4 tables, archives `to_jsonb(row)` into `test_mode_archive` then `delete where is_test`). Purge runs in **FK-safe order** `PURGE_ORDER = payment→collab→creator→campaign`.
+- **No id-counter reset** (unlike WO): Saadaa IDs are derived `max+1` from live data → next id auto-continues after purge. Scope set persisted in `app_settings.test_mode_scopes` (JSON array string, `[]`=off). All actions gate on `assertPermission("system_config")`.
+
+---
+
 ## Cross-cutting notes
 - **No SQL views/RPCs for analytics** — every fetcher pulls raw rows (`.limit()` 2k–10k) and aggregates in JS; `access_role_summary` is the only DB view used.
 - **Parent/child collab rule is pervasive:** payment lives on the representative; `commercial_amount` is equal-split and re-summed across siblings for any display/KPI.

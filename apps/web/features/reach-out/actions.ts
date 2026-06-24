@@ -6,6 +6,7 @@ import { after } from "next/server";
 import { ReachOutSchema } from "./schema";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { stampTestRows } from "@/features/settings/actions";
 import { isVoidedStatus } from "@/lib/workflow";
 import {
   NOTIFICATION_TYPES,
@@ -202,6 +203,13 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
       })
       .eq("inf_id", row.inf_id);
   }
+
+  // Test Mode: stamp the new creator (creator scope) + reach-out post (collab
+  // scope) when those scopes are on. No-op when Test Mode is off.
+  await stampTestRows([
+    { scope: "creator", table: "creators", idColumn: "inf_id", ids: row.inf_id ? [row.inf_id] : [] },
+    { scope: "collab", table: "posts", idColumn: "post_id", ids: [row.post_id] },
+  ]);
 
   // Queue Instagram profile fetch for the 3-hr scrape-pending-apify cron.
   // Without this enqueue, a submit that bypasses the live IG lookup widget

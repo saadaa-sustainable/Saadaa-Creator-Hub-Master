@@ -22,6 +22,7 @@ import OrderStatusKM from "./order-status";
 import PostingKM from "./posting";
 import ReachOutInboundKM from "./reach-out-inbound";
 import ReachOutOutboundKM from "./reach-out-outbound";
+import SettingsKM from "./settings";
 import SheetsKM from "./sheets";
 import TatKM from "./tat";
 import UserPanelKM from "./user-panel";
@@ -48,6 +49,7 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   errors: ErrorsKM,
   sheets: SheetsKM,
   "user-panel": UserPanelKM,
+  settings: SettingsKM,
 };
 
 export type KMSlug = keyof typeof KM_REGISTRY;

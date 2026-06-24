@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { stampTestRows } from "@/features/settings/actions";
 import { isVoidedStatus } from "@/lib/workflow";
 import {
   NOTIFICATION_TYPES,
@@ -201,6 +202,25 @@ export async function submitInboundBatch(
       username,
       contentName,
     });
+  }
+
+  // Test Mode: stamp every new creator (creator scope) + post (collab scope) in
+  // this batch when those scopes are on. Two batched updates; no-op when off.
+  if (created.length > 0) {
+    await stampTestRows([
+      {
+        scope: "creator",
+        table: "creators",
+        idColumn: "inf_id",
+        ids: created.map((c) => c.infId).filter(Boolean),
+      },
+      {
+        scope: "collab",
+        table: "posts",
+        idColumn: "post_id",
+        ids: created.map((c) => c.postId),
+      },
+    ]);
   }
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
