@@ -32,6 +32,7 @@ import { cn } from "@/lib/cn";
 import { isInstagramProfileUrl } from "@/lib/validators";
 import { formatFollowers, proxyAvatarUrl } from "@/lib/formatters";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GENDERS, type Gender } from "./schema";
 import { CONTENT_CODES } from "./content-codes";
 import {
@@ -748,24 +749,18 @@ export function InboundForm({ campaigns }: InboundFormProps) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           <div className="md:col-span-2">
             <div className="form-floating">
-              <select
+              <SearchableSelect
                 id="rin_campaign"
-                className={cn(
-                  "form-control form-select",
-                  campaignInvalid && "is-invalid-control",
-                )}
+                className={cn(campaignInvalid && "is-invalid-control")}
                 value={campaignId}
-                onChange={(e) => setCampaignId(e.target.value)}
-                aria-invalid={campaignInvalid}
-              >
-                <option value=""></option>
-                {campaigns.map((c) => (
-                  <option key={c.campaign_id} value={c.campaign_id}>
-                    {c.campaign_id}
-                    {c.campaign_name ? ` · ${c.campaign_name}` : ""}
-                  </option>
-                ))}
-              </select>
+                onChange={setCampaignId}
+                options={campaigns.map((c) => ({
+                  value: c.campaign_id,
+                  label: `${c.campaign_id}${c.campaign_name ? ` · ${c.campaign_name}` : ""}`,
+                }))}
+                placeholder="Select campaign…"
+                searchPlaceholder="Search campaigns…"
+              />
               <label htmlFor="rin_campaign">
                 Campaign ID <span className="req">*</span>
               </label>
@@ -1086,22 +1081,16 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                       )}
                     </td>
                     <td>
-                      <select
-                        className={cn(
-                          "form-select",
-                          rowErrors.gender && "is-invalid-control",
-                        )}
+                      <SearchableSelect
+                        className={cn(rowErrors.gender && "is-invalid-control")}
                         value={r.gender}
-                        onChange={(e) =>
-                          updateRow(r.id, { gender: e.target.value as Gender })
+                        onChange={(v) =>
+                          updateRow(r.id, { gender: v as Gender })
                         }
-                      >
-                        {GENDERS.map((g) => (
-                          <option key={g} value={g}>
-                            {g}
-                          </option>
-                        ))}
-                      </select>
+                        options={GENDERS.map((g) => ({ value: g, label: g }))}
+                        placeholder="Select gender…"
+                        searchPlaceholder="Search…"
+                      />
                       {rowErrors.gender && (
                         <small className="field-error">
                           {rowErrors.gender}
@@ -1109,23 +1098,24 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                       )}
                     </td>
                     <td>
-                      <select
+                      <SearchableSelect
                         className={cn(
-                          "form-select",
                           rowErrors.contentCode && "is-invalid-control",
                         )}
                         value={r.contentCode}
-                        onChange={(e) =>
-                          updateRow(r.id, { contentCode: e.target.value })
+                        onChange={(v) =>
+                          updateRow(r.id, { contentCode: v })
                         }
-                      >
-                        <option value="">Choose code…</option>
-                        {CONTENT_CODES.map((c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.code} — {c.name}
-                          </option>
-                        ))}
-                      </select>
+                        options={[
+                          { value: "", label: "Choose code…" },
+                          ...CONTENT_CODES.map((c) => ({
+                            value: c.code,
+                            label: `${c.code} — ${c.name}`,
+                          })),
+                        ]}
+                        placeholder="Choose code…"
+                        searchPlaceholder="Search content types…"
+                      />
                       {rowErrors.contentCode && (
                         <small className="field-error">
                           {rowErrors.contentCode}
@@ -1249,22 +1239,14 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                     <span>
                       Gender <span className="req">*</span>
                     </span>
-                    <select
-                      className={cn(
-                        "form-control form-select",
-                        rowErrors.gender && "is-invalid-control",
-                      )}
+                    <SearchableSelect
+                      className={cn(rowErrors.gender && "is-invalid-control")}
                       value={r.gender}
-                      onChange={(e) =>
-                        updateRow(r.id, { gender: e.target.value as Gender })
-                      }
-                    >
-                      {GENDERS.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => updateRow(r.id, { gender: v as Gender })}
+                      options={GENDERS.map((g) => ({ value: g, label: g }))}
+                      placeholder="Select gender…"
+                      searchPlaceholder="Search…"
+                    />
                     {rowErrors.gender && (
                       <small className="field-error">{rowErrors.gender}</small>
                     )}
@@ -1273,23 +1255,22 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                     <span>
                       Content Type <span className="req">*</span>
                     </span>
-                    <select
+                    <SearchableSelect
                       className={cn(
-                        "form-control form-select",
                         rowErrors.contentCode && "is-invalid-control",
                       )}
                       value={r.contentCode}
-                      onChange={(e) =>
-                        updateRow(r.id, { contentCode: e.target.value })
-                      }
-                    >
-                      <option value="">Choose…</option>
-                      {CONTENT_CODES.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.code}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => updateRow(r.id, { contentCode: v })}
+                      options={[
+                        { value: "", label: "Choose…" },
+                        ...CONTENT_CODES.map((c) => ({
+                          value: c.code,
+                          label: c.code,
+                        })),
+                      ]}
+                      placeholder="Choose…"
+                      searchPlaceholder="Search content types…"
+                    />
                     {rowErrors.contentCode && (
                       <small className="field-error">
                         {rowErrors.contentCode}

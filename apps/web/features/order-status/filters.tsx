@@ -4,6 +4,7 @@ import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { OrderStatusFilterOptions, OrderStatusFilters } from "./types";
 
 const FILTER_KEYS = [
@@ -85,89 +86,99 @@ export function OrderStatusFiltersBar({
 
         <label className="onboarding-filter-field">
           <span>Campaign</span>
-          <select
+          <SearchableSelect
             value={initial.campaign ?? ""}
-            onChange={(e) => setParam("campaign", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All campaigns</option>
-            {options.campaigns.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.id}
-                {c.name && c.name !== c.id ? ` · ${c.name}` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("campaign", v || undefined)}
+            options={[
+              { value: "", label: "All campaigns" },
+              ...options.campaigns.map((c) => ({
+                value: c.id,
+                label: `${c.id}${c.name && c.name !== c.id ? ` · ${c.name}` : ""}`,
+              })),
+            ]}
+            placeholder="All campaigns"
+            searchPlaceholder="Search campaigns…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Status</span>
-          <select
+          <SearchableSelect
             value={initial.status ?? ""}
-            onChange={(e) => setParam("status", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All statuses</option>
-            <option value="pending">Pending Dispatch</option>
-            <option value="transit">In Transit</option>
-            <option value="delivered">Delivered</option>
-            <option value="rto">RTO</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+            onChange={(v) => setParam("status", v || undefined)}
+            options={[
+              { value: "", label: "All statuses" },
+              { value: "pending", label: "Pending Dispatch" },
+              { value: "transit", label: "In Transit" },
+              { value: "delivered", label: "Delivered" },
+              { value: "rto", label: "RTO" },
+              { value: "cancelled", label: "Cancelled" },
+            ]}
+            placeholder="All statuses"
+            searchPlaceholder="Search statuses…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Collab</span>
-          <select
+          <SearchableSelect
             value={initial.collab ?? ""}
-            onChange={(e) => setParam("collab", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All</option>
-            <option value="Barter">Barter</option>
-            <option value="Barter + Paid">Barter + Paid</option>
-          </select>
+            onChange={(v) => setParam("collab", v || undefined)}
+            options={[
+              { value: "", label: "All" },
+              { value: "Barter", label: "Barter" },
+              { value: "Barter + Paid", label: "Barter + Paid" },
+            ]}
+            placeholder="All"
+            searchPlaceholder="Search…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Financial</span>
-          <select
+          <SearchableSelect
             value={initial.financial ?? ""}
-            onChange={(e) => setParam("financial", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All</option>
-            <option value="paid">Paid</option>
-            <option value="refunded">Refunded</option>
-            <option value="partially_refunded">Partial refund</option>
-            <option value="pending">Pending</option>
-          </select>
+            onChange={(v) => setParam("financial", v || undefined)}
+            options={[
+              { value: "", label: "All" },
+              { value: "paid", label: "Paid" },
+              { value: "refunded", label: "Refunded" },
+              { value: "partially_refunded", label: "Partial refund" },
+              { value: "pending", label: "Pending" },
+            ]}
+            placeholder="All"
+            searchPlaceholder="Search…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Discount</span>
-          <select
+          <SearchableSelect
             value={initial.discount ?? ""}
-            onChange={(e) => setParam("discount", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All</option>
-            <option value="yes">Has code</option>
-            <option value="no">No code</option>
-          </select>
+            onChange={(v) => setParam("discount", v || undefined)}
+            options={[
+              { value: "", label: "All" },
+              { value: "yes", label: "Has code" },
+              { value: "no", label: "No code" },
+            ]}
+            placeholder="All"
+            searchPlaceholder="Search…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Repeat creator</span>
-          <select
+          <SearchableSelect
             value={initial.repeat ?? ""}
-            onChange={(e) => setParam("repeat", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All</option>
-            <option value="yes">Repeat</option>
-            <option value="no">First-time</option>
-          </select>
+            onChange={(v) => setParam("repeat", v || undefined)}
+            options={[
+              { value: "", label: "All" },
+              { value: "yes", label: "Repeat" },
+              { value: "no", label: "First-time" },
+            ]}
+            placeholder="All"
+            searchPlaceholder="Search…"
+          />
         </label>
 
         <div className="onboarding-filter-actions">

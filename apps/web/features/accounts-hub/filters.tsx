@@ -3,6 +3,7 @@ import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { AccountsFilters } from "./types";
 
 interface FilterOptions {
@@ -78,55 +79,50 @@ export function AccountsFiltersBar({
 
         <label className="onboarding-filter-field">
           <span>Campaign</span>
-          <select
+          <SearchableSelect
             value={initial.campaign ?? ""}
-            onChange={(e) => setParam("campaign", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All campaigns</option>
-            {options.campaigns.map((c) => (
-              <option key={c.campaign_id} value={c.campaign_id}>
-                {c.campaign_id}
-                {c.campaign_name ? ` · ${c.campaign_name}` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("campaign", v || undefined)}
+            options={[
+              { value: "", label: "All campaigns" },
+              ...options.campaigns.map((c) => ({
+                value: c.campaign_id,
+                label: `${c.campaign_id}${c.campaign_name ? ` · ${c.campaign_name}` : ""}`,
+              })),
+            ]}
+            placeholder="All campaigns"
+            searchPlaceholder="Search campaigns…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Payment Status</span>
-          <select
+          <SearchableSelect
             value={initial.statusFilter ?? ""}
-            onChange={(e) =>
-              setParam("statusFilter", e.target.value || undefined)
-            }
-            className="onboarding-filter-select"
-          >
-            <option value="">All statuses</option>
-            {options.statuses.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("statusFilter", v || undefined)}
+            options={[
+              { value: "", label: "All statuses" },
+              ...options.statuses.map((s) => ({ value: s, label: s })),
+            ]}
+            placeholder="All statuses"
+            searchPlaceholder="Search statuses…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Ads Rights</span>
-          <select
+          <SearchableSelect
             value={initial.adsRights ?? ""}
-            onChange={(e) =>
-              setParam("adsRights", e.target.value || undefined)
-            }
-            className="onboarding-filter-select"
-          >
-            <option value="">All</option>
-            {options.adsRights.map((r) => (
-              <option key={r} value={r}>
-                {r === "yes" ? "Yes" : "No"}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("adsRights", v || undefined)}
+            options={[
+              { value: "", label: "All" },
+              ...options.adsRights.map((r) => ({
+                value: r,
+                label: r === "yes" ? "Yes" : "No",
+              })),
+            ]}
+            placeholder="All"
+            searchPlaceholder="Search…"
+          />
         </label>
 
         <div className="onboarding-filter-actions">

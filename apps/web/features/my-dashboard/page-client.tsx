@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type {
   MyDashboardFilterOptions,
   MyDashboardKpi,
@@ -87,57 +88,51 @@ export function MyDashboardBody({
           </label>
           <label className="onboarding-filter-field">
             <span>Campaign</span>
-            <select
+            <SearchableSelect
               value={filters.campaign}
-              onChange={(event) =>
-                setFilters((prev) => ({
-                  ...prev,
-                  campaign: event.target.value,
-                }))
-              }
-              className="onboarding-filter-select"
-            >
-              <option value="">All campaigns</option>
-              {filterOptions.campaigns.map((campaign) => (
-                <option key={campaign} value={campaign}>
-                  {campaign}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setFilters((prev) => ({ ...prev, campaign: v }))}
+              options={[
+                { value: "", label: "All campaigns" },
+                ...filterOptions.campaigns.map((campaign) => ({
+                  value: campaign,
+                  label: campaign,
+                })),
+              ]}
+              placeholder="All campaigns"
+              searchPlaceholder="Search campaigns…"
+            />
           </label>
           <label className="onboarding-filter-field">
             <span>Stage</span>
-            <select
+            <SearchableSelect
               value={filters.status}
-              onChange={(event) =>
-                setFilters((prev) => ({ ...prev, status: event.target.value }))
-              }
-              className="onboarding-filter-select"
-            >
-              <option value="">All stages</option>
-              {filterOptions.statuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setFilters((prev) => ({ ...prev, status: v }))}
+              options={[
+                { value: "", label: "All stages" },
+                ...filterOptions.statuses.map((status) => ({
+                  value: status,
+                  label: status,
+                })),
+              ]}
+              placeholder="All stages"
+              searchPlaceholder="Search stages…"
+            />
           </label>
           <label className="onboarding-filter-field">
             <span>Tier</span>
-            <select
+            <SearchableSelect
               value={filters.tier}
-              onChange={(event) =>
-                setFilters((prev) => ({ ...prev, tier: event.target.value }))
-              }
-              className="onboarding-filter-select"
-            >
-              <option value="">All tiers</option>
-              {filterOptions.tiers.map((tier) => (
-                <option key={tier} value={tier}>
-                  {tier}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setFilters((prev) => ({ ...prev, tier: v }))}
+              options={[
+                { value: "", label: "All tiers" },
+                ...filterOptions.tiers.map((tier) => ({
+                  value: tier,
+                  label: tier,
+                })),
+              ]}
+              placeholder="All tiers"
+              searchPlaceholder="Search tiers…"
+            />
           </label>
         </div>
         {Object.values(filters).some(Boolean) && (

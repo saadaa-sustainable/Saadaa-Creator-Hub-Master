@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { deleteUser, saveUser, toggleUserActive } from "./actions";
 import { deleteRole } from "./roles-actions";
 import { RoleEditorModal, useScopesPreview } from "./role-editor-modal";
@@ -535,50 +536,46 @@ function StickyToolbar(props: {
             <span>
               <Shield size={10} aria-hidden /> Role
             </span>
-            <select
+            <SearchableSelect
               value={props.roleFilter}
-              onChange={(e) => props.onRole(e.target.value)}
-              className="onboarding-filter-select"
-            >
-              <option value="">All Roles</option>
-              {props.roleOptions.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+              onChange={props.onRole}
+              options={[
+                { value: "", label: "All Roles" },
+                ...props.roleOptions.map((r) => ({ value: r, label: r })),
+              ]}
+              placeholder="All Roles"
+              searchPlaceholder="Search roles…"
+            />
           </label>
           <label className="onboarding-filter-field">
             <span>
               <Filter size={10} aria-hidden /> Status
             </span>
-            <select
+            <SearchableSelect
               value={props.statusFilter}
-              onChange={(e) => props.onStatus(e.target.value)}
-              className="onboarding-filter-select"
-            >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+              onChange={props.onStatus}
+              options={[
+                { value: "", label: "All Status" },
+                { value: "active", label: "Active" },
+                { value: "inactive", label: "Inactive" },
+              ]}
+              placeholder="All Status"
+              searchPlaceholder="Search…"
+            />
           </label>
           <label className="onboarding-filter-field">
             <span>
               <Clock size={10} aria-hidden /> Last Active
             </span>
-            <select
+            <SearchableSelect
               value={props.lastActive}
-              onChange={(e) =>
-                props.onLastActive(e.target.value as LastActiveFilter)
-              }
-              className="onboarding-filter-select"
-            >
-              {(Object.keys(LAST_ACTIVE_LABEL) as LastActiveFilter[]).map((k) => (
-                <option key={k} value={k}>
-                  {LAST_ACTIVE_LABEL[k]}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => props.onLastActive(v as LastActiveFilter)}
+              options={(Object.keys(LAST_ACTIVE_LABEL) as LastActiveFilter[]).map(
+                (k) => ({ value: k, label: LAST_ACTIVE_LABEL[k] }),
+              )}
+              placeholder={LAST_ACTIVE_LABEL[""]}
+              searchPlaceholder="Search…"
+            />
           </label>
         </div>
       </div>
@@ -1556,30 +1553,28 @@ function UserModal({
               <span className="text-[0.6rem] uppercase tracking-[0.06em] font-extrabold text-text-tertiary">
                 Role *
               </span>
-              <select
+              <SearchableSelect
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="form-control"
-              >
-                {roleOptions.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+                onChange={setRole}
+                options={roleOptions.map((r) => ({ value: r, label: r }))}
+                placeholder="Select role…"
+                searchPlaceholder="Search roles…"
+              />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-[0.6rem] uppercase tracking-[0.06em] font-extrabold text-text-tertiary">
                 Status
               </span>
-              <select
+              <SearchableSelect
                 value={active ? "true" : "false"}
-                onChange={(e) => setActive(e.target.value === "true")}
-                className="form-control"
-              >
-                <option value="true">Active</option>
-                <option value="false">Inactive</option>
-              </select>
+                onChange={(v) => setActive(v === "true")}
+                options={[
+                  { value: "true", label: "Active" },
+                  { value: "false", label: "Inactive" },
+                ]}
+                placeholder="Active"
+                searchPlaceholder="Search…"
+              />
             </label>
           </div>
 

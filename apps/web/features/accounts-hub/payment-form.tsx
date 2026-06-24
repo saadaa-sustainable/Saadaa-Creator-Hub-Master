@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, MissingFieldsAlert } from "@/components/ui";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { cn } from "@/lib/cn";
 import { formatRupees } from "@/lib/formatters";
 import { todayIstIso } from "@/lib/payable-cycle";
@@ -571,29 +572,27 @@ export function PaymentEntryPanel() {
                       <span className="req">*</span>
                     </label>
                     <div className="flex items-center gap-2 min-w-0">
-                      <select
+                      <SearchableSelect
                         id={postFieldId}
                         className="acc-field__input acc-field__input--select min-w-0"
                         value={row.postId}
-                        onChange={(e) =>
+                        onChange={(v) =>
                           patchRow(row.key, {
-                            postId: e.target.value,
+                            postId: v,
                             amount:
-                              eligibleById.get(e.target.value)
-                                ?.commercial_amount?.toString() ?? row.amount,
+                              eligibleById.get(v)?.commercial_amount?.toString() ??
+                              row.amount,
                           })
                         }
-                      >
-                        <option value="">
-                          {loadingEligible ? "Loading collabs…" : "Pick a collab"}
-                        </option>
-                        {eligible.map((p) => (
-                          <option key={p.post_id} value={p.post_id}>
-                            {p.collab_id ?? p.post_id_short ?? p.post_id} ·{" "}
-                            {p.inf_name ?? p.username ?? "—"}
-                          </option>
-                        ))}
-                      </select>
+                        options={eligible.map((p) => ({
+                          value: p.post_id,
+                          label: `${p.collab_id ?? p.post_id_short ?? p.post_id} · ${p.inf_name ?? p.username ?? "—"}`,
+                        }))}
+                        placeholder={
+                          loadingEligible ? "Loading collabs…" : "Pick a collab"
+                        }
+                        searchPlaceholder="Search collabs…"
+                      />
                       {linked && (
                         <span
                           className="inline-flex items-center gap-1 whitespace-nowrap text-[0.72rem] font-semibold text-text-secondary"

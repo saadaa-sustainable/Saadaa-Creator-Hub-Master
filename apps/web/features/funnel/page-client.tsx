@@ -16,6 +16,7 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { FunnelChart } from "./funnel-chart";
 import type { FunnelData, FunnelMetrics, FunnelPeriodMode } from "./types";
 
@@ -141,31 +142,31 @@ function FilterRow({
           <span className="inline-flex items-center gap-1">
             <Calendar size={12} aria-hidden /> Period
           </span>
-          <select
+          <SearchableSelect
             value={mode}
-            onChange={(e) => onModeChange(e.target.value as FunnelPeriodMode)}
-            className="onboarding-filter-select"
-          >
-            <option value="month">Monthly</option>
-            <option value="week">Weekly (ISO)</option>
-          </select>
+            onChange={(v) => onModeChange(v as FunnelPeriodMode)}
+            options={[
+              { value: "month", label: "Monthly" },
+              { value: "week", label: "Weekly (ISO)" },
+            ]}
+            placeholder="Monthly"
+            searchPlaceholder="Search…"
+          />
         </label>
         <label className="onboarding-filter-field">
           <span className="inline-flex items-center gap-1">
             <Users size={12} aria-hidden /> Team
           </span>
-          <select
+          <SearchableSelect
             value={team}
-            onChange={(e) => onTeamChange(e.target.value)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All team</option>
-            {teams.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            onChange={onTeamChange}
+            options={[
+              { value: "", label: "All team" },
+              ...teams.map((t) => ({ value: t, label: t })),
+            ]}
+            placeholder="All team"
+            searchPlaceholder="Search team…"
+          />
         </label>
         <div className="onboarding-filter-actions">
           <button

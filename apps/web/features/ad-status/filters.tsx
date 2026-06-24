@@ -4,6 +4,7 @@ import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { AdStatusFilterOptions, AdStatusFilters } from "./types";
 
 const FILTER_KEYS = [
@@ -76,50 +77,52 @@ export function AdStatusFiltersBar({
 
         <label className="onboarding-filter-field">
           <span>Campaign</span>
-          <select
+          <SearchableSelect
             value={initial.campaign ?? ""}
-            onChange={(e) => setParam("campaign", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All Campaigns</option>
-            {options.campaigns.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.id}
-                {c.name && c.name !== c.id ? ` · ${c.name}` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("campaign", v || undefined)}
+            options={[
+              { value: "", label: "All Campaigns" },
+              ...options.campaigns.map((c) => ({
+                value: c.id,
+                label: `${c.id}${c.name && c.name !== c.id ? ` · ${c.name}` : ""}`,
+              })),
+            ]}
+            placeholder="All Campaigns"
+            searchPlaceholder="Search campaigns…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Classification</span>
-          <select
+          <SearchableSelect
             value={initial.classification ?? ""}
-            onChange={(e) =>
-              setParam("classification", e.target.value || undefined)
-            }
-            className="onboarding-filter-select"
-          >
-            <option value="">All Results</option>
-            <option value="Winner">Winner</option>
-            <option value="ITE">ITE</option>
-            <option value="Discarded but analyse">Discarded (Analyse)</option>
-            <option value="Discarded">Discarded</option>
-            <option value="__untested">Untested only</option>
-          </select>
+            onChange={(v) => setParam("classification", v || undefined)}
+            options={[
+              { value: "", label: "All Results" },
+              { value: "Winner", label: "Winner" },
+              { value: "ITE", label: "ITE" },
+              { value: "Discarded but analyse", label: "Discarded (Analyse)" },
+              { value: "Discarded", label: "Discarded" },
+              { value: "__untested", label: "Untested only" },
+            ]}
+            placeholder="All Results"
+            searchPlaceholder="Search…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Ad Status</span>
-          <select
+          <SearchableSelect
             value={initial.adStatus ?? ""}
-            onChange={(e) => setParam("adStatus", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All</option>
-            <option value="run">Run</option>
-            <option value="running">Running</option>
-          </select>
+            onChange={(v) => setParam("adStatus", v || undefined)}
+            options={[
+              { value: "", label: "All" },
+              { value: "run", label: "Run" },
+              { value: "running", label: "Running" },
+            ]}
+            placeholder="All"
+            searchPlaceholder="Search…"
+          />
         </label>
       </div>
 

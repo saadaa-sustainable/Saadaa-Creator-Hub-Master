@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatRupees } from "@/lib/formatters";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type {
   CampaignTotalsRow,
   CostAnalyticsData,
@@ -277,52 +278,46 @@ function FilterRow({
           <span>
             <Calendar size={10} aria-hidden /> Month
           </span>
-          <select
+          <SearchableSelect
             value={month}
-            onChange={(e) => onMonthChange(e.target.value)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All months</option>
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+            onChange={onMonthChange}
+            options={[
+              { value: "", label: "All months" },
+              ...months.map((m) => ({ value: m, label: m })),
+            ]}
+            placeholder="All months"
+            searchPlaceholder="Search months…"
+          />
         </label>
         <label className="onboarding-filter-field">
           <span>
             <Layers size={10} aria-hidden /> Tier
           </span>
-          <select
+          <SearchableSelect
             value={tier}
-            onChange={(e) => onTierChange(e.target.value)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All tiers</option>
-            {TIERS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            onChange={onTierChange}
+            options={[
+              { value: "", label: "All tiers" },
+              ...TIERS.map((t) => ({ value: t, label: t })),
+            ]}
+            placeholder="All tiers"
+            searchPlaceholder="Search tiers…"
+          />
         </label>
         <label className="onboarding-filter-field">
           <span>
             <Wallet size={10} aria-hidden /> Collab
           </span>
-          <select
+          <SearchableSelect
             value={collabType}
-            onChange={(e) => onCollabTypeChange(e.target.value)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All types</option>
-            {COLLAB_TYPES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            onChange={onCollabTypeChange}
+            options={[
+              { value: "", label: "All types" },
+              ...COLLAB_TYPES.map((c) => ({ value: c, label: c })),
+            ]}
+            placeholder="All types"
+            searchPlaceholder="Search types…"
+          />
         </label>
         <div className="onboarding-filter-actions">
           <button

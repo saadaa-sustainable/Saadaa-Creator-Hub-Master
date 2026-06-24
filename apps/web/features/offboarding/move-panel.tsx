@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, UserMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { moveToOffboarding } from "./actions";
 import type { OffboardCollabOption } from "./queries";
 
@@ -62,23 +63,21 @@ export function MoveToOffboardingPanel({
       <div className="flex flex-wrap items-end gap-2">
         <label className="onboarding-filter-field flex-1 min-w-[200px]">
           <span>Collab ID</span>
-          <select
+          <SearchableSelect
             value={postId}
-            onChange={(e) => setPostId(e.target.value)}
-            className="onboarding-filter-select"
+            onChange={setPostId}
             disabled={pending || collabs.length === 0}
-          >
-            <option value="">
-              {collabs.length === 0
+            options={collabs.map((c) => ({
+              value: c.postId,
+              label: c.label,
+            }))}
+            placeholder={
+              collabs.length === 0
                 ? "No active collabs to offboard"
-                : "Select a collab…"}
-            </option>
-            {collabs.map((c) => (
-              <option key={c.collabId} value={c.postId}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+                : "Select a collab…"
+            }
+            searchPlaceholder="Search collabs…"
+          />
         </label>
         <Button
           variant="danger"

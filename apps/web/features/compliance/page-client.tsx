@@ -29,6 +29,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { ComplianceData, RateBreakdown } from "./types";
 
 /**
@@ -348,17 +349,16 @@ function FilterSelect({
   return (
     <label className="onboarding-filter-field">
       <span>{label}</span>
-      <select
+      <SearchableSelect
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="onboarding-filter-select"
-      >
-        {options.map(([optionValue, optionLabel]) => (
-          <option key={`${label}-${optionValue}`} value={optionValue}>
-            {optionLabel}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        options={options.map(([optionValue, optionLabel]) => ({
+          value: optionValue,
+          label: optionLabel,
+        }))}
+        placeholder={options[0]?.[1] ?? `All ${label.toLowerCase()}`}
+        searchPlaceholder={`Search ${label.toLowerCase()}…`}
+      />
     </label>
   );
 }

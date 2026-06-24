@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatDate, formatRupees, workflowStatusLabel } from "@/lib/formatters";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type {
   AuditViolation,
   ErrorPortalData,
@@ -174,29 +175,33 @@ function FilterRow({
           <span>
             <Filter size={10} aria-hidden /> Severity
           </span>
-          <select
+          <SearchableSelect
             value={severity}
-            onChange={(e) => onSeverityChange(e.target.value as Severity)}
-            className="onboarding-filter-select"
-          >
-            <option value="all">All severities</option>
-            <option value="HIGH">Critical (HIGH)</option>
-            <option value="MEDIUM">Warnings (MEDIUM)</option>
-            <option value="LOW">Info (LOW)</option>
-          </select>
+            onChange={(v) => onSeverityChange(v as Severity)}
+            options={[
+              { value: "all", label: "All severities" },
+              { value: "HIGH", label: "Critical (HIGH)" },
+              { value: "MEDIUM", label: "Warnings (MEDIUM)" },
+              { value: "LOW", label: "Info (LOW)" },
+            ]}
+            placeholder="All severities"
+            searchPlaceholder="Search…"
+          />
         </label>
         <label className="onboarding-filter-field">
           <span>
             <CheckCircle2 size={10} aria-hidden /> Show Resolved
           </span>
-          <select
+          <SearchableSelect
             value={showResolved ? "yes" : "no"}
-            onChange={(e) => onResolvedToggle(e.target.value === "yes")}
-            className="onboarding-filter-select"
-          >
-            <option value="no">Unresolved only</option>
-            <option value="yes">Include resolved</option>
-          </select>
+            onChange={(v) => onResolvedToggle(v === "yes")}
+            options={[
+              { value: "no", label: "Unresolved only" },
+              { value: "yes", label: "Include resolved" },
+            ]}
+            placeholder="Unresolved only"
+            searchPlaceholder="Search…"
+          />
         </label>
         <div className="onboarding-filter-actions">
           <span className="text-[0.6rem] text-text-tertiary tabular self-center mr-2 inline-flex items-center gap-1">

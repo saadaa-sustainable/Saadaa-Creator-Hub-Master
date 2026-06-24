@@ -4,6 +4,7 @@ import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type {
   JourneyClientFilters,
   JourneyFilterOptions,
@@ -105,114 +106,94 @@ export function JourneyFiltersBar({
         {/* Campaign — URL-driven */}
         <label className="onboarding-filter-field">
           <span>Campaign</span>
-          <select
+          <SearchableSelect
             value={initial.campaign ?? ""}
-            onChange={(e) => setCampaignParam(e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All Campaigns</option>
-            {options.campaigns.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.id}
-                {c.name && c.name !== c.id ? ` · ${c.name}` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setCampaignParam(v || undefined)}
+            options={[
+              { value: "", label: "All Campaigns" },
+              ...options.campaigns.map((c) => ({
+                value: c.id,
+                label: `${c.id}${c.name && c.name !== c.id ? ` · ${c.name}` : ""}`,
+              })),
+            ]}
+            placeholder="All Campaigns"
+            searchPlaceholder="Search campaigns…"
+          />
         </label>
 
         {/* Influencer — client-side */}
         <label className="onboarding-filter-field">
           <span>Influencer</span>
-          <select
+          <SearchableSelect
             value={clientFilters.influencer}
-            onChange={(e) =>
-              onClientFiltersChange({ influencer: e.target.value })
-            }
-            className="onboarding-filter-select"
-          >
-            <option value="">All Influencers</option>
-            {influencerOptions.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onClientFiltersChange({ influencer: v })}
+            options={[
+              { value: "", label: "All Influencers" },
+              ...influencerOptions.map((u) => ({ value: u, label: u })),
+            ]}
+            placeholder="All Influencers"
+            searchPlaceholder="Search influencers…"
+          />
         </label>
 
         {/* Team Member — client-side */}
         <label className="onboarding-filter-field">
           <span>Team Member</span>
-          <select
+          <SearchableSelect
             value={clientFilters.teamMember}
-            onChange={(e) =>
-              onClientFiltersChange({ teamMember: e.target.value })
-            }
-            className="onboarding-filter-select"
-          >
-            <option value="">All Members</option>
-            {teamMemberOptions.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onClientFiltersChange({ teamMember: v })}
+            options={[
+              { value: "", label: "All Members" },
+              ...teamMemberOptions.map((m) => ({ value: m, label: m })),
+            ]}
+            placeholder="All Members"
+            searchPlaceholder="Search members…"
+          />
         </label>
 
         {/* Tier — client-side */}
         <label className="onboarding-filter-field">
           <span>Tier</span>
-          <select
+          <SearchableSelect
             value={clientFilters.tier}
-            onChange={(e) =>
-              onClientFiltersChange({ tier: e.target.value })
-            }
-            className="onboarding-filter-select"
-          >
-            <option value="">All Tiers</option>
-            {TIER_LABELS.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onClientFiltersChange({ tier: v })}
+            options={[
+              { value: "", label: "All Tiers" },
+              ...TIER_LABELS.map((t) => ({ value: t.value, label: t.label })),
+            ]}
+            placeholder="All Tiers"
+            searchPlaceholder="Search tiers…"
+          />
         </label>
 
         {/* Order Status — client-side */}
         <label className="onboarding-filter-field">
           <span>Order Status</span>
-          <select
+          <SearchableSelect
             value={clientFilters.orderStatus}
-            onChange={(e) =>
-              onClientFiltersChange({ orderStatus: e.target.value })
-            }
-            className="onboarding-filter-select"
-          >
-            <option value="">All Statuses</option>
-            {ORDER_STATUS_LABELS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onClientFiltersChange({ orderStatus: v })}
+            options={[
+              { value: "", label: "All Statuses" },
+              ...ORDER_STATUS_LABELS.map((s) => ({ value: s, label: s })),
+            ]}
+            placeholder="All Statuses"
+            searchPlaceholder="Search statuses…"
+          />
         </label>
 
         {/* Collab Type — client-side */}
         <label className="onboarding-filter-field">
           <span>Collab Type</span>
-          <select
+          <SearchableSelect
             value={clientFilters.collabType}
-            onChange={(e) =>
-              onClientFiltersChange({ collabType: e.target.value })
-            }
-            className="onboarding-filter-select"
-          >
-            <option value="">All Types</option>
-            {COLLAB_TYPE_LABELS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onClientFiltersChange({ collabType: v })}
+            options={[
+              { value: "", label: "All Types" },
+              ...COLLAB_TYPE_LABELS.map((t) => ({ value: t, label: t })),
+            ]}
+            placeholder="All Types"
+            searchPlaceholder="Search types…"
+          />
         </label>
       </div>
 

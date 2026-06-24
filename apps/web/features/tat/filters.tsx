@@ -4,6 +4,7 @@ import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Calendar, Filter, Layers, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { TatFilterOptions, TatFilters } from "./types";
 
 const FILTER_KEYS = [
@@ -54,57 +55,54 @@ export function TatFiltersBar({
           <span>
             <Filter size={10} aria-hidden /> Campaign
           </span>
-          <select
+          <SearchableSelect
             value={initial.campaign ?? ""}
-            onChange={(e) => setParam("campaign", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All Campaigns</option>
-            {options.campaigns.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.id}
-                {c.name && c.name !== c.id ? ` · ${c.name}` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("campaign", v || undefined)}
+            options={[
+              { value: "", label: "All Campaigns" },
+              ...options.campaigns.map((c) => ({
+                value: c.id,
+                label: `${c.id}${c.name && c.name !== c.id ? ` · ${c.name}` : ""}`,
+              })),
+            ]}
+            placeholder="All Campaigns"
+            searchPlaceholder="Search campaigns…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>
             <Layers size={10} aria-hidden /> Tier
           </span>
-          <select
+          <SearchableSelect
             value={initial.tier ?? ""}
-            onChange={(e) => setParam("tier", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All Tiers</option>
-            {options.tiers.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("tier", v || undefined)}
+            options={[
+              { value: "", label: "All Tiers" },
+              ...options.tiers.map((t) => ({ value: t, label: t })),
+            ]}
+            placeholder="All Tiers"
+            searchPlaceholder="Search tiers…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>
             <Filter size={10} aria-hidden /> Status
           </span>
-          <select
+          <SearchableSelect
             value={initial.status ?? ""}
-            onChange={(e) =>
-              setParam(
-                "status",
-                (e.target.value as TatFilters["status"]) || undefined,
-              )
+            onChange={(v) =>
+              setParam("status", (v as TatFilters["status"]) || undefined)
             }
-            className="onboarding-filter-select"
-          >
-            <option value="">Posted + Delivered</option>
-            <option value="posted">Posted only</option>
-            <option value="delivered">Delivered only</option>
-          </select>
+            options={[
+              { value: "", label: "Posted + Delivered" },
+              { value: "posted", label: "Posted only" },
+              { value: "delivered", label: "Delivered only" },
+            ]}
+            placeholder="Posted + Delivered"
+            searchPlaceholder="Search…"
+          />
         </label>
 
         <label className="onboarding-filter-field">

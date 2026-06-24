@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { FunnelChart } from "@/features/funnel/funnel-chart";
 import type { FunnelMetrics } from "@/features/funnel/types";
 import type { InternalDashboardData } from "./types";
@@ -231,68 +232,64 @@ function FilterRow({
           <span className="inline-flex items-center gap-1">
             <Calendar size={10} aria-hidden /> Period
           </span>
-          <select
+          <SearchableSelect
             value={mode}
-            onChange={(e) => onModeChange(e.target.value as PeriodMode)}
-            className="onboarding-filter-select"
-          >
-            <option value="month">Monthly</option>
-            <option value="week">Weekly (ISO)</option>
-          </select>
+            onChange={(v) => onModeChange(v as PeriodMode)}
+            options={[
+              { value: "month", label: "Monthly" },
+              { value: "week", label: "Weekly (ISO)" },
+            ]}
+            placeholder="Monthly"
+            searchPlaceholder="Search…"
+          />
         </label>
         {mode === "month" ? (
           <label className="onboarding-filter-field">
             <span className="inline-flex items-center gap-1">
               <Filter size={10} aria-hidden /> Month
             </span>
-            <select
+            <SearchableSelect
               value={month}
-              onChange={(e) => onMonthChange(e.target.value)}
-              className="onboarding-filter-select"
-            >
-              <option value="">All months</option>
-              {monthOptions.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
+              onChange={onMonthChange}
+              options={[
+                { value: "", label: "All months" },
+                ...monthOptions.map((m) => ({ value: m, label: m })),
+              ]}
+              placeholder="All months"
+              searchPlaceholder="Search months…"
+            />
           </label>
         ) : (
           <label className="onboarding-filter-field">
             <span className="inline-flex items-center gap-1">
               <Filter size={10} aria-hidden /> Week
             </span>
-            <select
+            <SearchableSelect
               value={week}
-              onChange={(e) => onWeekChange(e.target.value)}
-              className="onboarding-filter-select"
-            >
-              <option value="">All weeks</option>
-              {weekOptions.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
-            </select>
+              onChange={onWeekChange}
+              options={[
+                { value: "", label: "All weeks" },
+                ...weekOptions.map((w) => ({ value: w, label: w })),
+              ]}
+              placeholder="All weeks"
+              searchPlaceholder="Search weeks…"
+            />
           </label>
         )}
         <label className="onboarding-filter-field">
           <span className="inline-flex items-center gap-1">
             <Users size={10} aria-hidden /> Team
           </span>
-          <select
+          <SearchableSelect
             value={team}
-            onChange={(e) => onTeamChange(e.target.value)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All team</option>
-            {teams.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            onChange={onTeamChange}
+            options={[
+              { value: "", label: "All team" },
+              ...teams.map((t) => ({ value: t, label: t })),
+            ]}
+            placeholder="All team"
+            searchPlaceholder="Search team…"
+          />
         </label>
         <div className="onboarding-filter-actions">
           <button

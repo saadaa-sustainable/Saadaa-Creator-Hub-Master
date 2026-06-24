@@ -4,6 +4,7 @@ import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { DashboardFilterOptions, DashboardFilters } from "./types";
 
 const FILTER_KEYS = [
@@ -55,19 +56,19 @@ export function DashboardFiltersBar({
       <div className="onboarding-filter-grid acc-filter-grid">
         <label className="onboarding-filter-field">
           <span>Campaign</span>
-          <select
+          <SearchableSelect
             value={initial.campaign ?? ""}
-            onChange={(e) => setParam("campaign", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All campaigns</option>
-            {options.campaigns.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.id}
-                {c.name && c.name !== c.id ? ` · ${c.name}` : ""}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("campaign", v || undefined)}
+            options={[
+              { value: "", label: "All campaigns" },
+              ...options.campaigns.map((c) => ({
+                value: c.id,
+                label: `${c.id}${c.name && c.name !== c.id ? ` · ${c.name}` : ""}`,
+              })),
+            ]}
+            placeholder="All campaigns"
+            searchPlaceholder="Search campaigns…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
@@ -92,49 +93,47 @@ export function DashboardFiltersBar({
 
         <label className="onboarding-filter-field">
           <span>Content type</span>
-          <select
+          <SearchableSelect
             value={initial.contentType ?? ""}
-            onChange={(e) => setParam("contentType", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All content</option>
-            {options.contentTypes.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("contentType", v || undefined)}
+            options={[
+              { value: "", label: "All content" },
+              ...options.contentTypes.map((c) => ({ value: c, label: c })),
+            ]}
+            placeholder="All content"
+            searchPlaceholder="Search content…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Tier</span>
-          <select
+          <SearchableSelect
             value={initial.influencerType ?? ""}
-            onChange={(e) => setParam("influencerType", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All tiers</option>
-            {TIERS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => setParam("influencerType", v || undefined)}
+            options={[
+              { value: "", label: "All tiers" },
+              ...TIERS.map((t) => ({ value: t, label: t })),
+            ]}
+            placeholder="All tiers"
+            searchPlaceholder="Search tiers…"
+          />
         </label>
 
         <label className="onboarding-filter-field">
           <span>Status</span>
-          <select
+          <SearchableSelect
             value={initial.status ?? ""}
-            onChange={(e) => setParam("status", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          >
-            <option value="">All status</option>
-            <option value="Reach Out">Reach Out</option>
-            <option value="On Board">Onboard</option>
-            <option value="Posted">Posted</option>
-            <option value="Delivered">Delivered</option>
-          </select>
+            onChange={(v) => setParam("status", v || undefined)}
+            options={[
+              { value: "", label: "All status" },
+              { value: "Reach Out", label: "Reach Out" },
+              { value: "On Board", label: "Onboard" },
+              { value: "Posted", label: "Posted" },
+              { value: "Delivered", label: "Delivered" },
+            ]}
+            placeholder="All status"
+            searchPlaceholder="Search status…"
+          />
         </label>
 
         <div className="onboarding-filter-actions">

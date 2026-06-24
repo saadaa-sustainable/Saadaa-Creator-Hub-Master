@@ -45,6 +45,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { formatDate, formatRupees } from "@/lib/formatters";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   deleteSheetRows,
   fetchCellComments,
@@ -1418,8 +1419,8 @@ function Cell({
     if (!isEditing) setDraft(rawString(value, col));
   }, [value, col, isEditing]);
 
-  const submit = () => {
-    if (draft === rawString(value, col)) {
+  const submitValue = (next: string) => {
+    if (next === rawString(value, col)) {
       onStopEdit();
       return;
     }
@@ -1428,7 +1429,7 @@ function Cell({
         tableId,
         rowKey,
         column: col.key,
-        value: draft,
+        value: next,
       });
       if (res.ok) {
         toast.success(`${col.label} updated`, {
@@ -1441,6 +1442,8 @@ function Cell({
       }
     });
   };
+
+  const submit = () => submitValue(draft);
 
   const cancel = () => {
     setDraft(rawString(value, col));
@@ -1480,22 +1483,22 @@ function Cell({
     if (col.type === "select" || col.type === "status") {
       return (
         <td className={baseCell} style={pinnedStyle}>
-          <select
-            autoFocus
+          <SearchableSelect
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={submit}
-            onKeyDown={onKey}
-            className="h-7 w-full rounded border-2 border-warning bg-bg-white text-[0.72rem] font-bold text-text-primary px-1 focus:outline-none focus:ring-2 focus:ring-warning/30"
+            onChange={(v) => {
+              setDraft(v);
+              submitValue(v);
+            }}
+            options={[
+              { value: "", label: "—" },
+              ...(col.options ?? []).map((o) => ({ value: o, label: o })),
+            ]}
+            clearable
             disabled={pending}
-          >
-            <option value="">—</option>
-            {(col.options ?? []).map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
+            placeholder="—"
+            searchPlaceholder="Search…"
+            className="h-7 border-2 border-warning"
+          />
         </td>
       );
     }

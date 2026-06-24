@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import {
@@ -114,6 +114,7 @@ export function OrderCreationModal({
     watch,
     getValues,
     setValue,
+    control,
     formState: { errors },
   } = useForm<OnboardingInput>({
     resolver: zodResolver(OnboardingSchema),
@@ -531,18 +532,21 @@ export function OrderCreationModal({
               </div>
 
               <div className="form-floating relative">
-                <select
-                  className={cn("form-select", collabLocked && "br-readonly")}
-                  id="ob_collab"
-                  disabled={collabLocked}
-                  {...register("collabType")}
-                >
-                  {COLLAB_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  control={control}
+                  name="collabType"
+                  render={({ field }) => (
+                    <SearchableSelect
+                      id="ob_collab"
+                      className={cn(collabLocked && "br-readonly")}
+                      disabled={collabLocked}
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      options={COLLAB_TYPES.map((t) => ({ value: t, label: t }))}
+                      searchPlaceholder="Search…"
+                    />
+                  )}
+                />
                 <label htmlFor="ob_collab">
                   Collab Type <span className="req">*</span>
                 </label>
@@ -601,18 +605,26 @@ export function OrderCreationModal({
               </div>
 
               <div className="form-floating">
-                <select
-                  className="form-select"
-                  id="ob_adsRights"
-                  {...register("adsUsageRights")}
-                >
-                  <option value="">None</option>
-                  {ADS_USAGE_RIGHTS.filter((a) => a !== "").map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  control={control}
+                  name="adsUsageRights"
+                  render={({ field }) => (
+                    <SearchableSelect
+                      id="ob_adsRights"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      options={[
+                        { value: "", label: "None" },
+                        ...ADS_USAGE_RIGHTS.filter((a) => a !== "").map((a) => ({
+                          value: a,
+                          label: a,
+                        })),
+                      ]}
+                      placeholder="None"
+                      searchPlaceholder="Search…"
+                    />
+                  )}
+                />
                 <label htmlFor="ob_adsRights">
                   <ShieldCheck size={11} className="inline mr-1" />
                   Ads Usage Rights
@@ -885,18 +897,26 @@ export function OrderCreationModal({
           <section className="ob-form-section">
             <div className="form-grid">
               <div className="form-floating form-grid-full">
-                <select
-                  className="form-control"
-                  id="ob_duration"
-                  {...register("duration")}
-                >
-                  <option value="">Select content duration…</option>
-                  {CONTENT_DURATIONS.filter((d) => d).map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  control={control}
+                  name="duration"
+                  render={({ field }) => (
+                    <SearchableSelect
+                      id="ob_duration"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      options={[
+                        { value: "", label: "Select content duration…" },
+                        ...CONTENT_DURATIONS.filter((d) => d).map((d) => ({
+                          value: d,
+                          label: d,
+                        })),
+                      ]}
+                      placeholder="Select content duration…"
+                      searchPlaceholder="Search durations…"
+                    />
+                  )}
+                />
                 <label htmlFor="ob_duration">Content Duration</label>
               </div>
               <div className="form-floating form-grid-full">

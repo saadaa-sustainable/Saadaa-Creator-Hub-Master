@@ -27,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { submitCampaign, editCampaign } from "./actions";
 import {
   CampaignCreateSchema,
@@ -544,13 +545,16 @@ export function CampaignCreateForm({
                           control={control}
                           name={`budgetRows.${idx}.tier`}
                           render={({ field }) => (
-                            <select className="form-select br-tier" {...field}>
-                              {INFLUENCER_TIERS.map((t) => (
-                                <option key={t} value={t}>
-                                  {t}
-                                </option>
-                              ))}
-                            </select>
+                            <SearchableSelect
+                              className="br-tier"
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              options={INFLUENCER_TIERS.map((t) => ({
+                                value: t,
+                                label: t,
+                              }))}
+                              searchPlaceholder="Search tiers…"
+                            />
                           )}
                         />
                       </td>
@@ -559,16 +563,16 @@ export function CampaignCreateForm({
                           control={control}
                           name={`budgetRows.${idx}.collabType`}
                           render={({ field }) => (
-                            <select
-                              className="form-select br-collab"
-                              {...field}
-                            >
-                              {COLLAB_TYPES.map((c) => (
-                                <option key={c} value={c}>
-                                  {c}
-                                </option>
-                              ))}
-                            </select>
+                            <SearchableSelect
+                              className="br-collab"
+                              value={field.value ?? ""}
+                              onChange={field.onChange}
+                              options={COLLAB_TYPES.map((c) => ({
+                                value: c,
+                                label: c,
+                              }))}
+                              searchPlaceholder="Search…"
+                            />
                           )}
                         />
                       </td>
@@ -758,13 +762,15 @@ export function CampaignCreateForm({
                       control={control}
                       name={`budgetRows.${idx}.tier`}
                       render={({ field }) => (
-                        <select className="form-control form-select" {...field}>
-                          {INFLUENCER_TIERS.map((t) => (
-                            <option key={t} value={t}>
-                              {t}
-                            </option>
-                          ))}
-                        </select>
+                        <SearchableSelect
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          options={INFLUENCER_TIERS.map((t) => ({
+                            value: t,
+                            label: t,
+                          }))}
+                          searchPlaceholder="Search tiers…"
+                        />
                       )}
                     />
                   </label>
@@ -774,13 +780,15 @@ export function CampaignCreateForm({
                       control={control}
                       name={`budgetRows.${idx}.collabType`}
                       render={({ field }) => (
-                        <select className="form-control form-select" {...field}>
-                          {COLLAB_TYPES.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
+                        <SearchableSelect
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          options={COLLAB_TYPES.map((c) => ({
+                            value: c,
+                            label: c,
+                          }))}
+                          searchPlaceholder="Search…"
+                        />
                       )}
                     />
                   </label>

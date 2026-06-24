@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { formatFollowers, tierFromFollowers } from "@/lib/formatters";
 import { Avatar } from "@/components/ui/avatar";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
 import {
   REACHOUT_DEFAULTS,
@@ -337,20 +338,19 @@ export function OutboundForm({
               name="campaignId"
               render={({ field }) => (
                 <div className="form-floating">
-                  <select
-                    {...field}
+                  <SearchableSelect
                     id="ro_campaign"
-                    className="form-control form-select"
-                    required
-                  >
-                    <option value=""></option>
-                    {campaigns.map((c) => (
-                      <option key={c.campaign_id} value={c.campaign_id}>
-                        {c.campaign_id +
-                          (c.campaign_name ? ` · ${c.campaign_name}` : "")}
-                      </option>
-                    ))}
-                  </select>
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    options={campaigns.map((c) => ({
+                      value: c.campaign_id,
+                      label:
+                        c.campaign_id +
+                        (c.campaign_name ? ` · ${c.campaign_name}` : ""),
+                    }))}
+                    placeholder="Select campaign…"
+                    searchPlaceholder="Search campaigns…"
+                  />
                   <label htmlFor="ro_campaign">
                     Campaign ID <span className="req">*</span>
                   </label>
@@ -680,22 +680,16 @@ export function OutboundForm({
             name="gender"
             render={({ field }) => (
               <div className="form-floating relative">
-                <select
-                  {...field}
+                <SearchableSelect
                   id="ro_gender"
-                  className={cn(
-                    "form-control form-select",
-                    isExistingCreator && "field-auto",
-                  )}
-                  required
+                  className={cn(isExistingCreator && "field-auto")}
                   disabled={isExistingCreator}
-                >
-                  {GENDERS.map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </select>
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  options={GENDERS.map((g) => ({ value: g, label: g }))}
+                  placeholder="Select gender…"
+                  searchPlaceholder="Search…"
+                />
                 <label htmlFor="ro_gender">
                   Gender <span className="req">*</span>
                 </label>
@@ -829,19 +823,17 @@ export function OutboundForm({
             name="contentType"
             render={({ field }) => (
               <div className="form-floating">
-                <select
-                  {...field}
+                <SearchableSelect
                   id="ro_contentCode"
-                  className="form-control form-select"
-                  required
-                >
-                  <option value=""></option>
-                  {CONTENT_CODES.map((c) => (
-                    <option key={c.code} value={c.code}>
-                      {c.code} — {c.name}
-                    </option>
-                  ))}
-                </select>
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  options={CONTENT_CODES.map((c) => ({
+                    value: c.code,
+                    label: `${c.code} — ${c.name}`,
+                  }))}
+                  placeholder="Select content type…"
+                  searchPlaceholder="Search content types…"
+                />
                 <label htmlFor="ro_contentCode">
                   Content Type <span className="req">*</span>
                 </label>
@@ -865,22 +857,16 @@ export function OutboundForm({
             name="language"
             render={({ field }) => (
               <div className="form-floating reachout-language-field relative">
-                <select
-                  {...field}
+                <SearchableSelect
                   id="ro_language"
-                  className={cn(
-                    "form-control form-select",
-                    isExistingCreator && "field-auto",
-                  )}
-                  required
+                  className={cn(isExistingCreator && "field-auto")}
                   disabled={isExistingCreator}
-                >
-                  {LANGUAGES.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  options={LANGUAGES.map((l) => ({ value: l, label: l }))}
+                  placeholder="Select language…"
+                  searchPlaceholder="Search languages…"
+                />
                 <label htmlFor="ro_language">
                   Primary Language <span className="req">*</span>
                 </label>
