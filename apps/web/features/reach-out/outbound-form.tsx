@@ -68,6 +68,9 @@ export function OutboundForm({
   const [, startLookup] = useTransition();
   const [hit, setHit] = useState<CreatorLookupHit | null>(null);
   const [lookupState, setLookupState] = useState<LookupState>("idle");
+  // Simulated fetch progress for the single live fetch (no real done/total): climbs
+  // toward ~95% while loading, snaps to 100% on completion.
+  const [fetchPct, setFetchPct] = useState(0);
   const [verificationOverridden, setVerificationOverridden] = useState(false);
   const defaultCampaignId =
     initialCampaignId &&
@@ -133,6 +136,25 @@ export function OutboundForm({
     if (!defaultCampaignId) return;
     setValue("campaignId", defaultCampaignId, { shouldDirty: false });
   }, [defaultCampaignId, setValue]);
+
+  // Animate the simulated fetch %: ease toward 95 while loading, jump to 100 then
+  // fade out once the fetch resolves.
+  useEffect(() => {
+    if (lookupState === "loading") {
+      setFetchPct(8);
+      const t = setInterval(
+        () => setFetchPct((p) => (p < 95 ? p + Math.max(1, (95 - p) * 0.12) : p)),
+        180,
+      );
+      return () => clearInterval(t);
+    }
+    if (lookupState === "found") {
+      setFetchPct(100);
+      const t = setTimeout(() => setFetchPct(0), 700);
+      return () => clearTimeout(t);
+    }
+    setFetchPct(0);
+  }, [lookupState]);
 
   useEffect(() => {
     if (!contentType) return;
@@ -572,9 +594,17 @@ export function OutboundForm({
                   <p>
                     <strong>Fetching live from Instagram…</strong>
                   </p>
+                  <div
+                    className="fetch-bar fetch-bar--determinate"
+                    style={{ maxWidth: 220, margin: "10px auto 4px" }}
+                  >
+                    <span style={{ width: `${Math.round(fetchPct)}%` }} />
+                  </div>
+                  <strong className="text-[0.82rem] tabular-nums text-[#161513]">
+                    {Math.round(fetchPct)}% fetched
+                  </strong>
                   <small>
-                    Takes a few seconds — Meta is pulling followers + recent
-                    posts to compute ER.
+                    Meta is pulling followers + recent posts to compute ER.
                   </small>
                 </div>
               ) : !hit ? (

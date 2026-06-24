@@ -187,6 +187,42 @@ export async function probeAppUsage(): Promise<number> {
   }
 }
 
+/**
+ * BEST-EFFORT verified-badge lookup via Instagram's public web_profile_info JSON
+ * (the `<title>Verified</title>` badge isn't exposed by Meta business_discovery).
+ * READ-ONLY, no auth. IG throttles data-center IPs hard, so this often gets blocked
+ * from a server — returns null on ANY failure (caller falls back to manual). Use
+ * ONLY for the low-volume single (outbound) fetch; never in the 50-row bulk.
+ * Returns true/false (verified) or null (unknown / blocked).
+ */
+export async function fetchIgVerified(handle: string): Promise<boolean | null> {
+  const clean = cleanHandle(handle);
+  if (!clean) return null;
+  try {
+    const res = await fetch(
+      `https://i.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(clean)}`,
+      {
+        headers: {
+          "x-ig-app-id": "936619743392459",
+          "user-agent":
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram",
+          accept: "*/*",
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+    if (!res.ok) return null;
+    const j = (await res.json()) as {
+      data?: { user?: { is_verified?: boolean } };
+    };
+    const v = j?.data?.user?.is_verified;
+    return typeof v === "boolean" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Single business_discovery GET (one outbound Fetch click). */
 export async function fetchBusinessDiscovery(
   handle: string,

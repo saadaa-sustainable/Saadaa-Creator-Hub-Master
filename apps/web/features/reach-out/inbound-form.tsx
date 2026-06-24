@@ -954,26 +954,38 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                 : "Fetch all"}
             </button>
             {fetchingAll && fetchProgress && (
-              <span className="inline-flex items-center gap-2 rounded-full bg-[#F5F1EC] px-3 py-1 text-[0.72rem] font-semibold text-[#161513]">
-                {cooldownLeft > 0 ? (
-                  <>
-                    <Clock size={11} className="text-[#B57514]" />
-                    Cooling down {cooldownLeft}s · {fetchProgress.done}/
-                    {fetchProgress.total}
-                  </>
-                ) : (
-                  <>
-                    <Loader2 size={11} className="animate-spin" />
-                    Fetching {fetchProgress.done}/{fetchProgress.total}
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={cancelFetchAll}
-                  className="ml-1 text-[#C0392B] hover:underline"
+              <span className="inline-flex flex-col gap-1 rounded-xl bg-[#F5F1EC] px-3 py-1.5 text-[0.72rem] font-semibold text-[#161513]">
+                <span className="inline-flex items-center gap-2">
+                  {cooldownLeft > 0 ? (
+                    <>
+                      <Clock size={11} className="text-[#B57514]" />
+                      Cooling down {cooldownLeft}s · {fetchProgress.done}/
+                      {fetchProgress.total}
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 size={11} className="animate-spin" />
+                      Fetching {fetchProgress.done}/{fetchProgress.total}
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={cancelFetchAll}
+                    className="ml-1 text-[#C0392B] hover:underline"
+                  >
+                    Stop
+                  </button>
+                </span>
+                <span
+                  className="fetch-bar fetch-bar--determinate"
+                  style={{ minWidth: 160 }}
                 >
-                  Stop
-                </button>
+                  <span
+                    style={{
+                      width: `${fetchProgress.total ? Math.round((fetchProgress.done / fetchProgress.total) * 100) : 0}%`,
+                    }}
+                  />
+                </span>
               </span>
             )}
             <button

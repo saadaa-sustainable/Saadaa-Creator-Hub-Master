@@ -10,6 +10,7 @@ import { stampTestRows } from "@/features/settings/actions";
 import {
   fetchBusinessDiscovery,
   fetchBusinessDiscoveryBatch,
+  fetchIgVerified,
   META_BATCH_SIZE,
   type MetaDiscoveryResult,
 } from "@/lib/meta-graph";
@@ -810,13 +811,22 @@ export async function lookupCreator(
   //    Meta — historic / deactivated / error tiers cover the request.
   const gate = await checkMetaGate();
   let meta: MetaDiscoveryResult;
+  // Best-effort verified-badge crawl (Meta can't return it) — run IN PARALLEL with
+  // the Meta fetch so it adds no latency. Single-fetch only (never in bulk). null
+  // when blocked/unknown → verification stays manual.
+  let igVerified: boolean | null = null;
   if (gate.coolingDown) {
     meta = {
       status: "error",
       error: `rate-limit cooldown — retry in ${gate.retryAfterSec}s`,
     };
   } else {
-    meta = await fetchBusinessDiscovery(username);
+    const [m, v] = await Promise.all([
+      fetchBusinessDiscovery(username),
+      fetchIgVerified(username),
+    ]);
+    meta = m;
+    igVerified = v;
     await recordMetaUsage(1, meta.usagePct ?? 0);
   }
 
@@ -838,6 +848,10 @@ export async function lookupCreator(
   }
 
   const hit = assembleNonCreatorHit(username, link, meta, hist, clean);
+  // Apply the best-effort verified badge to a live Meta hit (manual otherwise).
+  if (hit.source === "meta" && igVerified !== null) {
+    hit.verification = igVerified ? "Yes" : "No";
+  }
   // Only report genuine fetch attempts — a cooldown defer isn't a real failure.
   if (!gate.coolingDown) reportLookupIssue(hit);
   persistFetches(supabase, [hit]);
