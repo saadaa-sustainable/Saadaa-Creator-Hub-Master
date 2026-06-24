@@ -105,6 +105,7 @@ export function SearchableSelect({
         <button
           type="button"
           id={id}
+          data-searchable-select=""
           aria-haspopup="listbox"
           aria-expanded={open}
           className={cn(

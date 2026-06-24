@@ -385,7 +385,8 @@
       border-radius: 9px;
     }
     .form-floating > .form-control,
-    .form-floating > .form-select {
+    .form-floating > .form-select,
+    .form-floating > button[data-searchable-select] {
       padding-top: 1.4rem;
       padding-bottom: 0.35rem;
       min-height: 52px;
@@ -1092,10 +1093,17 @@
     position: relative;
   }
   .form-floating > .form-control,
-  .form-floating > .form-select {
+  .form-floating > .form-select,
+  .form-floating > button[data-searchable-select] {
     padding-top: 1.5rem;
     padding-bottom: 0.4rem;
     height: auto;
+  }
+  /* SearchableSelect button can't drive :placeholder-shown — keep the floating
+     label pinned at the top (resting position) so it never overlaps the value. */
+  .form-floating > button[data-searchable-select] ~ label {
+    top: 0.5rem;
+    transform: none;
   }
   .form-floating > label {
     position: absolute;
@@ -2030,7 +2038,8 @@
       line-height: 1.15;
     }
     .form-floating > .form-control,
-    .form-floating > .form-select {
+    .form-floating > .form-select,
+    .form-floating > button[data-searchable-select] {
       min-height: 42px;
       padding-top: 1.02rem;
       padding-bottom: 0.22rem;
