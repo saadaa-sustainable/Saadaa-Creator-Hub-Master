@@ -54,7 +54,12 @@ export interface MetaDiscoveryResult {
 
 function creds(): { token: string; ownId: string } | null {
   const token = process.env.META_GRAPH_API_TOKEN?.trim();
-  const ownId = process.env.ID?.trim();
+  // Our own IG business id. `META_IG_BUSINESS_ID` is the canonical name (set this
+  // on Vercel — `ID` is too generic to rely on in prod); `ID` is kept as a local
+  // fallback so existing .env.local files keep working.
+  const ownId = (
+    process.env.META_IG_BUSINESS_ID || process.env.ID
+  )?.trim();
   if (!token || !ownId) return null;
   return { token, ownId };
 }
