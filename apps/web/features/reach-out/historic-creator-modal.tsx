@@ -137,7 +137,7 @@ export function HistoricCreatorButton() {
 
       {open && (
         <div
-          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
           onClick={(e) => {
             if (e.target === e.currentTarget) close();
           }}
@@ -263,6 +263,7 @@ export function HistoricCreatorButton() {
                           username={c.username}
                           name={c.inf_name}
                           size={36}
+                          interactive={false}
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">

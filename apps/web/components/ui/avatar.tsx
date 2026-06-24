@@ -19,6 +19,9 @@ export interface AvatarProps {
   size?: number;
   verified?: boolean;
   className?: string;
+  /** When false, the avatar is a plain image — no click-to-open creator overview.
+   *  Use inside pickers/lists where the overview modal would stack awkwardly. */
+  interactive?: boolean;
 }
 
 interface CreatorOverview {
@@ -54,6 +57,7 @@ export function Avatar({
   size = 40,
   verified,
   className,
+  interactive = true,
 }: AvatarProps) {
   const [failed, setFailed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -63,7 +67,8 @@ export function Avatar({
   const proxied = proxyAvatarUrl(src, size * 2);
   const showImage = proxied && !failed;
   const label = name ?? username ?? "Avatar";
-  const handle = username?.trim().toLowerCase() ?? "";
+  // Only clickable when a handle exists AND the avatar is interactive.
+  const handle = interactive ? (username?.trim().toLowerCase() ?? "") : "";
 
   useEffect(() => {
     if (!previewOpen) return;
@@ -104,7 +109,7 @@ export function Avatar({
       <div
         className={cn(
           "relative inline-flex shrink-0 items-center justify-center rounded-full bg-bg-muted text-text-secondary font-semibold overflow-hidden border border-border-warm",
-          showImage && "cursor-zoom-in",
+          showImage && handle && "cursor-zoom-in",
           className,
         )}
         style={{
