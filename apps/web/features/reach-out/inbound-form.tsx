@@ -860,41 +860,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                 ? `Fetch (${unfetchedRows.length})`
                 : "Fetch all"}
             </button>
-            {fetchBusy && fetchProgress && (
-              <span className="inline-flex flex-col gap-1 rounded-xl bg-[#F5F1EC] px-3 py-1.5 text-[0.72rem] font-semibold text-[#161513]">
-                <span className="inline-flex items-center gap-2">
-                  {cooldownLeft > 0 ? (
-                    <>
-                      <Clock size={11} className="text-[#B57514]" />
-                      Cooling down {cooldownLeft}s · {fetchProgress.done}/
-                      {fetchProgress.total}
-                    </>
-                  ) : (
-                    <>
-                      <Loader2 size={11} className="animate-spin" />
-                      Fetching {fetchProgress.done}/{fetchProgress.total}
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={cancelFetchAll}
-                    className="ml-1 text-[#C0392B] hover:underline"
-                  >
-                    Stop
-                  </button>
-                </span>
-                <span
-                  className="fetch-bar fetch-bar--determinate"
-                  style={{ minWidth: 160 }}
-                >
-                  <span
-                    style={{
-                      width: `${fetchProgress.total ? Math.round((fetchProgress.done / fetchProgress.total) * 100) : 0}%`,
-                    }}
-                  />
-                </span>
-              </span>
-            )}
             <button
               type="button"
               className="btn-accent btn-sm"
@@ -911,6 +876,52 @@ export function InboundForm({ campaigns }: InboundFormProps) {
             </button>
           </div>
         </div>
+
+        {fetchBusy && fetchProgress && (
+          <div className="mb-3 rounded-[12px] border border-[#E7E2D2] bg-[#F5F1EC] px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="inline-flex items-center gap-2 text-[0.84rem] font-semibold text-[#161513]">
+                {cooldownLeft > 0 ? (
+                  <Clock className="h-4 w-4 text-[#B57514]" aria-hidden />
+                ) : (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                )}
+                {cooldownLeft > 0
+                  ? `Cooling down ${cooldownLeft}s…`
+                  : "Fetching live from Instagram…"}
+              </span>
+              <span className="inline-flex items-center gap-3">
+                <strong className="text-[0.84rem] tabular-nums text-[#161513]">
+                  {fetchProgress.done}/{fetchProgress.total} ·{" "}
+                  {fetchProgress.total
+                    ? Math.round(
+                        (fetchProgress.done / fetchProgress.total) * 100,
+                      )
+                    : 0}
+                  %
+                </strong>
+                <button
+                  type="button"
+                  onClick={cancelFetchAll}
+                  className="text-[0.75rem] font-semibold text-[#C0392B] hover:underline"
+                >
+                  Stop
+                </button>
+              </span>
+            </div>
+            <div className="fetch-bar fetch-bar--determinate mt-2.5">
+              <span
+                style={{
+                  width: `${fetchProgress.total ? Math.round((fetchProgress.done / fetchProgress.total) * 100) : 0}%`,
+                }}
+              />
+            </div>
+            <small className="mt-1.5 block text-[0.72rem] text-[#9A9384]">
+              Auto-batches of 50 with a cooldown between — Meta is pulling
+              followers + recent posts to compute ER.
+            </small>
+          </div>
+        )}
 
         {failures.length > 0 && (
           <div className="alert alert-danger mb-2">
