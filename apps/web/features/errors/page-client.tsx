@@ -22,6 +22,8 @@ import {
   Truck,
   Users,
   Wallet,
+  WifiOff,
+  UserX,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -74,7 +76,12 @@ export function ErrorPortalBody({ data }: { data: ErrorPortalData }) {
   const apiFails = useMemo(
     () =>
       data.systemErrors.filter((e) =>
-        ["ig_fetch", "apify_fail"].includes(e.type),
+        [
+          "ig_fetch",
+          "apify_fail",
+          "meta_fetch_failed",
+          "meta_profile_unavailable",
+        ].includes(e.type),
       ),
     [data.systemErrors],
   );
@@ -263,6 +270,20 @@ function KpiStrip({ summary }: { summary: ErrorPortalData["summary"] }) {
         label="API Fails"
         primary={String(summary.apiFails)}
         secondary="IG / Apify"
+      />
+      <KpiTile
+        tone="warning"
+        icon={WifiOff}
+        label="Meta Fetch Fails"
+        primary={String(summary.metaFetchFails)}
+        secondary="API errored — retry"
+      />
+      <KpiTile
+        tone="muted"
+        icon={UserX}
+        label="Profile Unavailable"
+        primary={String(summary.metaProfileUnavailable)}
+        secondary="Personal / deactivated"
       />
       <KpiTile
         tone="danger"

@@ -14,6 +14,7 @@ import {
   type MetaDiscoveryResult,
 } from "@/lib/meta-graph";
 import { checkMetaGate, recordMetaUsage } from "@/lib/meta-rate-limit";
+import { logSystemError } from "@/lib/system-errors";
 import { isVoidedStatus } from "@/lib/workflow";
 import {
   NOTIFICATION_TYPES,
@@ -548,6 +549,36 @@ function creatorLookupFromRow(
   };
 }
 
+/**
+ * Surface a non-fetchable Reach Out lookup in the Error Portal, split by cause so
+ * the team can triage each separately (distinct KPIs in the portal):
+ *   - "error"       → the Meta API itself failed (rate-limit / network / token)
+ *                     → type `meta_fetch_failed`
+ *   - "deactivated" → the API worked but the profile is unavailable (personal /
+ *                     dead / deactivated) → type `meta_profile_unavailable`
+ * Deduped per (type, handle) by logSystemError. Fire-and-forget via after().
+ */
+function reportLookupIssue(hit: CreatorLookupHit): void {
+  if (hit.source !== "error" && hit.source !== "deactivated") return;
+  const type =
+    hit.source === "deactivated"
+      ? "meta_profile_unavailable"
+      : "meta_fetch_failed";
+  const message =
+    hit.note ??
+    (hit.source === "deactivated"
+      ? "Instagram profile unavailable (private, personal, or deactivated)."
+      : "Meta live fetch failed.");
+  after(() =>
+    logSystemError({
+      type,
+      key: hit.username,
+      message,
+      source: "reach_out",
+    }),
+  );
+}
+
 interface HistRow {
   profile_id: string | null;
   followers: number | null;
@@ -768,7 +799,10 @@ export async function lookupCreator(
     }
   }
 
-  return assembleNonCreatorHit(username, link, meta, hist, clean);
+  const hit = assembleNonCreatorHit(username, link, meta, hist, clean);
+  // Only report genuine fetch attempts — a cooldown defer isn't a real failure.
+  if (!gate.coolingDown) reportLookupIssue(hit);
+  return hit;
 }
 
 export async function lookupCreatorsFromDataset(
@@ -955,6 +989,9 @@ export async function lookupCreatorsBatch(
       histByUser.get(h) ?? null,
       cleanByUser.get(h) ?? null,
     );
+    // Only report handles actually sent to Meta this batch (skip deferred >50
+    // and cooldown cases — those aren't real failures).
+    if (meta) reportLookupIssue(hits[h]);
   }
 
   return { hits, coolingDown, retryAfterSec, fetched };

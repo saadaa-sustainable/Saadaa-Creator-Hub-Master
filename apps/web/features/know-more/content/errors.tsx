@@ -15,7 +15,13 @@ export default function ErrorsKM() {
           </li>
           <li>
             <strong>2. KPI strip</strong> — CRITICAL · WARNING · INFO · API Failures ·
-            Missing Email. Counts of unresolved errors per category.
+            Meta Fetch Fails · Profile Unavailable · Missing Email. Counts of
+            unresolved errors per category. The two Reach Out lookup KPIs split
+            the cases the team triages separately: <KMCode>meta_fetch_failed</KMCode>{" "}
+            (the Meta API itself errored — rate-limit / network / token, retry)
+            vs <KMCode>meta_profile_unavailable</KMCode> (API worked but the
+            handle is private / personal / deactivated). Both are logged from the
+            Reach Out Fetch and deduped per handle.
           </li>
           <li>
             <strong>3. Filter strip</strong> — category, resolved status, date range.

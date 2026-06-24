@@ -67,6 +67,9 @@ export interface ErrorPortalSummary {
   low: number; // info
   apiFails: number; // system_errors of type ig_fetch / apify_fail
   missingEmail: number;
+  // Reach Out Meta lookup issues, split so the team can triage each separately:
+  metaFetchFails: number; // API itself failed (rate-limit / network / token) — type meta_fetch_failed
+  metaProfileUnavailable: number; // API worked but the profile is unavailable (personal/dead/deactivated) — type meta_profile_unavailable
 }
 
 export interface ErrorPortalData {

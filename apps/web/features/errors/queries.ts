@@ -44,7 +44,15 @@ const TWO_DAYS_MS = 2 * 86_400_000;
 
 function emptyData(): ErrorPortalData {
   return {
-    summary: { high: 0, medium: 0, low: 0, apiFails: 0, missingEmail: 0 },
+    summary: {
+      high: 0,
+      medium: 0,
+      low: 0,
+      apiFails: 0,
+      missingEmail: 0,
+      metaFetchFails: 0,
+      metaProfileUnavailable: 0,
+    },
     health: {
       reachOut: 0,
       onBoard: 0,
@@ -302,6 +310,11 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
       ["ig_fetch", "apify_fail"].includes(e.type),
     ).length,
     missingEmail: missingEmails.length,
+    metaFetchFails: sysErrors.filter((e) => e.type === "meta_fetch_failed")
+      .length,
+    metaProfileUnavailable: sysErrors.filter(
+      (e) => e.type === "meta_profile_unavailable",
+    ).length,
   };
 
   return {
