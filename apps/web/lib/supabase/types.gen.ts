@@ -132,6 +132,7 @@ export interface CreatorsRow {
   id: number;
   inf_id: string;
   sif_number: number | null;
+  creator_type: "historic_creator" | "new_creator";
   username: string;
   inf_name: string | null;
   instagram_link: string | null;
@@ -854,6 +855,7 @@ export type Database = {
           category: string | null
           collab_counter: number
           created_at: string | null
+          creator_type: string
           er: number | null
           followers: number | null
           gender: string | null
@@ -880,6 +882,7 @@ export type Database = {
           category?: string | null
           collab_counter?: number
           created_at?: string | null
+          creator_type?: string
           er?: number | null
           followers?: number | null
           gender?: string | null
@@ -906,6 +909,7 @@ export type Database = {
           category?: string | null
           collab_counter?: number
           created_at?: string | null
+          creator_type?: string
           er?: number | null
           followers?: number | null
           gender?: string | null

@@ -611,7 +611,11 @@ export function OutboundForm({
                         <AlertCircle className="h-3 w-3" />
                       )}
                       {hit.source === "creator"
-                        ? "From Records"
+                        ? hit.creator_type === "historic_creator"
+                          ? "From Records · Historic"
+                          : hit.creator_type === "new_creator"
+                            ? "From Records · New"
+                            : "From Records"
                         : hit.source === "meta"
                           ? "Live"
                           : hit.source === "historic"

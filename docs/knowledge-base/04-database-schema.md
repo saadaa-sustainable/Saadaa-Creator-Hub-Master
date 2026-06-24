@@ -76,6 +76,7 @@ Per-influencer profile, bank details, IG metrics. One row per creator, keyed by 
 | `sif_number` | int | **UNIQUE.** Integer part of `inf_id` = the **single linear counter** of the system (the "linear counting checking" column). P (`post_number`) + C (`collab_number`) derive PER-CREATOR from the SIF parent. New creator = `max(sif_number)+1`. (2026-06-24) |
 | `profile_id` | text | **UNIQUE** (nulls ok). Legacy IG numeric id (Meta `ig_id`). NULL = not fetchable / deactivated |
 | `collab_counter` | int | count of the creator's collabs (1 collab ⇒ 1) |
+| `creator_type` | text | `historic_creator` (from the `cleaned_data`/`ig_data_historic` archive) \| `new_creator` (added fresh in the new project). NOT NULL default `new_creator` + CHECK. Backfill 2026-06-24: 7,761 historic / 68 new. Surfaced on Reach Out Fetch ("From Records · Historic/New"). |
 | `username` | text | **UNIQUE** (lowercased soft-key) |
 | `inf_name` / `instagram_url` / `instagram_link` | text | |
 | `followers` | int | |

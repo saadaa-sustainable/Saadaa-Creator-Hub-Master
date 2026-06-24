@@ -91,3 +91,9 @@ create unique index if not exists creators_sif_number_unique on creators (sif_nu
 --    inf_id UNTOUCHED. id is a plain serial w/ no FK + no app refs. Migration
 --    creators_reorder_id_by_sif_number (offset +1e8 then row_number() over sif_number;
 --    setval creators_id_seq to max). Refresh the editor to see the new order.
+
+-- 7. creator_type label (migration creators_creator_type_label): historic_creator
+--    (inf_id in cleaned_data.sif_id OR profile_id in ig_data_historic) vs new_creator.
+--    NOT NULL default 'new_creator' + CHECK + index. Backfill: 7,761 historic / 68 new.
+--    New reach-out creators get 'new_creator' via the column default. Surfaced on the
+--    Reach Out Fetch ("From Records · Historic/New").

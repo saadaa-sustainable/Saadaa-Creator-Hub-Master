@@ -477,6 +477,8 @@ export interface CreatorLookupHit {
   source: "creator" | "meta" | "historic" | "deactivated" | "error";
   username: string;
   inf_id?: string;
+  /** historic_creator (from the archive) vs new_creator (added in the new project). */
+  creator_type?: "historic_creator" | "new_creator" | null;
   /** Legacy IG numeric profile id (Meta `ig_id` / historic). Persisted on submit. */
   profile_id?: string | null;
   /** Historic legacy SIF for this handle (from cleaned_data), if any. */
@@ -523,11 +525,16 @@ function creatorLookupFromRow(
   const verRaw = str("verification");
   const followers = num("followers");
 
+  const ctypeRaw = str("creator_type");
   return {
     source: "creator",
     username: String(creatorRow.username ?? username),
     inf_id:
       typeof creatorRow.inf_id === "string" ? creatorRow.inf_id : undefined,
+    creator_type:
+      ctypeRaw === "historic_creator" || ctypeRaw === "new_creator"
+        ? ctypeRaw
+        : null,
     profile_id: str("profile_id"),
     historic_sif: str("historic_sif"),
     inf_name: str("inf_name") ?? str("full_name"),
