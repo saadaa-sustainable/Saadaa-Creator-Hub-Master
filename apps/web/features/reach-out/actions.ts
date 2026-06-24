@@ -472,6 +472,8 @@ export interface CreatorLookupHit {
   creator_type?: "historic_creator" | "new_creator" | null;
   /** Legacy IG numeric profile id (Meta `ig_id` / historic). Persisted on submit. */
   profile_id?: string | null;
+  /** IG bio text (Meta business_discovery). Persisted to instagram_cache. */
+  biography?: string | null;
   /** Historic legacy SIF for this handle (from cleaned_data), if any. */
   historic_sif?: string | null;
   inf_name: string | null;
@@ -599,6 +601,7 @@ function persistFetches(
       avg_likes: h.avg_likes,
       profile_pic: h.profile_pic,
       profile_id: h.profile_id ?? null,
+      biography: h.biography ?? null,
       reachout_type: direction,
       is_verified:
         h.verification === "Yes"
@@ -660,6 +663,7 @@ function assembleNonCreatorHit(
       source: "meta",
       username,
       profile_id: n.ig_id ?? hist?.profile_id ?? clean?.profile_id ?? null,
+      biography: n.biography,
       historic_sif: historicSif,
       inf_name: n.name,
       instagram_link: link,

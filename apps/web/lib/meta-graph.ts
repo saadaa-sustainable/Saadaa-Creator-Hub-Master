@@ -31,7 +31,8 @@ export const META_BATCH_SIZE = 50;
 /** media.limit — fewer recent posts = faster Meta response. 6 keeps ER reasonable
  *  while roughly halving the per-fetch latency vs 12 (Meta's media pull dominates). */
 const MEDIA_LIMIT = 6;
-const PROFILE_FIELDS = "ig_id,username,name,followers_count,profile_picture_url";
+const PROFILE_FIELDS =
+  "ig_id,username,name,biography,followers_count,profile_picture_url";
 
 export type MetaDiscoveryStatus = "ok" | "notfound" | "error";
 
@@ -39,6 +40,7 @@ export interface MetaDiscoveryNode {
   ig_id: string | null; // legacy numeric profile id (USE THIS as profile_id)
   username: string | null;
   name: string | null; // display/full name
+  biography: string | null;
   followers: number | null;
   profile_pic: string | null;
   avg_likes: number | null; // mean like_count over recent media
@@ -113,6 +115,7 @@ function buildNode(
     ig_id?: number | string;
     username?: string;
     name?: string;
+    biography?: string;
     followers_count?: number;
     profile_picture_url?: string;
     media?: { data?: Array<{ like_count?: number; comments_count?: number }> };
@@ -140,6 +143,10 @@ function buildNode(
     ig_id: bd.ig_id != null ? String(bd.ig_id) : null,
     username: typeof bd.username === "string" ? bd.username : fallbackHandle,
     name: typeof bd.name === "string" && bd.name.length > 0 ? bd.name : null,
+    biography:
+      typeof bd.biography === "string" && bd.biography.length > 0
+        ? bd.biography
+        : null,
     followers,
     profile_pic:
       typeof bd.profile_picture_url === "string"
