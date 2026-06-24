@@ -28,8 +28,9 @@ const GRAPH_VERSION = "v21.0";
 
 /** Meta caps a batch at 50 sub-requests per HTTP call (ig_fetching.py BATCH_MAX). */
 export const META_BATCH_SIZE = 50;
-/** media.limit — 1/4 the CPU cost of limit(50), statistically comparable ER. */
-const MEDIA_LIMIT = 12;
+/** media.limit — fewer recent posts = faster Meta response. 6 keeps ER reasonable
+ *  while roughly halving the per-fetch latency vs 12 (Meta's media pull dominates). */
+const MEDIA_LIMIT = 6;
 const PROFILE_FIELDS = "ig_id,username,name,followers_count,profile_picture_url";
 
 export type MetaDiscoveryStatus = "ok" | "notfound" | "error";
