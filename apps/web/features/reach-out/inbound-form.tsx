@@ -44,7 +44,6 @@ import {
   type InboundRowInput,
 } from "./inbound-schema";
 import { submitInboundBatch } from "./inbound-actions";
-import { HistoricCreatorButton } from "./historic-creator-modal";
 
 interface InboundFormProps {
   campaigns: {
@@ -676,11 +675,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
       }}
       className="reachout-form space-y-3"
     >
-      {/* Reference: browse prior creators (historic + new) before reaching out. */}
-      <div className="flex justify-end">
-        <HistoricCreatorButton />
-      </div>
-
       {/* ── Campaign Assignment + Cap chip ─────────────────────────────── */}
       <section
         className="glass-card reachout-step-card"

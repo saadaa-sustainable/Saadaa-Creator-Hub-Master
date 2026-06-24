@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { Lightbulb } from "lucide-react";
 
 export interface PageHeaderProps {
@@ -12,6 +13,8 @@ export interface PageHeaderProps {
   };
   /** Optional Know More slug — opens the help modal for this view. */
   knowMore?: string;
+  /** Optional action(s) rendered inline next to the Know More button. */
+  actions?: ReactNode;
 }
 
 export function PageHeader({
@@ -19,11 +22,12 @@ export function PageHeader({
   title,
   modePill,
   knowMore,
+  actions,
 }: PageHeaderProps) {
   const ModeIcon = modePill?.icon;
   return (
     <header className="page-header">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="header-icon" aria-hidden>
           <Icon />
         </span>
@@ -38,6 +42,7 @@ export function PageHeader({
             <Lightbulb className="h-3.5 w-3.5" aria-hidden /> Know More
           </button>
         )}
+        {actions}
       </div>
       {modePill && (
         <span

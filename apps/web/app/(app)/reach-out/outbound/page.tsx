@@ -4,6 +4,7 @@ import { getActor } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
 import { PageHeader } from "@/components/ui/page-header";
 import { OutboundForm } from "@/features/reach-out/outbound-form";
+import { HistoricCreatorButton } from "@/features/reach-out/historic-creator-modal";
 import { fetchCampaignsForSelect } from "@/features/reach-out/queries";
 
 export const metadata = { title: "Reach Out — Outbound" };
@@ -32,6 +33,7 @@ export default async function Page({ searchParams }: PageProps) {
         title="Reach Out · Outbound"
         modePill={{ label: "We initiate", icon: Send }}
         knowMore="reach-out-outbound"
+        actions={<HistoricCreatorButton />}
       />
       <OutboundForm
         campaigns={campaigns}
