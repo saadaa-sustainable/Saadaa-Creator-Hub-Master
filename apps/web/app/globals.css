@@ -11388,3 +11388,38 @@ input[type="date"]::-webkit-clear-button {
     font-size: 1.1rem;
   }
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   SearchableSelect inside a .form-floating field.
+   A combobox always shows its value, so the floating label never floats — the
+   absolutely-positioned label just collides with the trigger's text. Render the
+   label STATICALLY above the control instead. Unlayered (outside @layer) on
+   purpose: Tailwind's utility-layer padding on the trigger (`py-2.5`) outranks any
+   @layer components rule by cascade-layer order, so the fix must be unlayered to win.
+   :has() + the data-searchable-select marker scope it to combobox fields only.
+   ─────────────────────────────────────────────────────────────────────────── */
+.form-floating:has(button[data-searchable-select]) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.form-floating:has(button[data-searchable-select]) > label {
+  position: static;
+  inset: auto;
+  transform: none;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  pointer-events: auto;
+  white-space: normal;
+}
+.form-floating:has(button[data-searchable-select]) > button[data-searchable-select] {
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+  min-height: 0;
+}
