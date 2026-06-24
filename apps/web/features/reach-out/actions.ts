@@ -587,7 +587,9 @@ function reportLookupIssue(hit: CreatorLookupHit): void {
 function persistFetches(
   supabase: ReturnType<typeof createServiceClient>,
   hits: CreatorLookupHit[],
+  direction: "outbound" | "inbound",
 ): void {
+  const nowIso = new Date().toISOString();
   const rows = hits
     .filter((h) => h.source === "meta" || h.source === "historic")
     .map((h) => ({
@@ -597,6 +599,7 @@ function persistFetches(
       avg_likes: h.avg_likes,
       profile_pic: h.profile_pic,
       profile_id: h.profile_id ?? null,
+      reachout_type: direction,
       is_verified:
         h.verification === "Yes"
           ? true
@@ -604,7 +607,10 @@ function persistFetches(
             ? false
             : null,
       status: h.source,
-      scraped_at: new Date().toISOString(),
+      // timestamptz (UTC). scraped_at = this fetch; updated_at always set so the
+      // row never has a NULL touch time. App renders IST; raw Supabase shows UTC.
+      scraped_at: nowIso,
+      updated_at: nowIso,
     }));
   if (rows.length === 0) return;
   after(async () => {
@@ -854,7 +860,11 @@ export async function lookupCreator(
   }
   // Only report genuine fetch attempts — a cooldown defer isn't a real failure.
   if (!gate.coolingDown) reportLookupIssue(hit);
-  persistFetches(supabase, [hit]);
+  persistFetches(
+    supabase,
+    [hit],
+    permission === "reachout_inbound" ? "inbound" : "outbound",
+  );
   return hit;
 }
 
@@ -1047,7 +1057,11 @@ export async function lookupCreatorsBatch(
     if (meta) reportLookupIssue(hits[h]);
   }
 
-  persistFetches(supabase, Object.values(hits));
+  persistFetches(
+    supabase,
+    Object.values(hits),
+    permission === "reachout_inbound" ? "inbound" : "outbound",
+  );
 
   return { hits, coolingDown, retryAfterSec, fetched };
 }
