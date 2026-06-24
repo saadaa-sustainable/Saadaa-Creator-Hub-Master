@@ -172,7 +172,9 @@ function rosterValue(row: Record<string, string>, ...keys: string[]): string {
 export function InboundForm({ campaigns }: InboundFormProps) {
   const router = useRouter();
   const [submitting, startSubmit] = useTransition();
-  const [fetchingAll, startFetchAll] = useTransition();
+  // Explicit busy flag — useTransition's isPending is unreliable across the awaits
+  // + cooldown setTimeouts in the fetch loop, which hid the progress chip.
+  const [fetchBusy, setFetchBusy] = useState(false);
   const [campaignId, setCampaignId] = useState("");
   const [rows, setRows] = useState<RowState[]>([newRow()]);
   const [failures, setFailures] = useState<{ row: number; error: string }[]>(
@@ -349,7 +351,8 @@ export function InboundForm({ campaigns }: InboundFormProps) {
 
   // Fetch EVERY unresolved row, auto-looping in batches of 50 with the rate-gate
   // cooldown between batches (e.g. 70 rows → fetch 50, cool down, fetch 20).
-  const fetchAllRows = () => {
+  const fetchAllRows = async () => {
+    if (fetchBusy) return;
     const targets = rows.filter(
       (r) =>
         igUrlRe.test(r.instagramLink.trim()) &&
@@ -362,11 +365,12 @@ export function InboundForm({ campaigns }: InboundFormProps) {
     }
     cancelFetchRef.current = false;
     const total = targets.length;
-    startFetchAll(async () => {
-      let remaining = [...targets];
-      let done = 0;
-      setFetchProgress({ done: 0, total });
-      let guard = 0;
+    setFetchBusy(true);
+    setFetchProgress({ done: 0, total });
+    let remaining = [...targets];
+    let done = 0;
+    let guard = 0;
+    try {
       while (remaining.length && !cancelFetchRef.current && guard++ < 50) {
         const chunk = remaining.slice(0, META_BATCH);
         markRowsLoading(new Set(chunk.map((r) => r.id)));
@@ -393,11 +397,14 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           break; // nothing fetched and not cooling — avoid a tight loop
         }
       }
+      if (cancelFetchRef.current)
+        toast.info(`Stopped. Fetched ${done}/${total}.`);
+      else toast.success(`Fetched ${done} profile(s).`);
+    } finally {
       setFetchProgress(null);
       setCooldownLeft(0);
-      if (cancelFetchRef.current) toast.info(`Stopped. Fetched ${done}/${total}.`);
-      else toast.success(`Fetched ${done} profile(s).`);
-    });
+      setFetchBusy(false);
+    }
   };
 
   const cancelFetchAll = () => {
@@ -841,10 +848,10 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               type="button"
               className="btn-toolbar"
               onClick={fetchAllRows}
-              disabled={fetchingAll || unfetchedRows.length === 0}
+              disabled={fetchBusy || unfetchedRows.length === 0}
               title="Fetch all profiles live from Instagram — auto-batches of 50 with a cooldown between"
             >
-              {fetchingAll ? (
+              {fetchBusy ? (
                 <Loader2 size={12} className="animate-spin" />
               ) : (
                 <Zap size={12} />
@@ -853,7 +860,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                 ? `Fetch (${unfetchedRows.length})`
                 : "Fetch all"}
             </button>
-            {fetchingAll && fetchProgress && (
+            {fetchBusy && fetchProgress && (
               <span className="inline-flex flex-col gap-1 rounded-xl bg-[#F5F1EC] px-3 py-1.5 text-[0.72rem] font-semibold text-[#161513]">
                 <span className="inline-flex items-center gap-2">
                   {cooldownLeft > 0 ? (
