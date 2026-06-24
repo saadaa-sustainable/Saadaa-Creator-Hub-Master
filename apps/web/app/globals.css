@@ -4587,7 +4587,9 @@
   .avatar-preview-overlay {
     position: fixed;
     inset: 0;
-    z-index: 90;
+    /* Above the Historic Creator picker (z-500) + its SearchableSelect popovers
+       (z-1200) so the creator overview opens on top, not behind. */
+    z-index: 1300;
     display: grid;
     place-items: center;
     padding: 1.25rem;

@@ -128,11 +128,13 @@ export function HistoricCreatorButton() {
     <>
       <button
         type="button"
-        className="btn-submit"
         onClick={() => setOpen(true)}
+        className="group inline-flex items-center gap-2 rounded-full border border-[#E7E2D2] bg-white px-4 py-2.5 text-[0.82rem] font-bold text-[#161513] shadow-[0_1px_2px_rgba(180,150,120,0.12)] transition-all duration-200 hover:-translate-y-px hover:border-[#F0C61E] hover:shadow-[0_8px_20px_-6px_rgba(240,198,30,0.35)] active:translate-y-0"
       >
-        <Users className="h-4 w-4" />
-        Historic Creator
+        <span className="grid h-5 w-5 place-items-center rounded-full bg-[#F0EAD6] text-[#8C5A2B] transition-colors group-hover:bg-[#F0C61E] group-hover:text-[#161513]">
+          <Users className="h-3 w-3" aria-hidden />
+        </span>
+        Historic Creators
       </button>
 
       {open && (
@@ -145,7 +147,7 @@ export function HistoricCreatorButton() {
           aria-modal="true"
           aria-label="Historic Creators"
         >
-          <div className="flex max-h-[82vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
             {/* Header. */}
             <div className="flex items-start justify-between gap-3 border-b border-[#E7E2D2] px-5 py-4">
               <div className="flex min-w-0 items-center gap-2.5">
@@ -263,7 +265,6 @@ export function HistoricCreatorButton() {
                           username={c.username}
                           name={c.inf_name}
                           size={36}
-                          interactive={false}
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
