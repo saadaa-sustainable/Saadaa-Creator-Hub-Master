@@ -67,12 +67,15 @@ The spine of the system. One row per **deliverable** (reel or static post). Ever
 
 ## Table: `creators`
 
-Per-influencer profile, bank details, IG metrics. One row per creator, keyed by `inf_id`.
+Per-influencer profile, bank details, IG metrics. One row per creator, keyed by `inf_id`. **FULL registry as of 2026-06-24 — 7,829 rows** (was 141): every historic creator imported from `cleaned_data` (one per real `sif_id`, deduped by username + profile_id) + `ig_data_historic` metrics. `profile_id` NULL on 284 rows = not fetchable (deactivated). `migration 2026_06_24_creators_sif_number_historic_import`.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid | PK |
-| `inf_id` | text | **UNIQUE.** Legacy default `INF-NNN` from `inf_id_seq`; `submit_reachout` RPC generates `SIF-{N}` via MAX numeric suffix +1 |
+| `inf_id` | text | **UNIQUE.** The creator's SIF (historic SIF for imported creators — **frozen** for Meta ad-name matching; fresh for new). `submit_reachout` generates `SIF-{max(sif_number)+1}` |
+| `sif_number` | int | **UNIQUE.** Integer part of `inf_id` = the **single linear counter** of the system (the "linear counting checking" column). P (`post_number`) + C (`collab_number`) derive PER-CREATOR from the SIF parent. New creator = `max(sif_number)+1`. (2026-06-24) |
+| `profile_id` | text | **UNIQUE** (nulls ok). Legacy IG numeric id (Meta `ig_id`). NULL = not fetchable / deactivated |
+| `collab_counter` | int | count of the creator's collabs (1 collab ⇒ 1) |
 | `username` | text | **UNIQUE** (lowercased soft-key) |
 | `inf_name` / `instagram_url` / `instagram_link` | text | |
 | `followers` | int | |
@@ -87,7 +90,7 @@ Per-influencer profile, bank details, IG metrics. One row per creator, keyed by 
 | `ig_fetched_at` | timestamptz | |
 | `created_at` / `updated_at` | timestamptz | |
 
-**Constraints/Indexes:** `inf_id` UNIQUE, `username` UNIQUE, `category` index.
+**Constraints/Indexes:** `inf_id` UNIQUE, `sif_number` UNIQUE, `profile_id` UNIQUE, `username` UNIQUE, `category` index.
 
 ---
 

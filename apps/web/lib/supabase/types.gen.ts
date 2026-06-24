@@ -131,6 +131,7 @@ export interface PostsRow {
 export interface CreatorsRow {
   id: number;
   inf_id: string;
+  sif_number: number | null;
   username: string;
   inf_name: string | null;
   instagram_link: string | null;
@@ -865,6 +866,7 @@ export type Database = {
           language: string | null
           profile_id: string | null
           profile_pic: string | null
+          sif_number: number | null
           state: string | null
           updated_at: string | null
           username: string
@@ -890,6 +892,7 @@ export type Database = {
           language?: string | null
           profile_id?: string | null
           profile_pic?: string | null
+          sif_number?: number | null
           state?: string | null
           updated_at?: string | null
           username: string
@@ -915,6 +918,7 @@ export type Database = {
           language?: string | null
           profile_id?: string | null
           profile_pic?: string | null
+          sif_number?: number | null
           state?: string | null
           updated_at?: string | null
           username?: string
