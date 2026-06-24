@@ -286,6 +286,7 @@ All "enums" are **TEXT columns guarded by CHECK constraints**, not Postgres `ENU
 | `trg_access_roles_updated_at` | `access_roles` | `touch_access_roles_updated_at()` |
 | `trg_cell_comments_updated_at` | `cell_comments` | `touch_cell_comments_updated_at()` |
 | `trg_sync_creator_avatar` | storage→creators | avatar mirror (applied live, DDL not in repo) |
+| `trg_sync_collab_counter` | `posts` | `sync_creator_collab_counter()` — keeps `creators.collab_counter` = distinct collabs per creator on insert/update(inf_id,collab_number)/delete |
 
 ## pg_cron Jobs
 
