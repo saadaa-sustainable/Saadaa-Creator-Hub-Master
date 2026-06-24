@@ -36,12 +36,7 @@ import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { GENDERS, type Gender } from "./schema";
 import { CONTENT_CODES } from "./content-codes";
-import {
-  lookupCreator,
-  lookupCreatorsFromDataset,
-  lookupCreatorsBatch,
-  type CreatorLookupHit,
-} from "./actions";
+import { lookupCreatorsBatch, type CreatorLookupHit } from "./actions";
 import {
   INBOUND_MANUAL_CAP,
   inboundUsernameFromUrl,
@@ -194,9 +189,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const cancelFetchRef = useRef(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
-  const lookupTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>(
-    {},
-  );
   const lookupCache = useRef<Record<string, CreatorLookupHit | null>>({});
 
   const validCount = useMemo(() => rows.filter(isRowValid).length, [rows]);
@@ -298,76 +290,8 @@ export function InboundForm({ campaigns }: InboundFormProps) {
     [],
   );
 
-  const runRowLookup = useCallback(
-    async (id: string, value: string) => {
-      const username = inboundUsernameFromUrl(value);
-      if (!username || !igUrlRe.test(value.trim())) {
-        updateRow(id, { lookup: undefined });
-        return;
-      }
-
-      setRows((prev) =>
-        prev.map((row) => {
-          if (row.id !== id) return row;
-          if (
-            row.lookup?.username === username &&
-            row.lookup.status === "found"
-          )
-            return row;
-          return {
-            ...row,
-            lookup: {
-              username,
-              source: row.lookup?.source ?? "unknown",
-              status: "loading",
-              name: row.lookup?.name ?? null,
-              followers: row.lookup?.followers ?? null,
-              gender: row.lookup?.gender ?? null,
-              category: row.lookup?.category ?? null,
-              profilePic: row.lookup?.profilePic ?? null,
-              verification: row.lookup?.verification ?? null,
-            },
-          };
-        }),
-      );
-
-      try {
-        if (
-          Object.prototype.hasOwnProperty.call(lookupCache.current, username)
-        ) {
-          applyLookupResult(id, username, lookupCache.current[username]);
-          return;
-        }
-        const result = await lookupCreator(value, "reachout_inbound");
-        lookupCache.current[username] = result;
-        applyLookupResult(id, username, result);
-      } catch (error) {
-        setRows((prev) =>
-          prev.map((row) =>
-            row.id === id
-              ? {
-                  ...row,
-                  lookup: {
-                    username,
-                    source: "unknown",
-                    status: "error",
-                    name: null,
-                    followers: null,
-                    gender: null,
-                    category: null,
-                    profilePic: null,
-                    verification: null,
-                    error:
-                      error instanceof Error ? error.message : "Lookup failed",
-                  },
-                }
-              : row,
-          ),
-        );
-      }
-    },
-    [applyLookupResult, updateRow],
-  );
+  // (Per-row auto-lookup removed 2026-06-24 — fetching is batch-only via "Fetch all"
+  // so a 50-row roster costs ONE Meta batch call, not one per row.)
 
   // Rows that carry a valid IG URL but haven't been fetched yet (no lookup, or it
   // hasn't resolved). Used to gate submit and to label the Fetch-all button.
@@ -482,6 +406,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
 
   const handleInstagramChange = (id: string, value: string) => {
     const username = inboundUsernameFromUrl(value);
+    // NO auto-fetch on paste/type — fetching happens only via "Fetch all" so the
+    // whole batch costs one Meta batch call (not one per row). Just track the URL;
+    // drop a stale lookup if the handle changed so the row becomes fetchable again.
     setRows((prev) =>
       prev.map((row) => {
         if (row.id !== id) return row;
@@ -490,21 +417,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
         return { ...row, instagramLink: value, lookup: keepLookup };
       }),
     );
-
-    if (lookupTimers.current[id]) clearTimeout(lookupTimers.current[id]);
-    if (username && igUrlRe.test(value.trim())) {
-      lookupTimers.current[id] = setTimeout(() => {
-        void runRowLookup(id, value);
-      }, 120);
-    }
   };
-
-  useEffect(() => {
-    const timers = lookupTimers.current;
-    return () => {
-      Object.values(timers).forEach(clearTimeout);
-    };
-  }, []);
 
   const downloadTemplate = async () => {
     const headers = ["instaLink", "gender", "contentCode"];
@@ -638,24 +551,11 @@ export function InboundForm({ campaigns }: InboundFormProps) {
         });
       });
       setRows(next);
-      const lookupRows = next.filter((row) =>
-        igUrlRe.test(row.instagramLink.trim()),
+      // Staged only — NO auto-fetch. The user clicks "Fetch all" so the whole
+      // import is fetched in Meta batches of 50 (one call per 50), not one per row.
+      toast.success(
+        `${parsed.length} row(s) staged. Click Fetch all, then submit.`,
       );
-      const datasetHits = await lookupCreatorsFromDataset(
-        lookupRows.map((row) => row.instagramLink),
-        "reachout_inbound",
-      );
-      lookupRows.forEach((row) => {
-        const username = inboundUsernameFromUrl(row.instagramLink);
-        const hit = datasetHits[username];
-        if (hit) {
-          lookupCache.current[username] = hit;
-          applyLookupResult(row.id, username, hit);
-        } else {
-          void runRowLookup(row.id, row.instagramLink);
-        }
-      });
-      toast.success(`${parsed.length} row(s) staged. Review and submit.`);
     } catch (err) {
       toast.error(
         `Parse error: ${err instanceof Error ? err.message : "Could not read file"}`,
@@ -1130,7 +1030,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                         onChange={(e) =>
                           handleInstagramChange(r.id, e.target.value)
                         }
-                        onBlur={(e) => void runRowLookup(r.id, e.target.value)}
                       />
                       {hasUrl && (
                         <div className="inbound-row-profile is-compact">
@@ -1300,7 +1199,6 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                     onChange={(e) =>
                       handleInstagramChange(r.id, e.target.value)
                     }
-                    onBlur={(e) => void runRowLookup(r.id, e.target.value)}
                   />
                   {rowErrors.instagramLink && (
                     <small className="field-error">
