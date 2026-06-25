@@ -31,6 +31,7 @@ import {
   collabSiblings,
   countCollabDeliverables,
   deliverableBreakdown,
+  findRepresentativePostId,
   formatDeliverableCount,
   isCollabRepresentative,
   isOnboarded,
@@ -158,7 +159,8 @@ export function OnboardingTable({
         <OrderCreationModal
           open={!!orderRow}
           onClose={() => setOrderRow(null)}
-          postId={orderRow.post_id}
+          id={orderRow.id}
+          postId={orderRow.post_id ?? undefined}
           postIdShort={orderRow.post_id_short ?? undefined}
           collabId={collabIdLabel(orderRow)}
           creatorName={orderRow.creator?.inf_name}
@@ -452,7 +454,9 @@ function ObCard({
                 className="action-danger"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onEmail(r.post_id);
+                  // Email targets the collab representative; post_id is non-null
+                  // on onboarded rows (this button only renders then).
+                  onEmail(findRepresentativePostId(r, rows));
                 }}
                 aria-label="Send collab email"
               >
@@ -726,7 +730,9 @@ function OnboardingOverviewModal({
               type="button"
               className="btn-primary-cta"
               onClick={() => {
-                onEmail(row.post_id);
+                // Email targets the collab representative; post_id is non-null
+                // here (canSendEmail ⇒ onboarded).
+                onEmail(findRepresentativePostId(row, rows));
                 onClose();
               }}
             >

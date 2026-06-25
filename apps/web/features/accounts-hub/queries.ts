@@ -358,9 +358,11 @@ export async function fetchAccountsHubData(
   // (summed above). paid-so-far is the sum of installment amounts; remainder is
   // the still-owed balance; _isPartial is true while 0 < paid < total.
   const decorate = (p: (typeof posts)[number]): AccountsRow => {
-    const payment = paymentsByPostId.get(p.post_id) ?? null;
+    // Accounts Hub only handles onboarded posts, so post_id is non-null here;
+    // `?? ""` keeps the map lookups well-typed against the now-nullable column.
+    const payment = paymentsByPostId.get(p.post_id ?? "") ?? null;
     const total = Number(p.commercial_amount ?? 0);
-    const paidSoFar = paidSoFarByPostId.get(p.post_id) ?? 0;
+    const paidSoFar = paidSoFarByPostId.get(p.post_id ?? "") ?? 0;
     const remainder = Math.max(0, total - paidSoFar);
     const isPartial =
       paidSoFar > 0 && total > 0 && paidSoFar + 0.0001 < total;

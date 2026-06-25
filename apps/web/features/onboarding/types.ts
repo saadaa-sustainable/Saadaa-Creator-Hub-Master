@@ -5,6 +5,8 @@ import type {
 } from "@/lib/supabase/types.gen";
 
 export interface OnboardingRow {
+  /** Bigserial primary key — identifies reach-out rows whose post_id is still NULL. */
+  id: number;
   post_id: PostsRow["post_id"];
   post_id_short: PostsRow["post_id_short"];
   workflow_status: PostsRow["workflow_status"];

@@ -317,7 +317,8 @@ export function OutboundForm({
             toast.error(res.error);
             return;
           }
-          toast.success(`Reach-out created: ${res.postId}`);
+          // post_id is now minted at onboarding (null here), so confirm by name.
+          toast.success(`Reach-out logged for ${values.influencerName}`);
           reset(formDefaults);
           setSubmitAttempted(false);
           setHit(null);

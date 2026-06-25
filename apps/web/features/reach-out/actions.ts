@@ -25,8 +25,11 @@ import {
 export type ReachOutResult =
   | {
       ok: true;
-      postId: string;
-      postIdShort: string;
+      // Bigserial id of the new reach-out row.
+      id: number;
+      // post_id / post_id_short are NULL now — minted at onboarding, not reach-out.
+      postId: string | null;
+      postIdShort: string | null;
       postNumber: number;
       // NULL now — collab is minted at onboarding, not reach-out.
       collabNumber: number | null;
@@ -181,8 +184,11 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
   }
 
   const row = data as {
-    post_id: string;
-    post_id_short: string;
+    id: number;
+    // post_id / post_id_short are minted at ONBOARDING now — reach-out returns
+    // NULL for these. The bigserial `id` identifies the new reach-out row.
+    post_id: string | null;
+    post_id_short: string | null;
     post_number: number;
     // Collab is minted at onboarding now, so reach-out returns NULL for these.
     collab_number: number | null;
@@ -190,16 +196,8 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     collab_id: string | null;
   };
 
-  await (supabase as any)
-    .from("posts")
-    .update({
-      nomenclature: buildLegacyNomenclature(
-        row.post_id,
-        username,
-        v.contentType,
-      ),
-    })
-    .eq("post_id", row.post_id);
+  // No nomenclature at reach-out: nomenclature embeds the post_id, which doesn't
+  // exist until onboarding mints it. submitOnboarding builds it then.
 
   // Persist enrichment fields directly on creators (not exposed via RPC args).
   // Best-effort — RPC succeeded already, so partial creator metadata is OK.
@@ -222,7 +220,8 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
   // scope) when those scopes are on. No-op when Test Mode is off.
   await stampTestRows([
     { scope: "creator", table: "creators", idColumn: "inf_id", ids: row.inf_id ? [row.inf_id] : [] },
-    { scope: "collab", table: "posts", idColumn: "post_id", ids: [row.post_id] },
+    // Reach-out rows have NULL post_id (minted at onboarding) — stamp by id.
+    { scope: "collab", table: "posts", idColumn: "id", ids: [row.id] },
   ]);
 
   // (Apify enqueue removed 2026-06-24 — Reach Out now fetches live via Meta
@@ -234,11 +233,8 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
   // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────
   // Email the logged-in actor that their reach-out was logged. Fire-and-forget
   // via after() so the form stays fast; best-effort, never blocks/throws.
-  const confirmPostId = row.post_id;
-  // A reach-out has NO collab yet (minted at onboarding), so show the deliverable
-  // post id rather than fabricating a C-number that would clash with the eventual
-  // onboarded C1.
-  const confirmCollabId = row.collab_id ?? confirmPostId;
+  // A reach-out has NO post_id and NO collab yet — both are minted at onboarding —
+  // so don't print a fabricated id; the confirmation reads "Assigned at onboarding".
   after(async () => {
     let campaignLabel = v.campaignId;
     try {
@@ -257,7 +253,7 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
       type: NOTIFICATION_TYPES.REACHOUT_CONFIRMATION,
       subject: `Reach-out logged — @${username} added to ${v.campaignId}`,
       title: "Reach-out logged",
-      subtitle: `COLLAB ID: ${confirmCollabId}`,
+      subtitle: `CAMPAIGN: ${v.campaignId}`,
       summaryLines: [
         `@${username} has been added to your campaign as a ${
           direction === "inbound" ? "inbound" : "outbound"
@@ -276,11 +272,12 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
         { label: "Language", value: v.language },
         { label: "Engagement Rate", value: v.er != null ? `${v.er}%` : null },
         { label: "Avg. Likes", value: v.avgLikes ?? null },
-        { label: "Collab ID", value: confirmCollabId },
-        { label: "Post ID (deliverable)", value: confirmPostId },
+        // Post ID + Collab ID are assigned when this reach-out is onboarded.
+        { label: "Collab ID", value: "Assigned at onboarding" },
+        { label: "Post ID", value: "Assigned at onboarding" },
       ],
-      postId: confirmPostId,
-      collabId: confirmCollabId,
+      postId: null,
+      collabId: null,
     });
   });
 
@@ -292,6 +289,8 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
 
   return {
     ok: true,
+    id: row.id,
+    // post_id / post_id_short are NULL until onboarding mints them.
     postId: row.post_id,
     postIdShort: row.post_id_short,
     postNumber: row.post_number,
@@ -335,13 +334,15 @@ const ReachOutEditSchema = z.object({
 });
 
 export async function editReachOut(
-  postId: string,
+  // Reach-out rows have NULL post_id (minted at onboarding) — they are keyed by
+  // their bigserial `id`. No live UI caller yet (see TODO above).
+  rowId: number,
   input: unknown,
 ): Promise<ReachOutEditResult> {
   await assertPermission("reachout_outbound");
 
-  const id = (postId ?? "").trim();
-  if (!id) return { ok: false, error: "Post ID is required." };
+  if (!Number.isFinite(rowId) || rowId <= 0)
+    return { ok: false, error: "Row id is required." };
 
   const parsed = ReachOutEditSchema.safeParse(input);
   if (!parsed.success) {
@@ -358,11 +359,11 @@ export async function editReachOut(
 
   const { data: post, error: postErr } = await (supabase as any)
     .from("posts")
-    .select("post_id, username, inf_id, content_type, workflow_status")
-    .eq("post_id", id)
+    .select("id, post_id, username, inf_id, content_type, workflow_status")
+    .eq("id", rowId)
     .maybeSingle();
   if (postErr) return { ok: false, error: postErr.message };
-  if (!post) return { ok: false, error: `Reach-out ${id} not found.` };
+  if (!post) return { ok: false, error: `Reach-out ${rowId} not found.` };
 
   const stage = String(post.workflow_status ?? "");
   const isFrozen = stage !== "" && stage !== "Reach Out";
@@ -426,16 +427,26 @@ export async function editReachOut(
   }
 
   // Persist content edit. content_name has no posts column; it only feeds the
-  // legacy nomenclature string, which we rebuild to stay consistent.
+  // legacy nomenclature string. nomenclature embeds the post_id, which a
+  // reach-out row doesn't have yet (minted at onboarding) — so only rebuild it
+  // when a post_id is already present (re-edit of an onboarded row).
   const username = String(post.username ?? "");
+  const existingPostId = (post.post_id as string | null) ?? null;
+  const updatePatch: Record<string, unknown> = {
+    content_type: v.contentType,
+    updated_at: new Date().toISOString(),
+  };
+  if (existingPostId) {
+    updatePatch.nomenclature = buildLegacyNomenclature(
+      existingPostId,
+      username,
+      v.contentType,
+    );
+  }
   const { error: updateErr } = await (supabase as any)
     .from("posts")
-    .update({
-      content_type: v.contentType,
-      nomenclature: buildLegacyNomenclature(id, username, v.contentType),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("post_id", id);
+    .update(updatePatch)
+    .eq("id", rowId);
   if (updateErr) return { ok: false, error: updateErr.message };
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
@@ -447,8 +458,9 @@ export async function editReachOut(
 
   return {
     ok: true,
-    postId: id,
-    message: `Reach-out ${id} updated.`,
+    // post_id may be NULL on a reach-out row — fall back to the row id label.
+    postId: existingPostId ?? String(rowId),
+    message: `Reach-out ${existingPostId ?? rowId} updated.`,
   };
 }
 

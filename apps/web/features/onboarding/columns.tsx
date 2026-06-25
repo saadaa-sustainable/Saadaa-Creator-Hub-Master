@@ -25,7 +25,9 @@ export function collabKeyOf(r: OnboardingRow): string {
   // onboarded C1). See project_collab_deliverable_numbering_rule.
   if (r.inf_id && r.collab_number != null)
     return `${r.inf_id}-C${Number(r.collab_number)}`;
-  return r.post_id ?? "";
+  // post_id is NULL on un-onboarded reach-out rows — fall back to the bigserial
+  // id so multiple pending reach-outs don't all collapse to the key "".
+  return r.post_id ?? (r.id != null ? `id:${r.id}` : "");
 }
 
 /** Display-friendly Collab ID. Not-yet-onboarded reach-out rows have no collab. */
@@ -273,7 +275,9 @@ export function EmailStatusCell({
           className="action-btn action-btn--danger"
           onClick={(e) => {
             e.stopPropagation();
-            onSend(r.post_id);
+            // Email lives on the collab's representative deliverable; post_id is
+            // guaranteed non-null on onboarded rows (this cell only renders then).
+            onSend(findRepresentativePostId(r, rows));
           }}
         >
           <Send size={10} aria-hidden />

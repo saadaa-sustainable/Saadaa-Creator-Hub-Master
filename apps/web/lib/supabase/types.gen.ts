@@ -53,7 +53,10 @@ export type PaymentStatus = "Not Due" | "Due" | "Partial" | "Done";
 // ─────────────────────────────────────────────────────────────────────────────
 export interface PostsRow {
   id: number;
-  post_id: string;
+  // Nullable since 2026-06-25: post_id is minted at ONBOARDING, not reach-out.
+  // A reach-out row carries a NULL post_id until its first onboard; the
+  // bigserial `id` above is the real primary key.
+  post_id: string | null;
   post_id_short: string | null;
   post_number: number | null;
   collab_number: number | null;

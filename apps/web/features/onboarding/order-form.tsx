@@ -50,7 +50,13 @@ import {
 } from "./collab-email-modal";
 
 interface OnboardingFormProps {
-  postId: string;
+  /**
+   * Bigserial row id — identifies a reach-out row whose post_id is still NULL.
+   * Onboarding mints post_id, so reach-out rows are onboarded by `id`.
+   */
+  id?: number;
+  /** post_id — present only on already-minted (re-onboarded) rows. */
+  postId?: string;
   postIdShort?: string;
   collabId?: string | null;
   creatorName?: string | null;
@@ -78,6 +84,7 @@ interface ShopifyPreview {
 }
 
 export function OrderCreationModal({
+  id,
   postId,
   postIdShort,
   collabId,
@@ -95,6 +102,10 @@ export function OrderCreationModal({
   const [lookupErr, setLookupErr] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  // post_id is minted at ONBOARDING. A reach-out row arrives with postId
+  // undefined; submitOnboarding returns the freshly-minted post_id, which the
+  // inline collab-email phase needs to target. Captured on a successful save.
+  const [savedPostId, setSavedPostId] = useState<string | null>(null);
   // Two-phase flow: fill the onboarding form, then (on save) review + send the
   // collab email inline within this same modal. `emailDraft` holds the draft
   // built from the just-saved values; non-null means we're in the email phase.
@@ -275,7 +286,9 @@ export function OrderCreationModal({
             campaignId: repeatCampaignId,
             contentType: repeatContentType,
           })
-        : await submitOnboarding({ ...values, postId });
+        : // Reach-out rows are onboarded by their bigserial `id` (post_id is
+          // NULL until onboarding mints it); already-minted rows pass postId.
+          await submitOnboarding({ ...values, id, postId });
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -286,6 +299,9 @@ export function OrderCreationModal({
           ? `${label} onboarded. ${res.childrenSpawned} deliverable row(s) spawned.`
           : `${label} onboarded.`;
       toast.success(msg);
+      // Capture the minted post_id so the inline collab-email phase can target
+      // it (a reach-out onboard arrives with postId undefined).
+      setSavedPostId(res.postId);
       // Refresh so the board reflects the new On Board state, then surface the
       // inline collab-email review pane in this same modal. The onboarding is
       // already persisted — sending the email is now an optional follow-up.
@@ -341,7 +357,7 @@ export function OrderCreationModal({
               <Mail size={16} />
               <h2 className="font-semibold">Review Collaboration Email</h2>
               <span className="chip text-[10px] tabular">
-                {postIdShort ?? postId}
+                {postIdShort ?? savedPostId ?? postId ?? "Pending"}
               </span>
               {collabId && (
                 <span
@@ -363,7 +379,7 @@ export function OrderCreationModal({
           </header>
 
           <CollabEmailPane
-            postId={postId}
+            postId={savedPostId ?? postId ?? ""}
             draft={emailDraft}
             inline
             onClose={finishFlow}
@@ -389,7 +405,7 @@ export function OrderCreationModal({
             </h2>
             {!repeatMode && (
               <span className="chip text-[10px] tabular">
-                {postIdShort ?? postId}
+                {postIdShort ?? postId ?? "Pending"}
               </span>
             )}
             {collabId && (

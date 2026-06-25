@@ -197,7 +197,8 @@ export function PostingOverviewModal({
             <div className="ob-overview-item">
               <span>Partnership Key</span>
               <PartnershipKeyEdit
-                postId={row.post_id}
+                // Posting rows are always onboarded — post_id is non-null here.
+                postId={row.post_id ?? ""}
                 value={row.partnership_id}
               />
             </div>

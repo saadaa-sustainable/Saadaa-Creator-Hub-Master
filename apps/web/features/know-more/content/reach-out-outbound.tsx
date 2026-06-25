@@ -96,15 +96,18 @@ export default function ReachOutOutboundKM() {
             followers, gender, language, ER, avg_likes, verification.
           </li>
           <li>
-            <strong>posts</strong> · post_id <KMCode>SIF-{"{N}"}-P{"{N}"}</KMCode>{" "}
-            (auto via submit_reachout RPC), workflow_status{" "}
+            <strong>posts</strong> · submit_reachout RPC inserts the row (returns
+            its bigserial <KMCode>id</KMCode>), workflow_status{" "}
             <KMCode>Reach Out</KMCode>, campaign_id, content_type, reachout_type{" "}
             <KMCode>Outbound</KMCode>, reachout_direction{" "}
             <KMCode>outbound</KMCode>. Commercial agreed amount + collab_type
             are captured in onboarding (or inbound roster).{" "}
-            <strong>No collab is minted at reach-out</strong> —{" "}
-            <KMCode>collab_id</KMCode> / <KMCode>collab_number</KMCode> stay NULL
-            until onboarding maps an order (a collab = one order).
+            <strong>Nothing is minted at reach-out</strong> —{" "}
+            <KMCode>post_id</KMCode> (P), <KMCode>post_number</KMCode>,{" "}
+            <KMCode>collab_id</KMCode> / <KMCode>collab_number</KMCode> all stay
+            NULL until onboarding (the row is identified by its bigserial id).
+            Onboarding mints the P-block + collab in one go (a collab = one
+            order); ghosted reach-outs keep NULL ids forever.
           </li>
           <li>
             <strong>instagram_cache</strong> · pending row upserted on every

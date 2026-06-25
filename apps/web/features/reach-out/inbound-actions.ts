@@ -21,20 +21,8 @@ interface RowFailure {
   error: string;
 }
 
-function todayIsoInIndia(): string {
-  return new Date().toLocaleDateString("en-CA", {
-    timeZone: "Asia/Kolkata",
-  });
-}
-
-function buildLegacyNomenclature(
-  postId: string,
-  username: string,
-  contentType: string,
-  date = todayIsoInIndia(),
-): string {
-  return `${postId}-${username}-${contentType}-${date}`;
-}
+// Nomenclature is no longer built at reach-out — it embeds the post_id, which
+// is minted at ONBOARDING. submitOnboarding builds it then.
 
 export type InboundBatchResult = {
   ok: boolean;
@@ -66,8 +54,10 @@ export async function submitInboundBatch(
   const { campaignId, rows } = parsed.data;
   const supabase = createServiceClient();
   const created: {
-    postId: string;
-    postIdShort: string;
+    id: number;
+    // post_id / post_id_short are minted at ONBOARDING — NULL at reach-out.
+    postId: string | null;
+    postIdShort: string | null;
     infId: string;
     row: number;
     username: string;
@@ -176,24 +166,19 @@ export async function submitInboundBatch(
     }
 
     const row = data as {
-      post_id: string;
-      post_id_short: string;
+      id: number;
+      // post_id / post_id_short are minted at ONBOARDING now — NULL at reach-out.
+      // The bigserial `id` identifies the new reach-out row.
+      post_id: string | null;
+      post_id_short: string | null;
       post_number: number;
       // NULL now — collab is minted at onboarding, not reach-out.
       collab_number: number | null;
       inf_id: string;
     };
 
-    await (supabase as any)
-      .from("posts")
-      .update({
-        nomenclature: buildLegacyNomenclature(
-          row.post_id,
-          username,
-          r.contentCode,
-        ),
-      })
-      .eq("post_id", row.post_id);
+    // No nomenclature at reach-out: nomenclature embeds the post_id, which
+    // doesn't exist until onboarding mints it. submitOnboarding builds it then.
 
     // Persist the legacy profile_id from the Meta/historic Fetch onto the new
     // creator (lets a returning handle be recognised later). Best-effort.
@@ -205,6 +190,8 @@ export async function submitInboundBatch(
     }
 
     created.push({
+      id: row.id,
+      // postId / postIdShort are NULL until onboarding mints them.
       postId: row.post_id,
       postIdShort: row.post_id_short,
       infId: row.inf_id,
@@ -225,10 +212,11 @@ export async function submitInboundBatch(
         ids: created.map((c) => c.infId).filter(Boolean),
       },
       {
+        // Reach-out rows have NULL post_id (minted at onboarding) — stamp by id.
         scope: "collab",
         table: "posts",
-        idColumn: "post_id",
-        ids: created.map((c) => c.postId),
+        idColumn: "id",
+        ids: created.map((c) => c.id),
       },
     ]);
   }

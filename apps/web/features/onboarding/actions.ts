@@ -189,7 +189,7 @@ export async function submitOnboarding(
     const { data: thisPost } = await (supabase as any)
       .from("posts")
       .select("campaign_id, username, workflow_status")
-      .eq("post_id", v.postId)
+      .eq(v.id != null ? "id" : "post_id", v.id ?? v.postId)
       .maybeSingle();
     const campaignId = (thisPost?.campaign_id ?? "").trim();
     const thisUser = (thisPost?.username ?? "").trim().toLowerCase();
@@ -285,21 +285,23 @@ export async function submitOnboarding(
     if (assignee.includes("@")) {
       const esc = (s: string) =>
         s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      // A reach-out row has no post_id yet — reference it by its row id instead.
+      const rowRef = v.postId ?? (v.id != null ? `row #${v.id}` : "—");
       after(async () => {
         await sendNotification({
           type: NOTIFICATION_TYPES.SHOPIFY_VALIDATION_FAILED,
           to: assignee,
           subject: `Shopify order ${v.orderId} not found — onboarding blocked`,
           title: "Shopify order validation failed",
-          subtitle: `POST ID: ${v.postId}`,
+          subtitle: `POST ID: ${rowRef}`,
           htmlBody: `<p style="margin:0 0 12px;">The Shopify Order ID entered while onboarding could not be validated — it was not in the synced data, and a live check on Shopify also did not return a usable order.</p>
 <table style="width:100%;border-collapse:collapse;font-size:0.86rem;margin:0 0 14px;">
-<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;width:34%;">Post ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(v.postId)}</td></tr>
+<tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;width:34%;">Post ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(rowRef)}</td></tr>
 <tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Order ID</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">${esc(v.orderId)}</td></tr>
 <tr><td style="background:#F5F1EC;border:1px solid #E7E2D2;padding:8px 12px;font-weight:600;">Reason</td><td style="border:1px solid #E7E2D2;padding:8px 12px;">Order not found, or missing the influencer tag (INF)</td></tr>
 </table>
 <p style="margin:0;color:#6E695E;font-size:0.82rem;">Check the Order ID is correct and that the order is tagged for influencer orders (INF) on Shopify, then retry onboarding.</p>`,
-          postId: v.postId,
+          postId: v.postId ?? null,
         });
       });
     }
@@ -314,16 +316,16 @@ export async function submitOnboarding(
   const { data: parentPost, error: parentErr } = await supabase
     .from("posts")
     .select(
-      "post_id, post_id_short, post_number, collab_number, collab_id, inf_id, username, campaign_id, content_type, reach_out_date, reachout_direction, creator_brief_link, nomenclature",
+      "id, post_id, post_id_short, post_number, collab_number, collab_id, inf_id, username, campaign_id, content_type, reach_out_date, reachout_direction, creator_brief_link, nomenclature",
     )
-    .eq("post_id", v.postId)
+    .eq(v.id != null ? "id" : "post_id", (v.id ?? v.postId)!)
     .maybeSingle();
 
   if (parentErr) return { ok: false, error: parentErr.message };
   if (!parentPost) {
     return {
       ok: false,
-      error: `Post ${v.postId} not found.`,
+      error: `Post ${v.id ?? v.postId} not found.`,
       fieldErrors: { postId: "Post not found" },
     };
   }
@@ -336,14 +338,6 @@ export async function submitOnboarding(
     typeof parent.reach_out_date === "string" && parent.reach_out_date
       ? parent.reach_out_date
       : today;
-  const parentNomenclature =
-    (parent.nomenclature as string | null) ||
-    buildLegacyNomenclature(
-      v.postId,
-      parent.username,
-      parent.content_type,
-      nomenclatureDate,
-    );
   const orderObj = order as Record<string, unknown>;
   const orderEmail = (orderObj.email as string | null) ?? null;
   const orderAddress = (orderObj.address as string | null) ?? null;
@@ -363,43 +357,70 @@ export async function submitOnboarding(
     null;
   const onboardedBy = actor.name || actor.email || null;
 
-  // Collab is minted HERE, at onboarding, keyed to the order_id (a collab = one
-  // order). mint_collab_for_order reuses the collab already mapped to this exact
-  // order_id (idempotent re-onboard / same order), else mints the creator's next
-  // C. Reach-out posts carry NULL collab until this runs. Concurrency-safe
-  // (advisory lock per creator). See project_collab_deliverable_numbering_rule.
+  // §6.2 deliverable expansion
+  const total = v.reels + v.posts;
+
+  // Mint at ONBOARDING. A reach-out row arrives with NULL post_id/post_number/
+  // collab — this is its FIRST onboard, so mint_onboarding_block reserves the
+  // contiguous P-block (P{maxP+1..maxP+N}) AND the collab C (reuse-on-same-order
+  // else next C), with maxP/maxC over posts ∪ historic_posts (historic
+  // continuation). A re-onboard of an already-minted row (post_id present) keeps
+  // its stored P/C — no re-mint. See project_collab_deliverable_numbering_rule.
+  const isFirstOnboard = parent.post_id == null;
   let collabNumber: number | null = null;
   let collabId: string | null = null;
-  if (parent.inf_id) {
+  let startPostNumber: number;
+  let postIdBase: string;
+  if (isFirstOnboard) {
+    if (!parent.inf_id) {
+      return { ok: false, error: "Reach-out row is missing its creator id." };
+    }
     const { data: minted, error: mintErr } = await (supabase as any).rpc(
-      "mint_collab_for_order",
-      { p_inf_id: parent.inf_id, p_order_id: v.orderId },
+      "mint_onboarding_block",
+      {
+        p_inf_id: parent.inf_id,
+        p_order_id: v.orderId,
+        p_deliverable_count: Math.max(total, 1),
+      },
     );
     if (mintErr) return { ok: false, error: mintErr.message };
     const m = Array.isArray(minted) ? minted[0] : minted;
     collabNumber = (m?.collab_number as number | null) ?? null;
     collabId = (m?.collab_id as string | null) ?? null;
-  }
-  if (collabId == null) {
-    // Defensive — a reach-out post always has an inf_id, so this should not fire.
-    collabNumber = collabNumber ?? 1;
-    collabId = parent.inf_id
-      ? `${parent.inf_id}-C${collabNumber}`
-      : v.postId;
+    startPostNumber = (m?.start_post_number as number | null) ?? 1;
+    postIdBase =
+      (m?.post_id_base as string | null) ??
+      `${parent.inf_id}-P${startPostNumber}`;
+  } else {
+    // Re-onboard / edit of an already-minted collab — reuse its stored ids.
+    postIdBase = parent.post_id as string;
+    startPostNumber = (parent.post_number as number | null) ?? 1;
+    collabNumber = (parent.collab_number as number | null) ?? null;
+    collabId =
+      (parent.collab_id as string | null) ??
+      (parent.inf_id ? `${parent.inf_id}-C${collabNumber ?? 1}` : postIdBase);
   }
 
-  // §6.2 deliverable expansion — first deliverable type
-  const total = v.reels + v.posts;
   const firstType: "reel" | "post" | null =
     total > 0 ? (v.reels > 0 ? "reel" : "post") : null;
   const parentReels = firstType === "reel" ? 1 : 0;
   const parentPosts = firstType === "post" ? 1 : 0;
 
-  // Equal-split rule: the agreed collab price (`v.commercials`) is divided
-  // across all deliverables (parent + children) so SUM(commercial_amount)
-  // across the collab equals the originally agreed total.
+  // Equal-split rule: the agreed collab price is divided across all deliverables
+  // (parent + children) so SUM(commercial_amount) across the collab equals the
+  // originally agreed total.
   const perDeliverableAmount =
     total > 0 ? Math.round((v.commercials / total) * 100) / 100 : v.commercials;
+
+  // Nomenclature now that the deliverable post_id (postIdBase) is known.
+  const parentNomenclature =
+    (parent.nomenclature as string | null) ||
+    buildLegacyNomenclature(
+      postIdBase,
+      parent.username,
+      parent.content_type,
+      nomenclatureDate,
+    );
 
   // 3. UPDATE parent post
   const postPatch: Record<string, unknown> = {
@@ -436,9 +457,16 @@ export async function submitOnboarding(
     // deliverable_index is kept for ordering only.
     collab_number: collabNumber,
     collab_id: collabId,
-    parent_post_id: v.postId,
+    parent_post_id: postIdBase,
     deliverable_role: total > 1 ? "parent" : "single",
   };
+  // First onboard mints the deliverable post_id onto the (previously NULL)
+  // reach-out row. A re-onboard keeps the stored post_id (do not clobber).
+  if (isFirstOnboard) {
+    postPatch.post_id = postIdBase;
+    postPatch.post_id_short = postIdBase;
+    postPatch.post_number = startPostNumber;
+  }
   if (parsedAddr.state) postPatch.state = parsedAddr.state;
   if (parsedAddr.city) postPatch.city = parsedAddr.city;
   if (parsedAddr.pincode) postPatch.pincode = parsedAddr.pincode;
@@ -452,7 +480,7 @@ export async function submitOnboarding(
   const { error: updErr } = await (supabase as any)
     .from("posts")
     .update(postPatch)
-    .eq("post_id", v.postId);
+    .eq(v.id != null ? "id" : "post_id", v.id ?? v.postId);
 
   if (updErr) return { ok: false, error: updErr.message };
 
@@ -483,22 +511,15 @@ export async function submitOnboarding(
   let childrenSpawned = 0;
   // Test Mode: collect every post in this collab (the onboarded parent + any
   // spawned children) so they can be stamped is_test=true when Collab scope is on.
-  const testCollabPostIds: string[] = [v.postId];
-  if (total > 1) {
+  const testCollabPostIds: string[] = [postIdBase];
+  if (isFirstOnboard && total > 1) {
     const remainingReels = firstType === "reel" ? v.reels - 1 : v.reels;
     const remainingPosts = firstType === "post" ? v.posts - 1 : v.posts;
 
-    const { data: maxRow } = await supabase
-      .from("posts")
-      .select("post_number")
-      .eq("inf_id", parent.inf_id as string)
-      .order("post_number", { ascending: false, nullsFirst: false })
-      .limit(1)
-      .maybeSingle();
-    let nextPostNum =
-      (((maxRow as Record<string, unknown> | null)?.post_number as
-        | number
-        | null) ?? 0) + 1;
+    // Children take the next P-numbers from the block reserved by
+    // mint_onboarding_block (the parent took startPostNumber). No re-query of
+    // max(post_number) — that would race the reservation.
+    let nextPostNum = startPostNumber + 1;
     let childIdx = 2; // parent is index 1
 
     const children: Record<string, unknown>[] = [];
@@ -557,7 +578,7 @@ export async function submitOnboarding(
     // payment_status null keeps the PaymentStatus enum (Not Due | Due | Done)
     // intact for downstream Accounts Hub queries.
     payment_status: null,
-        parent_post_id: v.postId,
+        parent_post_id: postIdBase,
         deliverable_role: "child",
         deliverable_type: kind,
         deliverable_index: childIdx,
@@ -604,7 +625,7 @@ export async function submitOnboarding(
   // Email the actor that onboarding was saved. This is SEPARATE from the
   // collab email (sendCollabEmail), which goes to the influencer — this one
   // confirms the actor's own save. Fire-and-forget via after(); best-effort.
-  const creatorHandle = (parent.username as string | null) ?? v.postId;
+  const creatorHandle = (parent.username as string | null) ?? postIdBase;
   const deliverableSummary =
     total > 0
       ? [
@@ -627,7 +648,7 @@ export async function submitOnboarding(
       rows: [
         { label: "Creator", value: `@${creatorHandle}` },
         { label: "Collab ID", value: collabId },
-        { label: "Post ID (deliverable)", value: v.postId },
+        { label: "Post ID (deliverable)", value: postIdBase },
         { label: "Order ID", value: v.orderId },
         { label: "Collaboration Type", value: v.collabType },
         { label: "Commercials", value: formatRupees(v.commercials) },
@@ -645,7 +666,7 @@ export async function submitOnboarding(
       ],
       footnote:
         "This confirms your save. The collaboration email to the creator is sent separately.",
-      postId: v.postId,
+      postId: postIdBase,
       collabId,
     });
   });
@@ -656,7 +677,7 @@ export async function submitOnboarding(
   revalidatePath("/journey");
   revalidatePath("/posting");
 
-  return { ok: true, postId: v.postId, childrenSpawned };
+  return { ok: true, postId: postIdBase, childrenSpawned };
 }
 
 // ─── Repeat Collab (C2+ for an existing creator, started at Onboarding) ───────

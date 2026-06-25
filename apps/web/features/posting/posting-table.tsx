@@ -95,7 +95,8 @@ export function PostingTable({
         <PostingModal
           open={!!selected}
           onClose={() => setSelected(null)}
-          postId={selected.post_id}
+          // Posting rows are always onboarded — post_id is non-null here.
+          postId={selected.post_id ?? ""}
           postIdShort={selected.post_id_short ?? undefined}
           collabId={collabIdLabel(selected)}
           creatorName={selected.creator?.inf_name}

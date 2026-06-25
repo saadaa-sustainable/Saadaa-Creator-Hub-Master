@@ -66,7 +66,11 @@ export type ContentDuration = (typeof CONTENT_DURATIONS)[number];
 
 export const OnboardingSchema = z
   .object({
-    postId: z.string().trim().min(1, "Post ID required"),
+    // Reach-out rows are onboarded by their bigserial `id` (post_id is NULL until
+    // onboarding mints it). Already-onboarded rows still pass postId. One of the
+    // two must be present — enforced in the superRefine below.
+    id: z.coerce.number().int().positive().optional(),
+    postId: z.string().trim().optional(),
     agency: z.string().trim().optional().default(""),
     collabType: z.enum(COLLAB_TYPES, { message: "Collaboration Type required" }),
     commercials: z.coerce.number().min(0).default(0),
@@ -85,6 +89,15 @@ export const OnboardingSchema = z
     remarks: z.string().trim().optional().default(""),
   })
   .superRefine((data, ctx) => {
+    // Either the bigserial row id (reach-out onboard) or a post_id (already
+    // onboarded) must identify the row to onboard.
+    if (data.id == null && !(data.postId && data.postId.length)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["postId"],
+        message: "Row id or Post ID required",
+      });
+    }
     // Bank details required for Barter + Paid
     if (data.collabType === "Barter + Paid") {
       if (!data.bankName) {

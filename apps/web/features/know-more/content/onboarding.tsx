@@ -30,20 +30,24 @@ export default function OnboardingKM() {
             below the filters to that member&apos;s metrics.
           </li>
           <li>
-            <strong>Collab ID model — one row per collab</strong> · a collab is
-            born at <strong>onboarding, keyed to the order</strong> (a collab =
-            one order). On submit, <KMCode>mint_collab_for_order</KMCode> reuses
-            the collab already mapped to that exact Order ID, else mints the
-            creator&apos;s next <KMCode>collab_id</KMCode>{" "}
-            (<KMCode>SIF-1-C1</KMCode>, <KMCode>SIF-1-C2</KMCode> …). All
-            deliverables of one onboarding share that collab_id; the per-creator
-            deliverable number <KMCode>P{"{n}"}</KMCode> stays linear across
-            collabs. <strong>Reach-out rows have no collab yet</strong> — the
-            board shows <KMCode>Pending</KMCode> until they are onboarded. The
-            board groups by <KMCode>collab_id</KMCode> and renders ONE
-            representative row per collab (the deliverable with the lowest{" "}
-            <KMCode>post_id</KMCode>). A dedicated <strong>Collab ID</strong>{" "}
-            column / chip shows it on the row, card, and overview.
+            <strong>IDs are minted HERE — both post_id (P) and collab (C)</strong>{" "}
+            · a reach-out row arrives with NULL <KMCode>post_id</KMCode> /{" "}
+            <KMCode>collab_id</KMCode> (identified by its bigserial id). On submit,{" "}
+            <KMCode>mint_onboarding_block</KMCode> reserves, in one advisory-locked
+            call: the <strong>collab</strong> (reuse the C already on that exact
+            Order ID, else the creator&apos;s next{" "}
+            <KMCode>SIF-1-C{"{n}"}</KMCode>) and the <strong>P-block</strong> —
+            one <KMCode>post_id</KMCode> per deliverable{" "}
+            (<KMCode>P{"{maxP+1}"}</KMCode> … <KMCode>P{"{maxP+N}"}</KMCode>), all
+            sharing the collab_id. <strong>maxP and maxC continue over{" "}
+            <KMCode>posts</KMCode> ∪ <KMCode>historic_posts</KMCode></strong> — a
+            historic creator with C2/P2 onboarded with 3 deliverables yields C3 +
+            P3/P4/P5. <strong>Reach-out rows have no collab yet</strong> — the
+            board shows <KMCode>Pending</KMCode> until onboarded. The board groups
+            by <KMCode>collab_id</KMCode> and renders ONE representative row per
+            collab (lowest <KMCode>post_id</KMCode>). A dedicated{" "}
+            <strong>Collab ID</strong> column / chip shows it on the row, card,
+            and overview.
           </li>
           <li>
             <strong>Deliverables chip</strong> · a <KMCode>Layers</KMCode> chip

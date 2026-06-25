@@ -29,6 +29,7 @@ export async function fetchOnboardingTable(
     .from("posts")
     .select(
       `
+      id,
       post_id,
       post_id_short,
       workflow_status,

@@ -35,6 +35,7 @@ function monthLabel(iso: string): string {
  */
 // Base columns — proven to exist across every consumer in this repo.
 const POSTS_COLS_BASE = [
+  "id",
   "post_id",
   "post_id_short",
   "collab_id",
@@ -499,11 +500,11 @@ export async function fetchDashboardData(
     const inf = String(p.inf_id ?? "");
     if (!inf) continue;
     // No collab until an order is mapped — reach-out rows (NULL collab_number)
-    // key by post_id so they never merge into a fabricated "-C1".
+    // key by their bigserial id so NULL post_id rows never merge into one key.
     const key =
       p.collab_number != null
         ? `${inf}|${Number(p.collab_number)}`
-        : `post:${String(p.post_id ?? "")}`;
+        : `id:${String(p.id)}`;
     commercialTotalByCollab.set(
       key,
       (commercialTotalByCollab.get(key) ?? 0) +

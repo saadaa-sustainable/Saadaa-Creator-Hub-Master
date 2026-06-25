@@ -60,7 +60,7 @@ function applyClientFilters(
         const handleMatch = (card.username ?? "")
           .toLowerCase()
           .includes(searchLower);
-        const postMatch = card.post_id.toLowerCase().includes(searchLower);
+        const postMatch = (card.post_id ?? "").toLowerCase().includes(searchLower);
         if (!nameMatch && !handleMatch && !postMatch) return false;
       }
 
