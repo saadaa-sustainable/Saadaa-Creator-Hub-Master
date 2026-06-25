@@ -168,11 +168,20 @@ export async function historicCreatorFilterOptions(): Promise<{
         : ""),
   }));
 
-  const { data: postRows } = await svc.from("posts").select("onboarded_by");
+  // Team members = live onboarders (posts.onboarded_by) UNION the historic
+  // callout people (historic_posts.onboarded_by = the legacy callout_by), so the
+  // picker can filter by who reached out to a creator in the archive too.
+  const [{ data: postRows }, { data: histRows }] = await Promise.all([
+    svc.from("posts").select("onboarded_by"),
+    svc.from("historic_posts").select("onboarded_by"),
+  ]);
 
   const teamMembers = Array.from(
     new Set(
-      ((postRows ?? []) as Array<{ onboarded_by: string | null }>)
+      [
+        ...((postRows ?? []) as Array<{ onboarded_by: string | null }>),
+        ...((histRows ?? []) as Array<{ onboarded_by: string | null }>),
+      ]
         .map((p) => p.onboarded_by)
         .filter((v): v is string => typeof v === "string" && v.trim() !== ""),
     ),
