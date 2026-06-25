@@ -1,7 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { isVoidedStatus } from "@/lib/workflow";
 import type {
-  CollabTypeBreakdown,
   CreatorAnalyticsFilterOptions,
   CreatorAnalyticsFilters,
   CreatorAnalyticsRow,
@@ -11,329 +9,111 @@ import type {
 /**
  * Creator Analytics roster + per-creator collab history.
  *
- * Mirrors the dashboard/queries.ts approach: pull the bounded corpora
- * (creators + live posts + historic_posts) with the service-role client and
- * group in JS, so cross-table aggregates aren't bottlenecked by PostgREST's
- * limited grouping. Every posts-derived metric is keyed on inf_id.
- *
- *   - live collab count  = distinct collab_id (coalesced to inf_id||'-C'||
- *                          collab_number for legacy rows) across live posts.
- *   - deliverables       = Σ (reels + static_posts + stories) over live posts.
- *   - current_stage      = workflow_status of the creator's MOST-RECENT post
- *                          across live ∪ historic (by post_date → onboard_date
- *                          → reach_out_date); strictly later date wins, ties go
- *                          to live. Historic-only creators show their historic
- *                          stage instead of "—".
- *   - historic collab    = distinct collab_id (same coalesce) across
- *                          historic_posts.
- *   - collab history list = posts ∪ historic_posts, newest first.
+ * SERVER-SIDE PAGINATED. The heavy lifting (cross-table aggregation, filtering,
+ * follower-desc ordering, and the windowed slice) all happens inside the
+ * `creator_analytics_page` Postgres RPC — the browser only ever receives ONE
+ * page (60 rows) of already-aggregated creators plus the full filtered
+ * `total_count`. The per-creator collab history is fetched ON DEMAND via
+ * `creator_collab_history` when a creator's modal opens, so the roster never
+ * ships the ~11k-row collab corpus to the client.
  */
+
+const PAGE_SIZE = 60;
 
 const FETCH_LIMIT = 50000;
 
 type Raw = Record<string, unknown>;
 
-/** A row is a real collaboration only once it carries a collab id/number.
- * Reach-out-only and (pending-backfill) no-order rows are NOT collabs. */
-function hasCollab(r: Raw): boolean {
-  return r.collab_id != null || r.collab_number != null;
+/** Empty string / undefined → null, so the RPC treats "no filter" uniformly. */
+function nz(v: string | undefined | null): string | null {
+  const s = (v ?? "").trim();
+  return s ? s : null;
 }
 
-/** Collab grouping key with legacy fallback — distinct collabs per creator. */
-function collabKey(r: Raw): string {
-  const cid = (r.collab_id as string | null) ?? "";
-  if (cid) return cid;
-  const inf = (r.inf_id as string | null) ?? "";
-  const cn = r.collab_number as number | null;
-  if (inf && cn != null) return `${inf}-C${cn}`;
-  // No collab key yet (reach-out only) — key by post id / unique id so it isn't
-  // merged with a real collab.
-  return (r.post_id as string | null) ?? `id:${String(r.id ?? "")}`;
-}
-
-/** Display label for a collab in the history modal. */
-function collabLabel(r: Raw): string {
-  const cid = (r.collab_id as string | null) ?? "";
-  if (cid) return cid;
-  const inf = (r.inf_id as string | null) ?? "";
-  const cn = r.collab_number as number | null;
-  if (inf && cn != null) return `${inf}-C${cn}`;
-  return (r.post_id_short as string | null) ?? (r.post_id as string | null) ?? "—";
-}
-
-function dateOf(r: Raw, ...keys: string[]): string | null {
-  for (const k of keys) {
-    const v = r[k];
-    if (v) return String(v).slice(0, 10);
-  }
-  return null;
-}
-
-function maxDate(a: string | null, b: string | null): string | null {
-  if (!a) return b;
-  if (!b) return a;
-  return a >= b ? a : b;
-}
-function minDate(a: string | null, b: string | null): string | null {
-  if (!a) return b;
-  if (!b) return a;
-  return a <= b ? a : b;
-}
-
-interface Agg {
-  collabKeys: Set<string>;
-  deliverables: number;
-  reachOutFrom: string | null;
-  reachOutTo: string | null;
-  lastOnboard: string | null;
-  lastPost: string | null;
-  collabTypes: CollabTypeBreakdown;
-  /** Most-recent live post's status + its sort date. */
-  currentStage: string | null;
-  currentStageDate: string | null;
-  collabs: CreatorCollab[];
-}
-
-function newAgg(): Agg {
-  return {
-    collabKeys: new Set<string>(),
-    deliverables: 0,
-    reachOutFrom: null,
-    reachOutTo: null,
-    lastOnboard: null,
-    lastPost: null,
-    collabTypes: {},
-    currentStage: null,
-    currentStageDate: null,
-    collabs: [],
-  };
-}
-
-export async function fetchCreatorAnalytics(
+/**
+ * One page of the creator roster. Maps the filter set → the RPC params
+ * (`p_offset = (page-1)*pageSize`, `p_limit = pageSize`; empty filter → null),
+ * calls `creator_analytics_page`, and returns the mapped rows plus the full
+ * filtered count (`total_count`, identical on every row). Rows arrive already
+ * ordered by followers desc.
+ */
+export async function fetchCreatorAnalyticsPage(
   filters: CreatorAnalyticsFilters,
-): Promise<CreatorAnalyticsRow[]> {
+  page = 1,
+  pageSize = PAGE_SIZE,
+): Promise<{ rows: CreatorAnalyticsRow[]; total: number }> {
   const supabase = createServiceClient();
+  const safePage = page > 0 ? page : 1;
 
-  const [creatorsRes, postsRes, historicRes] = await Promise.all([
-    (supabase as any)
-      .from("creators")
-      .select(
-        "inf_id, username, inf_name, followers, category, profile_pic, creator_type, state, instagram_link",
-      )
-      .limit(FETCH_LIMIT),
-    (supabase as any)
-      .from("posts")
-      .select(
-        "inf_id, collab_id, collab_number, post_id, post_id_short, workflow_status, content_type, collab_type, payment_status, reels, static_posts, stories, reach_out_date, onboard_date, post_date, post_link",
-      )
-      .limit(FETCH_LIMIT),
-    (supabase as any)
-      .from("historic_posts")
-      .select(
-        "inf_id, collab_id, collab_number, post_id, post_id_short, workflow_status, content_type, collab_type, payment_status, reach_out_date, onboard_date, post_date, post_link",
-      )
-      .limit(FETCH_LIMIT),
-  ]);
-
-  if (creatorsRes.error) throw creatorsRes.error;
-  if (postsRes.error) throw postsRes.error;
-  if (historicRes.error) throw historicRes.error;
-
-  const creators = (creatorsRes.data ?? []) as Raw[];
-  const livePosts = (postsRes.data ?? []) as Raw[];
-  const historicPosts = (historicRes.data ?? []) as Raw[];
-
-  // Live aggregation.
-  const liveAgg = new Map<string, Agg>();
-  for (const p of livePosts) {
-    // Voided (offboarded) collabs don't count toward a creator's roster stats.
-    if (isVoidedStatus(p.workflow_status as string | null)) continue;
-    const inf = String(p.inf_id ?? "").trim();
-    if (!inf) continue;
-    let agg = liveAgg.get(inf);
-    if (!agg) {
-      agg = newAgg();
-      liveAgg.set(inf, agg);
-    }
-    if (hasCollab(p)) agg.collabKeys.add(collabKey(p));
-    agg.deliverables +=
-      (Number(p.reels ?? 0) || 0) +
-      (Number(p.static_posts ?? 0) || 0) +
-      (Number(p.stories ?? 0) || 0);
-    const ro = dateOf(p, "reach_out_date");
-    agg.reachOutFrom = minDate(agg.reachOutFrom, ro);
-    agg.reachOutTo = maxDate(agg.reachOutTo, ro);
-    agg.lastOnboard = maxDate(agg.lastOnboard, dateOf(p, "onboard_date"));
-    agg.lastPost = maxDate(agg.lastPost, dateOf(p, "post_date"));
-    const ct = String(p.collab_type ?? "").trim();
-    if (ct) agg.collabTypes[ct] = (agg.collabTypes[ct] ?? 0) + 1;
-    // Most-recent live post drives the current stage.
-    const sortDate =
-      dateOf(p, "post_date", "onboard_date", "reach_out_date") ?? "";
-    if (agg.currentStageDate == null || sortDate >= agg.currentStageDate) {
-      agg.currentStageDate = sortDate;
-      agg.currentStage = (p.workflow_status as string | null) ?? null;
-    }
-    if (hasCollab(p)) {
-      agg.collabs.push({
-        collabId: collabLabel(p),
-        contentType: (p.content_type as string | null) ?? null,
-        postDate: dateOf(p, "post_date", "onboard_date", "reach_out_date"),
-        paymentStatus: (p.payment_status as string | null) ?? null,
-        postLink: (p.post_link as string | null) ?? null,
-        source: "live",
-      });
-    }
-  }
-
-  // Historic aggregation (no deliverable split in legacy → deliverables stay 0).
-  // Historic rows ALSO drive current_stage via the same date-compared logic, so
-  // a historic-only creator surfaces their historic stage instead of "—".
-  const histAgg = new Map<string, Agg>();
-  for (const p of historicPosts) {
-    const inf = String(p.inf_id ?? "").trim();
-    if (!inf) continue;
-    let agg = histAgg.get(inf);
-    if (!agg) {
-      agg = newAgg();
-      histAgg.set(inf, agg);
-    }
-    if (hasCollab(p)) agg.collabKeys.add(collabKey(p));
-    const ro = dateOf(p, "reach_out_date");
-    agg.reachOutFrom = minDate(agg.reachOutFrom, ro);
-    agg.reachOutTo = maxDate(agg.reachOutTo, ro);
-    agg.lastOnboard = maxDate(agg.lastOnboard, dateOf(p, "onboard_date"));
-    agg.lastPost = maxDate(agg.lastPost, dateOf(p, "post_date"));
-    const ct = String(p.collab_type ?? "").trim();
-    if (ct) agg.collabTypes[ct] = (agg.collabTypes[ct] ?? 0) + 1;
-    // Most-recent historic row drives the historic stage (same sort-date rule).
-    const sortDate =
-      dateOf(p, "post_date", "onboard_date", "reach_out_date") ?? "";
-    if (agg.currentStageDate == null || sortDate >= agg.currentStageDate) {
-      agg.currentStageDate = sortDate;
-      agg.currentStage = (p.workflow_status as string | null) ?? null;
-    }
-    if (hasCollab(p)) {
-      agg.collabs.push({
-        collabId: collabLabel(p),
-        contentType: (p.content_type as string | null) ?? null,
-        postDate: dateOf(p, "post_date", "onboard_date", "reach_out_date"),
-        paymentStatus: (p.payment_status as string | null) ?? null,
-        postLink: (p.post_link as string | null) ?? null,
-        source: "historic",
-      });
-    }
-  }
-
-  // Merge per inf_id over the creators roster.
-  const rows: CreatorAnalyticsRow[] = creators.map((c) => {
-    const inf = String(c.inf_id ?? "").trim();
-    const live = liveAgg.get(inf);
-    const hist = histAgg.get(inf);
-
-    const liveCount = live?.collabKeys.size ?? 0;
-    const histCount = hist?.collabKeys.size ?? 0;
-
-    const breakdown: CollabTypeBreakdown = {};
-    for (const [k, v] of Object.entries(live?.collabTypes ?? {})) {
-      breakdown[k] = (breakdown[k] ?? 0) + v;
-    }
-    for (const [k, v] of Object.entries(hist?.collabTypes ?? {})) {
-      breakdown[k] = (breakdown[k] ?? 0) + v;
-    }
-
-    const collabs = [...(live?.collabs ?? []), ...(hist?.collabs ?? [])].sort(
-      (a, b) => String(b.postDate ?? "").localeCompare(String(a.postDate ?? "")),
-    );
-
-    // Current stage = most-recent stage across live ∪ historic by sort date.
-    // The strictly later-dated source wins; ties (and live-only / historic-only
-    // creators) resolve to live, the newer system. So a live re-reach-out beats
-    // an older historic post, while a historic-only creator still surfaces its
-    // historic stage instead of "—".
-    const liveStageDate = live?.currentStageDate ?? null;
-    const histStageDate = hist?.currentStageDate ?? null;
-    const historicWins =
-      histStageDate != null &&
-      (liveStageDate == null || histStageDate > liveStageDate);
-    const currentStage = historicWins
-      ? (hist?.currentStage ?? null)
-      : (live?.currentStage ?? hist?.currentStage ?? null);
-
-    return {
-      inf_id: inf,
-      username: String(c.username ?? ""),
-      inf_name: (c.inf_name as string | null) ?? null,
-      followers: c.followers != null ? Number(c.followers) : null,
-      category: (c.category as string | null) ?? null,
-      profile_pic: (c.profile_pic as string | null) ?? null,
-      creator_type: (c.creator_type as string | null) ?? null,
-      current_stage: currentStage,
-      live_collab_count: liveCount,
-      historic_collab_count: histCount,
-      total_collab_count: liveCount + histCount,
-      deliverable_count: live?.deliverables ?? 0,
-      last_onboard_date: maxDate(
-        live?.lastOnboard ?? null,
-        hist?.lastOnboard ?? null,
-      ),
-      last_post_date: maxDate(live?.lastPost ?? null, hist?.lastPost ?? null),
-      collab_type_breakdown: breakdown,
-      reach_out_from: minDate(
-        live?.reachOutFrom ?? null,
-        hist?.reachOutFrom ?? null,
-      ),
-      reach_out_to: maxDate(live?.reachOutTo ?? null, hist?.reachOutTo ?? null),
-      collabs,
-      state: (c.state as string | null) ?? null,
-      instagram_link: (c.instagram_link as string | null) ?? null,
-    };
+  const { data, error } = await (supabase as any).rpc("creator_analytics_page", {
+    p_search: nz(filters.q),
+    p_tier: nz(filters.tier),
+    p_region: nz(filters.region),
+    p_creator_type: nz(filters.creatorType),
+    p_stage: nz(filters.stage),
+    p_reach_from: nz(filters.reachOutFrom),
+    p_reach_to: nz(filters.reachOutTo),
+    p_posted_from: nz(filters.postedFrom),
+    p_posted_to: nz(filters.postedTo),
+    p_limit: pageSize,
+    p_offset: (safePage - 1) * pageSize,
   });
 
-  return applyFilters(rows, filters);
+  if (error) throw error;
+
+  const records = (data ?? []) as Raw[];
+  const rows: CreatorAnalyticsRow[] = records.map((r) => ({
+    inf_id: String(r.inf_id ?? ""),
+    username: String(r.username ?? ""),
+    inf_name: (r.inf_name as string | null) ?? null,
+    followers: r.followers != null ? Number(r.followers) : null,
+    category: (r.category as string | null) ?? null,
+    profile_pic: (r.profile_pic as string | null) ?? null,
+    creator_type: (r.creator_type as string | null) ?? null,
+    current_stage: (r.current_stage as string | null) ?? null,
+    live_collab_count: Number(r.live_collab_count ?? 0) || 0,
+    historic_collab_count: Number(r.historic_collab_count ?? 0) || 0,
+    total_collab_count: Number(r.total_collab_count ?? 0) || 0,
+    deliverable_count: Number(r.deliverable_count ?? 0) || 0,
+    last_onboard_date: (r.last_onboard_date as string | null) ?? null,
+    last_post_date: (r.last_post_date as string | null) ?? null,
+    collab_types: (r.collab_types as string | null) ?? null,
+    reach_out_from: (r.reach_out_from as string | null) ?? null,
+    reach_out_to: (r.reach_out_to as string | null) ?? null,
+    state: (r.state as string | null) ?? null,
+    instagram_link: (r.instagram_link as string | null) ?? null,
+  }));
+
+  const total = Number(records[0]?.total_count ?? 0) || 0;
+  return { rows, total };
 }
 
-function applyFilters(
-  rows: CreatorAnalyticsRow[],
-  filters: CreatorAnalyticsFilters,
-): CreatorAnalyticsRow[] {
-  const needle = (filters.q ?? "").trim().toLowerCase();
-  const tier = (filters.tier ?? "").trim();
-  const region = (filters.region ?? "").trim();
-  const creatorType = (filters.creatorType ?? "").trim();
-  const stage = (filters.stage ?? "").trim();
-  const roFrom = filters.reachOutFrom ?? "";
-  const roTo = filters.reachOutTo ?? "";
-  const postFrom = filters.postedFrom ?? "";
-  const postTo = filters.postedTo ?? "";
+/**
+ * Full merged collab history for ONE creator (posts ∪ historic_posts, newest
+ * first), fetched on demand when that creator's history modal opens. Backed by
+ * the `creator_collab_history` RPC.
+ */
+export async function fetchCreatorCollabHistory(
+  infId: string,
+): Promise<CreatorCollab[]> {
+  const id = (infId ?? "").trim();
+  if (!id) return [];
 
-  return rows.filter((r) => {
-    if (needle) {
-      const hit = [r.inf_id, r.inf_name, r.username].some((f) =>
-        String(f ?? "").toLowerCase().includes(needle),
-      );
-      if (!hit) return false;
-    }
-    if (tier && r.category !== tier) return false;
-    if (region && r.state !== region) return false;
-    if (creatorType && r.creator_type !== creatorType) return false;
-    if (stage && r.current_stage !== stage) return false;
-    if (roFrom || roTo) {
-      // Match if the creator's reach-out window overlaps the selected range.
-      const from = r.reach_out_from;
-      const to = r.reach_out_to;
-      if (!from && !to) return false;
-      if (roFrom && to && to < roFrom) return false;
-      if (roTo && from && from > roTo) return false;
-    }
-    if (postFrom || postTo) {
-      const lp = r.last_post_date;
-      if (!lp) return false;
-      if (postFrom && lp < postFrom) return false;
-      if (postTo && lp > postTo) return false;
-    }
-    return true;
+  const supabase = createServiceClient();
+  const { data, error } = await (supabase as any).rpc("creator_collab_history", {
+    p_inf_id: id,
   });
+
+  if (error) throw error;
+
+  return ((data ?? []) as Raw[]).map((r) => ({
+    collabId: String(r.collab_id ?? "—"),
+    contentType: (r.content_type as string | null) ?? null,
+    postDate: (r.post_date as string | null) ?? null,
+    paymentStatus: (r.payment_status as string | null) ?? null,
+    postLink: (r.post_link as string | null) ?? null,
+    source: (r.source as string | null) === "historic" ? "historic" : "live",
+  }));
 }
 
 export async function fetchCreatorAnalyticsFilterOptions(): Promise<CreatorAnalyticsFilterOptions> {

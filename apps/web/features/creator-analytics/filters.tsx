@@ -43,6 +43,9 @@ export function CreatorAnalyticsFiltersBar({
       const next = new URLSearchParams(params.toString());
       if (!value) next.delete(key);
       else next.set(key, value);
+      // Any filter change lands the user on page 1 of the new result set.
+      next.delete("cpage");
+      next.delete("page");
       startTransition(() =>
         router.replace(`?${next.toString()}` as never, { scroll: false }),
       );
@@ -66,6 +69,9 @@ export function CreatorAnalyticsFiltersBar({
   const clearAll = () => {
     const next = new URLSearchParams(params.toString());
     FILTER_KEYS.forEach((k) => next.delete(k));
+    // Reset pagination too, so the cleared view starts on page 1.
+    next.delete("cpage");
+    next.delete("page");
     startTransition(() =>
       router.replace(`?${next.toString()}` as never, { scroll: false }),
     );

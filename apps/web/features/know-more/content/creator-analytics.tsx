@@ -59,6 +59,14 @@ export default function CreatorAnalyticsKM() {
             last post date.
           </li>
         </KMList>
+        <KMCallout tone="info">
+          The roster is <strong>server-paginated, 60 creators per page</strong>.
+          The page lives in <KMCode>?cpage</KMCode>; Prev / Next at the bottom
+          (mirroring the Historic Creators picker — <KMCode>X–Y of Z</KMCode>)
+          re-fetch the next 60 server-side. Only one page ever reaches the
+          browser, so the whole 7,800-creator base never loads at once. Changing
+          any filter resets you to page 1.
+        </KMCallout>
       </KMSection>
 
       <KMSection tag="Stage + Historic / New labels">
@@ -81,10 +89,15 @@ export default function CreatorAnalyticsKM() {
         <KMList>
           <li>
             Clicking a creator opens a <strong>collab-history modal</strong>{" "}
-            listing every collaboration from <KMCode>posts</KMCode> ∪{" "}
-            <KMCode>historic_posts</KMCode>, ordered newest first. Each line shows
-            the collab id, content type, post date, payment status and a{" "}
-            <strong>Live / Historic</strong> source badge.
+            that <strong>loads on demand</strong> — a brief spinner, then every
+            collaboration from <KMCode>posts</KMCode> ∪{" "}
+            <KMCode>historic_posts</KMCode> (via the{" "}
+            <KMCode>creator_collab_history</KMCode> RPC), ordered newest first.
+            Each line shows the collab id, content type, post date, payment
+            status, a <strong>Live / Historic</strong> source badge and a
+            post-link button when an IG URL is present. The header stats (total
+            collabs, deliverables, dates, collab-type tally) come from the row
+            already in hand, so they show instantly.
           </li>
           <li>
             Counts are <strong>distinct collabs</strong> — deliverable rows of one

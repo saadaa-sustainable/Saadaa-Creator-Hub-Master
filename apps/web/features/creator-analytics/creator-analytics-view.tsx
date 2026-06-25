@@ -1,25 +1,35 @@
 "use client";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Grid3X3,
   History,
   Inbox,
   List as ListIcon,
+  Loader2,
   Sparkles,
   X,
 } from "lucide-react";
-import { DataTable } from "@/components/data-table/data-table";
 import { Avatar, StatusPill, WorkflowStatusPill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDate, formatFollowers } from "@/lib/formatters";
-import type { ColumnDef } from "@tanstack/react-table";
 import type { WorkflowStatus } from "@/lib/supabase/types.gen";
+import { loadCreatorCollabHistory } from "./actions";
 import type { CreatorAnalyticsRow, CreatorCollab } from "./types";
 
 export interface CreatorAnalyticsViewProps {
+  /** ONE page of creators (server-paginated, already ordered followers desc). */
   rows: CreatorAnalyticsRow[];
+  /** Full filtered creator count across all pages (drives the pager). */
+  total: number;
+  /** 1-based current page. */
+  page: number;
+  pageSize: number;
   initialView?: "list" | "cards";
 }
 
@@ -54,6 +64,9 @@ function StageCell({ stage }: { stage: string | null }) {
 
 export function CreatorAnalyticsView({
   rows,
+  total,
+  page,
+  pageSize,
   initialView = "list",
 }: CreatorAnalyticsViewProps) {
   const [view, setView] = useState<"list" | "cards">(initialView);
@@ -71,103 +84,7 @@ export function CreatorAnalyticsView({
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  const columns = useMemo<ColumnDef<CreatorAnalyticsRow>[]>(
-    () => [
-      {
-        id: "creator",
-        accessorFn: (r) => r.inf_name ?? r.username ?? "",
-        header: "Creator",
-        cell: ({ row }) => <CreatorCell r={row.original} />,
-      },
-      {
-        id: "inf_id",
-        header: "INF ID",
-        accessorKey: "inf_id",
-        cell: ({ row }) => (
-          <span className="tabular text-[0.78rem]">{row.original.inf_id}</span>
-        ),
-      },
-      {
-        id: "type",
-        header: "Type",
-        accessorKey: "creator_type",
-        cell: ({ row }) => <CreatorTypeChip type={row.original.creator_type} />,
-      },
-      {
-        id: "stage",
-        header: "Current Stage",
-        accessorKey: "current_stage",
-        cell: ({ row }) => <StageCell stage={row.original.current_stage} />,
-      },
-      {
-        id: "tier",
-        header: "Tier",
-        accessorKey: "category",
-        cell: ({ row }) =>
-          row.original.category ? (
-            <span className="campaign-chip">{row.original.category}</span>
-          ) : (
-            <span className="text-text-tertiary">—</span>
-          ),
-      },
-      {
-        id: "followers",
-        header: "Followers",
-        accessorFn: (r) => r.followers ?? 0,
-        cell: ({ row }) => (
-          <span className="tabular">
-            {formatFollowers(row.original.followers)}
-          </span>
-        ),
-      },
-      {
-        id: "collabs",
-        header: "Collabs",
-        accessorFn: (r) => r.total_collab_count,
-        cell: ({ row }) => (
-          <span className="tabular whitespace-nowrap text-[0.78rem]">
-            {collabSummary(row.original)}
-          </span>
-        ),
-      },
-      {
-        id: "deliverables",
-        header: "Deliverables",
-        accessorFn: (r) => r.deliverable_count,
-        cell: ({ row }) => (
-          <span className="tabular">{row.original.deliverable_count}</span>
-        ),
-      },
-      {
-        id: "last_post",
-        header: "Last Post",
-        accessorFn: (r) => r.last_post_date ?? "",
-        cell: ({ row }) => (
-          <span className="tabular whitespace-nowrap text-[0.78rem]">
-            {formatDate(row.original.last_post_date)}
-          </span>
-        ),
-      },
-      {
-        id: "actions",
-        header: "History",
-        cell: ({ row }) => (
-          <button
-            type="button"
-            className="action-btn action-btn--view"
-            onClick={() => setDetailRow(row.original)}
-            aria-label={`View collab history for ${
-              row.original.inf_name ?? row.original.username
-            }`}
-          >
-            <History size={11} aria-hidden />
-            History
-          </button>
-        ),
-      },
-    ],
-    [],
-  );
+  const isEmpty = rows.length === 0;
 
   return (
     <>
@@ -202,19 +119,7 @@ export function CreatorAnalyticsView({
         </button>
       </div>
 
-      {view === "list" ? (
-        <div className="ob-list-wrap">
-          <DataTable<CreatorAnalyticsRow>
-            data={rows}
-            columns={columns}
-            emptyTitle="No creators match these filters"
-            emptyDescription="Try clearing filters or widening the date ranges."
-            mobileCard={(r) => (
-              <CreatorCard r={r} onOpen={() => setDetailRow(r)} />
-            )}
-          />
-        </div>
-      ) : rows.length === 0 ? (
+      {isEmpty ? (
         <div className="glass-card text-center py-10 text-text-tertiary">
           <Inbox size={28} className="mx-auto mb-2" />
           <p className="font-medium text-text-primary">
@@ -224,18 +129,211 @@ export function CreatorAnalyticsView({
             Try clearing filters or widening the date ranges.
           </p>
         </div>
+      ) : view === "list" ? (
+        <CreatorListTable rows={rows} onOpen={setDetailRow} />
       ) : (
         <div className="ob-card-grid">
           {rows.map((r) => (
-            <CreatorCard
-              key={r.inf_id}
-              r={r}
-              onOpen={() => setDetailRow(r)}
-            />
+            <CreatorCard key={r.inf_id} r={r} onOpen={() => setDetailRow(r)} />
           ))}
         </div>
       )}
+
+      <CreatorPager total={total} page={page} pageSize={pageSize} />
     </>
+  );
+}
+
+/** Desktop table of the current page, with a mobile card stack fallback. */
+function CreatorListTable({
+  rows,
+  onOpen,
+}: {
+  rows: CreatorAnalyticsRow[];
+  onOpen: (r: CreatorAnalyticsRow) => void;
+}) {
+  return (
+    <div className="ob-list-wrap">
+      {/* Mobile: stacked cards (the table is too wide for phones). */}
+      <div className="grid gap-2 md:hidden">
+        {rows.map((r) => (
+          <CreatorCard key={r.inf_id} r={r} onOpen={() => onOpen(r)} />
+        ))}
+      </div>
+
+      {/* Desktop: dense roster table. */}
+      <div className="hidden md:block overflow-auto rounded-[var(--radius)] border border-border bg-bg-white shadow-sm">
+        <table className="w-full min-w-[820px] border-collapse text-[0.82rem]">
+          <thead className="sticky top-0 z-[1] bg-bg-ecru">
+            <tr>
+              {[
+                "Creator",
+                "INF ID",
+                "Type",
+                "Current Stage",
+                "Tier",
+                "Followers",
+                "Collabs",
+                "History",
+              ].map((h) => (
+                <th
+                  key={h}
+                  scope="col"
+                  className="border-b border-border px-2.5 py-2.5 text-left text-[0.7rem] font-bold uppercase tracking-[0.04em] text-text-secondary"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, idx) => (
+              <tr
+                key={r.inf_id}
+                className={cn(
+                  "border-b border-border-soft last:border-0",
+                  idx % 2 === 1 && "bg-bg-alt/50",
+                  "transition-colors hover:bg-bg-alt",
+                )}
+              >
+                <td className="px-2.5 py-1.5 align-middle">
+                  <CreatorCell r={r} />
+                </td>
+                <td className="px-2.5 py-1.5 align-middle">
+                  <span className="tabular text-[0.78rem]">{r.inf_id}</span>
+                </td>
+                <td className="px-2.5 py-1.5 align-middle">
+                  <CreatorTypeChip type={r.creator_type} />
+                </td>
+                <td className="px-2.5 py-1.5 align-middle">
+                  <StageCell stage={r.current_stage} />
+                </td>
+                <td className="px-2.5 py-1.5 align-middle">
+                  {r.category ? (
+                    <span className="campaign-chip">{r.category}</span>
+                  ) : (
+                    <span className="text-text-tertiary">—</span>
+                  )}
+                </td>
+                <td className="px-2.5 py-1.5 align-middle">
+                  <span className="tabular">{formatFollowers(r.followers)}</span>
+                </td>
+                <td className="px-2.5 py-1.5 align-middle">
+                  <span className="tabular whitespace-nowrap text-[0.78rem]">
+                    {collabSummary(r)}
+                  </span>
+                </td>
+                <td className="px-2.5 py-1.5 align-middle">
+                  <button
+                    type="button"
+                    className="action-btn action-btn--view"
+                    onClick={() => onOpen(r)}
+                    aria-label={`View collab history for ${
+                      r.inf_name ?? r.username
+                    }`}
+                  >
+                    <History size={11} aria-hidden />
+                    History
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Server-driven pager mirroring the Historic Creators picker footer
+ * ("X–Y of Z · Prev N/M Next"). Prev/Next are <Link>s that flip `?cpage`
+ * while preserving the active tab and every current filter param — changing the
+ * page re-renders the server tab body with a new offset, so there's no heavy
+ * client state here.
+ */
+function CreatorPager({
+  total,
+  page,
+  pageSize,
+}: {
+  total: number;
+  page: number;
+  pageSize: number;
+}) {
+  const pathname = usePathname();
+  const params = useSearchParams();
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+
+  const hrefForPage = (p: number) => {
+    const next = new URLSearchParams(params.toString());
+    if (p <= 1) next.delete("cpage");
+    else next.set("cpage", String(p));
+    next.delete("page");
+    const qs = next.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
+
+  const atStart = page <= 1;
+  const atEnd = page >= totalPages;
+
+  const navBtn =
+    "inline-flex items-center gap-1 rounded-[8px] border border-[#E7E2D2] bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#6E695E] transition-colors hover:bg-[#F5F1EC]";
+  const navDisabled =
+    "inline-flex items-center gap-1 rounded-[8px] border border-[#E7E2D2] bg-white px-2.5 py-1.5 text-[12px] font-semibold text-[#6E695E] opacity-40 pointer-events-none";
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-[var(--radius)] border border-border bg-bg-white px-3.5 py-2.5 shadow-sm">
+      <span className="text-[12px] text-text-secondary">
+        {total === 0
+          ? "0 creators"
+          : `${rangeStart}–${rangeEnd} of ${total.toLocaleString(
+              "en-IN",
+            )} creator${total === 1 ? "" : "s"}`}
+      </span>
+      <div className="flex items-center gap-1.5">
+        {atStart ? (
+          <span className={navDisabled} aria-disabled>
+            <ChevronLeft size={13} aria-hidden />
+            Prev
+          </span>
+        ) : (
+          <Link
+            href={hrefForPage(page - 1) as never}
+            scroll={false}
+            className={navBtn}
+            aria-label="Previous page"
+            rel="prev"
+          >
+            <ChevronLeft size={13} aria-hidden />
+            Prev
+          </Link>
+        )}
+        <span className="px-1 text-[12px] tabular text-text-tertiary">
+          {page} / {totalPages}
+        </span>
+        {atEnd ? (
+          <span className={navDisabled} aria-disabled>
+            Next
+            <ChevronRight size={13} aria-hidden />
+          </span>
+        ) : (
+          <Link
+            href={hrefForPage(page + 1) as never}
+            scroll={false}
+            className={navBtn}
+            aria-label="Next page"
+            rel="next"
+          >
+            Next
+            <ChevronRight size={13} aria-hidden />
+          </Link>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -340,6 +438,9 @@ function CreatorHistoryModal({
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const [collabs, setCollabs] = useState<CreatorCollab[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -350,9 +451,29 @@ function CreatorHistoryModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  // On-demand: load this creator's collab history when the modal opens.
+  useEffect(() => {
+    let cancelled = false;
+    setCollabs(null);
+    setError(null);
+    loadCreatorCollabHistory(row.inf_id)
+      .then((list) => {
+        if (!cancelled) setCollabs(list);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load history");
+          setCollabs([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [row.inf_id]);
+
   if (!mounted) return null;
 
-  const breakdown = Object.entries(row.collab_type_breakdown);
+  const loading = collabs === null;
 
   return createPortal(
     <div className="modal-backdrop modal-backdrop--onboarding" onClick={onClose}>
@@ -442,31 +563,31 @@ function CreatorHistoryModal({
               )}`}
               mono
             />
-            <DetailItem
-              label="Collab Types"
-              value={
-                breakdown.length
-                  ? breakdown.map(([k, v]) => `${k}: ${v}`).join(" · ")
-                  : "—"
-              }
-            />
+            <DetailItem label="Collab Types" value={row.collab_types ?? "—"} />
           </section>
 
           <section className="mt-3">
             <div className="mb-2 flex items-center gap-2 text-[0.78rem] text-text-secondary">
               <History size={13} aria-hidden />
-              <strong className="text-text-primary">
-                Every collaboration
-              </strong>
-              <span className="pill pill--parent">{row.collabs.length}</span>
+              <strong className="text-text-primary">Every collaboration</strong>
+              {!loading && !error && (
+                <span className="pill pill--parent">{collabs.length}</span>
+              )}
             </div>
-            {row.collabs.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-text-tertiary">
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                <span className="text-[0.78rem]">Loading collab history…</span>
+              </div>
+            ) : error ? (
+              <p className="ob-overview-note text-danger-text">{error}</p>
+            ) : collabs.length === 0 ? (
               <p className="ob-overview-note">
                 No collaborations recorded for this creator yet.
               </p>
             ) : (
               <ul className="flex flex-col gap-1.5">
-                {row.collabs.map((c, i) => (
+                {collabs.map((c, i) => (
                   <CollabRow key={`${c.collabId}-${c.source}-${i}`} c={c} />
                 ))}
               </ul>

@@ -17,9 +17,6 @@ export interface CreatorCollab {
   source: "live" | "historic";
 }
 
-/** Per-collab-type tally, e.g. { Barter: 3, "Barter + Paid": 1 }. */
-export type CollabTypeBreakdown = Record<string, number>;
-
 export interface CreatorAnalyticsRow {
   inf_id: string;
   username: string;
@@ -38,11 +35,13 @@ export interface CreatorAnalyticsRow {
   deliverable_count: number;
   last_onboard_date: string | null;
   last_post_date: string | null;
-  collab_type_breakdown: CollabTypeBreakdown;
+  /**
+   * Pre-formatted per-collab-type tally text from the RPC, e.g.
+   * "Barter: 2 · Barter + Paid: 1". Null when the creator has no typed collab.
+   */
+  collab_types: string | null;
   reach_out_from: string | null;
   reach_out_to: string | null;
-  /** Full merged collab history, newest first — feeds the per-creator modal. */
-  collabs: CreatorCollab[];
   /** Region (creators.state) — also used by the region filter. */
   state: string | null;
   instagram_link: string | null;
