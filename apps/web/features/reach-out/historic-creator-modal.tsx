@@ -9,14 +9,30 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
+  Plus,
 } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { OrderCreationModal } from "@/features/onboarding/order-form";
 import {
+  historicCreatorCollabSummary,
   historicCreatorFilterOptions,
   listHistoricCreators,
   type HistoricCreatorRow,
 } from "./historic-creator-actions";
+
+type CollabSummary = { count: number; ids: string[]; next: number };
+type CollabSummaryMap = Record<string, CollabSummary>;
+
+/** Strip the "SIF-N-" prefix → bare "C1, C2" labels. */
+function shortCollabIds(ids: string[]): string {
+  return ids
+    .map((id) => {
+      const m = id.match(/C\d+$/i);
+      return m ? m[0].toUpperCase() : id;
+    })
+    .join(", ");
+}
 
 function compactFollowers(n: number | null): string {
   if (!n) return "—";
@@ -53,6 +69,14 @@ export function HistoricCreatorButton() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [options, setOptions] = useState<FilterOptions | null>(null);
+
+  // Prior-collab summary keyed by inf_id, loaded per page of rows. Powers the
+  // collab-history line + "next C{n}" hint and the Onboard affordance.
+  const [summaries, setSummaries] = useState<CollabSummaryMap>({});
+
+  // The creator currently being onboarded via the nested repeat-collab modal.
+  const [onboardCreator, setOnboardCreator] =
+    useState<HistoricCreatorRow | null>(null);
 
   // Track the latest request so a slow earlier fetch can't clobber a newer one.
   const reqRef = useRef(0);
@@ -118,6 +142,28 @@ export function HistoricCreatorButton() {
     fetchList();
   }, [open, fetchList]);
 
+  // Load prior-collab summaries for the visible page of rows. Keyed on the set
+  // of inf_ids so it re-runs on page / filter changes. Non-fatal on error —
+  // rows still render, just without the collab-history line.
+  useEffect(() => {
+    if (!open || rows.length === 0) {
+      setSummaries({});
+      return;
+    }
+    let cancelled = false;
+    const infIds = rows.map((r) => r.inf_id);
+    historicCreatorCollabSummary(infIds)
+      .then((map) => {
+        if (!cancelled) setSummaries(map);
+      })
+      .catch(() => {
+        if (!cancelled) setSummaries({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, rows]);
+
   const close = () => setOpen(false);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -139,7 +185,9 @@ export function HistoricCreatorButton() {
 
       {open && (
         <div
-          className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px]"
+          className={`fixed inset-0 flex items-center justify-center bg-black/70 p-4 backdrop-blur-[2px] ${
+            onboardCreator ? "z-[200]" : "z-[500]"
+          }`}
           onClick={(e) => {
             if (e.target === e.currentTarget) close();
           }}
@@ -255,6 +303,7 @@ export function HistoricCreatorButton() {
                 <ul className="divide-y divide-[#E7E2D2]">
                   {rows.map((c) => {
                     const isHistoric = c.creator_type === "historic_creator";
+                    const summary = summaries[c.inf_id];
                     return (
                       <li
                         key={`${c.inf_id}-${c.username}`}
@@ -287,6 +336,24 @@ export function HistoricCreatorButton() {
                             </a>
                             {c.category ? ` · ${c.category}` : ""}
                           </div>
+                          {summary && (
+                            <div className="mt-0.5 truncate text-[0.66rem] text-[#9A9384]">
+                              {summary.count > 0 ? (
+                                <span className="text-[#6E695E]">
+                                  ↻ {summary.count} collab
+                                  {summary.count === 1 ? "" : "s"} ·{" "}
+                                  {shortCollabIds(summary.ids)} · next C
+                                  {summary.next}
+                                </span>
+                              ) : summary.next === 2 ? (
+                                <span className="text-[#6E695E]">
+                                  ↻ Reached out before · next C2
+                                </span>
+                              ) : (
+                                <span>First collab</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-[0.6rem] font-semibold ${
@@ -308,6 +375,19 @@ export function HistoricCreatorButton() {
                         >
                           <ExternalLink size={13} />
                         </a>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOnboardCreator(c);
+                          }}
+                          className="group/onb inline-flex shrink-0 items-center gap-1 rounded-full border border-[#E7E2D2] bg-white px-2.5 py-1 text-[0.66rem] font-bold text-[#161513] transition-colors hover:border-[#F0C61E] hover:bg-[#F0C61E]"
+                          title={`Onboard a new collab for ${c.inf_name ?? c.username}`}
+                          aria-label={`Onboard ${c.inf_name ?? c.username}`}
+                        >
+                          <Plus size={11} aria-hidden />
+                          Onboard
+                        </button>
                         <div className="w-16 shrink-0 text-right text-[0.9rem] font-bold tabular text-[#161513]">
                           {compactFollowers(c.followers)}
                         </div>
@@ -351,6 +431,19 @@ export function HistoricCreatorButton() {
             </div>
           </div>
         </div>
+      )}
+
+      {onboardCreator && (
+        <OrderCreationModal
+          repeatMode
+          open
+          lockCreatorInfId={onboardCreator.inf_id}
+          lockCreatorLabel={onboardCreator.inf_name ?? onboardCreator.username}
+          creatorName={onboardCreator.inf_name ?? null}
+          username={onboardCreator.username}
+          postId=""
+          onClose={() => setOnboardCreator(null)}
+        />
       )}
     </>
   );

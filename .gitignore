@@ -39,3 +39,4 @@ coverage/
 
 # one-off PII export (creator emails) — never commit
 historic_posted_no_order_*.csv
+historic_incomplete_ordered.csv

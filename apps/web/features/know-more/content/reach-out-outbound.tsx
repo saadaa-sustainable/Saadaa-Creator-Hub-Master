@@ -24,7 +24,24 @@ export default function ReachOutOutboundKM() {
             Backed by the <KMCode>list_historic_creators</KMCode> RPC — filters
             span creators-level (search/tier) + collab-level (content/campaign/
             team) joined on <KMCode>inf_id = sif_id</KMCode> across posts +
-            cleaned_data. Paginated 60/page by followers desc. View-only browser.
+            cleaned_data. Paginated 60/page by followers desc.
+          </li>
+          <li>
+            <strong>Collab history per row</strong> · each creator shows their
+            past collaborations — <KMCode>↻ {"{N}"} collab(s) · C1, C2 · next C
+            {"{n}"}</KMCode> for a repeat collaborator,{" "}
+            <KMCode>Reached out before · next C2</KMCode> for a historic creator
+            we only ever reached out to, or <KMCode>First collab</KMCode> for a
+            brand-new one. Sourced from the <KMCode>prior_collab_summary</KMCode>{" "}
+            RPC, so the predicted next C matches exactly what onboarding mints.
+          </li>
+          <li>
+            <strong>Onboard button</strong> · each row has an{" "}
+            <KMCode>Onboard</KMCode> pill that opens the onboarding form{" "}
+            pre-locked to that creator (repeat-collab mode). Fill campaign +
+            order + deliverables and submit — it mints the creator&apos;s next
+            collab (continuing their C/P over posts ∪ historic_posts). Lets the
+            team re-onboard a past creator straight from the browser.
           </li>
         </KMList>
       </KMSection>

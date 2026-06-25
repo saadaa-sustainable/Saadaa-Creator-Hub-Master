@@ -65,6 +65,14 @@ interface OnboardingFormProps {
   initial?: Partial<OnboardingInput>;
   /** Repeat-collab mode: pick an existing creator + campaign to start a C2+ collab. */
   repeatMode?: boolean;
+  /**
+   * Pre-lock the repeat-collab creator to this inf_id (repeatMode only). When
+   * set, the creator picker is replaced by a read-only fixed field — the caller
+   * has already chosen who is being onboarded.
+   */
+  lockCreatorInfId?: string;
+  /** Display label for the locked creator (name or @handle). */
+  lockCreatorLabel?: string;
   open: boolean;
   onClose: () => void;
 }
@@ -92,6 +100,8 @@ export function OrderCreationModal({
   username,
   initial,
   repeatMode = false,
+  lockCreatorInfId,
+  lockCreatorLabel,
   open,
   onClose,
 }: OnboardingFormProps) {
@@ -115,7 +125,7 @@ export function OrderCreationModal({
   const [repeatCampaigns, setRepeatCampaigns] = useState<
     Array<{ campaign_id: string; campaign_name: string | null }>
   >([]);
-  const [repeatInfId, setRepeatInfId] = useState("");
+  const [repeatInfId, setRepeatInfId] = useState(lockCreatorInfId ?? "");
   const [repeatCampaignId, setRepeatCampaignId] = useState("");
   const [repeatContentType, setRepeatContentType] = useState("");
 
@@ -472,18 +482,34 @@ export function OrderCreationModal({
                   >
                     Creator <span className="req">*</span>
                   </label>
-                  <SearchableSelect
-                    id="rc_creator"
-                    value={repeatInfId}
-                    onChange={setRepeatInfId}
-                    placeholder="Select creator…"
-                    searchPlaceholder="Search by SIF, name, or @handle…"
-                    options={repeatCreators.map((c) => ({
-                      value: c.inf_id,
-                      label: `${c.inf_id} — ${c.inf_name || c.username}`,
-                      hint: c.username ? `@${c.username}` : undefined,
-                    }))}
-                  />
+                  {lockCreatorInfId ? (
+                    <div
+                      id="rc_creator"
+                      className="br-readonly flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-text-primary [background:var(--bg-surface)] [border:1px_solid_var(--border)]"
+                      title="Creator fixed for this onboard"
+                      aria-readonly="true"
+                    >
+                      <span className="chip text-[10px] tabular shrink-0">
+                        {lockCreatorInfId}
+                      </span>
+                      <span className="truncate">
+                        {lockCreatorLabel ?? lockCreatorInfId}
+                      </span>
+                    </div>
+                  ) : (
+                    <SearchableSelect
+                      id="rc_creator"
+                      value={repeatInfId}
+                      onChange={setRepeatInfId}
+                      placeholder="Select creator…"
+                      searchPlaceholder="Search by SIF, name, or @handle…"
+                      options={repeatCreators.map((c) => ({
+                        value: c.inf_id,
+                        label: `${c.inf_id} — ${c.inf_name || c.username}`,
+                        hint: c.username ? `@${c.username}` : undefined,
+                      }))}
+                    />
+                  )}
                 </div>
                 <div>
                   <label

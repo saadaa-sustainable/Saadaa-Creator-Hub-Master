@@ -93,6 +93,47 @@ export async function listHistoricCreators(
   return { rows, total, page, pageSize: PAGE_SIZE };
 }
 
+/**
+ * Prior-collab summary for a batch of creators, keyed by inf_id. Powers the
+ * collab-history line + "next C{n}" hint in the Historic Creator picker. Backed
+ * by the `prior_collab_summary` RPC, which already folds in the
+ * reach-out-only-historic → C2 rule via `next_collab`.
+ */
+export async function historicCreatorCollabSummary(
+  infIds: string[],
+): Promise<Record<string, { count: number; ids: string[]; next: number }>> {
+  await assertReachOutAccess();
+
+  const ids = Array.from(
+    new Set((infIds ?? []).filter((v): v is string => typeof v === "string" && v.trim() !== "")),
+  );
+  if (ids.length === 0) return {};
+
+  const { data, error } = await (createServiceClient() as any).rpc(
+    "prior_collab_summary",
+    { p_inf_ids: ids },
+  );
+
+  if (error) {
+    throw new Error(error.message ?? "Failed to load collab summaries");
+  }
+
+  const out: Record<string, { count: number; ids: string[]; next: number }> = {};
+  for (const r of (data ?? []) as Array<{
+    inf_id: string;
+    prior_count: number | string | null;
+    collab_ids: string[] | null;
+    next_collab: number | string | null;
+  }>) {
+    out[r.inf_id] = {
+      count: Number(r.prior_count ?? 0) || 0,
+      ids: Array.isArray(r.collab_ids) ? r.collab_ids : [],
+      next: Number(r.next_collab ?? 0) || 0,
+    };
+  }
+  return out;
+}
+
 export async function historicCreatorFilterOptions(): Promise<{
   tiers: string[];
   contentTypes: { value: string; label: string }[];
