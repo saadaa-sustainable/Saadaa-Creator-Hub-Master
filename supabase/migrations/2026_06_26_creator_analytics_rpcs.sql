@@ -1,11 +1,13 @@
 -- Creator Analytics server-side pagination.
 --
--- creator_analytics_page  — per-creator aggregation over posts ∪ historic_posts
---   (live/historic collab counts, current stage, deliverables, collab-type
---   breakdown, reach/post date ranges), filtered + ordered followers desc +
---   paginated 60/page with a window count(*) total_count. Replaces the old
---   fetch-7829-creators-into-JS approach that made the tab laggy.
--- creator_collab_history  — on-demand per-creator collab list for the row modal.
+-- creator_analytics_page  — per-creator aggregation over posts ∪ historic_posts,
+--   filtered + ordered followers desc + paginated 60/page.
+--   ⚠️ SUPERSEDED: this request-time-aggregation version timed out via PostgREST
+--   (the 3×-referenced `allposts` CTE got materialized into a catastrophic plan).
+--   The live body below is replaced by the summary-cache version in
+--   2026_06_26_creator_analytics_summary_fix.sql — keep that file's definition.
+-- creator_collab_history  — on-demand per-creator collab list for the row modal
+--   (UNCHANGED; still the live definition).
 --
 -- See apps/web/features/creator-analytics/. Applied via MCP 2026-06-26.
 
