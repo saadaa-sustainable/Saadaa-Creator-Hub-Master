@@ -28,7 +28,8 @@ export type ReachOutResult =
       postId: string;
       postIdShort: string;
       postNumber: number;
-      collabNumber: number;
+      // NULL now — collab is minted at onboarding, not reach-out.
+      collabNumber: number | null;
       infId: string;
     }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
@@ -183,9 +184,10 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     post_id: string;
     post_id_short: string;
     post_number: number;
-    collab_number: number;
+    // Collab is minted at onboarding now, so reach-out returns NULL for these.
+    collab_number: number | null;
     inf_id: string;
-    collab_id: string;
+    collab_id: string | null;
   };
 
   await (supabase as any)
@@ -233,9 +235,10 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
   // Email the logged-in actor that their reach-out was logged. Fire-and-forget
   // via after() so the form stays fast; best-effort, never blocks/throws.
   const confirmPostId = row.post_id;
-  const confirmCollabId =
-    row.collab_id ??
-    (row.inf_id ? `${row.inf_id}-C${row.collab_number}` : confirmPostId);
+  // A reach-out has NO collab yet (minted at onboarding), so show the deliverable
+  // post id rather than fabricating a C-number that would clash with the eventual
+  // onboarded C1.
+  const confirmCollabId = row.collab_id ?? confirmPostId;
   after(async () => {
     let campaignLabel = v.campaignId;
     try {

@@ -305,8 +305,10 @@ export async function fetchOnboardingKpis(
     const cid = r.collab_id as string | null;
     if (cid) return cid;
     const inf = r.inf_id as string | null;
-    const cn = (r.collab_number as number | null) ?? 1;
-    if (inf) return `${inf}-C${cn}`;
+    const cn = r.collab_number as number | null;
+    // No collab until an order is mapped — key reach-out rows by post_id, never
+    // a fabricated "-C1".
+    if (inf && cn != null) return `${inf}-C${cn}`;
     return (r.post_id as string) ?? JSON.stringify(r);
   };
 

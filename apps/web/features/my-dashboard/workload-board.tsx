@@ -108,12 +108,15 @@ function compactId(post: MyPost): string {
   return post.post_id_short ?? post.post_id ?? "—";
 }
 
-// Collab ID groups all deliverables of one collaboration.
-// Legacy rows may have a null collab_id — fall back to inf_id||'-C'||collab_number.
+// Collab ID groups all deliverables of one collaboration. A collab exists only
+// once an order is mapped (onboarding); reach-out rows (NULL collab_number) have
+// no collab id, never a fabricated "-C1".
 function collabId(post: MyPost): string | null {
   return (
     post.collab_id ??
-    (post.inf_id ? `${post.inf_id}-C${Number(post.collab_number ?? 1)}` : null)
+    (post.inf_id && post.collab_number != null
+      ? `${post.inf_id}-C${Number(post.collab_number)}`
+      : null)
   );
 }
 

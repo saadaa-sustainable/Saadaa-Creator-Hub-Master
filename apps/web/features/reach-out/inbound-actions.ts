@@ -179,7 +179,8 @@ export async function submitInboundBatch(
       post_id: string;
       post_id_short: string;
       post_number: number;
-      collab_number: number;
+      // NULL now — collab is minted at onboarding, not reach-out.
+      collab_number: number | null;
       inf_id: string;
     };
 

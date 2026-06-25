@@ -190,3 +190,7 @@ Manual terminal stage that **VOIDS** a collab (2026-06-10). Moves a whole collab
 - **`closeCampaign`/`reopenCampaign`** interact with the daily auto-close cron; reopen stamps `auto_closed_at`.
 - **D7 freeze:** editing a reach-out's creator metadata is rejected once it leaves "Reach Out".
 - **D8:** editing a campaign never rewrites existing posts' commercials (returns a warning instead).
+
+## Collab minting — onboarding, not reach-out (2026-06-25)
+
+A collab (`C{n}`) is born at **onboarding**, keyed to the order (rule: a collab = one order). Reach-out posts carry NULL `collab_id`/`collab_number` and show **"Pending"** on the onboarding board until onboarded; their deliverable number `P{n}` is assigned at reach-out and stays per-creator linear across collabs. On onboarding submit, `mint_collab_for_order(inf_id, order_id)` reuses the collab already mapped to that order_id (idempotent re-onboard / same order) else mints the creator's next C. Re-onboarding a creator with a DIFFERENT order_id mints the next C (the repeat-collab flow creates a fresh reach-out post via `create_repeat_collab`, then onboards it). Board/KPI grouping treats NULL-collab rows by `post_id` (never a fabricated `-C1`). See [[project_collab_deliverable_numbering_rule]].

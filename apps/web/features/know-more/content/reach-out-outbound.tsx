@@ -5,7 +5,7 @@ export default function ReachOutOutboundKM() {
     <>
       <KMHeader
         title="Reach Out · Outbound"
-        subtitle="We initiate. Live IG lookup + profile preview + one-click submit creates the collab and queues enrichment."
+        subtitle="We initiate. Live IG lookup + profile preview + one-click submit logs the reach-out (the collab is minted later, at onboarding)."
       />
 
       <KMSection tag="Historic Creator picker">
@@ -101,7 +101,10 @@ export default function ReachOutOutboundKM() {
             <KMCode>Reach Out</KMCode>, campaign_id, content_type, reachout_type{" "}
             <KMCode>Outbound</KMCode>, reachout_direction{" "}
             <KMCode>outbound</KMCode>. Commercial agreed amount + collab_type
-            are captured in onboarding (or inbound roster).
+            are captured in onboarding (or inbound roster).{" "}
+            <strong>No collab is minted at reach-out</strong> —{" "}
+            <KMCode>collab_id</KMCode> / <KMCode>collab_number</KMCode> stay NULL
+            until onboarding maps an order (a collab = one order).
           </li>
           <li>
             <strong>instagram_cache</strong> · pending row upserted on every
@@ -123,8 +126,10 @@ export default function ReachOutOutboundKM() {
             agreed total now equal-splits across deliverables.
           </li>
           <li>
-            Re-submitting same username + campaign creates a new collab
-            episode (different post_id, shared inf_id).
+            Re-submitting same username + campaign creates a new deliverable
+            post <KMCode>P{"{n}"}</KMCode> (shared inf_id) — NOT a collab. The
+            collab (<KMCode>C{"{n}"}</KMCode>) is minted later at onboarding,
+            keyed to the order.
           </li>
           <li>
             <KMCode>onboarded_by</KMCode> stamps with the signed-in user

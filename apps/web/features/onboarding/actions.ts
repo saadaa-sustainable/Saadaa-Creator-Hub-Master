@@ -363,14 +363,30 @@ export async function submitOnboarding(
     null;
   const onboardedBy = actor.name || actor.email || null;
 
-  // Collab ID (groups all deliverable rows of this collaboration). Prefer the
-  // value already stamped at reach-out; otherwise derive it from
-  // inf_id || '-C' || collab_number so legacy rows created before the restructure
-  // still get a collab_id stamped on first onboard.
-  const collabNumber = (parent.collab_number as number | null) ?? 1;
-  const collabId =
-    (parent.collab_id as string | null) ??
-    (parent.inf_id ? `${parent.inf_id}-C${collabNumber}` : null);
+  // Collab is minted HERE, at onboarding, keyed to the order_id (a collab = one
+  // order). mint_collab_for_order reuses the collab already mapped to this exact
+  // order_id (idempotent re-onboard / same order), else mints the creator's next
+  // C. Reach-out posts carry NULL collab until this runs. Concurrency-safe
+  // (advisory lock per creator). See project_collab_deliverable_numbering_rule.
+  let collabNumber: number | null = null;
+  let collabId: string | null = null;
+  if (parent.inf_id) {
+    const { data: minted, error: mintErr } = await (supabase as any).rpc(
+      "mint_collab_for_order",
+      { p_inf_id: parent.inf_id, p_order_id: v.orderId },
+    );
+    if (mintErr) return { ok: false, error: mintErr.message };
+    const m = Array.isArray(minted) ? minted[0] : minted;
+    collabNumber = (m?.collab_number as number | null) ?? null;
+    collabId = (m?.collab_id as string | null) ?? null;
+  }
+  if (collabId == null) {
+    // Defensive — a reach-out post always has an inf_id, so this should not fire.
+    collabNumber = collabNumber ?? 1;
+    collabId = parent.inf_id
+      ? `${parent.inf_id}-C${collabNumber}`
+      : v.postId;
+  }
 
   // §6.2 deliverable expansion — first deliverable type
   const total = v.reels + v.posts;
@@ -415,9 +431,10 @@ export async function submitOnboarding(
     // payment_status null keeps the PaymentStatus enum (Not Due | Due | Done)
     // intact for downstream Accounts Hub queries.
     payment_status: null,
-    // Collab ID model: all deliverable rows of this collab share collab_id.
-    // Grouping is by collab_id, NOT by parent/child. deliverable_index is kept
-    // for ordering only.
+    // Collab ID model: all deliverable rows of this collab share collab_id +
+    // collab_number. Grouping is by collab_id, NOT by parent/child.
+    // deliverable_index is kept for ordering only.
+    collab_number: collabNumber,
     collab_id: collabId,
     parent_post_id: v.postId,
     deliverable_role: total > 1 ? "parent" : "single",

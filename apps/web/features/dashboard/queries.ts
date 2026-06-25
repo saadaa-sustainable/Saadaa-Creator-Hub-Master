@@ -498,7 +498,12 @@ export async function fetchDashboardData(
   for (const p of posts) {
     const inf = String(p.inf_id ?? "");
     if (!inf) continue;
-    const key = `${inf}|${Number(p.collab_number ?? 1)}`;
+    // No collab until an order is mapped — reach-out rows (NULL collab_number)
+    // key by post_id so they never merge into a fabricated "-C1".
+    const key =
+      p.collab_number != null
+        ? `${inf}|${Number(p.collab_number)}`
+        : `post:${String(p.post_id ?? "")}`;
     commercialTotalByCollab.set(
       key,
       (commercialTotalByCollab.get(key) ?? 0) +
@@ -540,7 +545,10 @@ export async function fetchDashboardData(
     // (payment lives on parent in Accounts Hub), parents read their own.
     const inf = String(p.inf_id ?? "");
     const idx = Number(p.deliverable_index ?? 1);
-    const collabKey = inf ? `${inf}|${Number(p.collab_number ?? 1)}` : null;
+    const collabKey =
+      inf && p.collab_number != null
+        ? `${inf}|${Number(p.collab_number)}`
+        : null;
     const parentPay =
       idx > 1 && collabKey ? (parentPaymentByCollab.get(collabKey) ?? "") : payLow;
     const effectivePay = idx > 1 ? parentPay : payLow;
@@ -555,7 +563,9 @@ export async function fetchDashboardData(
     // have a null collab_id — fall back to inf_id||'-C'||collab_number.
     const collabId =
       (p.collab_id as string | null) ??
-      (inf ? `${inf}-C${Number(p.collab_number ?? 1)}` : null);
+      (inf && p.collab_number != null
+        ? `${inf}-C${Number(p.collab_number)}`
+        : null);
     return {
       postId: String(p.post_id_short ?? p.post_id ?? ""),
       collabId,

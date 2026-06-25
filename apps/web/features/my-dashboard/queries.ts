@@ -130,7 +130,10 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
       collab_number: number | null;
       commercial_amount: number | null;
     }>) {
-      const key = `${s.inf_id ?? ""}|${Number(s.collab_number ?? 1)}`;
+      // Reach-out rows (NULL collab_number) are not a collab — exclude them so
+      // they don't inflate a fabricated "|1" bucket.
+      if (s.collab_number == null) continue;
+      const key = `${s.inf_id ?? ""}|${Number(s.collab_number)}`;
       collabTotalMap.set(
         key,
         (collabTotalMap.get(key) ?? 0) + Number(s.commercial_amount ?? 0),
@@ -145,8 +148,11 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
           .trim()
           .toLowerCase(),
       ) ?? null;
-    const key = `${p.inf_id ?? ""}|${Number(p.collab_number ?? 1)}`;
-    const total = collabTotalMap.get(key);
+    const key =
+      p.collab_number != null
+        ? `${p.inf_id ?? ""}|${Number(p.collab_number)}`
+        : null;
+    const total = key ? collabTotalMap.get(key) : undefined;
     return {
       ...p,
       commercial_amount: total ?? p.commercial_amount ?? 0,

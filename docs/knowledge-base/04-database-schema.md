@@ -311,3 +311,24 @@ Extensions: `pg_cron`, `pg_net`, `supabase_vault`. Bearer JWT read at fire-time 
 - **`inf_id`** = `SIF-N` (now the historic SIF per creator, 2026-06-24). **`post_number`** is **per-creator** (P linear per creator across collabs). **`collab_number`** is per-creator (C1 at reach-out for NEW creators; C2+ at onboarding). **`collab_id` = `inf_id-C{collab_number}`**; **`post_id` = short `inf_id-P{post_number}`** (no `-C`). **`campaign_id` = `IFC{NNN}`**.
 - **Deliverable model:** total = `reels + static_posts`. **Stories count as deliverables but never spawn a child row** (`deliverable_type` CHECK only allows `reel`/`post`).
 - **Parent/child (`deliverable_index`)** is legacy — the 2026-06-06 Collab ID restructure replaced grouping with `collab_id`; payment is raised per `collab_id`.
+
+## historic_posts (legacy archive, isolated from live analytics) — 2026-06-25
+
+`historic_posts` mirrors the `posts` column shape but is a **separate table** so no live dashboard/query touches it (zero leakage). Built from `cleaned_data` (the legacy-sheet archive). 11,252 rows (1 per real-SIF collab episode). `is_historic=true` on every row.
+
+- **Keys**: `post_id` = synthetic `'H'||cleaned_data.id` (UNIQUE, non-null — avoids the 23 dup + 74 live-collision legacy post_ids); `legacy_post_id` = original; `source_cleaned_id` = `cleaned_data.id` (traceback); `inf_id` = `sif_id` (NO hard FK to creators — 44 historic SIFs aren't in `creators`).
+- **workflow_status** (founder rule): `Posted` if `link_to_post ~* 'instagram\.com'`; else `On Board` if `order_id` present; else `Reach Out`. (9,794 / 246 / 1,212.)
+- **Indexes**: post_id (uniq), inf_id, workflow_status, reachout_direction, campaign_id, legacy_post_id.
+- Carries content_type, collab_type, commercial_amount, payment/order/tracking, dates (reach_out/onboard/post/est_delivery), post_link, followers/avg_likes/engaged_rate/profile_pic, influencer_category (tier), full address, etc.
+
+### Phase 0 enrichment of cleaned_data
+Before mapping, `cleaned_data` was refreshed from `ig_data_historic` (latest fetch per `profile_id`): overwrote `followers`/`avg_likes`/`engaged_rate`, added `cleaned_data.profile_pic` (← `image_url`). 10,531 rows. Pre-values snapshotted to new `cleaned_data.enrich_snapshot` (jsonb); `raw_dump` untouched.
+
+### Helpers
+`_hist_to_date(text)` (DD/MM/YYYY + ISO, null on junk), `_hist_to_num(text)` (strip currency/commas, null on junk). Reused by any future legacy-text→typed cast.
+
+> **Update 2026-06-25**: `historic_posts.post_id` uses `{sif_id}-P{n}` (per-creator `row_number()` over cleaned_data id), mirroring live `posts` — not the earlier `H{id}`. Added `post_number`, `post_id_short`, `collab_number`, and `profile_id` (← cleaned_data.profile_id). `legacy_post_id` keeps the original; `source_cleaned_id` is the cleaned_data.id traceback (audit only).
+
+> **Update 2026-06-25 (collab logic)**: In `historic_posts`, `collab_number`/`collab_id` are derived by grouping a creator's posts by `order_id` (a collab = an order): same order_id = same collab w/ multiple deliverables, distinct order_ids = distinct collabs (`{sif}-C{n}`, dense_rank by first appearance). Reach-out posts (no order) have NULL collab. `deliverable_index` = position within the collab; `post_number` (P{n}) = per-creator deliverable index.
+
+> **Update 2026-06-25 (live collab minting moved to onboarding)**: `submit_reachout` + `create_repeat_collab` RPCs now INSERT NULL `collab_number`/`collab_id` (collab is no longer minted at reach-out; the column default of 1 means the explicit NULL is required). New RPC `mint_collab_for_order(p_inf_id, p_order_id)` (SECURITY DEFINER, advisory-lock per creator) is called at onboarding: reuses the collab already mapped to the normalized order_id (strip leading '#', trim, lowercase), else `max(collab_number)+1`. `trg_sync_collab_counter` unchanged (already filters `collab_number IS NOT NULL`). Live posts: reach-out rows carry NULL collab until onboarded.

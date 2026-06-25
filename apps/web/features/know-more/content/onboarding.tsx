@@ -30,15 +30,20 @@ export default function OnboardingKM() {
             below the filters to that member&apos;s metrics.
           </li>
           <li>
-            <strong>Collab ID model — one row per collab</strong> · every
-            deliverable carries a <KMCode>collab_id</KMCode>{" "}
-            (<KMCode>SIF-1-C1</KMCode>) = creator id + the collaboration number.
-            All deliverables of one reach-out share that collab_id. The board
-            groups by <KMCode>collab_id</KMCode> and renders ONE representative
-            row per collab (the deliverable with the lowest{" "}
-            <KMCode>post_id</KMCode>). There is no parent/child — grouping is
-            purely by collab_id. A dedicated <strong>Collab ID</strong> column /
-            chip shows it on the row, card, and overview.
+            <strong>Collab ID model — one row per collab</strong> · a collab is
+            born at <strong>onboarding, keyed to the order</strong> (a collab =
+            one order). On submit, <KMCode>mint_collab_for_order</KMCode> reuses
+            the collab already mapped to that exact Order ID, else mints the
+            creator&apos;s next <KMCode>collab_id</KMCode>{" "}
+            (<KMCode>SIF-1-C1</KMCode>, <KMCode>SIF-1-C2</KMCode> …). All
+            deliverables of one onboarding share that collab_id; the per-creator
+            deliverable number <KMCode>P{"{n}"}</KMCode> stays linear across
+            collabs. <strong>Reach-out rows have no collab yet</strong> — the
+            board shows <KMCode>Pending</KMCode> until they are onboarded. The
+            board groups by <KMCode>collab_id</KMCode> and renders ONE
+            representative row per collab (the deliverable with the lowest{" "}
+            <KMCode>post_id</KMCode>). A dedicated <strong>Collab ID</strong>{" "}
+            column / chip shows it on the row, card, and overview.
           </li>
           <li>
             <strong>Deliverables chip</strong> · a <KMCode>Layers</KMCode> chip

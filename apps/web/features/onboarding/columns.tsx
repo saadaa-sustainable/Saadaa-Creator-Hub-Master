@@ -19,12 +19,18 @@ import type { OnboardingRow } from "./types";
  */
 export function collabKeyOf(r: OnboardingRow): string {
   if (r.collab_id) return r.collab_id;
-  if (r.inf_id) return `${r.inf_id}-C${Number(r.collab_number ?? 1)}`;
+  // A collab exists only once an order is mapped (onboarding). With no
+  // collab_number a reach-out row keys by its own post_id — NEVER a fabricated
+  // "-C1" (that would merge pending reach-outs and collide with the eventual
+  // onboarded C1). See project_collab_deliverable_numbering_rule.
+  if (r.inf_id && r.collab_number != null)
+    return `${r.inf_id}-C${Number(r.collab_number)}`;
   return r.post_id ?? "";
 }
 
-/** Display-friendly Collab ID (the stamped collab_id, with legacy fallback). */
+/** Display-friendly Collab ID. Not-yet-onboarded reach-out rows have no collab. */
 export function collabIdLabel(r: OnboardingRow): string {
+  if (!r.collab_id && r.collab_number == null) return "Pending";
   return collabKeyOf(r);
 }
 
