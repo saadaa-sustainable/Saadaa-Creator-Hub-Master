@@ -102,7 +102,7 @@ export async function fetchFunnelData(
   const { data, error } = await (supabase as any)
     .from(tableName)
     .select(POSTS_SELECT)
-    .limit(10_000);
+    .limit(50_000);
 
   if (error) {
     console.error("[funnel] posts query failed:", error);

@@ -108,7 +108,7 @@ export async function fetchDashboardFilterOptions(
     (supabase as any)
       .from(tableName)
       .select("content_type, workflow_status")
-      .limit(5000),
+      .limit(50000),
   ]);
   const contentSet = new Set<string>();
   const statusSet = new Set<string>();
@@ -136,7 +136,7 @@ export async function fetchDashboardData(
 
   // Try extended (with ads_status). 42703 → retry base. Page still renders.
   const buildPostsQuery = (cols: string) => {
-    let q = (supabase as any).from(tableName).select(cols).limit(5000);
+    let q = (supabase as any).from(tableName).select(cols).limit(50000);
     if (filters.campaign) q = q.eq("campaign_id", filters.campaign);
     if (filters.contentType) q = q.eq("content_type", filters.contentType);
     if (filters.status) q = q.ilike("workflow_status", `%${filters.status}%`);
@@ -161,7 +161,7 @@ export async function fetchDashboardData(
     (supabase as any)
       .from("creators")
       .select("username, inf_name, category, followers, profile_pic")
-      .limit(5000),
+      .limit(50000),
   ]);
 
   if (postsRes.error) {
