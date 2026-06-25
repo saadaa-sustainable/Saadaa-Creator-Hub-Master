@@ -75,6 +75,15 @@ import { FunnelBody } from "@/features/funnel/page-client";
 import { fetchInternalDashboardData } from "@/features/internal-dashboard/queries";
 import { InternalDashboardBody } from "@/features/internal-dashboard/page-client";
 
+// ── Creator Analytics ──────────────────────────────────────────────────────────
+import { CreatorAnalyticsFiltersBar } from "@/features/creator-analytics/filters";
+import { CreatorAnalyticsView } from "@/features/creator-analytics/creator-analytics-view";
+import {
+  fetchCreatorAnalytics,
+  fetchCreatorAnalyticsFilterOptions,
+} from "@/features/creator-analytics/queries";
+import type { CreatorAnalyticsFilters } from "@/features/creator-analytics/types";
+
 /**
  * Raw search params for the Dashboard route. Carries the `tab` slug plus every
  * embedded view's own filter keys (campaign, tier, status, search, …). Each tab
@@ -103,6 +112,38 @@ export async function OverviewTabBody({
       <DashboardFiltersBar initial={params} options={options} />
       <DashboardOverviewStrip data={data} />
       <DashboardBento data={data} />
+    </div>
+  );
+}
+
+// ── Creator Analytics ──────────────────────────────────────────────────────
+// Dashboard-native creator roster directory (no standalone sidebar route).
+// Filter bar ABOVE the roster, then the list/card view with a per-creator
+// collab-history modal. Wrapped in `.onboarding-stage` so the filter bar +
+// view get the same grid rhythm as every standalone page.
+export async function CreatorAnalyticsTabBody({ sp }: { sp: TabSearchParams }) {
+  const creatorFilters: CreatorAnalyticsFilters = {
+    q: sp.q,
+    tier: sp.tier,
+    region: sp.region,
+    creatorType: sp.creatorType,
+    stage: sp.stage,
+    reachOutFrom: sp.reachOutFrom,
+    reachOutTo: sp.reachOutTo,
+    postedFrom: sp.postedFrom,
+    postedTo: sp.postedTo,
+  };
+  const [rows, options] = await Promise.all([
+    fetchCreatorAnalytics(creatorFilters),
+    fetchCreatorAnalyticsFilterOptions(),
+  ]);
+  return (
+    <div className="onboarding-stage creator-analytics-stage">
+      <CreatorAnalyticsFiltersBar initial={creatorFilters} options={options} />
+      <CreatorAnalyticsView
+        rows={rows}
+        initialView={sp.view === "cards" ? "cards" : "list"}
+      />
     </div>
   );
 }

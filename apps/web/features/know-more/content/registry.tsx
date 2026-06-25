@@ -9,9 +9,11 @@ import AdStatusKM from "./ad-status";
 import CampaignsKM from "./campaigns";
 import ComplianceKM from "./compliance";
 import CostAnalyticsKM from "./cost-analytics";
+import CreatorAnalyticsKM from "./creator-analytics";
 import DashboardKM from "./dashboard";
 import ErrorsKM from "./errors";
 import FunnelKM from "./funnel";
+import HistoricAnalyticsKM from "./historic-analytics";
 import InternalDashboardKM from "./internal-dashboard";
 import JourneyKM from "./journey";
 import MyDashboardKM from "./my-dashboard";
@@ -45,6 +47,8 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   compliance: ComplianceKM,
   funnel: FunnelKM,
   "cost-analytics": CostAnalyticsKM,
+  "creator-analytics": CreatorAnalyticsKM,
+  "historic-analytics": HistoricAnalyticsKM,
   "internal-dashboard": InternalDashboardKM,
   errors: ErrorsKM,
   sheets: SheetsKM,

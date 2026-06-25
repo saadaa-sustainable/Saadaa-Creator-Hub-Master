@@ -142,3 +142,11 @@
 - **Parent/child collab rule is pervasive:** payment lives on the representative; `commercial_amount` is equal-split and re-summed across siblings for any display/KPI.
 - **Defensive EXTENDED→BASE column fallback** (`42703`) in dashboard, tat, ad-status, order-status fetchers — missing prod columns degrade gracefully.
 - **Legacy parity** cited per fetcher header (getDashboardStatsFiltered, getDashboardMetrics, getComplianceKPIs, getBudgetVsActuals, getAccountsHubData/submitPayments, runErrorAudit, getAdStatusData, _isoWeek, _nextPayableCycleDate_).
+
+## Historic Analytics + Creator Analytics (2026-06-25)
+
+**Historic Analytics** — sidebar route `/historic-analytics` (`performance_view`-gated, History icon). Reuses the entire dashboard Overview bento over the `historic_posts_dash` VIEW (= historic_posts + NULL-aliased reels/static_posts/stories/partnership_id/ad_partnership_valid/ads_usage_rights/collab_email_sent_at/collab_email_skipped/ads_status). `fetchDashboardData(filters, tableName)` + `fetchDashboardFilterOptions(tableName)` are parameterized; pass `'historic_posts_dash'`. Caveats: deliverable counts + Ad Winners = 0 (legacy has no structured deliverable split), only 3 stages (Reach Out / On Board / Posted) so later bands are empty by design.
+
+**Creator Analytics** — dashboard tab `?tab=creators` (`features/creator-analytics/`). `fetchCreatorAnalytics` fetches creators + posts + historic_posts, groups by inf_id in JS: live + historic collab counts (only rows with a real collab_id/collab_number count — reach-out-only/no-order rows excluded), deliverables, current_stage (most-recent live post), date ranges, collab_type breakdown, per-creator collab-history list (modal). Filters (search/tier/region/creator_type/stage/reach-out + posted ranges) applied in JS, URL-synced. List/card toggle (cards forced ≤768px), shared Avatar, Historic/New chip + stage pill. Stage/labels: current_stage from live posts; creator_type drives the Historic/New chip.
+
+**Prior-collab badge** (onboarding board): reach-out rows show a ↻ chip with prior collab count + ids + next C, via RPC `prior_collab_summary(p_inf_ids[])` — next_collab matches `mint_onboarding_block` (incl reach-out-only-historic → C2). See [[project_collab_deliverable_numbering_rule]].

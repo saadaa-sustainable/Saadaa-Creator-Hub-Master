@@ -95,7 +95,9 @@ const adsRequired = (raw: string | null | undefined) => {
   return !["", "no", "n/a", "none", "0", "false"].includes(v);
 };
 
-export async function fetchDashboardFilterOptions(): Promise<DashboardFilterOptions> {
+export async function fetchDashboardFilterOptions(
+  tableName = "posts",
+): Promise<DashboardFilterOptions> {
   const supabase = createServiceClient();
   const [{ data: camps }, { data: posts }] = await Promise.all([
     (supabase as any)
@@ -104,7 +106,7 @@ export async function fetchDashboardFilterOptions(): Promise<DashboardFilterOpti
       .order("campaign_id", { ascending: false })
       .limit(500),
     (supabase as any)
-      .from("posts")
+      .from(tableName)
       .select("content_type, workflow_status")
       .limit(5000),
   ]);
@@ -125,6 +127,7 @@ export async function fetchDashboardFilterOptions(): Promise<DashboardFilterOpti
 
 export async function fetchDashboardData(
   filters: DashboardFilters,
+  tableName = "posts",
 ): Promise<DashboardData> {
   const supabase = createServiceClient();
   const today = todayIso();
@@ -133,7 +136,7 @@ export async function fetchDashboardData(
 
   // Try extended (with ads_status). 42703 → retry base. Page still renders.
   const buildPostsQuery = (cols: string) => {
-    let q = (supabase as any).from("posts").select(cols).limit(5000);
+    let q = (supabase as any).from(tableName).select(cols).limit(5000);
     if (filters.campaign) q = q.eq("campaign_id", filters.campaign);
     if (filters.contentType) q = q.eq("content_type", filters.contentType);
     if (filters.status) q = q.ilike("workflow_status", `%${filters.status}%`);
@@ -672,7 +675,7 @@ export async function fetchDashboardData(
         .select("num_influencers")
         .eq("campaign_id", cid),
       (supabase as any)
-        .from("posts")
+        .from(tableName)
         .select("username, workflow_status")
         .eq("campaign_id", cid)
         .limit(20000),

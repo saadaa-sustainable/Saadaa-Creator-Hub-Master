@@ -4576,6 +4576,22 @@
       color-mix(in oklab, var(--color-success-text) 25%, transparent);
   }
 
+  /* Onboarding collab cell — stacks the Collab ID chip over the prior-collab
+     history chip on Reach Out rows. */
+  .ob-collab-cell {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+  }
+  /* Compact, inline prior-collab history chip (warning token). */
+  .ob-prior-collab {
+    font-size: 0.6rem;
+    padding: 1px 7px;
+    max-width: 100%;
+  }
+
   /* Email status cell */
   .email-missing-cell {
     display: inline-flex;

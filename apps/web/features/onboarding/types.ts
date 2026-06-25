@@ -60,6 +60,17 @@ export interface OnboardingRow {
   _collabDeliverableBreakdown?: string;
   /** Presentation-only: agreed commercial total summed across collab siblings. */
   _collabCommercialTotal?: number;
+  /**
+   * Presentation-only: prior-collab history for a Reach Out row, stamped
+   * server-side from `prior_collab_summary`. Lets the board show how many times
+   * this creator collaborated before + what the next collab (C) will mint.
+   * Not persisted; absent on raw query rows and on non-reach-out rows.
+   */
+  _priorCollabCount?: number;
+  /** Presentation-only: full prior collab ids, e.g. ["SIF-1-C1","SIF-1-C2"]. */
+  _priorCollabIds?: string[];
+  /** Presentation-only: the C number the next onboard will mint for this creator. */
+  _nextCollab?: number;
 }
 
 /**

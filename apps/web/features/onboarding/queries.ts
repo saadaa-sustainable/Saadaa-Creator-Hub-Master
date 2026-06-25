@@ -107,6 +107,32 @@ export async function fetchOnboardingTable(
     });
   }
 
+  // Prior-collab history for the Reach Out rows — gives the team a glance at how
+  // many times a creator collaborated before + the next C the onboard will mint.
+  // Only reach-out rows carry it; onboarded rows already show their own collab.
+  const reachOutInfIds = [
+    ...new Set(
+      rows
+        .filter((row) => row.workflow_status === "Reach Out")
+        .map((row) => (row.inf_id ?? row.creator?.inf_id ?? "").trim())
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const priorByInf = await fetchPriorCollabSummary(reachOutInfIds);
+  const stampPrior = (row: OnboardingRow): OnboardingRow => {
+    if (row.workflow_status !== "Reach Out") return row;
+    const infId = (row.inf_id ?? row.creator?.inf_id ?? "").trim();
+    const prior = infId ? priorByInf.get(infId) : undefined;
+    if (!prior) return row;
+    return {
+      ...row,
+      _priorCollabCount: prior.count,
+      _priorCollabIds: prior.ids,
+      _nextCollab: prior.next,
+    };
+  };
+  rows = rows.map(stampPrior);
+
   const missingProfileUsernames = [
     ...new Set(
       rows
@@ -171,6 +197,42 @@ export async function fetchOnboardingTable(
       },
     };
   });
+}
+
+/**
+ * Prior-collaboration summary for a set of inf_ids — wraps the
+ * `prior_collab_summary` RPC, which counts COMPLETED collabs across
+ * `posts` ∪ `historic_posts` and returns the C number the next onboard will
+ * mint (already honouring the reach-out-only-historic → C2 rule). Keyed by
+ * inf_id so the onboarding board can stamp each Reach Out row in one round-trip.
+ *
+ * Returns an empty Map when `infIds` is empty (no RPC call).
+ */
+export async function fetchPriorCollabSummary(
+  infIds: string[],
+): Promise<Map<string, { count: number; ids: string[]; next: number }>> {
+  const out = new Map<string, { count: number; ids: string[]; next: number }>();
+  if (infIds.length === 0) return out;
+
+  const supabase = createServiceClient();
+  const { data, error } = await (supabase as any).rpc("prior_collab_summary", {
+    p_inf_ids: infIds,
+  });
+  if (error) {
+    console.error("[onboarding] prior_collab_summary RPC:", error.message);
+    return out;
+  }
+
+  for (const r of (data ?? []) as Array<Record<string, unknown>>) {
+    const infId = String(r.inf_id ?? "").trim();
+    if (!infId) continue;
+    out.set(infId, {
+      count: Number(r.prior_count ?? 0) || 0,
+      ids: Array.isArray(r.collab_ids) ? (r.collab_ids as string[]) : [],
+      next: Number(r.next_collab ?? 1) || 1,
+    });
+  }
+  return out;
 }
 
 /**

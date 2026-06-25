@@ -37,6 +37,7 @@ import {
   isOnboarded,
   isOverdue,
   onboardingColumns,
+  PriorCollabChip,
 } from "./columns";
 import { OrderCreationModal } from "./order-form";
 import { CollabEmailModal, type CollabEmailDraft } from "./collab-email-modal";
@@ -347,6 +348,7 @@ function ObCard({
         >
           {collabIdLabel(r)}
         </span>
+        <PriorCollabChip r={r} />
         {(r.nomenclature ?? r.content_type) && (
           <span className="pill pill--muted">
             {r.nomenclature ?? r.content_type}

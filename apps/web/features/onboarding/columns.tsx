@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Layers,
   Link as LinkIcon,
+  RotateCcw,
   Send,
   SlashSquare,
 } from "lucide-react";
@@ -34,6 +35,63 @@ export function collabKeyOf(r: OnboardingRow): string {
 export function collabIdLabel(r: OnboardingRow): string {
   if (!r.collab_id && r.collab_number == null) return "Pending";
   return collabKeyOf(r);
+}
+
+/**
+ * Short collab labels for the prior-collab chip — strips the `SIF-N-` prefix
+ * so "SIF-1-C1" reads as "C1". Falls back to the raw id if it doesn't match.
+ */
+function shortCollabLabels(ids: string[]): string {
+  return ids
+    .map((id) => {
+      const m = String(id).match(/-(C\d+)$/i);
+      return m ? m[1] : id;
+    })
+    .join(", ");
+}
+
+/**
+ * Prior-collab history chip for a Reach Out row. Renders inline below the
+ * "Pending" collab label so the team sees, at a glance, how many times the
+ * creator collaborated before + what the next collab (C) will mint:
+ *
+ *   • repeat collaborator → "↻ {N} prior · {C1, C2} · next C{n}"
+ *   • reach-out-only historic creator (next === 2) → "↻ Reached out before · next C2"
+ *   • brand new (next === 1) → renders nothing.
+ *
+ * Stamped server-side (`_priorCollab*`); absent on non-reach-out rows.
+ */
+export function PriorCollabChip({ r }: { r: OnboardingRow }) {
+  if (r.workflow_status !== "Reach Out" || r._nextCollab == null) return null;
+  const count = r._priorCollabCount ?? 0;
+  const next = r._nextCollab;
+
+  if (count > 0) {
+    const ids = shortCollabLabels(r._priorCollabIds ?? []);
+    return (
+      <span
+        className="pill pill-warning ob-prior-collab"
+        title={`Collaborated ${count} time${count === 1 ? "" : "s"} before${
+          ids ? ` (${ids})` : ""
+        }. Next onboard mints C${next}.`}
+      >
+        <RotateCcw size={9} aria-hidden />
+        {count} prior{ids ? ` · ${ids}` : ""} · next C{next}
+      </span>
+    );
+  }
+  if (next === 2) {
+    return (
+      <span
+        className="pill pill-warning ob-prior-collab"
+        title="Reached out to before but never onboarded. Next onboard mints C2."
+      >
+        <RotateCcw size={9} aria-hidden />
+        Reached out before · next C2
+      </span>
+    );
+  }
+  return null;
 }
 
 /** All deliverable rows belonging to the same collab_id as `r`. */
@@ -354,12 +412,15 @@ export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
     id: "collab_id",
     header: "Collab ID",
     cell: ({ row }) => (
-      <span
-        className="campaign-chip tabular"
-        title="Groups all deliverables of this collaboration"
-      >
-        {collabIdLabel(row.original)}
-      </span>
+      <div className="ob-collab-cell">
+        <span
+          className="campaign-chip tabular"
+          title="Groups all deliverables of this collaboration"
+        >
+          {collabIdLabel(row.original)}
+        </span>
+        <PriorCollabChip r={row.original} />
+      </div>
     ),
   },
   {

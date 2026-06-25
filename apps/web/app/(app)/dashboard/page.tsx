@@ -12,6 +12,7 @@ import {
   AdStatusTabBody,
   ComplianceTabBody,
   CostTabBody,
+  CreatorAnalyticsTabBody,
   FunnelTabBody,
   InternalTabBody,
   JourneyTabBody,
@@ -140,6 +141,8 @@ function TabBody({
       return (
         <OverviewTabBody params={overviewFilters} options={overviewOptions} />
       );
+    case "creators":
+      return <CreatorAnalyticsTabBody sp={sp} />;
     case "journey":
       return <JourneyTabBody sp={sp} />;
     case "tat":

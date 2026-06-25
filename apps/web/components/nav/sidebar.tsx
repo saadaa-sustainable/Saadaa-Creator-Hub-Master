@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Sheet,
   Settings,
+  History,
   LogOut,
   X,
   type LucideIcon,
@@ -110,6 +111,12 @@ const NAV: NavSection[] = [
       // sidebar entries are removed (the routes still exist + are reachable from
       // the Dashboard tabs / direct URL).
       { label: "Sheet View", href: "/sheets", icon: Sheet },
+      {
+        label: "Historic Analytics",
+        href: "/historic-analytics",
+        icon: History,
+        show: (a) => hasPermission(a, "performance_view"),
+      },
       {
         label: "User Panel",
         href: "/admin/users",

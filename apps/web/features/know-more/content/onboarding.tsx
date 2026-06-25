@@ -50,6 +50,21 @@ export default function OnboardingKM() {
             and overview.
           </li>
           <li>
+            <strong>Prior-collab history badge</strong> · on a{" "}
+            <KMCode>Reach Out</KMCode> row a small ↻ chip appears under the{" "}
+            <KMCode>Pending</KMCode> collab label showing the creator&apos;s
+            collaboration history. A repeat collaborator reads{" "}
+            <KMCode>{"{N}"} prior · C1, C2 · next C{"{n}"}</KMCode> (prior collab
+            count, their existing C numbers, and the C the next onboard will
+            mint); a creator we only reached out to before reads{" "}
+            <KMCode>Reached out before · next C2</KMCode>; a brand-new creator
+            shows nothing. Sourced server-side from the{" "}
+            <KMCode>prior_collab_summary</KMCode> RPC (counts{" "}
+            <KMCode>posts</KMCode> ∪ <KMCode>historic_posts</KMCode>), so the C it
+            predicts matches exactly what <KMCode>mint_onboarding_block</KMCode>{" "}
+            reserves on submit. The same chip renders on the row and the card.
+          </li>
+          <li>
             <strong>Deliverables chip</strong> · a <KMCode>Layers</KMCode> chip
             shows the human count (<KMCode>1 deliverable</KMCode>,{" "}
             <KMCode>3 deliverables</KMCode> …) with the{" "}
