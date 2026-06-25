@@ -15,6 +15,8 @@ import {
 import type { DashboardFilters } from "@/features/dashboard/types";
 import { fetchFunnelData } from "@/features/funnel/queries";
 import { FunnelBody } from "@/features/funnel/page-client";
+import { fetchInternalDashboardData } from "@/features/internal-dashboard/queries";
+import { InternalDashboardBody } from "@/features/internal-dashboard/page-client";
 import { HistoricViewToggle } from "./view-toggle";
 
 export const metadata = { title: "Historic Analytics" };
@@ -42,7 +44,12 @@ export default async function HistoricAnalyticsPage({
   if (!actor || !hasPermission(actor, "performance_view")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const view = sp.view === "funnel" ? "funnel" : "overview";
+  const view =
+    sp.view === "funnel"
+      ? "funnel"
+      : sp.view === "internal"
+        ? "internal"
+        : "overview";
   const filters: DashboardFilters = {
     campaign: sp.campaign,
     status: sp.status,
@@ -68,6 +75,13 @@ export default async function HistoricAnalyticsPage({
           fallback={<StageSkeleton kind="board" kpiCount={9} />}
         >
           <HistoricFunnelBody />
+        </Suspense>
+      ) : view === "internal" ? (
+        <Suspense
+          key="internal"
+          fallback={<StageSkeleton kind="board" kpiCount={6} />}
+        >
+          <HistoricInternalBody />
         </Suspense>
       ) : (
         <Suspense
@@ -106,6 +120,16 @@ async function HistoricFunnelBody() {
   return (
     <div className="onboarding-stage funnel-stage">
       <FunnelBody data={data} />
+    </div>
+  );
+}
+
+async function HistoricInternalBody() {
+  const data = await fetchInternalDashboardData(HISTORIC_TABLE);
+  // Mirrors /internal-dashboard below its header, fed by the migrated archive.
+  return (
+    <div className="onboarding-stage internal-dashboard-stage">
+      <InternalDashboardBody data={data} />
     </div>
   );
 }

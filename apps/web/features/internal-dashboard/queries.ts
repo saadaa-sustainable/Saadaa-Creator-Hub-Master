@@ -86,10 +86,12 @@ function statusKey(value: unknown): string {
     .toLowerCase();
 }
 
-export async function fetchInternalDashboardData(): Promise<InternalDashboardData> {
+export async function fetchInternalDashboardData(
+  tableName = "posts",
+): Promise<InternalDashboardData> {
   const supabase = createServiceClient();
   const { data, error } = await (supabase as any)
-    .from("posts")
+    .from(tableName)
     .select(POSTS_SELECT)
     .limit(10_000);
   if (error) {
