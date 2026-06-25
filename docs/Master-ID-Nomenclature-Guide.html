@@ -1,414 +1,419 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Master ID &amp; Nomenclature — Saadaa CreatorHub</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<meta charset="utf-8">
+<title>Identity &amp; Naming · A Field Manual · Saadaa CreatorHub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,360..500&family=Newsreader:ital,opsz,wght@0,6..72,380..560;1,6..72,400..480&family=Spline+Sans+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg-base:#FAF8F5; --bg-surface:#F5F1EC; --bg-ecru:#F0EAD6; --bg-white:#FFFFFF;
-    --text-primary:#161513; --text-secondary:#6E695E; --text-tertiary:#9A9384;
-    --border:#E7E2D2; --accent:#F0C61E;
-    --success-t:#4F7C4D; --success-b:#ECF1E9;
-    --warning-t:#B57514; --warning-b:#FAF1DC;
-    --danger-t:#C0392B; --danger-b:#FDECEA;
-    --sidebar-bg:#2C2420; --sidebar-active:#F0C61E;
-    --purple:#7B4FBF; --pink:#B54F7A; --indigo:#3B6FD4;
-    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-    --sans:'Inter',system-ui,-apple-system,sans-serif;
-    --display:'Space Grotesk','Inter',system-ui,sans-serif;
+    --paper:    oklch(0.962 0.017 79);
+    --paper-2:  oklch(0.934 0.022 77);
+    --ink:      oklch(0.255 0.018 55);
+    --ink-2:    oklch(0.40 0.022 52);
+    --muted:    oklch(0.565 0.022 58);
+    --faint:    oklch(0.70 0.018 64);
+    --rule:     oklch(0.835 0.022 72);
+    --rule-2:   oklch(0.885 0.018 74);
+    --terra:    oklch(0.585 0.132 42);
+    --terra-d:  oklch(0.475 0.118 39);
+    --olive:    oklch(0.515 0.090 150);
+    --indigo:   oklch(0.50 0.105 250);
+    --display:  'Fraunces', Georgia, serif;
+    --body:     'Newsreader', Georgia, serif;
+    --mono:     'Spline Sans Mono', ui-monospace, monospace;
   }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth}
-  body{
-    font-family:var(--sans); color:var(--text-primary); background:var(--bg-base);
-    line-height:1.6; font-size:15px; -webkit-font-smoothing:antialiased;
-    display:grid; grid-template-columns:264px 1fr; min-height:100vh;
-  }
-
-  /* ── Sidebar ───────────────────────────────── */
-  aside{
-    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
-    background:var(--sidebar-bg); color:#D8D2C7; padding:30px 22px 40px;
-  }
-  aside .brand{font-family:var(--display); font-weight:700; font-size:15px; color:#fff; letter-spacing:-.01em; line-height:1.3}
-  aside .brand b{color:var(--accent)}
-  aside .brand small{display:block; font-family:var(--sans); font-weight:500; font-size:11px; color:#8E867A; letter-spacing:.04em; text-transform:uppercase; margin-top:6px}
-  aside nav{margin-top:28px; display:flex; flex-direction:column; gap:2px}
-  aside nav a{
-    color:#A9A294; text-decoration:none; font-size:12.5px; font-weight:500;
-    padding:8px 11px; border-radius:7px; transition:.16s; display:flex; gap:10px; align-items:baseline;
-  }
-  aside nav a .n{font-family:var(--mono); font-size:11px; color:#6F675B; min-width:16px}
-  aside nav a:hover{background:rgba(255,255,255,.05); color:#EAE4D8}
-  aside nav a.active{background:rgba(240,198,30,.12); color:var(--accent)}
-  aside nav a.active .n{color:var(--accent)}
-  aside .foot{margin-top:30px; padding-top:18px; border-top:1px solid rgba(255,255,255,.08); font-size:11px; color:#6F675B; line-height:1.7}
-
-  /* ── Main ──────────────────────────────────── */
-  main{padding:0 0 80px; max-width:980px}
-  .wrap{padding:0 56px}
-
-  /* Hero */
-  header.hero{padding:64px 56px 38px; border-bottom:1px solid var(--border); background:linear-gradient(180deg,var(--bg-surface),var(--bg-base))}
-  .eyebrow{font-family:var(--mono); font-size:11.5px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:var(--warning-t)}
-  header.hero h1{font-family:var(--display); font-weight:700; font-size:46px; line-height:1.04; letter-spacing:-.025em; margin:14px 0 0; max-width:18ch}
-  header.hero p.lede{margin-top:18px; font-size:17px; color:var(--text-secondary); max-width:60ch; line-height:1.55}
-  .accent-rule{width:54px; height:4px; background:var(--accent); border-radius:3px; margin:24px 0 0}
-  .meta-row{margin-top:26px; display:flex; flex-wrap:wrap; gap:10px}
-  .meta-chip{font-family:var(--mono); font-size:11.5px; font-weight:500; color:var(--text-secondary); background:var(--bg-white); border:1px solid var(--border); padding:6px 12px; border-radius:20px}
-  .meta-chip b{color:var(--text-primary)}
-
-  section.block{padding-top:54px}
-  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:6px}
-  .sec-head .sn{font-family:var(--mono); font-size:13px; font-weight:600; color:var(--accent); background:var(--text-primary); width:30px; height:30px; border-radius:8px; display:grid; place-items:center; flex:none}
-  .sec-head h2{font-family:var(--display); font-weight:700; font-size:27px; letter-spacing:-.02em; line-height:1.1}
-  .sec-intro{color:var(--text-secondary); max-width:68ch; margin:8px 0 26px; font-size:14.5px}
-
-  /* Rule card */
-  .rule{background:var(--bg-white); border:1px solid var(--border); border-radius:14px; padding:22px 24px; margin-bottom:18px; box-shadow:0 1px 0 rgba(22,21,19,.02)}
-  .rule-top{display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap}
-  .rule-top h3{font-family:var(--display); font-weight:600; font-size:18px; letter-spacing:-.01em; flex:1 1 auto; min-width:0}
-  .badge{font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; padding:4px 9px; border-radius:6px; flex:none; white-space:nowrap}
-  .badge.both{background:var(--bg-ecru); color:#7a6a32}
-  .badge.new{background:#E9EFFB; color:var(--indigo)}
-  .badge.historic{background:#F1EAF9; color:var(--purple)}
-  .fmt{font-family:var(--mono); font-size:13px; font-weight:500; color:var(--text-primary); background:var(--bg-surface); border:1px solid var(--border); border-radius:8px; padding:9px 13px; margin:14px 0 4px; display:block; overflow-x:auto; white-space:pre}
-  .minted{font-size:13px; color:var(--text-secondary); margin:10px 0 16px}
-  .minted b{color:var(--text-primary); font-weight:600}
-
-  /* Tabs */
-  .tabs{display:flex; gap:4px; background:var(--bg-surface); border:1px solid var(--border); border-radius:9px; padding:3px; width:max-content}
-  .tabs button{font-family:var(--sans); font-size:12px; font-weight:600; color:var(--text-secondary); background:none; border:none; padding:6px 14px; border-radius:7px; cursor:pointer; transition:.15s}
-  .tabs button.on{background:var(--bg-white); color:var(--text-primary); box-shadow:0 1px 3px rgba(22,21,19,.06)}
-  .panel{margin-top:14px}
-  .panel[hidden]{display:none}
-  .panel p{font-size:14px; color:var(--text-primary); line-height:1.6}
-  .panel.logic pre{font-family:var(--mono); font-size:12.5px; line-height:1.65; color:#2a2722; background:var(--bg-surface); border:1px solid var(--border); border-radius:9px; padding:14px 16px; overflow-x:auto; white-space:pre-wrap; word-break:break-word}
-  .plabel{font-family:var(--mono); font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--text-tertiary); display:none; margin-bottom:6px}
-
-  .lists{display:grid; grid-template-columns:1fr 1fr; gap:18px 28px; margin-top:18px; padding-top:16px; border-top:1px solid var(--border)}
-  .lists h4{font-family:var(--mono); font-size:10.5px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--text-tertiary); margin-bottom:9px}
-  .lists ul{list-style:none; display:flex; flex-direction:column; gap:7px}
-  .lists li{font-size:13px; color:var(--text-secondary); padding-left:15px; position:relative; line-height:1.5}
-  .lists li::before{content:''; position:absolute; left:0; top:8px; width:5px; height:5px; border-radius:50%; background:var(--accent)}
-  .lists.ex code{font-family:var(--mono); font-size:12px; color:var(--text-primary); background:var(--bg-surface); padding:1px 5px; border-radius:4px}
-  .lists.edge li::before{background:var(--warning-t)}
-
-  /* Anatomy */
-  .feature{background:var(--bg-white); border:1px solid var(--border); border-radius:16px; padding:30px 30px 26px; margin-top:30px}
-  .feature h3{font-family:var(--display); font-weight:700; font-size:19px; letter-spacing:-.015em; margin-bottom:4px}
-  .feature .sub{color:var(--text-secondary); font-size:13.5px; margin-bottom:24px}
-  .anatomy{display:flex; flex-wrap:wrap; gap:36px}
-  .id-build{flex:1 1 280px}
-  .id-string{font-family:var(--mono); font-weight:600; font-size:30px; letter-spacing:-.01em; display:flex; align-items:flex-end; gap:2px; flex-wrap:wrap}
-  .seg{position:relative; padding:4px 6px 22px; border-radius:7px}
-  .seg .tag{position:absolute; bottom:2px; left:0; right:0; text-align:center; font-family:var(--sans); font-size:9.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase}
-  .seg.sif{background:#FBF2D2; color:#8a6f12} .seg.sif .tag{color:var(--warning-t)}
-  .seg.dash{color:var(--text-tertiary); padding-bottom:22px}
-  .seg.p{background:#E9EFFB; color:var(--indigo)} .seg.p .tag{color:var(--indigo)}
-  .seg.c{background:#F1EAF9; color:var(--purple)} .seg.c .tag{color:var(--purple)}
-  .id-note{margin-top:18px; font-size:13px; color:var(--text-secondary); line-height:1.55}
-  .id-note b{color:var(--text-primary)}
-
-  /* Lifecycle flow */
-  .flow{display:flex; gap:0; margin-top:26px; flex-wrap:wrap}
-  .stage{flex:1 1 200px; background:var(--bg-surface); border:1px solid var(--border); border-radius:13px; padding:18px 18px 20px; position:relative}
-  .stage + .stage{margin-left:14px}
-  .stage .st-n{font-family:var(--mono); font-size:11px; color:var(--text-tertiary); font-weight:600}
-  .stage h4{font-family:var(--display); font-weight:600; font-size:16px; margin:5px 0 10px}
-  .stage .mints{display:flex; flex-direction:column; gap:6px}
-  .pill{font-family:var(--mono); font-size:11px; font-weight:500; padding:4px 9px; border-radius:6px; width:max-content}
-  .pill.null{background:var(--bg-ecru); color:var(--text-tertiary); text-decoration:line-through; text-decoration-color:#c9bfa6}
-  .pill.mint{background:var(--success-b); color:var(--success-t); font-weight:600}
-  .pill.id{background:var(--text-primary); color:var(--accent)}
-  .stage p{font-size:12px; color:var(--text-secondary); margin-top:10px; line-height:1.45}
-  .arrow{align-self:center; color:var(--text-tertiary); font-size:22px; padding:0 4px; flex:none}
-
-  /* New vs historic table */
-  .cmp{width:100%; border-collapse:collapse; margin-top:22px; font-size:13.5px; background:var(--bg-white); border:1px solid var(--border); border-radius:12px; overflow:hidden}
-  .cmp th,.cmp td{text-align:left; padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:top}
-  .cmp thead th{background:var(--bg-surface); font-family:var(--display); font-weight:600; font-size:13px}
-  .cmp thead th.h-new{color:var(--indigo)} .cmp thead th.h-hist{color:var(--purple)}
-  .cmp td:first-child{font-weight:600; color:var(--text-primary); width:22%}
-  .cmp tr:last-child td{border-bottom:none}
-  .cmp code{font-family:var(--mono); font-size:12px; background:var(--bg-surface); padding:1px 5px; border-radius:4px}
-
-  /* Glossary */
-  .gloss-search{margin:20px 0 18px; position:relative; max-width:380px}
-  .gloss-search input{width:100%; font-family:var(--sans); font-size:14px; padding:11px 14px 11px 38px; border:1px solid var(--border); border-radius:10px; background:var(--bg-white); color:var(--text-primary)}
-  .gloss-search input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(240,198,30,.18)}
-  .gloss-search svg{position:absolute; left:13px; top:12px; color:var(--text-tertiary)}
-  .gloss{display:grid; grid-template-columns:1fr 1fr; gap:12px}
-  .gterm{background:var(--bg-white); border:1px solid var(--border); border-radius:11px; padding:14px 16px}
-  .gterm dt{font-family:var(--mono); font-weight:600; font-size:13px; color:var(--text-primary); margin-bottom:5px}
-  .gterm dd{font-size:12.5px; color:var(--text-secondary); line-height:1.5}
-  .gterm[hidden]{display:none}
-
-  /* Discrepancies */
-  .warn{background:var(--warning-b); border:1px solid #EBD9A8; border-radius:12px; padding:16px 18px; margin-bottom:14px}
-  .warn h4{font-family:var(--display); font-weight:600; font-size:15px; color:var(--warning-t); margin-bottom:5px; display:flex; gap:8px; align-items:center}
-  .warn p{font-size:13px; color:#6b5520; line-height:1.55}
-  .warn p code{font-family:var(--mono); font-size:12px; background:rgba(181,117,20,.1); padding:1px 5px; border-radius:4px}
-
-  footer{margin-top:64px; padding:28px 56px 0; border-top:1px solid var(--border); color:var(--text-tertiary); font-size:12px; line-height:1.7}
-  footer b{color:var(--text-secondary)}
-
-  /* Print / PDF */
-  @media print{
-    @page{margin:14mm 14mm 16mm}
-    body{display:block; font-size:11px; background:#fff}
-    aside{display:none}
-    main{max-width:none}
-    .wrap,header.hero,footer{padding-left:0; padding-right:0}
-    header.hero{padding-top:0; background:#fff; border-bottom:2px solid var(--text-primary)}
-    header.hero h1{font-size:32px}
-    .rule,.feature,.gterm,.warn,.stage,.cmp{break-inside:avoid; box-shadow:none}
-    section.block{break-inside:avoid-page; padding-top:26px}
-    .tabs{display:none}
-    .panel[hidden]{display:block !important}      /* show BOTH tabs in print */
-    .plabel{display:block}
-    .gloss-search{display:none}
-    .gterm[hidden]{display:block !important}
-    a[href]{color:inherit; text-decoration:none}
-    .stage + .stage{margin-left:0}
-    .flow{gap:8px}
-  }
+  *{box-sizing:border-box}
+  @page{ size:210mm 297mm; margin:0 }
+  html{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  body{margin:0; font-family:var(--body); color:var(--ink); font-size:11.5px; line-height:1.6;
+    font-weight:420; background:var(--paper); font-optical-sizing:auto}
+  .page{position:relative; width:210mm; height:297mm; margin:0 auto; background:var(--paper);
+    padding:17mm 18mm 15mm; overflow:hidden;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E")}
+  .page + .page{page-break-before:always}
+  h1,h2,h3{font-family:var(--display); font-weight:380; color:var(--ink); margin:0; font-optical-sizing:auto; letter-spacing:-.005em}
+  p{margin:0 0 8px}
+  em{font-style:italic}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-family:var(--mono); font-size:8.5px; letter-spacing:.32em; text-transform:uppercase; color:var(--terra-d); font-weight:500}
+  .folio{position:absolute; bottom:9mm; left:18mm; right:18mm; display:flex; justify-content:space-between;
+    font-family:var(--mono); font-size:8px; letter-spacing:.18em; text-transform:uppercase; color:var(--faint);
+    border-top:0.5px solid var(--rule); padding-top:5px}
+  .shead{display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:end; margin-bottom:5px}
+  .shead .no{font-family:var(--display); font-weight:300; font-size:48px; line-height:.8; color:var(--terra); letter-spacing:-.03em}
+  .shead h2{font-size:28px; line-height:1.02}
+  .shead .sub{grid-column:2; color:var(--muted); font-size:10.5px; font-style:italic; margin-top:3px; max-width:120mm}
+  .hr{height:0.5px; background:var(--rule); margin:11px 0 13px; border:0}
+  .hr.thick{height:1.4px; background:var(--ink)}
+  .lead{font-size:12px; line-height:1.55; color:var(--ink-2); max-width:132mm}
+  .lead .dropcap{float:left; font-family:var(--display); font-weight:360; font-size:44px; line-height:.74;
+    margin:5px 8px 0 0; color:var(--terra)}
+  /* cover */
+  .cover{display:flex; flex-direction:column; justify-content:space-between; padding:22mm 18mm 15mm}
+  .cover-top{display:flex; justify-content:space-between; align-items:flex-start}
+  .mark{display:flex; align-items:center; gap:9px}
+  .mark .sq{width:30px; height:30px; border:1.4px solid var(--ink); display:flex; align-items:center; justify-content:center;
+    font-family:var(--display); font-weight:400; font-size:17px}
+  .mark .nm{font-family:var(--mono); font-size:9px; letter-spacing:.2em; text-transform:uppercase; line-height:1.5; color:var(--ink-2)}
+  .cover h1{font-size:80px; line-height:.94; font-weight:340; letter-spacing:-.02em; margin:0}
+  .cover h1 .it{font-style:italic; font-weight:340; color:var(--terra)}
+  .cover .deck{font-size:14px; line-height:1.55; color:var(--ink-2); max-width:130mm; margin-top:18px; font-style:italic}
+  .cover-rule{height:1.4px; background:var(--ink); margin:24px 0 14px}
+  .specs{display:grid; grid-template-columns:repeat(4,1fr); gap:0}
+  .specs .c{border-left:0.5px solid var(--rule); padding:0 0 0 11px}
+  .specs .c:first-child{border-left:0; padding-left:0}
+  .specs .k{font-family:var(--display); font-weight:300; font-size:29px; line-height:1; color:var(--ink)}
+  .specs .l{font-family:var(--mono); font-size:7.6px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-top:6px; line-height:1.4}
+  /* flow */
+  .flow{display:grid; grid-template-columns:repeat(4,1fr); margin:8px 0 2px}
+  .flow .s{padding:0 12px 4px 0; border-right:0.5px solid var(--rule); margin-right:12px}
+  .flow .s:last-child{border-right:0; margin-right:0; padding-right:0}
+  .flow .si{font-family:var(--mono); font-size:9px; color:var(--terra); letter-spacing:.1em}
+  .flow .st{font-family:var(--display); font-size:14px; font-weight:400; margin:5px 0 4px}
+  .flow .sx{font-size:9.4px; color:var(--muted); line-height:1.46}
+  .flow .sp{font-family:var(--mono); font-size:8px; margin-top:5px; color:var(--ink-2); display:block; line-height:1.7}
+  .flow .sp .null{color:var(--faint); text-decoration:line-through}
+  .flow .sp .go{color:var(--olive); font-weight:600}
+  /* anatomy specimen */
+  .anat{display:flex; gap:14mm; flex-wrap:wrap; margin:6px 0 2px}
+  .anat .id{font-family:var(--display); font-weight:440; font-size:28px; letter-spacing:-.01em; line-height:1}
+  .anat .s-sif{color:var(--ink)} .anat .s-p{color:var(--terra)} .anat .s-c{color:var(--olive)}
+  .anat .cap{font-size:9.4px; color:var(--muted); font-style:italic; margin-top:7px; max-width:62mm; line-height:1.5}
+  .anat .cap b{font-style:normal; color:var(--ink); font-weight:460; font-family:var(--display)}
+  /* two-col prose */
+  .cols{column-count:2; column-gap:12mm; column-rule:0.5px solid var(--rule)}
+  .cols p{margin:0 0 8px}
+  .runin{font-family:var(--display); font-weight:460; font-size:11.5px; color:var(--ink)}
+  /* spec rule rows */
+  .spec{display:grid; grid-template-columns:24px 1fr; gap:12px; padding:8px 0; border-top:0.5px solid var(--rule); break-inside:avoid}
+  .spec:last-child{border-bottom:0.5px solid var(--rule)}
+  .spec .n{font-family:var(--display); font-weight:300; font-size:18px; color:var(--faint); line-height:1; padding-top:2px}
+  .spec .h{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap}
+  .spec .ht{font-family:var(--display); font-weight:460; font-size:14px; line-height:1.05; color:var(--ink)}
+  .spec .fmt{font-family:var(--mono); font-size:8.6px; color:var(--terra-d); background:oklch(0.585 0.132 42 / 0.08); border-radius:2px; padding:1.5px 6px}
+  .spec .pe{font-size:10.2px; color:var(--ink-2); margin:4px 0 4px; line-height:1.48; max-width:130mm}
+  .spec .lg{font-family:var(--mono); font-size:8.2px; color:var(--muted); line-height:1.58; max-width:130mm; white-space:pre-wrap}
+  .spec .lg b{color:var(--terra-d); font-weight:600}
+  .spec .ex{display:flex; flex-wrap:wrap; gap:5px; margin-top:5px}
+  .tag{font-family:var(--mono); font-size:8.2px; font-weight:500; color:var(--terra-d);
+    border:0.5px solid var(--terra); border-radius:2px; padding:1.5px 6px; background:oklch(0.585 0.132 42 / 0.07)}
+  .tag.k{color:var(--muted); border-color:var(--rule); background:transparent}
+  code{font-family:var(--mono); font-size:9.1px; color:var(--terra-d); background:oklch(0.585 0.132 42 / 0.08); border-radius:2px; padding:0 3px}
+  /* nomenclature specimen */
+  .nom{font-family:var(--mono); font-weight:500; font-size:18px; letter-spacing:-.01em; line-height:1.5; margin:4px 0 10px; display:flex; flex-wrap:wrap; align-items:baseline}
+  .nom .seg{position:relative; padding:2px 3px 16px}
+  .nom .seg .t{position:absolute; bottom:1px; left:0; font-family:var(--mono); font-size:7px; letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; color:var(--muted)}
+  .nom .pid{color:var(--terra)} .nom .usr{color:var(--ink)} .nom .ct{color:var(--olive)} .nom .dt{color:var(--indigo)} .nom .d{color:var(--faint)}
+  /* comparison */
+  .cmp{width:100%; border-collapse:collapse; font-size:9.4px; margin-top:4px}
+  .cmp th,.cmp td{text-align:left; padding:5.5px 8px; border-bottom:0.5px solid var(--rule-2); vertical-align:top}
+  .cmp thead th{border-bottom:1.2px solid var(--ink); font-family:var(--mono); font-size:8px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted)}
+  .cmp thead th.n{color:var(--terra-d)} .cmp thead th.h{color:var(--olive)}
+  .cmp td:first-child{font-family:var(--display); font-weight:460; font-size:10.2px; color:var(--ink); width:22%}
+  .cmp tr:last-child td{border-bottom:0}
+  .cmp .col-n,.cmp .col-h{color:var(--ink-2)}
+  /* notes */
+  .note{display:grid; grid-template-columns:auto 1fr; gap:9px; padding:6.5px 0; border-top:0.5px solid var(--rule); break-inside:avoid}
+  .note:last-child{border-bottom:0.5px solid var(--rule)}
+  .note .b{font-family:var(--display); font-weight:460; font-size:11px; color:var(--terra-d); line-height:1; padding-top:1px}
+  .note .nt{font-family:var(--display); font-weight:460; font-size:11px; color:var(--ink)}
+  .note .nx{font-size:9.8px; color:var(--ink-2); line-height:1.48; margin-top:2px}
+  .pull{font-family:var(--display); font-weight:340; font-size:17px; line-height:1.3; color:var(--ink); font-style:italic;
+    border-top:1.4px solid var(--ink); border-bottom:0.5px solid var(--rule); padding:11px 0; margin:13px 0}
+  .twohead{display:grid; grid-template-columns:1fr 1fr; gap:12mm; margin-top:2px}
+  .twohead h3{font-family:var(--display); font-weight:460; font-size:13.5px; color:var(--terra-d); margin-bottom:3px}
+  .colophon{text-align:center; font-family:var(--mono); font-size:8px; letter-spacing:.26em; text-transform:uppercase; color:var(--faint); margin-top:20px}
 </style>
 </head>
 <body>
-<aside>
-  <div class="brand">Saadaa <b>CreatorHub</b><small>Source of Truth</small></div>
-  <nav id="toc"></nav>
-  <div class="foot">
-    Generated from live code &amp; DB.<br/>Rules verified against the<br/>2026-06-25 schema.<br/><br/>Edit: <code style="font-family:var(--mono);color:#8E867A">docs/Master-ID-Nomenclature-Guide.html</code>
+
+<!-- ════════ COVER ════════ -->
+<section class="page cover">
+  <div class="cover-top">
+    <div class="mark"><div class="sq">S</div><div class="nm">Saadaa Design<br>Creator Hub · v2</div></div>
+    <div class="nm mono" style="text-align:right; color:var(--muted); font-size:9px; letter-spacing:.2em">Field Manual &#8470; 02<br>Identity &amp; Naming</div>
   </div>
-</aside>
-
-<main>
-  <header class="hero">
-    <div class="eyebrow">Master Reference · ID &amp; Nomenclature</div>
-    <h1>How every ID and name is born.</h1>
-    <p class="lede">The single source of truth for identifier generation in Saadaa CreatorHub — SIF, Post (P), Collab (C), nomenclature, and campaign IDs. Every rule in plain English <em>and</em> exact logic, for both the live project and the historic archive.</p>
-    <div class="accent-rule"></div>
-    <div class="meta-row">
-      <span class="meta-chip"><b>v2</b> · 2026-06-25</span>
-      <span class="meta-chip">8 sections · 24 rules</span>
-      <span class="meta-chip">New + Historic</span>
-      <span class="meta-chip">Verified vs live DB</span>
-    </div>
-  </header>
-
-  <div class="wrap">
-
-    <!-- ANATOMY -->
-    <section class="block" id="anatomy">
-      <div class="sec-head"><span class="sn">＃</span><h2>Anatomy of an ID</h2></div>
-      <p class="sec-intro">Every identifier is built on the creator's <b>SIF</b>. A deliverable adds a <b>-P</b> number; a collaboration adds a <b>-C</b> number. The two live in <em>separate columns</em> — a post_id never contains a -C, and a collab_id never contains a -P.</p>
-      <div class="feature">
-        <h3>Read the parts</h3>
-        <div class="sub">Worked on a real creator, SIF-1007, with two historic collabs (C1, C2 / P1, P2), onboarded again with 3 deliverables.</div>
-        <div class="anatomy">
-          <div class="id-build">
-            <div class="id-string">
-              <span class="seg sif">SIF-1007<span class="tag">creator</span></span>
-              <span class="seg dash">-</span>
-              <span class="seg p">P3<span class="tag">deliverable</span></span>
-            </div>
-            <p class="id-note"><b>post_id</b> — one per reel / static post. The <b>P</b> climbs per creator across every collab. Here P3 because P1–P2 are already used in history. <b>No -C lives here.</b></p>
-          </div>
-          <div class="id-build">
-            <div class="id-string">
-              <span class="seg sif">SIF-1007<span class="tag">creator</span></span>
-              <span class="seg dash">-</span>
-              <span class="seg c">C3<span class="tag">collab / order</span></span>
-            </div>
-            <p class="id-note"><b>collab_id</b> — one per order. All deliverables of that order share it. C3 because the creator already had C1, C2 historically. The 3 new deliverables P3/P4/P5 all carry collab_id <b>SIF-1007-C3</b>.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- LIFECYCLE -->
-    <section class="block" id="lifecycle">
-      <div class="sec-head"><span class="sn">↻</span><h2>When each ID is minted</h2></div>
-      <p class="sec-intro">The cardinal rule of the new project: <b>reach-out creates the row but mints nothing</b>. The Post (P) and Collab (C) IDs are both born at <b>onboarding</b>, the moment an order is attached.</p>
-      <div class="flow">
-        <div class="stage">
-          <div class="st-n">STAGE 1</div><h4>Reach Out</h4>
-          <div class="mints">
-            <span class="pill id">id (bigserial) ✓</span>
-            <span class="pill mint">SIF minted (new creator)</span>
-            <span class="pill null">post_id</span>
-            <span class="pill null">collab_id</span>
-            <span class="pill null">nomenclature</span>
-          </div>
-          <p>Row saved, shows <b>“Pending”</b>. Identified only by its internal id until onboarded.</p>
-        </div>
-        <div class="arrow">→</div>
-        <div class="stage">
-          <div class="st-n">STAGE 2</div><h4>Onboarding (order)</h4>
-          <div class="mints">
-            <span class="pill mint">post_id · P-block ✓</span>
-            <span class="pill mint">collab_id · C ✓</span>
-            <span class="pill mint">nomenclature ✓</span>
-          </div>
-          <p><code style="font-family:var(--mono);font-size:11px">mint_onboarding_block</code> reserves the collab + the contiguous P-block in one locked call.</p>
-        </div>
-        <div class="arrow">→</div>
-        <div class="stage">
-          <div class="st-n">STAGE 3</div><h4>Posting</h4>
-          <div class="mints">
-            <span class="pill id">post_link · post_date</span>
-            <span class="pill id">status → Posted</span>
-          </div>
-          <p>IDs unchanged. The deliverable gets its live link, date, and final status.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- RULE SECTIONS render here -->
-    <div id="sections"></div>
-
-    <!-- GLOSSARY -->
-    <section class="block" id="glossary">
-      <div class="sec-head"><span class="sn">A</span><h2>Glossary</h2></div>
-      <p class="sec-intro">Every term used across the platform's identifier system, defined precisely.</p>
-      <div class="gloss-search">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input id="gsearch" type="text" placeholder="Filter terms…" />
-      </div>
-      <div class="gloss" id="gloss"></div>
-    </section>
-
-    <!-- DISCREPANCIES -->
-    <section class="block" id="discrepancies">
-      <div class="sec-head"><span class="sn">!</span><h2>Known discrepancies &amp; transient state</h2></div>
-      <p class="sec-intro">An honest source of truth records what is <em>not</em> yet clean. These are flagged for engineering to reconcile — do not treat them as settled rules.</p>
-      <div id="warns"></div>
-    </section>
-
-    <footer>
-      <b>Saadaa CreatorHub — Master ID &amp; Nomenclature Guide.</b> Compiled from the live RPCs (<code style="font-family:var(--mono)">submit_reachout</code>, <code style="font-family:var(--mono)">mint_onboarding_block</code>, <code style="font-family:var(--mono)">create_repeat_collab</code>), the onboarding/reach-out server actions, the <code style="font-family:var(--mono)">historic_posts</code> migration, and the live Supabase schema.<br/>
-      Canonical rule: <b>collab = one order</b>; <b>P and C both minted at onboarding</b>; <b>P/C continue over posts ∪ historic_posts</b>. Keep this file in sync with <code style="font-family:var(--mono)">project_collab_deliverable_numbering_rule</code> and KB ch04/ch06.
-    </footer>
+  <div>
+    <div class="eyebrow" style="margin-bottom:14px">IDs, Nomenclature &amp; the Numbering System</div>
+    <h1>What every<br>id means, and<br>when it&rsquo;s <span class="it">born</span>.</h1>
+    <p class="deck">A working reference for the identifier system: the SIF creator id, the Post&nbsp;(P) and Collab&nbsp;(C) numbers, the four-part nomenclature, and the exact rules that mint them &mdash; for both the live project and the historic archive.</p>
   </div>
-</main>
-
-<script>
-const SECTIONS = [{"heading": "1. The SIF Creator ID", "intro": "The SIF id is the root of the entire naming system \u2014 every post_id and collab_id is built on top of it. It is the only global linear counter in the platform and is frozen for the life of the creator so that Meta ad-name matching stays stable.", "rules": [{"key": "sif_id", "title": "Creator SIF ID (single global linear counter)", "applies_to": "both", "format": "SIF-{n}  (inf_id = 'SIF-'||sif_number)", "when_minted": "At reach-out, by submit_reachout RPC, only the first time a username is seen. Reused thereafter. Frozen forever (Meta ad-name matching depends on it).", "plain_english": "Each creator gets one unique id SIF-{n}, where n is the next integer after the highest sif_number already in the creators table. This is the single global creator counter; nothing else in the system is globally numbered this way except campaigns.", "logic": "submit_reachout (2026_06_25c lines 44-50): perform pg_advisory_xact_lock(hashtext('reachout-user:'||username)); look up creators by username; if absent \u2192 select coalesce(max(creators.sif_number),0) into v_max; v_new := v_max+1; inf_id := 'SIF-'||v_new; insert creator. If present \u2192 reuse inf_id and update profile fields only.", "examples": ["SIF-1 (first creator ever)", "SIF-2 (second creator)", "SIF-7829 (registry size as of 2026-06-24)"], "edge_cases": ["Existing creator found by username \u2192 SIF reused, never re-minted.", "Historic creators imported with their ORIGINAL legacy SIF frozen (e.g. SIF-1234).", "Handle change \u2192 creator re-identified by profile_id (legacy IG id); SIF unchanged, no renumber.", "create_repeat_collab uses the existing creator's SIF; it does not mint a new one."]}, {"key": "creator_type", "title": "Creator origin tag", "applies_to": "both", "format": "Enum: 'historic_creator' | 'new_creator'", "when_minted": "At creator creation \u2014 'new_creator' via submit_reachout post-launch; 'historic_creator' set during legacy migration.", "plain_english": "A flag on the creators row recording whether the creator predates the new platform (migrated) or was first reached out to inside it. Lets queries filter by lineage.", "logic": "types.gen.ts:138 creators.creator_type enum; reach-out/actions.ts:164 compares creator_type. New reach-outs default to new_creator.", "examples": ["historic_creator", "new_creator"], "edge_cases": ["Default for any reach-out submitted after launch is new_creator.", "Historic creators were bulk-tagged during the cleaned_data \u2192 creators migration."]}]}, {"heading": "2. Post ID (P) \u2014 Deliverables", "intro": "A post_id identifies a single deliverable (one reel or one static post). It is minted at onboarding (not reach-out), is per-creator linear, and deliberately carries NO collab suffix \u2014 collab grouping is a separate column. This is the segment most often miscopied; the -C suffix belongs to collab_id, never to post_id.", "rules": [{"key": "post_id", "title": "Deliverable Post ID", "applies_to": "both", "format": "{sif_id}-P{post_number}   e.g. SIF-1-P1", "when_minted": "At onboarding, first onboard only, via mint_onboarding_block \u2192 post_id_base, stamped in submitOnboarding (actions.ts:466). Re-onboard preserves the stored value. Reach-out rows carry NULL post_id.", "plain_english": "Each deliverable gets a short id combining the creator's SIF and a per-creator post counter. There is NO -C suffix; collab grouping lives entirely in the separate collab_id column. post_id and post_id_short hold the same value today.", "logic": "mint_onboarding_block (2026_06_25c:147-157): v_maxp := max(post_number) over (posts \u222a historic_posts WHERE inf_id=p_inf_id); post_id_base := p_inf_id||'-P'||(v_maxp+1). submitOnboarding stamps post_id=post_id_short=postIdBase only when isFirstOnboard (parent.post_id==null).", "examples": ["SIF-1-P1 (creator SIF-1, first deliverable across all their collabs)", "SIF-1-P2 (could belong to collab C1 or C2)", "SIF-2-P1 (different creator's first deliverable)"], "edge_cases": ["Reach-out rows: post_id NULL, identified by bigserial id.", "Multiple deliverables in one collab take consecutive P numbers (P{n},P{n+1},...) but ONE shared collab_id.", "Per-creator, not global or per-campaign \u2014 every creator has their own P1.", "Re-onboarding never re-mints; stored post_id preserved.", "Stories increment the deliverable count but never get their own post_id row.", "post_id_short is a redundant duplicate column (legacy from the pre-2026-06-06 -C-suffix model)."]}, {"key": "post_number", "title": "Per-creator linear post number (the 'P')", "applies_to": "both", "format": "{n} (integer)", "when_minted": "At onboarding via mint_onboarding_block: start_post_number = max(post_number over posts \u222a historic_posts for this creator)+1. Children take start+1, start+2, ... Reach-out: NULL.", "plain_english": "A counter that climbs per creator across all their collabs. Creator SIF-1 gets post_numbers 1,2,3,... no matter which collab each deliverable belongs to. It is the integer inside the P part of post_id.", "logic": "mint_onboarding_block:147-156 (per-inf_id union max). submitOnboarding:468 assigns startPostNumber to the parent; child loop (522-591) does nextPostNum=startPostNumber+1 then nextPostNum++ per child. NO re-query of max during the child loop (would race the reservation).", "examples": ["SIF-1-C1 (1 reel) \u2192 post_number 1", "SIF-1-C2 (3 posts) \u2192 post_numbers 2,3,4", "SIF-1-C3 (2 reels) \u2192 post_numbers 5,6", "Historic continuation: if legacy SIF-1 ended at 50, new C2 starts at P51"], "edge_cases": ["Per-creator, NOT global (current as of 2026-06-25). The pre-2026-06-06 code was global \u2014 that is the ONLY era harvest #4's 'GLOBAL' claim was true.", "Reach-out rows NULL until onboarding.", "Children skip the parent's number and take parent+1,+2,...", "Historic posts included in the MAX so live numbering continues from legacy.", "Stories do not increment post_number."]}, {"key": "reach_out_row_identifier", "title": "Reach-out row identity (bigserial id)", "applies_to": "new", "format": "bigint (1,2,3,...)", "when_minted": "On INSERT into posts at reach-out; auto-incremented. Reach-out rows have NULL post_id, so id is their only key until onboarding.", "plain_english": "Because reach-out rows have no post_id yet, they are addressed by the internal bigserial posts.id. Once onboarded, the post_id is stamped and becomes the external key; id stays the true PK.", "logic": "submit_reachout RETURNING posts.id into v_id; returns it. editReachOut (reach-out/actions.ts:339) keys on rowId when post_id is NULL. stampTestRows keys on id when post_id NULL.", "examples": ["First reach-out \u2192 id=1, post_id=NULL, collab_id=NULL", "After onboard \u2192 id=1 now has post_id='SIF-1-P1', collab_id='SIF-1-C1'"], "edge_cases": ["UNIQUE(post_id) permits MULTIPLE NULLs (NULLs distinct in Postgres), so many un-onboarded rows coexist.", "id is never NULL; it is the real PK.", "UI shows 'Pending' for NULL-post_id rows and never exposes the raw id."]}]}, {"heading": "3. Collab ID (C) \u2014 One Order = One Collab", "intro": "A collab represents a single order/agreement. Every deliverable of that order shares one collab_id. Minting is at onboarding and is idempotent on normalized order_id, so re-submitting the same order reuses the same collab. The -C suffix lives ONLY here.", "rules": [{"key": "collab_id", "title": "Collaboration grouping id", "applies_to": "both", "format": "{sif_id}-C{collab_number}   e.g. SIF-1-C1", "when_minted": "At onboarding via mint_onboarding_block. Reused if the normalized order_id already maps to a collab for this creator; else next per-creator collab_number. Reach-out rows: NULL.", "plain_english": "One collab = one order. All deliverables of an order (1 reel, or 3 reels + 2 posts, etc.) share the collab_id. Re-onboarding the same order reuses the same collab_id (idempotent).", "logic": "mint_onboarding_block (2026_06_25c:121-145): v_oid := lower(btrim(regexp_replace(order_id,'^#+',''))); if v_oid<>'' \u2192 reuse existing collab_number for matching normalized order_id; else v_cn := max(collab_number over posts \u222a historic_posts for inf_id)+1; collab_id := p_inf_id||'-C'||v_cn. Stamped submitOnboarding:459.", "examples": ["SIF-1-C1 (order #123)", "SIF-1-C2 (order #456)", "SIF-1-C1 reused (order #123 re-onboarded)", "SIF-2-C1 (different creator)"], "edge_cases": ["Order normalization strips leading '#' and trims/lowercases. NOTE: leading zeros are NOT stripped by the regex \u2014 '0123' vs '123' equivalence is claimed in harvests but not guaranteed by code; verify.", "Reach-out rows NULL until onboarding.", "Different order_id for same creator \u2192 new collab_number minted.", "Re-onboard reuses stored collab_id (submitOnboarding:397-401 short-circuits, does not re-call the RPC).", "One draft payment is raised per collab_id; board KPIs count unique collab_ids."]}, {"key": "collab_number", "title": "Per-creator collab episode counter (the 'C')", "applies_to": "both", "format": "{n} (integer >= 1)", "when_minted": "At onboarding via mint_onboarding_block. Reused on matching normalized order_id; else max+1 over posts \u222a historic_posts for the creator. Reach-out: NULL.", "plain_english": "A per-creator counter for which collaboration episode this is. SIF-1's first order is C1, second order C2, etc. It is the integer inside the C part of collab_id.", "logic": "Same derivation as collab_id (mint_onboarding_block:128-145). Assigned submitOnboarding:458 (collab_number=collabNumber). CHECK posts_collab_number_chk: collab_number>=1.", "examples": ["SIF-1-C1 (first order)", "SIF-1-C2 (second order)", "Historic continuation: legacy C1\u2013C5 \u2192 next is C6", "Two deliverables same order \u2192 same collab_number"], "edge_cases": ["Reach-out rows NULL until onboarding.", "Same order re-onboarded \u2192 stored collab_number reused (no increment).", "Historic posts included in MAX so live collabs continue legacy numbering.", "deliverable_index is legacy ordering only; collab_id is the grouping key."]}, {"key": "deliverable_index", "title": "Position within a collab (legacy ordinal)", "applies_to": "both", "format": "{n} (integer, parent=1, children 2,3,...)", "when_minted": "At onboarding when total deliverables > 1. Parent=1, children=2,3,... For single-deliverable collabs, parent gets index 1 (see gap).", "plain_english": "An ordinal for sorting multiple deliverables inside one collab. Now superseded by collab_id for grouping; kept only for ordering within a collab and for historic-table compatibility.", "logic": "NEW: submitOnboarding:477 parent deliverable_index=1 (firstType branch); child loop:584 deliverable_index=childIdx (starts at 2). HISTORIC: ROW_NUMBER() OVER (PARTITION BY collab_id ORDER BY post_number) when order_id present, else NULL.", "examples": ["Parent reel in C1 \u2192 1; first child post \u2192 2; second child reel \u2192 3", "Single-deliverable collab \u2192 1", "Historic: SIF-153-P1,P2 same order \u2192 1,2"], "edge_cases": ["Set only when total>1 in some paths; value for total=1 is ambiguous (see gaps) \u2014 code suggests 1.", "Stories count toward total but never create an indexed child row.", "deliverable_role (parent/child/single) is the modern role marker; deliverable_index is compatibility-only.", "Historic: NULL for all reach-out rows (no order_id); all observed multi-post collabs are [1,2] only (no 3+ yet)."]}, {"key": "deliverable_type", "title": "Deliverable content format", "applies_to": "new", "format": "Enum: 'reel' | 'post'", "when_minted": "At onboarding during deliverable expansion (\u00a76.2). Parent gets firstType; children get the type for each remaining deliverable.", "plain_english": "Marks whether a deliverable row is a video reel or a static post. When a collab is onboarded with several deliverables, the parent takes the first type and children spawn with their own types.", "logic": "onboarding/actions.ts:404-407 firstType; 475-477 applied to parent; children carry the same/appropriate type.", "examples": ["reel", "post"], "edge_cases": ["Stories are NOT a deliverable_type \u2014 story counts are tracked separately and never spawn a typed row (parent.stories is set to 0 at onboarding, line 441).", "A 'single' or 'parent' row has exactly one deliverable_type."]}]}, {"heading": "4. Nomenclature (Audit String)", "intro": "Nomenclature is the human-readable audit label stamped at onboarding. Format is exactly four dash-separated segments. The post_id segment inside it is SIF-N-P{n} with NO -C suffix \u2014 the most common harvest error was inserting a -C here.", "rules": [{"key": "nomenclature_format", "title": "Nomenclature format string", "applies_to": "both", "format": "{post_id}-{username}-{content_type}-{reach_out_date}", "when_minted": "At onboarding (buildLegacyNomenclature), once post_id is known. Parent and every child get it. Reach-out rows: NULL. Re-onboard preserves an existing value.", "plain_english": "A readable identifier joining four parts with dashes: the deliverable post_id (SIF-N-P{n}, NO -C), the creator's Instagram handle, the content-type code, and the date the creator was first reached out to (YYYY-MM-DD, IST).", "logic": "onboarding/actions.ts:140-149 buildLegacyNomenclature(postId,username,contentType,date) \u2192 `${postId}-${username}-${contentType}-${date}`; returns null if postId/username/contentType missing. Applied 416-423 (parent, reuses parent.nomenclature if set) and 542-547 (children). Date = parent.reach_out_date else todayIsoInIndia().", "examples": ["SIF-15-P42-johndoe-Reel-2026-06-15  (CORRECT \u2014 no -C)", "SIF-8-P128-fashionista99-Post-2026-05-20", "SIF-1-P1-devesh-UGC-2026-06-15"], "edge_cases": ["CORRECTION: harvest examples like 'SIF-15-P42-C1-johndoe-...' are WRONG \u2014 the post_id segment has no -C; the -C is only on the separate collab_id column.", "Reach-out rows NULL nomenclature; identified by bigserial id.", "If username or content_type missing, onboarding builder returns null (row saved without nomenclature).", "editReachOut's builder (reach-out/actions.ts:56-62) does NOT null-check; missing segments would yield a malformed double-dash string.", "contentName is NOT a segment despite the legacy comment at reach-out/actions.ts:306; if enabled the format would gain a 5th segment.", "Date is the ORIGINAL reach_out_date, reused across C2,C3,... not the onboarding date.", "Display falls back to content_type when nomenclature is null (columns.tsx:445-451)."]}, {"key": "date_format", "title": "Date segment format", "applies_to": "both", "format": "YYYY-MM-DD (ISO 8601, Asia/Kolkata)", "when_minted": "new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'}) at reach-out; reused at onboarding.", "plain_english": "The date part is an ISO calendar date generated in Indian Standard Time, capturing when outreach happened (not the onboarding moment).", "logic": "reach-out/actions.ts:50-54 todayIsoInIndia(); onboarding:334-340 nomenclatureDate = parent.reach_out_date || today. 'en-CA' locale chosen specifically for YYYY-MM-DD output.", "examples": ["2026-06-15", "2026-05-20"], "edge_cases": ["No time component.", "A reach-out at 11pm UTC may render the next IST day (UTC+5:30).", "Falls back to today if reach_out_date missing."]}, {"key": "segment_username", "title": "Username segment", "applies_to": "both", "format": "lowercase handle (dots/underscores/hyphens preserved, no leading @)", "when_minted": "At reach-out, extracted from the Instagram link/input and lowercased; frozen once the collab leaves 'Reach Out'.", "plain_english": "The creator's Instagram handle without the @, lowercased for case-insensitive uniqueness. Used verbatim as the second nomenclature segment.", "logic": "reach-out/actions.ts:44-48 extractUsernameFromInput matches instagram.com/@?([A-Za-z0-9._]+) then lowercases. Stored in creators.username and posts.username; submit_reachout looks up creators by it.", "examples": ["johndoe", "fashionista99", "travelgram"], "edge_cases": ["Frozen after 'Reach Out' status (decision D7); onboarding edits cannot change it.", "Dots/underscores/hyphens preserved.", "Extraction failure \u2192 reach-out rejected ('Could not derive username from URL')."]}, {"key": "segment_content_type", "title": "Content-type segment", "applies_to": "both", "format": "Free-text string (no enum)", "when_minted": "At reach-out; editable via editReachOut while still 'Reach Out' (triggers nomenclature rebuild). Captured into nomenclature at onboarding.", "plain_english": "The deliverable format label (UGC, Reels, Stories, VRP, IFADs, ...). No fixed list \u2014 the allowed set is whatever distinct values exist in posts, fetched on demand.", "logic": "reach-out/schema.ts:63 contentType required string; onboarding/queries.ts:205-213 fetchOnboardingFilterOptions pulls DISTINCT content_type. editReachOut rebuilds nomenclature on content_type change (line 440).", "examples": ["UGC", "Reels", "Stories", "VRP", "IFADs", "Plus Size"], "edge_cases": ["No validation against a fixed list; case-sensitive as stored.", "Stories dropped during deliverable expansion; nomenclature uses the parent's type.", "Editable only while in 'Reach Out' (D7 freeze afterward)."]}]}, {"heading": "5. Campaign ID", "intro": "Campaigns have their own global identifier namespace, independent of creators. Like SIF, it is a global monotonic counter, advisory-lock serialized.", "rules": [{"key": "campaign_id", "title": "Campaign ID", "applies_to": "new", "format": "IFC{NNN}  (zero-padded 3 digits)", "when_minted": "At campaign creation via submit_campaign RPC, advisory-lock serialized.", "plain_english": "Campaign ids are IFC + a zero-padded number from MAX(campaign_num)+1 \u2014 globally unique and increasing, never reset by year or month.", "logic": "2026_05_20_submit_campaign_rpc.sql:88 v_campaign_id := 'IFC'||lpad(v_campaign_num::text,3,'0'); advisory lock serializes concurrent submits.", "examples": ["IFC001", "IFC042", "IFC999"], "edge_cases": ["Global counter, no per-period reset.", "Advisory lock prevents concurrent-submit collisions.", "First-value ambiguity (IFC000 vs IFC001) \u2014 see gaps; project memory finalized IFC001."]}]}, {"heading": "6. New vs Historic Provenance", "intro": "New and historic ids share grammar but differ entirely in how they are produced. This section records the historic-table derivation rules and the deliberate numbering continuity between the two.", "rules": [{"key": "historic_post_id", "title": "Historic post_id derivation", "applies_to": "historic", "format": "SIF-{sif_number}-P{post_number}", "when_minted": "Once, at the cleaned_data \u2192 historic_posts migration. post_number = ROW_NUMBER() OVER (PARTITION BY username ORDER BY cleaned_data.id).", "plain_english": "Each legacy deliverable got a post_id from a per-creator dense row number assigned at migration time, regardless of whether it reached Instagram or had an order. legacy_post_id retains the original sheet value.", "logic": "SELECT CONCAT('SIF-',cd.sif_id,'-P',ROW_NUMBER() OVER (PARTITION BY cd.username ORDER BY cd.id)) FROM cleaned_data cd.", "examples": ["SIF-1007-P1, SIF-1007-P2 (two orders)", "SIF-102-P1,P2,P3 (three orders)"], "edge_cases": ["No-order rows still get P{n}.", "Reach-out rows get post_number but NULL collab_id/collab_number/deliverable_index.", "Per-creator (PARTITION BY username), matching the live per-creator rule."]}, {"key": "historic_collab_id", "title": "Historic collab_id / collab_number derivation", "applies_to": "historic", "format": "SIF-{sif_number}-C{collab_number}  /  integer", "when_minted": "At migration, only when order_id present. collab_number = DENSE_RANK() over distinct order_id per creator; NULL for reach-out rows.", "plain_english": "Legacy collabs group posts sharing an order_id; each distinct order got a sequential C number by first appearance. Reach-out rows (no order) have NULL collab.", "logic": "DENSE_RANK() OVER (PARTITION BY sif_id ORDER BY MIN(order_id) OVER (PARTITION BY sif_id,order_id)) when order_id NOT NULL; collab_id = CONCAT('SIF-',sif_id,'-C',collab_number).", "examples": ["SIF-102-C1/C2/C3 (three orders)", "SIF-153-P1,P2 same order \u2192 both SIF-153-C1"], "edge_cases": ["Same order_id \u2192 same collab_id.", "Reach-out rows NULL regardless of post_number.", "164 Posted-but-no-order backfill rows still NULL collab pending reconciliation."]}, {"key": "historic_deliverable_index", "title": "Historic deliverable_index", "applies_to": "historic", "format": "integer from 1", "when_minted": "At migration when order_id present: ROW_NUMBER() within collab ordered by post_number; NULL otherwise.", "plain_english": "Position of a post inside its order group: first=1, second=2. Null for reach-out rows.", "logic": "ROW_NUMBER() OVER (PARTITION BY collab_id ORDER BY post_number) when order_id NOT NULL.", "examples": ["SIF-153-P1\u21921, SIF-153-P2\u21922 (same order)", "SIF-102-P1\u21921 (single-post collab)"], "edge_cases": ["Most collabs are single-post (index 1 only).", "All observed multi-post collabs are [1,2]; none with 3+ deliverables yet.", "NULL for reach-out rows."]}, {"key": "historic_status", "title": "Historic workflow_status derivation", "applies_to": "historic", "format": "'Posted' | 'On Board' | 'Reach Out'", "when_minted": "At migration, derived from post_link / order_id presence.", "plain_english": "Posted = has a real instagram.com link; On Board = has an order_id but no real link; Reach Out = neither.", "logic": "CASE WHEN post_link LIKE 'https://www.instagram.com%' THEN 'Posted' WHEN order_id IS NOT NULL THEN 'On Board' ELSE 'Reach Out' END. Verified counts: 1,212 Posted (1,211 real links), 246 On Board, 9,794 Reach Out.", "examples": ["real IG link + order \u2192 Posted", "order, link='Ghosted' \u2192 On Board", "no order, no link \u2192 Reach Out"], "edge_cases": ["164 Posted-but-no-order anomaly rows pending backfill.", "19 Reach Out rows carry non-IG post_link values (e.g. 'Ghosted').", "1 Posted row without a real IG link."]}, {"key": "historic_traceback", "title": "Historic traceback & enrichment columns", "applies_to": "historic", "format": "source_cleaned_id (bigint FK), profile_id (IG numeric id), legacy_post_id (text)", "when_minted": "At migration; copied 1:1 from cleaned_data.", "plain_english": "Archive-only columns absent from live rows: source_cleaned_id links back to the cleaned_data source row; profile_id is the Instagram numeric id (~95% backfilled); legacy_post_id keeps the original sheet post id.", "logic": "historic_posts.source_cleaned_id = cleaned_data.id (1:1); historic_posts.profile_id = cleaned_data.profile_id (NULL where unenriched).", "examples": ["SIF-102-P1 \u2192 source_cleaned_id=11276", "SIF-1007-P1 \u2192 profile_id=8489263759", "SIF-102-P1 \u2192 profile_id=NULL (unenriched)"], "edge_cases": ["Every historic row has exactly one source_cleaned_id (no NULL).", "profile_id NULL where legacy enrichment failed (~5%).", "SIF_ERROR rows kept in cleaned_data for audit but EXCLUDED from historic_posts."]}]}, {"heading": "7. Codes & Enumerations", "intro": "Closed-set and free-text fields used across the platform, with their exact legal values and the discrepancies engineering should reconcile.", "rules": [{"key": "workflow_status_new", "title": "Workflow status (new model)", "applies_to": "new", "format": "Enum: 'Reach Out' | 'On Board' | 'Order Sent' | 'Posted' | 'Delivered' | 'RTO' | 'Cancelled' | 'Cancelled After RTO' | 'Offboarding' | 'Offboarded' | 'Awaiting Reply' | 'Declined'", "when_minted": "Set at reach-out ('Reach Out'), onboarding ('On Board'), and subsequent transitions.", "plain_english": "Tracks a collab's full lifecycle from initial contact through delivery, with terminal failure (RTO/Cancelled) and end-of-life (Offboarding/Offboarded) branches.", "logic": "types.gen.ts:21-33 union; status-pill.tsx:44-57 tone mapping. 'On Board' is displayed as 'Onboard' via the label formatter.", "examples": ["Reach Out", "On Board", "Posted", "Delivered", "RTO"], "edge_cases": ["'On Board' relabeled 'Onboard' in UI.", "RTO / Cancelled / Cancelled After RTO are terminal failure states.", "Awaiting Reply and Declined are rare, not fully integrated into the main flow."]}, {"key": "collab_type", "title": "Collaboration type (payment model)", "applies_to": "both", "format": "Enum: 'Barter' | 'Barter + Paid'", "when_minted": "At reach-out (outbound) or onboarding (inbound forced to Barter).", "plain_english": "Barter = product only (no cash); Barter + Paid = product plus cash. When Barter, commercial_amount is always 0.", "logic": "onboarding/schema.ts:27-28 COLLAB_TYPES; Barter rule enforced 2026_06_06...:129-133 and via applyBarterLock.", "examples": ["Barter", "Barter + Paid"], "edge_cases": ["Inbound reach-outs forced to Barter, commercials locked to 0.", "DISCREPANCY: campaign form offers 'Barter'/'Paid'; onboarding historically allowed a third; production rule permits ONLY Barter / Barter + Paid (see gaps)."]}, {"key": "reachout_direction_type", "title": "Reach-out direction vs type", "applies_to": "new", "format": "direction: 'inbound'|'outbound' (lowercase); type: 'Inbound'|'Outbound' (title-case)", "when_minted": "At reach-out; type derived from direction.", "plain_english": "reachout_direction (lowercase) is the canonical who-initiated value and drives logic; reachout_type is its title-cased display/audit twin.", "logic": "schema.ts:41-46 REACHOUT_DIRECTIONS; RPC validates inbound/outbound; actions.ts:166 p_reachout_type = direction==='inbound'?'Inbound':'Outbound'.", "examples": ["inbound / Inbound", "outbound / Outbound"], "edge_cases": ["Storage of direction is always lowercase.", "Inbound auto-sets collab_type Barter and commercials 0.", "Use reachout_direction for canonical logic, not reachout_type."]}, {"key": "influencer_tier", "title": "Influencer tier by followers", "applies_to": "both", "format": "Labels: Nano (1K\u201310K) | Micro (10K\u201350K) | Mid tier (50K\u2013500K) | Macro (500K\u20131M) | Mega (1M+)", "when_minted": "GENERATED creators.category, recomputed from followers.", "plain_english": "Follower-count buckets for budgeting. WARNING: the form's range labels and the runtime thresholds disagree.", "logic": "formatters.ts:82-91 tierFromFollowers uses <10K Nano, <50K Micro, <300K Mid tier, <1M Macro, >=1M Mega; campaigns/schema.ts:25-31 form labels say 50K\u2013500K for Mid tier.", "examples": ["Nano (1K to 10K)", "Mid tier (50K to 500K)", "Mega (1M+)"], "edge_cases": ["DISCREPANCY: form label 'Mid tier 50K\u2013500K' vs code boundary 300K. A 400K creator is labeled Mid tier by the form but Macro by the GENERATED column. Reconcile (see gaps).", "category recomputed whenever followers change."]}, {"key": "content_type_enum", "title": "Content type (free-text)", "applies_to": "both", "format": "Free-text (no enum)", "when_minted": "At reach-out.", "plain_english": "Operator-entered label; no fixed list. The 'allowed' set is whatever distinct values already exist in posts, fetched on demand.", "logic": "onboarding/queries.ts:205-213 DISTINCT content_type from posts.", "examples": ["UGC", "Reels", "Stories", "VRP", "IFADs"], "edge_cases": ["No validation; case-sensitive.", "Distinct set is data-driven, not hard-coded."]}]}, {"heading": "8. Concurrency, Integrity & Invariants", "intro": "The rules that keep id generation race-free and the data internally consistent across both reach-out and onboarding paths.", "rules": [{"key": "advisory_lock_concurrency", "title": "Advisory-lock concurrency model", "applies_to": "both", "format": "N/A (mechanism)", "when_minted": "At reach-out (submit_reachout) and onboarding (mint_onboarding_block). Locks held to transaction commit.", "plain_english": "PostgreSQL advisory locks serialize id generation. Reach-out locks on the username (prevents duplicate creators). Onboarding locks on the creator (serializes the P-block + C reservation). Locks release at transaction end.", "logic": "submit_reachout (2026_06_25c:43): pg_advisory_xact_lock(hashtext('reachout-user:'||username)) before creator upsert. mint_onboarding_block:126: pg_advisory_xact_lock(hashtext('reachout-inf:'||p_inf_id)) before computing maxP/maxC. hashtext() \u2192 stable bigint.", "examples": ["Two reach-outs for 'alice': first wins reachout-user:alice and creates SIF-123; second waits, sees SIF-123, skips creation.", "Two onboards for SIF-123 (different orders): first locks reachout-inf:SIF-123, reserves P6&C2; second waits, then sees P6 written and reserves P7&C3."], "edge_cases": ["CORRECTION to harvest #1: the current reach-out path takes ONLY the 'reachout-user' lock; the second 'reachout-inf' lock at reach-out time was removed \u2014 it now lives in mint_onboarding_block (onboarding-time only).", "Locks are transaction-scoped; rollback releases before any dependent txn sees new ids.", "hashtext collisions theoretically possible but extremely rare.", "Locks serialize writes only; reads are not blocked.", "No deadlock: both RPCs acquire in a consistent order."]}, {"key": "barter_commercial_rule", "title": "Barter = 0 commercial amount", "applies_to": "both", "format": "N/A (invariant)", "when_minted": "At reach-out and onboarding whenever collab_type='Barter'.", "plain_english": "Barter collabs always have commercial_amount 0, enforced at both the database (RPC) and app (Zod/applyBarterLock) layers to keep data consistent.", "logic": "submit_reachout (2026_06_25c:62-63): if p_collab_type='Barter' then v_commercial_amount:=0; else coalesce(p_commercial_amount,0). submitOnboarding:179 applyBarterLock(parsed.data) zeros it pre-validation; per-deliverable amount derived from the already-locked value.", "examples": ["Barter + input 5000 \u2192 stored 0", "Barter + Paid \u2192 commercial_amount > 0 allowed"], "edge_cases": ["Inbound batch passes collab_type=null at reach-out, so the lock applies only at onboarding.", "Equal-split of 0 across N deliverables = 0 each (consistent).", "Payment rows still created for Barter (amount 0, status 'Not Due', never 'Due')."]}, {"key": "equal_split_commercials", "title": "Equal-split per-deliverable commercials", "applies_to": "new", "format": "perDeliverableAmount = round(agreed_total / total_deliverables, 2)", "when_minted": "At onboarding, stored on every deliverable row of the collab.", "plain_english": "The agreed collab total is divided equally across all deliverables and stored per row, so SUM(commercial_amount) over the collab reconstructs the original agreed total.", "logic": "onboarding/actions.ts:412-413 perDeliverableAmount = total>0 ? Math.round((v.commercials/total)*100)/100 : v.commercials; applied to parent (432) and children.", "examples": ["10000 over 4 deliverables \u2192 2500 each", "Barter (0) over 3 \u2192 0 each"], "edge_cases": ["Rounding to 2dp may leave tiny SUM drift vs the exact total on non-divisible amounts.", "Barter forces the total to 0 first, so split is trivially 0."]}, {"key": "order_id_normalization", "title": "Order-ID normalization for collab matching", "applies_to": "both", "format": "lower(btrim(regexp_replace(order_id,'^#+','')))", "when_minted": "At onboarding inside mint_onboarding_block before collab lookup.", "plain_english": "Before deciding whether an order already has a collab, the order_id is canonicalized: strip leading '#', trim whitespace, lowercase. Matching ids map to the same collab.", "logic": "mint_onboarding_block:121,133 apply the same regexp/btrim/lower to both the incoming order_id and stored order_ids.", "examples": ["'#123' \u2192 '123'", "'  ABC ' \u2192 'abc'", "'#123' and '123' \u2192 same collab"], "edge_cases": ["GAP: leading-zero stripping ('0123'\u2192'123') is asserted in harvest #1 examples but the regex only removes '#', not leading zeros \u2014 verify before relying on it.", "Empty/whitespace order_id (v_oid='') skips reuse and always mints a fresh collab_number."]}, {"key": "reonboard_idempotency", "title": "Re-onboard idempotency", "applies_to": "new", "format": "N/A (invariant)", "when_minted": "At onboarding, when parent.post_id is already set (isFirstOnboard=false).", "plain_english": "Re-onboarding an already-minted row never re-mints ids or nomenclature; the stored post_id, post_number, collab_id, collab_number and nomenclature are preserved.", "logic": "submitOnboarding:369 isFirstOnboard = parent.post_id==null. When false (397-401) it reuses parent.post_number and parent.collab_id and does NOT call mint_onboarding_block; the post_id/post_number/post_id_short writes are guarded by `if (isFirstOnboard)` (465-469).", "examples": ["First onboard of SIF-1 row \u2192 mints SIF-1-P1 / SIF-1-C1", "Edit-resubmit same row \u2192 keeps SIF-1-P1 / SIF-1-C1, no new mint"], "edge_cases": ["nomenclature reused via `parent.nomenclature || build...` (416-417).", "Children are spawned only on first onboard when total>1 (515)."]}]}];
-const GLOSSARY = [{"term": "SIF", "definition": "Saadaa Influencer Framework. The brand's internal creator-identity namespace. Every creator gets one SIF id of the form SIF-{n}; it is the root prefix of every post_id and collab_id."}, {"term": "inf_id", "definition": "The creator's SIF identifier as stored in the database (creators.inf_id, posts.inf_id). Equals 'SIF-'||sif_number. Stable forever once minted."}, {"term": "sif_number", "definition": "The bare integer behind a SIF id (creators.sif_number). The system's single global monotonic creator counter; max(sif_number)+1 mints the next creator."}, {"term": "post_id", "definition": "Deliverable identifier, format SIF-{n}-P{m}. One per reel or static post. Minted at onboarding. Carries NO -C suffix \u2014 collab grouping is a separate column."}, {"term": "post_id_short", "definition": "A second column holding the identical value to post_id in the current model. Legacy remnant from the pre-2026-06-06 era when post_id carried a -C suffix and post_id_short did not. Effectively redundant now."}, {"term": "post_number", "definition": "The integer 'P' component of post_id. Per-creator linear counter; continues across a creator's live posts \u222a historic_posts (both filtered by inf_id). NOT global as of 2026-06-25."}, {"term": "collab_id", "definition": "Collaboration (one order = one collab) identifier, format SIF-{n}-C{k}. All deliverables sharing one normalized order_id share this id. Minted/reused at onboarding."}, {"term": "collab_number", "definition": "The integer 'C' component of collab_id. Per-creator episode counter; reused when the same normalized order_id reappears, else max+1 over posts \u222a historic_posts. CHECK constraint: >= 1."}, {"term": "collab episode", "definition": "One discrete agreement/order with a creator, regardless of how many deliverables it contains. Synonymous with one collab_id / one collab_number value."}, {"term": "deliverable_index", "definition": "Legacy ordinal for ordering multiple deliverables within one collab (parent=1, children=2,3,...). Superseded by collab_id for grouping; retained for sort order and historic compatibility."}, {"term": "deliverable_role", "definition": "Modern role tag on each post row: 'parent' | 'child' | 'single'. Replaces the old parent/child model; collab_id is the true grouping key."}, {"term": "deliverable_type", "definition": "Content format of one deliverable row. Enum strictly 'reel' | 'post'. Stories are counted but never spawn a typed row."}, {"term": "nomenclature", "definition": "Human-readable audit string: {post_id}-{username}-{content_type}-{reach_out_date}. Built at onboarding via buildLegacyNomenclature. Nullable; reach-out rows have NULL."}, {"term": "mint_onboarding_block", "definition": "The RPC that, in one advisory-locked call, reserves a collab (reuse-or-new) and a contiguous post_number block for a creator at onboarding. Returns collab_number, collab_id, start_post_number, post_id_base."}, {"term": "submit_reachout", "definition": "The RPC that creates (or reuses) a creator and inserts a reach-out posts row with NULL post_id/collab. Mints the SIF for brand-new creators. Holds advisory lock on 'reachout-user:{username}'."}, {"term": "create_repeat_collab", "definition": "RPC that inserts a fresh Reach Out posts row for an EXISTING creator (C2+ scenario), with NULL post_id/collab \u2014 the new collab is minted later at onboarding."}, {"term": "order_id normalization", "definition": "Canonicalization applied before collab matching: lower(btrim(regexp_replace(order_id,'^#+',''))). Makes '#123', '0123'\u2192'123' equivalence... note: leading-zero stripping is NOT done by the regex (only '#' and whitespace); '0123' vs '123' equivalence is asserted in harvest examples but not guaranteed by the shown regex \u2014 verify."}, {"term": "advisory lock", "definition": "pg_advisory_xact_lock(hashtext(key)) \u2014 a transaction-scoped Postgres lock used to serialize per-creator / per-username ID generation and prevent duplicate-id races. Released at commit/rollback."}, {"term": "Barter rule", "definition": "Hard invariant: collab_type='Barter' forces commercial_amount=0, enforced at both RPC (submit_reachout) and app (applyBarterLock) layers."}, {"term": "collab_type", "definition": "Payment model of a collab: 'Barter' (product only) or 'Barter + Paid' (product + cash). Inbound reach-outs are always Barter."}, {"term": "reachout_direction", "definition": "Lowercase enum 'inbound' | 'outbound' \u2014 who initiated contact. Inbound forces Barter + 0 commercials."}, {"term": "reachout_type", "definition": "Title-cased display label 'Inbound' | 'Outbound', derived from reachout_direction for human-readable reports."}, {"term": "creator_type", "definition": "Origin tag on creators: 'historic_creator' (migrated from legacy) | 'new_creator' (created post-launch via submit_reachout)."}, {"term": "campaign_id", "definition": "Campaign identifier, format IFC{NNN} (zero-padded to 3 digits) from MAX(campaign_num)+1. Global, monotonic, advisory-lock serialized."}, {"term": "influencer_tier / category", "definition": "GENERATED creators.category bucketing by follower count (Nano/Micro/Mid tier/Macro/Mega). Runtime thresholds (300K Mid-tier boundary) differ from campaign-form labels (500K) \u2014 known discrepancy."}, {"term": "content_type", "definition": "Free-text deliverable label (UGC, Reels, Stories, VRP, IFADs, ...). No fixed enum; distinct set derived dynamically from posts at filter-fetch time. Appears as a nomenclature segment."}, {"term": "historic_posts", "definition": "Archive table (~11,252 rows from ~7,955 creators) of legacy deliverables, ids derived deterministically from cleaned_data via window functions at the 2026-06-24 migration."}, {"term": "cleaned_data", "definition": "Staging table holding the canonicalized legacy Google-Sheet rows; source of every historic_posts field via source_cleaned_id FK. Holds SIF_ERROR audit markers."}, {"term": "source_cleaned_id", "definition": "FK on historic_posts pointing back to cleaned_data.id (1:1). Enables full traceback of any archived id to its derivation inputs."}, {"term": "profile_id", "definition": "Instagram numeric account id (legacy ig_id), copied from cleaned_data; ~95% backfilled, NULL where enrichment failed. Used to re-identify creators across handle changes."}, {"term": "SIF_ERROR", "definition": "A sentinel in cleaned_data.sif_id marking a row that failed canonical-SIF dedup/assignment. Kept in cleaned_data for audit; EXCLUDED from historic_posts (not promoted to a named post)."}, {"term": "workflow_status", "definition": "Lifecycle stage of a posts row. New model: 12-value enum (Reach Out \u2192 On Board \u2192 Order Sent \u2192 Posted \u2192 Delivered, plus RTO/Cancelled/Offboarding/etc.). Historic model: only Posted | On Board | Reach Out."}, {"term": "bigserial id", "definition": "posts.id \u2014 the true primary key, auto-incremented per row. Sole identifier for reach-out rows while post_id is NULL."}];
-const NEWVHIST = [["Identifier grammar", "<code>SIF-{n}-P{m}<\/code> &middot; <code>SIF-{n}-C{k}<\/code>", "Identical &mdash; same grammar"], ["How minted", "Transactionally at runtime, under advisory locks", "Once, by SQL window functions at the 2026-06-24 migration"], ["SIF id", "Minted at reach-out (<code>submit_reachout<\/code>)", "Frozen from the original legacy sheet"], ["P &amp; C minted", "At onboarding (<code>mint_onboarding_block<\/code>)", "<code>ROW_NUMBER()<\/code> / <code>DENSE_RANK()<\/code> over cleaned_data"], ["post_number", "Per-creator; continues over posts &cup; historic", "<code>ROW_NUMBER() PARTITION BY username<\/code>"], ["collab_number", "Per-creator; = one order; reuse-on-match else max+1", "<code>DENSE_RANK()<\/code> over distinct order_id"], ["Reach-out rows", "NULL post_id &mdash; keyed by bigserial <code>id<\/code>", "Carry a migration-assigned post_number; NULL collab"], ["workflow_status", "Full 12-value lifecycle enum", "Collapsed to Posted / On Board / Reach Out"], ["Archive-only cols", "&mdash;", "<code>source_cleaned_id<\/code>, <code>profile_id<\/code>, <code>legacy_post_id<\/code>"], ["creator_type", "<code>new_creator<\/code>", "<code>historic_creator<\/code>"], ["Continuity weld", "MAX(P), MAX(C) <b>UNION over posts &cup; historic<\/b> &mdash; a returning legacy creator continues their numbering (SIF-1 ended P50/C5 &rarr; next is P51/C6)", "Feeds the live MAX() so numbering never restarts or collides"]];
-const WARNS = [{"title": "Influencer tier: 300K vs 500K boundary", "body": "The campaign form labels <code>Mid tier<\/code> as 50K&ndash;500K, but the runtime <code>tierFromFollowers<\/code> (formatters.ts) uses a <b>&lt;300K<\/b> cutoff. A 400K-follower creator is labelled <b>Mid tier<\/b> by the form yet classified <b>Macro<\/b> by the generated <code>creators.category<\/code> column. Engineering must pick one boundary."}, {"title": "collab_type: is bare &lsquo;Paid&rsquo; legal?", "body": "The production rule + project memory allow only <b>Barter<\/b> and <b>Barter + Paid<\/b>. The campaign form still surfaces a <code>Paid<\/code> option (most likely a legacy mislabel of Barter + Paid). Reconcile the campaign-schema enum with the onboarding enum."}, {"title": "post_id_short duplicates post_id", "body": "Both columns hold the identical value today. <code>post_id_short<\/code> is a remnant of the pre-2026-06-06 model where <code>post_id<\/code> carried a <code>-C<\/code> suffix and the short form did not. Treat it as deprecated/redundant &mdash; never rely on a difference between the two."}, {"title": "order_id normalization does NOT strip leading zeros", "body": "Collab matching canonicalizes the order_id as <code>lower(btrim(regexp_replace(order_id,'^#+','')))<\/code> &mdash; it strips a leading <code>#<\/code> and whitespace, lowercases, but does <b>not<\/b> strip leading zeros. <code>0123<\/code> and <code>123<\/code> are <b>not<\/b> guaranteed to map to the same collab. Verify before relying on it."}, {"title": "Transient: 164 Posted-but-no-order historic rows", "body": "164 historic <code>Posted<\/code> rows have a real Instagram link but NULL order_id &rarr; NULL collab. The team is backfilling order_ids (export &rarr; fill &rarr; re-ingest &rarr; Shopify sync). Once done these rows gain proper collab_ids and the anomaly disappears. As of 2026-06-25 treat their collab fields as pending."}, {"title": "SIF_ERROR rows live only in cleaned_data", "body": "2,178 dedup-failure rows (<code>SIF_ERROR<\/code> sentinel) are kept in <code>cleaned_data<\/code> for audit but are <b>excluded<\/b> from <code>historic_posts<\/code> (never promoted to a named post). The clean archive is 11,252 of the 13,430 cleaned_data rows."}, {"title": "Latent 5th nomenclature segment (contentName)", "body": "The reach-out form has a <code>contentName<\/code> field flagged &lsquo;legacy nomenclature segment&rsquo; but it is NOT in the current 4-part nomenclature. If ever enabled, the format would become <code>{post_id}-{username}-{content_type}-{content_name}-{date}<\/code>."}, {"title": "Campaign IDs start at IFC001", "body": "Format <code>IFC{NNN}<\/code> from <code>MAX(campaign_num)+1<\/code>, zero-padded to 3 digits. Project memory finalized the first campaign as <b>IFC001<\/b> (1-indexed), not IFC000."}];
-
-const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-const badgeClass = a => a==='new'?'new':a==='historic'?'historic':'both';
-const badgeText  = a => a==='new'?'New only':a==='historic'?'Historic':'New + Historic';
-
-function ruleCard(r,idx){
-  const id = `r-${r.key}-${idx}`;
-  return `<div class="rule">
-    <div class="rule-top">
-      <h3>${esc(r.title)}</h3>
-      <span class="badge ${badgeClass(r.applies_to)}">${badgeText(r.applies_to)}</span>
+  <div>
+    <div class="cover-rule"></div>
+    <div class="specs">
+      <div class="c"><div class="k">SIF-n</div><div class="l">One frozen id<br>per creator</div></div>
+      <div class="c"><div class="k">P + C</div><div class="l">Both minted<br>at onboarding</div></div>
+      <div class="c"><div class="k">11,252</div><div class="l">Historic<br>deliverables</div></div>
+      <div class="c"><div class="k">&cup;</div><div class="l">Live numbering<br>continues historic</div></div>
     </div>
-    <code class="fmt">${esc(r.format)}</code>
-    <div class="minted"><b>When:</b> ${esc(r.when_minted)}</div>
-    <div class="tabs" data-for="${id}">
-      <button class="on" data-t="plain">Plain English</button>
-      <button data-t="logic">Logic / SQL</button>
+  </div>
+</section>
+
+<!-- ════════ 01 · THE MODEL ════════ -->
+<section class="page">
+  <div class="shead"><div class="no">01</div><h2>How an id is born</h2>
+    <div class="sub">Reach-out creates the row but mints nothing. The Post&nbsp;(P) and Collab&nbsp;(C) ids are both born at onboarding, the moment an order attaches.</div></div>
+  <div class="hr thick"></div>
+  <p class="lead"><span class="dropcap">A</span> reach-out saves a row, but it carries no name: <code>post_id</code>, <code>collab_id</code> and the nomenclature are all NULL, and the row is addressed only by its internal bigserial <code>id</code> &mdash; the board shows it as &ldquo;Pending&rdquo;. The identity is granted at onboarding, when an order is attached and <code>mint_onboarding_block</code> reserves the collab and a contiguous block of post numbers in one advisory-locked call.</p>
+
+  <div class="flow">
+    <div class="s"><div class="si">i</div><div class="st">Reach Out</div><div class="sx">Row saved, identified by bigserial id. The SIF is minted here if the creator is new.</div>
+      <span class="sp">id <span class="go">&#10003;</span> &nbsp; SIF <span class="go">&#10003;</span><br><span class="null">post_id</span> &nbsp; <span class="null">collab_id</span></span></div>
+    <div class="s"><div class="si">ii</div><div class="st">Onboarding</div><div class="sx">An order attaches. mint_onboarding_block reserves the C and the P-block at once.</div>
+      <span class="sp">post_id <span class="go">&#10003;</span><br>collab_id <span class="go">&#10003;</span><br>nomenclature <span class="go">&#10003;</span></span></div>
+    <div class="s"><div class="si">iii</div><div class="st">Posting</div><div class="sx">The live link, date and final status land. The ids never change again.</div>
+      <span class="sp">post_link &middot; date<br>status &rarr; Posted</span></div>
+    <div class="s"><div class="si">iv</div><div class="st">Continuity</div><div class="sx">The mint reads posts &cup; historic, so a returning legacy creator keeps numbering.</div>
+      <span class="sp">maxP, maxC over<br>both tables</span></div>
+  </div>
+
+  <div class="hr"></div>
+  <div class="eyebrow" style="margin-bottom:7px">Anatomy &mdash; SIF-1007, a creator with historic C1, C2 / P1, P2</div>
+  <div class="anat">
+    <div><div class="id"><span class="s-sif">SIF-1007</span>-<span class="s-p">P3</span></div>
+      <div class="cap"><b>post_id</b> &mdash; one per reel or static post. The P climbs per creator across every collab; here P3 because P1&ndash;P2 already exist. No&nbsp;-C lives here.</div></div>
+    <div><div class="id"><span class="s-sif">SIF-1007</span>-<span class="s-c">C3</span></div>
+      <div class="cap"><b>collab_id</b> &mdash; one per order. C3 because the creator already had C1, C2. The three new deliverables P3/P4/P5 all share collab_id SIF-1007-C3.</div></div>
+  </div>
+
+  <div class="hr"></div>
+  <div class="cols">
+    <p><span class="runin">One SIF, frozen. </span>Every creator holds one id of the form <code>SIF-n</code>, the only global linear counter besides campaigns. It is minted once, at the first reach-out, and never re-issued &mdash; Meta ad-name matching depends on it staying stable.</p>
+    <p><span class="runin">P and C are separate columns. </span>A <code>post_id</code> never contains a&nbsp;-C, and a <code>collab_id</code> never contains a&nbsp;-P. The P counts deliverables; the C counts orders. They share only the SIF root.</p>
+    <p><span class="runin">Per-creator, not global. </span>Both P and C climb within a creator. Every creator has their own P1 and C1; the numbers say nothing about volume across the platform.</p>
+    <p><span class="runin">Historic continuity. </span>The mint takes <code>max(P)</code> and <code>max(C)</code> over <em>posts&nbsp;&cup;&nbsp;historic_posts</em>, so a legacy creator who ended at P50/C5 gets P51 and C6 next &mdash; never a collision with their own past.</p>
+  </div>
+
+  <div class="pull">A reach-out has a contact, not yet a name. Onboarding gives it both an order and an identity, in the same locked breath.</div>
+  <div class="folio"><span>Saadaa CreatorHub &middot; Identity &amp; Naming</span><span>01</span></div>
+</section>
+
+<!-- ════════ 02 · SIF & POST ID ════════ -->
+<section class="page">
+  <div class="shead"><div class="no">02</div><h2>The SIF, the Post&nbsp;id &amp; the creator key</h2>
+    <div class="sub">The creator root, the deliverable number that hangs off it, and the numeric id that survives a handle change.</div></div>
+  <div class="hr thick"></div>
+  <p class="lead" style="margin-bottom:2px">Every other id is built on the SIF. The Post id adds a per-creator deliverable counter; until onboarding stamps it, the row lives only by its database serial; and the <code>profile_id</code> keeps a creator recognisable even when their @handle changes.</p>
+
+  <div class="spec">
+    <div class="n">a</div><div>
+      <div class="h"><span class="ht">Creator SIF id</span><span class="fmt">SIF-{n}</span><span class="tag k">both</span></div>
+      <div class="pe">Each creator gets one unique <code>SIF-n</code> where n is the next integer after the highest <code>sif_number</code> in the registry. Minted at the first reach-out, reused forever, frozen for the life of the creator.</div>
+      <div class="lg"><b>submit_reachout</b>: lock <code>reachout-user:{username}</code> &rarr; if username unknown, <code>n = max(sif_number)+1</code>, insert creator; else reuse inf_id. inf_id = <code>'SIF-'||sif_number</code>.</div>
+      <div class="ex"><span class="tag">SIF-1</span><span class="tag">SIF-7829</span><span class="tag k">frozen &middot; Meta-matched</span></div>
     </div>
-    <div class="panel plain" id="${id}-plain"><p>${esc(r.plain_english)}</p></div>
-    <div class="panel logic" id="${id}-logic" hidden><div class="plabel">Logic / SQL</div><pre>${esc(r.logic)}</pre></div>
-    <div class="lists">
-      <div class="ex"><h4>Examples</h4><ul>${r.examples.map(e=>`<li><code>${esc(e)}</code></li>`).join('')}</ul></div>
-      <div class="edge"><h4>Edge cases &amp; rules</h4><ul>${r.edge_cases.map(e=>`<li>${esc(e)}</li>`).join('')}</ul></div>
+  </div>
+  <div class="spec">
+    <div class="n">b</div><div>
+      <div class="h"><span class="ht">Post id (deliverable)</span><span class="fmt">{sif}-P{post_number}</span><span class="tag k">both</span></div>
+      <div class="pe">One per reel or static post. Combines the SIF and a per-creator post counter. There is <em>no&nbsp;-C suffix</em> &mdash; collab grouping lives in the separate <code>collab_id</code> column. <code>post_id</code> and <code>post_id_short</code> hold the same value today.</div>
+      <div class="lg"><b>mint_onboarding_block</b>: post_id_base = <code>inf_id||'-P'||(maxP+1)</code>; stamped on the row only on the first onboard (parent.post_id was NULL).</div>
+      <div class="ex"><span class="tag">SIF-1-P1</span><span class="tag">SIF-1-P2</span><span class="tag k">NULL until onboarded</span></div>
     </div>
-  </div>`;
-}
+  </div>
+  <div class="spec">
+    <div class="n">c</div><div>
+      <div class="h"><span class="ht">Post number (the &ldquo;P&rdquo;)</span><span class="fmt">integer, per-creator</span><span class="tag k">both</span></div>
+      <div class="pe">The counter inside the P. It climbs per creator across <em>all</em> their collabs and continues over the historic archive &mdash; not global, not per-campaign. Children of a multi-deliverable collab take consecutive numbers.</div>
+      <div class="lg"><b>start = max(post_number) over (posts &cup; historic_posts WHERE inf_id) + 1.</b> Children take start+1, start+2&hellip; with no re-query (that would race the reservation).</div>
+      <div class="ex"><span class="tag">C2 of 3 posts &rarr; P2,P3,P4</span><span class="tag k">stories don&rsquo;t increment P</span></div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">d</div><div>
+      <div class="h"><span class="ht">Reach-out row identity</span><span class="fmt">bigserial id</span><span class="tag k">new</span></div>
+      <div class="pe">A reach-out row has no <code>post_id</code> yet, so it is addressed by the internal <code>posts.id</code> &mdash; rendered &ldquo;Pending&rdquo; on the board. Once onboarded, the post_id is stamped and becomes the external key, while id stays the true primary key.</div>
+      <div class="lg">UNIQUE(post_id) permits <b>many NULLs</b> (NULLs are distinct in Postgres). <code>editReachOut</code> / test-stamping key on id while post_id is NULL.</div>
+      <div class="ex"><span class="tag">id=143, post_id=NULL</span><span class="tag">&rarr; onboard &rarr; SIF-1-P1</span></div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">e</div><div>
+      <div class="h"><span class="ht">profile_id &mdash; identity across handle changes</span><span class="fmt">Instagram numeric id</span><span class="tag k">both</span></div>
+      <div class="pe">The creator&rsquo;s Instagram numeric account id (legacy <code>ig_id</code>), stored on the creator beside the SIF. Handles change; the numeric id does not &mdash; so a returning creator under a new @handle is re-identified by <code>profile_id</code>, keeping the same SIF with no renumber.</div>
+      <div class="lg">Copied from the Meta / historic lookup onto <code>creators.profile_id</code> and <code>historic_posts.profile_id</code>. <b>~95% backfilled</b> on the historic registry; NULL where enrichment failed (~5%).</div>
+      <div class="ex"><span class="tag">8489263759</span><span class="tag k">survives @handle change</span></div>
+    </div>
+  </div>
+  <div class="folio"><span>Saadaa CreatorHub &middot; Identity &amp; Naming</span><span>02</span></div>
+</section>
 
-function renderSections(){
-  const host = document.getElementById('sections');
-  const toc = document.getElementById('toc');
-  let tocHtml = `
-    <a href="#anatomy"><span class="n">#</span>Anatomy of an ID</a>
-    <a href="#lifecycle"><span class="n">↻</span>When IDs are minted</a>`;
-  let html = '';
-  SECTIONS.forEach((s,si)=>{
-    const num = si+1;
-    const sid = `s${num}`;
-    tocHtml += `<a href="#${sid}"><span class="n">${num}</span>${esc(s.heading.replace(/^\d+\.\s*/,''))}</a>`;
-    html += `<section class="block" id="${sid}">
-      <div class="sec-head"><span class="sn">${num}</span><h2>${esc(s.heading.replace(/^\d+\.\s*/,''))}</h2></div>
-      <p class="sec-intro">${esc(s.intro)}</p>
-      ${s.rules.map((r,ri)=>ruleCard(r,`${si}-${ri}`)).join('')}
-      ${num===6 ? newVsHist() : ''}
-    </section>`;
-  });
-  tocHtml += `
-    <a href="#glossary"><span class="n">A</span>Glossary</a>
-    <a href="#discrepancies"><span class="n">!</span>Discrepancies</a>`;
-  host.innerHTML = html;
-  toc.innerHTML = tocHtml;
-}
+<!-- ════════ 03 · COLLAB ID ════════ -->
+<section class="page">
+  <div class="shead"><div class="no">03</div><h2>The Collab id</h2>
+    <div class="sub">One order is one collab. Every deliverable of that order shares a single collab id, minted idempotently from the order number.</div></div>
+  <div class="hr thick"></div>
+  <p class="lead" style="margin-bottom:2px">A collab represents one agreement. Re-submitting the same order reuses the same collab id; a different order mints the next one. The&nbsp;-C suffix lives only here.</p>
 
-function newVsHist(){
-  return `<div class="feature" style="margin-top:8px"><h3>New vs Historic, side by side</h3>
-    <div class="sub">Same grammar, different provenance — welded together by numbering continuity.</div>
-    <table class="cmp"><thead><tr><th>Aspect</th><th class="h-new">New (live posts)</th><th class="h-hist">Historic (archive)</th></tr></thead><tbody>
-    ${NEWVHIST.map(r=>`<tr><td>${esc(r[0])}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('')}
-    </tbody></table></div>`;
-}
+  <div class="spec">
+    <div class="n">a</div><div>
+      <div class="h"><span class="ht">Collab id</span><span class="fmt">{sif}-C{collab_number}</span><span class="tag k">both</span></div>
+      <div class="pe">All deliverables of one order &mdash; a single reel, or three reels plus two posts &mdash; carry the same <code>collab_id</code>. Re-onboarding the same order is idempotent: it reuses the stored id, never minting a duplicate.</div>
+      <div class="lg"><b>mint_onboarding_block</b>: normalize order_id; if it already maps to a collab for this creator, reuse that collab_number; else <code>max(collab_number over posts &cup; historic) + 1</code>. collab_id = <code>inf_id||'-C'||n</code>.</div>
+      <div class="ex"><span class="tag">SIF-1-C1 (order #123)</span><span class="tag">SIF-1-C2 (order #456)</span><span class="tag k">re-onboard #123 &rarr; C1</span></div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">b</div><div>
+      <div class="h"><span class="ht">Collab number (the &ldquo;C&rdquo;)</span><span class="fmt">integer &ge; 1, per-creator</span><span class="tag k">both</span></div>
+      <div class="pe">Which collaboration episode this is for the creator. SIF-1&rsquo;s first order is C1, second C2. A returning legacy creator continues from their historic max, so a first <em>live</em> collab can be C6.</div>
+      <div class="lg">Same derivation as collab_id. CHECK constraint <code>collab_number &ge; 1</code>. Two deliverables sharing one order share one collab_number.</div>
+      <div class="ex"><span class="tag">legacy C1&ndash;C5 &rarr; next C6</span><span class="tag k">same order = same C</span></div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">c</div><div>
+      <div class="h"><span class="ht">Deliverable index &amp; type</span><span class="fmt">index 1,2,3&hellip; &middot; reel | post</span><span class="tag k">new</span></div>
+      <div class="pe">Within a collab, deliverables are ordered: parent = 1, children 2, 3&hellip; The type marks reel vs static post. Grouping is by <code>collab_id</code>; the index is ordering and historic compatibility only.</div>
+      <div class="lg">Parent <code>deliverable_role='single'|'parent'</code>, index 1; children index 2+. <b>Stories are counted but never spawn a typed row</b> &mdash; the parent&rsquo;s stories are set to 0 at onboarding.</div>
+      <div class="ex"><span class="tag">parent reel &rarr; 1</span><span class="tag">child post &rarr; 2</span><span class="tag k">type &isin; {reel, post}</span></div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">d</div><div>
+      <div class="h"><span class="ht">Order-id normalization</span><span class="fmt">lower(btrim(strip&nbsp;#))</span><span class="tag k">both</span></div>
+      <div class="pe">Before deciding whether an order already owns a collab, the order id is canonicalized: a leading <code>#</code> is stripped, whitespace trimmed, the value lowercased. Matching ids map to the same collab.</div>
+      <div class="lg"><code>lower(btrim(regexp_replace(order_id,'^#+','')))</code>. <b>Leading zeros are NOT stripped</b> &mdash; <code>0123</code> &ne; <code>123</code>. An empty order id always mints a fresh collab.</div>
+      <div class="ex"><span class="tag">#123 &rarr; 123</span><span class="tag">&lsquo;&nbsp;ABC&nbsp;&rsquo; &rarr; abc</span></div>
+    </div>
+  </div>
+  <div class="pull">The collab is the order, made nameable. Everything a creator delivers for one order lives under one&nbsp;-C.</div>
+  <div class="folio"><span>Saadaa CreatorHub &middot; Identity &amp; Naming</span><span>03</span></div>
+</section>
 
-function renderGlossary(){
-  document.getElementById('gloss').innerHTML = GLOSSARY.map(g=>
-    `<dl class="gterm" data-term="${esc(g.term.toLowerCase())} ${esc(g.definition.toLowerCase())}"><dt>${esc(g.term)}</dt><dd>${esc(g.definition)}</dd></dl>`
-  ).join('');
-}
+<!-- ════════ 04 · NOMENCLATURE ════════ -->
+<section class="page">
+  <div class="shead"><div class="no">04</div><h2>The nomenclature</h2>
+    <div class="sub">The human-readable audit label, stamped at onboarding. Four dash-joined segments &mdash; and the post id inside it never carries a&nbsp;-C.</div></div>
+  <div class="hr thick"></div>
+  <p class="lead" style="margin-bottom:2px">Nomenclature is the readable name written onto every deliverable when it is onboarded. Reach-out rows have none; re-onboarding preserves an existing value.</p>
 
-function renderWarns(){
-  document.getElementById('warns').innerHTML = WARNS.map(w=>
-    `<div class="warn"><h4>⚠ ${esc(w.title)}</h4><p>${w.body}</p></div>`
-  ).join('');
-}
+  <div class="eyebrow" style="margin:10px 0 2px">The format, read left to right</div>
+  <div class="nom">
+    <span class="seg pid">SIF-15-P42<span class="t">post id &middot; no -C</span></span><span class="seg d">-</span>
+    <span class="seg usr">johndoe<span class="t">username</span></span><span class="seg d">-</span>
+    <span class="seg ct">Reel<span class="t">content type</span></span><span class="seg d">-</span>
+    <span class="seg dt">2026-06-15<span class="t">reach-out date</span></span>
+  </div>
 
-// tab switching (event delegation)
-document.addEventListener('click',e=>{
-  const btn = e.target.closest('.tabs button'); if(!btn) return;
-  const wrap = btn.closest('.tabs'); const base = wrap.dataset.for; const t = btn.dataset.t;
-  wrap.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn));
-  document.getElementById(`${base}-plain`).hidden = (t!=='plain');
-  document.getElementById(`${base}-logic`).hidden = (t!=='logic');
-});
+  <div class="spec">
+    <div class="n">a</div><div>
+      <div class="h"><span class="ht">Format string</span><span class="fmt">{post_id}-{username}-{content_type}-{reach_out_date}</span></div>
+      <div class="pe">Four segments joined by dashes. The first is the deliverable <code>post_id</code> (<code>SIF-N-P{n}</code>, <em>no&nbsp;-C</em>); the&nbsp;-C lives only on the separate collab_id column, never inside the name.</div>
+      <div class="lg"><b>buildLegacyNomenclature</b>(postId, username, contentType, date) &rarr; the four-part string; returns NULL if post_id, username or content_type is missing. Applied to the parent and every child at onboarding.</div>
+      <div class="ex"><span class="tag">SIF-15-P42-johndoe-Reel-2026-06-15</span></div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">b</div><div>
+      <div class="h"><span class="ht">Date segment</span><span class="fmt">YYYY-MM-DD &middot; Asia/Kolkata</span></div>
+      <div class="pe">An ISO calendar date in Indian Standard Time, capturing when <em>outreach</em> happened &mdash; not the onboarding moment. The same reach-out date is reused across a creator&rsquo;s later collabs.</div>
+      <div class="lg"><code>toLocaleDateString('en-CA', {timeZone:'Asia/Kolkata'})</code> &mdash; en-CA yields YYYY-MM-DD. Falls back to today if reach_out_date is absent. No time component.</div>
+      <div class="ex"><span class="tag">2026-06-15</span><span class="tag k">reach-out date, reused</span></div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">c</div><div>
+      <div class="h"><span class="ht">Username &amp; content-type segments</span><span class="fmt">lowercase handle &middot; free-text code</span></div>
+      <div class="pe">The username is the Instagram handle without the @, lowercased and frozen once the row leaves Reach Out. The content type is an operator-entered label (UGC, Reels, VRP, IFADs&hellip;) with no fixed enum &mdash; the allowed set is whatever already exists in the data.</div>
+      <div class="lg">Username extracted via <code>instagram.com/@?([A-Za-z0-9._]+)</code> then lowercased. Content type editable only while in Reach Out (decision D7), which rebuilds the nomenclature.</div>
+      <div class="ex"><span class="tag">johndoe</span><span class="tag">UGC</span><span class="tag">VRP</span><span class="tag">IFADs</span></div>
+    </div>
+  </div>
+  <div class="pull" style="font-size:16px">A name is built only once the post id exists. So the name, like the id, is a thing of onboarding &mdash; never of reach-out.</div>
+  <div class="folio"><span>Saadaa CreatorHub &middot; Identity &amp; Naming</span><span>04</span></div>
+</section>
 
-// glossary filter
-document.addEventListener('input',e=>{
-  if(e.target.id!=='gsearch') return;
-  const q = e.target.value.trim().toLowerCase();
-  document.querySelectorAll('#gloss .gterm').forEach(el=>{
-    el.hidden = q && !el.dataset.term.includes(q);
-  });
-});
+<!-- ════════ 05 · NEW VS HISTORIC ════════ -->
+<section class="page">
+  <div class="shead"><div class="no">05</div><h2>New &amp; Historic</h2>
+    <div class="sub">Same grammar, different provenance. The two are welded by deliberate numbering continuity.</div></div>
+  <div class="hr thick"></div>
+  <p class="lead" style="margin-bottom:6px">Live ids are minted transactionally at runtime; historic ids were generated once, by SQL window functions, when the legacy sheet was migrated into <code>historic_posts</code>. The read grammar is identical; only the write provenance differs.</p>
 
-// scrollspy
-function spy(){
-  const links = [...document.querySelectorAll('#toc a')];
-  const map = links.map(a=>({a, el:document.querySelector(a.getAttribute('href'))})).filter(x=>x.el);
-  const obs = new IntersectionObserver(ents=>{
-    ents.forEach(en=>{
-      if(en.isIntersecting){
-        links.forEach(l=>l.classList.remove('active'));
-        const m = map.find(x=>x.el===en.target); if(m) m.a.classList.add('active');
-      }
-    });
-  },{rootMargin:'-10% 0px -80% 0px',threshold:0});
-  map.forEach(x=>obs.observe(x.el));
-}
+  <table class="cmp">
+    <thead><tr><th>Aspect</th><th class="n">New &mdash; live posts</th><th class="h">Historic &mdash; archive</th></tr></thead>
+    <tbody>
+      <tr><td>How minted</td><td class="col-n">Runtime, under advisory locks</td><td class="col-h">Once, by window functions at migration</td></tr>
+      <tr><td>SIF id</td><td class="col-n">At reach-out (submit_reachout)</td><td class="col-h">Frozen from the original legacy sheet</td></tr>
+      <tr><td>P &amp; C minted</td><td class="col-n">At onboarding (mint_onboarding_block)</td><td class="col-h"><code>ROW_NUMBER()</code> / <code>DENSE_RANK()</code></td></tr>
+      <tr><td>post_number</td><td class="col-n">Per-creator; continues over union</td><td class="col-h"><code>ROW_NUMBER() PARTITION BY username</code></td></tr>
+      <tr><td>collab_number</td><td class="col-n">Reuse-on-order else max+1</td><td class="col-h"><code>DENSE_RANK()</code> over distinct order_id</td></tr>
+      <tr><td>Reach-out rows</td><td class="col-n">NULL post_id &mdash; keyed by bigserial id</td><td class="col-h">Carry a migrated post_number; NULL collab</td></tr>
+      <tr><td>workflow_status</td><td class="col-n">Full 12-value lifecycle</td><td class="col-h">Posted / On Board / Reach Out only</td></tr>
+      <tr><td>Archive columns</td><td class="col-n">&mdash;</td><td class="col-h">source_cleaned_id, profile_id, legacy_post_id</td></tr>
+      <tr><td>creator_type</td><td class="col-n">new_creator</td><td class="col-h">historic_creator</td></tr>
+    </tbody>
+  </table>
 
-renderSections(); renderGlossary(); renderWarns(); spy();
-</script>
+  <div class="pull" style="font-size:15.5px; margin:13px 0">The mint reads both tables. A returning legacy creator who ended at P50&thinsp;/&thinsp;C5 gets P51 and C6 next &mdash; the archive and the live system share one continuous count.</div>
+
+  <div class="twohead">
+    <div>
+      <h3>Historic derivation</h3>
+      <p style="font-size:9.8px; color:var(--ink-2); line-height:1.48">post_id = <code>SIF-{sif}-P{ROW_NUMBER() PARTITION BY username}</code>. collab_number = <code>DENSE_RANK()</code> over distinct order_id (NULL for reach-out rows). deliverable_index = row number within the collab. Status derived purely from <code>post_link</code> / <code>order_id</code> presence. Every archive row keeps a <code>source_cleaned_id</code> back to its <code>cleaned_data</code> source, plus its <code>profile_id</code> and original <code>legacy_post_id</code>.</p>
+    </div>
+    <div>
+      <h3>The dedup boundary</h3>
+      <p style="font-size:9.8px; color:var(--ink-2); line-height:1.48">One real profile = one canonical SIF. Where a creator appeared under several SIFs, the loser&rsquo;s sif_id was renamed <code>SIF_ERROR</code> and kept in <code>cleaned_data</code> for audit only. The clean archive is <b>11,252</b> of the <b>13,430</b> cleaned rows; the <b>2,178</b> SIF_ERROR markers are never promoted into <code>historic_posts</code>.</p>
+    </div>
+  </div>
+
+  <div class="hr"></div>
+  <div class="note">
+    <div class="b">&#167;</div><div>
+      <div class="nt">Campaign id &mdash; a separate global counter</div>
+      <div class="nx">Campaigns have their own namespace: <code>IFC{NNN}</code>, zero-padded to three digits from <code>MAX(campaign_num)+1</code>, advisory-lock serialized, never reset by period. The first campaign is <b>IFC001</b>.</div>
+    </div>
+  </div>
+  <div class="folio"><span>Saadaa CreatorHub &middot; Identity &amp; Naming</span><span>05</span></div>
+</section>
+
+<!-- ════════ 06 · INVARIANTS & GAPS ════════ -->
+<section class="page">
+  <div class="shead"><div class="no">06</div><h2>Invariants &amp; open edges</h2>
+    <div class="sub">The rules that keep id generation race-free and consistent &mdash; and an honest list of what is not yet clean.</div></div>
+  <div class="hr thick"></div>
+
+  <div class="eyebrow" style="margin-bottom:5px">Invariants &mdash; always true</div>
+  <div class="spec">
+    <div class="n">a</div><div>
+      <div class="h"><span class="ht">Advisory-lock concurrency</span></div>
+      <div class="pe">Reach-out locks on the username (<code>reachout-user:{username}</code>) so two simultaneous submits can&rsquo;t create duplicate creators. Onboarding locks on the creator (<code>reachout-inf:{inf_id}</code>) inside <code>mint_onboarding_block</code> so the P-block and C reservation are atomic. Locks release at transaction end; rollback releases before any dependent read.</div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">b</div><div>
+      <div class="h"><span class="ht">Barter = zero, and equal split</span></div>
+      <div class="pe">When <code>collab_type='Barter'</code>, <code>commercial_amount</code> is forced to 0 at both the database and app layers. Otherwise the agreed total is split equally across all deliverables, so the sum across a collab reconstructs the original agreed amount.</div>
+    </div>
+  </div>
+  <div class="spec">
+    <div class="n">c</div><div>
+      <div class="h"><span class="ht">Re-onboard idempotency</span></div>
+      <div class="pe">Re-onboarding an already-minted row never re-mints. The guard is <code>isFirstOnboard = parent.post_id IS NULL</code>; when false, the stored post_id, post_number, collab id and nomenclature are all preserved, and children are not re-spawned.</div>
+    </div>
+  </div>
+
+  <div class="eyebrow" style="margin:13px 0 5px; color:var(--terra)">Open edges &mdash; flagged for reconciliation</div>
+  <div class="note"><div class="b">!</div><div>
+    <div class="nt">Tier boundary: 300K vs 500K</div>
+    <div class="nx">The campaign form labels <em>Mid tier</em> as 50K&ndash;500K, but runtime <code>tierFromFollowers</code> uses a &lt;300K cutoff. A 400K creator is Mid tier by the form yet Macro by the generated <code>category</code> column. Pick one boundary.</div></div></div>
+  <div class="note"><div class="b">!</div><div>
+    <div class="nt">collab_type: is bare &lsquo;Paid&rsquo; legal?</div>
+    <div class="nx">Production allows only <b>Barter</b> and <b>Barter&nbsp;+&nbsp;Paid</b>. The campaign form still shows a <code>Paid</code> option, most likely a legacy mislabel of Barter&nbsp;+&nbsp;Paid. Reconcile the two schemas.</div></div></div>
+  <div class="note"><div class="b">!</div><div>
+    <div class="nt">post_id_short duplicates post_id</div>
+    <div class="nx">Both columns hold the identical value today &mdash; a remnant of the pre-2026-06-06 model where post_id carried a&nbsp;-C suffix. Treat post_id_short as redundant; never rely on a difference.</div></div></div>
+  <div class="note"><div class="b">!</div><div>
+    <div class="nt">Transient: 164 Posted-but-no-order historic rows</div>
+    <div class="nx">164 historic Posted rows have a real Instagram link but NULL order_id &rarr; NULL collab. The team is backfilling order ids; once done these gain proper collab ids and the anomaly clears. As of 2026-06-25, treat their collab fields as pending.</div></div></div>
+
+  <div class="colophon">Saadaa CreatorHub &middot; Field Manual &#8470; 02 &middot; Identity &amp; Naming &middot; v2 &middot; 2026-06-25</div>
+  <div class="folio"><span>Saadaa CreatorHub &middot; Identity &amp; Naming</span><span>06</span></div>
+</section>
+
 </body>
 </html>
