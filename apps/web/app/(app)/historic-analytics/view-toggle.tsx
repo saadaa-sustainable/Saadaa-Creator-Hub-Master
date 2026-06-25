@@ -3,16 +3,23 @@
 import { useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { BarChart3, Filter } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type HistoricView = "overview" | "funnel";
 
+const HISTORIC_VIEWS: { id: HistoricView; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "funnel", label: "Funnel" },
+];
+
 /**
  * Overview / Funnel sub-tab for the Historic Analytics page. Writes the active
  * view to the `?view=` URL param (linkable + server-rendered) while preserving
- * every other param (the archive filters). Reuses the shared `.ob-viewtoggle`
- * pill chrome so it matches the rest of the app.
+ * every other param (the archive filters).
+ *
+ * Chrome matches the main Dashboard tab rail (`.dash-tabbar` trough +
+ * `.dash-tab-pill` pills, dark active fill) rather than the cramped legacy
+ * `.ob-viewtoggle`, so the two analytics surfaces read identically.
  */
 export function HistoricViewToggle({ active }: { active: HistoricView }) {
   const pathname = usePathname();
@@ -30,27 +37,35 @@ export function HistoricViewToggle({ active }: { active: HistoricView }) {
   );
 
   return (
-    <div className="ob-viewtoggle" role="tablist" aria-label="Historic view">
-      <Link
-        href={hrefFor("overview") as never}
-        scroll={false}
-        role="tab"
-        aria-selected={active === "overview"}
-        className={cn(active === "overview" && "active")}
-      >
-        <Filter size={12} aria-hidden />
-        Overview
-      </Link>
-      <Link
-        href={hrefFor("funnel") as never}
-        scroll={false}
-        role="tab"
-        aria-selected={active === "funnel"}
-        className={cn(active === "funnel" && "active")}
-      >
-        <BarChart3 size={12} aria-hidden />
-        Funnel
-      </Link>
+    <div
+      role="tablist"
+      aria-label="Historic view"
+      className="dash-tabbar flex items-center gap-1 overflow-x-auto"
+      style={{ scrollbarWidth: "thin" }}
+    >
+      {HISTORIC_VIEWS.map(({ id, label }) => {
+        const isActive = active === id;
+        return (
+          <Link
+            key={id}
+            href={hrefFor(id) as never}
+            scroll={false}
+            role="tab"
+            aria-selected={isActive}
+            data-active={isActive ? "true" : undefined}
+            className={cn(
+              "dash-tab-pill inline-flex items-center justify-center shrink-0",
+              "whitespace-nowrap rounded-[7px]",
+              "px-3 py-1.5 text-[0.74rem] font-semibold transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2",
+              "focus-visible:ring-accent/60",
+              !isActive && "text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {label}
+          </Link>
+        );
+      })}
     </div>
   );
 }

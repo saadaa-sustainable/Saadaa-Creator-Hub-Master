@@ -5815,6 +5815,18 @@
     font-size: 0.72rem;
     color: var(--color-text-tertiary);
   }
+  /* Discoverability cue for the interactive header avatar — clicking the photo
+     opens the in-app creator overview (replaces the old broken View Profile
+     link). Two-class selector to win over `.ob-overview-head span`. */
+  .ob-overview-head .ob-overview-profile-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 2px;
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: #2b5bb5;
+  }
   .ob-overview-pills {
     display: flex;
     flex-wrap: wrap;

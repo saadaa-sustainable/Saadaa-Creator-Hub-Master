@@ -8,7 +8,6 @@ import {
   Inbox,
   List as ListIcon,
   Sparkles,
-  UserRound,
   X,
 } from "lucide-react";
 import { DataTable } from "@/components/data-table/data-table";
@@ -367,28 +366,14 @@ function CreatorHistoryModal({
             <h2 className="font-semibold">Collab History</h2>
             <span className="chip text-[10px] tabular">{row.inf_id}</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            {row.username && (
-              <a
-                href={`/creators/${encodeURIComponent(row.username)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="action-btn action-btn--view"
-                aria-label={`View profile for ${row.inf_name ?? row.username}`}
-              >
-                <UserRound size={11} aria-hidden />
-                View Profile
-              </a>
-            )}
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <X size={14} aria-hidden />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
         </header>
 
         <div className="modal-body ob-overview-body">
@@ -399,10 +384,25 @@ function CreatorHistoryModal({
                 username={row.username}
                 name={row.inf_name}
                 size={48}
+                interactive={false}
               />
               <div className="ob-overview-identity">
                 <strong>{row.inf_name ?? (row.username || "—")}</strong>
                 <span>@{row.username || "—"}</span>
+                {row.username && (
+                  <a
+                    href={
+                      row.instagram_link ||
+                      `https://www.instagram.com/${row.username}/`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 mt-0.5 text-[11px] font-semibold text-[#3B6FD4] hover:underline"
+                  >
+                    <ExternalLink size={11} aria-hidden />
+                    View Profile
+                  </a>
+                )}
               </div>
               <CreatorTypeChip type={row.creator_type} />
             </div>
