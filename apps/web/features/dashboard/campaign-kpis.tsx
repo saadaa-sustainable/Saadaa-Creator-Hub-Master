@@ -12,12 +12,15 @@ const TONE = {
 
 export function DashboardCampaignKpis({
   campaign,
+  archival = false,
 }: {
   campaign: DashboardData["campaign"];
+  /** Hide the spend-derived "Total Spend" card for archive-only views. */
+  archival?: boolean;
 }) {
   return (
     <section>
-      <div className="acc-kpi-group">Campaign & Spend</div>
+      <div className="acc-kpi-group">{archival ? "Campaign" : "Campaign & Spend"}</div>
       <div className="acc-kpi-grid">
         <div className={cn("acc-kpi", TONE.pink)}>
           <div className="acc-kpi__head">
@@ -39,16 +42,18 @@ export function DashboardCampaignKpis({
           <div className="acc-kpi__primary tabular">{campaign.activeCampaigns}</div>
           <div className="acc-kpi__secondary tabular">In current window</div>
         </div>
-        <div className={cn("acc-kpi", TONE.success)}>
-          <div className="acc-kpi__head">
-            <span className="acc-kpi__icon" aria-hidden>
-              <Banknote size={16} />
-            </span>
-            <span className="acc-kpi__label">Total Spend</span>
+        {!archival && (
+          <div className={cn("acc-kpi", TONE.success)}>
+            <div className="acc-kpi__head">
+              <span className="acc-kpi__icon" aria-hidden>
+                <Banknote size={16} />
+              </span>
+              <span className="acc-kpi__label">Total Spend</span>
+            </div>
+            <div className="acc-kpi__primary tabular">{formatRupees(campaign.totalSpend)}</div>
+            <div className="acc-kpi__secondary tabular">Commercial amount</div>
           </div>
-          <div className="acc-kpi__primary tabular">{formatRupees(campaign.totalSpend)}</div>
-          <div className="acc-kpi__secondary tabular">Commercial amount</div>
-        </div>
+        )}
         <div className={cn("acc-kpi", TONE.muted)}>
           <div className="acc-kpi__head">
             <span className="acc-kpi__icon" aria-hidden>

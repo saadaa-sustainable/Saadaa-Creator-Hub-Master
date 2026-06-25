@@ -18,8 +18,18 @@ import type { DashboardData } from "./types";
  * three labelled bands using the shared `.acc-kpi` chrome so it matches every
  * other stage strip. Rendered above the full bento command-centre in the
  * Overview tab body.
+ *
+ * `archival` (default false) drops the spend-derived "Total Spend" card so the
+ * archive-only Historic Analytics page can hide spend. The live dashboard never
+ * passes it, so its layout is unchanged.
  */
-export function DashboardOverviewStrip({ data }: { data: DashboardData }) {
+export function DashboardOverviewStrip({
+  data,
+  archival = false,
+}: {
+  data: DashboardData;
+  archival?: boolean;
+}) {
   const { pipeline, campaign } = data;
   const totalPipeline =
     pipeline.reachOut + pipeline.onboarded + pipeline.posted;
@@ -52,13 +62,15 @@ export function DashboardOverviewStrip({ data }: { data: DashboardData }) {
             primary={String(totalPipeline)}
             secondary="Across all stages"
           />
-          <KpiCard
-            tone="warning"
-            icon={<Wallet size={16} aria-hidden />}
-            label="Total Spend"
-            primary={formatRupees(campaign.totalSpend)}
-            secondary="Σ commercial amount"
-          />
+          {!archival && (
+            <KpiCard
+              tone="warning"
+              icon={<Wallet size={16} aria-hidden />}
+              label="Total Spend"
+              primary={formatRupees(campaign.totalSpend)}
+              secondary="Σ commercial amount"
+            />
+          )}
         </div>
       </div>
 

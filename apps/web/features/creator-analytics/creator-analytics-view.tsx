@@ -2,11 +2,13 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
+  ExternalLink,
   Grid3X3,
   History,
   Inbox,
   List as ListIcon,
   Sparkles,
+  UserRound,
   X,
 } from "lucide-react";
 import { DataTable } from "@/components/data-table/data-table";
@@ -365,14 +367,28 @@ function CreatorHistoryModal({
             <h2 className="font-semibold">Collab History</h2>
             <span className="chip text-[10px] tabular">{row.inf_id}</span>
           </div>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={14} aria-hidden />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {row.username && (
+              <a
+                href={`/creators/${encodeURIComponent(row.username)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="action-btn action-btn--view"
+                aria-label={`View profile for ${row.inf_name ?? row.username}`}
+              >
+                <UserRound size={11} aria-hidden />
+                View Profile
+              </a>
+            )}
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X size={14} aria-hidden />
+            </button>
+          </div>
         </header>
 
         <div className="modal-body ob-overview-body">
@@ -470,6 +486,7 @@ function CreatorHistoryModal({
 }
 
 function CollabRow({ c }: { c: CreatorCollab }) {
+  const hasLink = !!c.postLink && /^https?:\/\//i.test(c.postLink.trim());
   return (
     <li className="flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-bg-surface px-2.5 py-1.5">
       <span className="post-id tabular">{c.collabId}</span>
@@ -492,6 +509,19 @@ function CollabRow({ c }: { c: CreatorCollab }) {
           <Sparkles size={9} aria-hidden />
           Live
         </span>
+      )}
+      {hasLink && (
+        <a
+          href={c.postLink!.trim()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="action-btn action-btn--view ml-auto"
+          aria-label={`Open Instagram post for ${c.collabId}`}
+          title="Open Instagram post"
+        >
+          <ExternalLink size={11} aria-hidden />
+          Post
+        </a>
       )}
     </li>
   );

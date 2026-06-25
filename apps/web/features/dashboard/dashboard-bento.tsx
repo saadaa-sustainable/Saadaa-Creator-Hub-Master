@@ -31,8 +31,20 @@ import type { DashboardData } from "./types";
  *   Row J  | Campaign & Spend KPIs (full row, 4 equal)
  *
  * Mobile (< lg): single column.
+ *
+ * `archival` (default false) is for the archive-only Historic Analytics page:
+ * it drops every spend-derived widget (Spotlight Spend, Spend per Campaign) and
+ * threads the flag into the Campaign KPIs so its Total Spend card is hidden too.
+ * The Hero then spans the full top row in place of the removed spotlight. The
+ * live dashboard never passes it, so its bento is byte-for-byte unchanged.
  */
-export function DashboardBento({ data }: { data: DashboardData }) {
+export function DashboardBento({
+  data,
+  archival = false,
+}: {
+  data: DashboardData;
+  archival?: boolean;
+}) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mt-1">
       {/* Row 0 — per-campaign focus (only when a single campaign is filtered) */}
@@ -42,8 +54,8 @@ export function DashboardBento({ data }: { data: DashboardData }) {
         </div>
       )}
 
-      {/* Row A */}
-      <div className="lg:col-span-8">
+      {/* Row A — Hero spans full width in archival mode (no spend spotlight). */}
+      <div className={archival ? "lg:col-span-12" : "lg:col-span-8"}>
         <DashboardHero
           totalReachOut={data.pipeline.reachOut}
           totalPosted={data.pipeline.posted}
@@ -51,12 +63,14 @@ export function DashboardBento({ data }: { data: DashboardData }) {
           postRatePct={data.pipeline.postRatePct}
         />
       </div>
-      <div className="lg:col-span-4">
-        <DashboardSpotlight
-          totalSpend={data.spotlight.totalSpend}
-          spendSpark={data.spotlight.spendSpark}
-        />
-      </div>
+      {!archival && (
+        <div className="lg:col-span-4">
+          <DashboardSpotlight
+            totalSpend={data.spotlight.totalSpend}
+            spendSpark={data.spotlight.spendSpark}
+          />
+        </div>
+      )}
 
       {/* Row B — Today's Pulse */}
       <div className="lg:col-span-12">
@@ -128,14 +142,16 @@ export function DashboardBento({ data }: { data: DashboardData }) {
         <DashboardTeamLeaderboard team={data.teamLeaderboard} />
       </div>
 
-      {/* Row I */}
-      <div className="lg:col-span-12">
-        <DashboardSpendsPerCampaign data={data.spendsPerCampaign} />
-      </div>
+      {/* Row I — spend widget, hidden in archival mode. */}
+      {!archival && (
+        <div className="lg:col-span-12">
+          <DashboardSpendsPerCampaign data={data.spendsPerCampaign} />
+        </div>
+      )}
 
       {/* Row J */}
       <div className="lg:col-span-12">
-        <DashboardCampaignKpis campaign={data.campaign} />
+        <DashboardCampaignKpis campaign={data.campaign} archival={archival} />
       </div>
     </div>
   );

@@ -89,11 +89,18 @@ function statusKey(value: unknown): string {
     .toLowerCase();
 }
 
-export async function fetchFunnelData(): Promise<FunnelData> {
+/**
+ * @param tableName  Posts corpus to read. Defaults to the live `posts` table so
+ *                   the Funnel tab is unchanged. Historic Analytics passes
+ *                   `historic_posts_dash` to funnel the migrated archive.
+ */
+export async function fetchFunnelData(
+  tableName = "posts",
+): Promise<FunnelData> {
   const supabase = createServiceClient();
 
   const { data, error } = await (supabase as any)
-    .from("posts")
+    .from(tableName)
     .select(POSTS_SELECT)
     .limit(10_000);
 

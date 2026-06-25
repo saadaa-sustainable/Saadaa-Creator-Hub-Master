@@ -13,6 +13,9 @@ import {
   fetchDashboardFilterOptions,
 } from "@/features/dashboard/queries";
 import type { DashboardFilters } from "@/features/dashboard/types";
+import { fetchFunnelData } from "@/features/funnel/queries";
+import { FunnelBody } from "@/features/funnel/page-client";
+import { HistoricViewToggle } from "./view-toggle";
 
 export const metadata = { title: "Historic Analytics" };
 
@@ -22,6 +25,10 @@ export const metadata = { title: "Historic Analytics" };
  * bento) but points every posts-driven query at the migrated archive via the
  * `historic_posts_dash` view (the `tableName` arg on the dashboard fetches).
  * Creators + campaigns still resolve from the live tables. Read-only.
+ *
+ * Spend is hidden everywhere here (`archival`) — the archive has no reliable
+ * commercial amounts — and the funnel is offered as a `?view=funnel` sub-tab,
+ * fed by `fetchFunnelData("historic_posts_dash")`.
  */
 const HISTORIC_TABLE = "historic_posts_dash";
 
@@ -35,6 +42,7 @@ export default async function HistoricAnalyticsPage({
   if (!actor || !hasPermission(actor, "performance_view")) redirect("/dashboard");
 
   const sp = await searchParams;
+  const view = sp.view === "funnel" ? "funnel" : "overview";
   const filters: DashboardFilters = {
     campaign: sp.campaign,
     status: sp.status,
@@ -52,12 +60,23 @@ export default async function HistoricAnalyticsPage({
         knowMore="historic-analytics"
       />
 
-      <Suspense
-        key={JSON.stringify(filters)}
-        fallback={<StageSkeleton kind="board" kpiCount={4} />}
-      >
-        <HistoricAnalyticsBody filters={filters} />
-      </Suspense>
+      <HistoricViewToggle active={view} />
+
+      {view === "funnel" ? (
+        <Suspense
+          key="funnel"
+          fallback={<StageSkeleton kind="board" kpiCount={9} />}
+        >
+          <HistoricFunnelBody />
+        </Suspense>
+      ) : (
+        <Suspense
+          key={JSON.stringify(filters)}
+          fallback={<StageSkeleton kind="board" kpiCount={4} />}
+        >
+          <HistoricAnalyticsBody filters={filters} />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -74,8 +93,19 @@ async function HistoricAnalyticsBody({
   return (
     <>
       <DashboardFiltersBar initial={filters} options={options} />
-      <DashboardOverviewStrip data={data} />
-      <DashboardBento data={data} />
+      <DashboardOverviewStrip data={data} archival />
+      <DashboardBento data={data} archival />
     </>
+  );
+}
+
+async function HistoricFunnelBody() {
+  const data = await fetchFunnelData(HISTORIC_TABLE);
+  // Mirrors /funnel below its header: the same funnel-stage wrapper holding the
+  // full FunnelBody, but fed by the migrated archive corpus.
+  return (
+    <div className="onboarding-stage funnel-stage">
+      <FunnelBody data={data} />
+    </div>
   );
 }

@@ -11,6 +11,8 @@ export interface CreatorCollab {
   contentType: string | null;
   postDate: string | null;
   paymentStatus: string | null;
+  /** Instagram post URL for this collab, when one was captured. */
+  postLink: string | null;
   /** Which corpus this collab came from. */
   source: "live" | "historic";
 }
@@ -27,7 +29,7 @@ export interface CreatorAnalyticsRow {
   profile_pic: string | null;
   /** `historic_creator` | `new_creator` (creators.creator_type). */
   creator_type: string | null;
-  /** Most-recent workflow_status across the creator's live posts. */
+  /** Most-recent workflow_status across the creator's live ∪ historic posts. */
   current_stage: string | null;
   live_collab_count: number;
   historic_collab_count: number;

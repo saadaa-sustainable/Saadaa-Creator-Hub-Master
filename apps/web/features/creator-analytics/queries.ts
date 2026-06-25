@@ -19,8 +19,11 @@ import type {
  *   - live collab count  = distinct collab_id (coalesced to inf_id||'-C'||
  *                          collab_number for legacy rows) across live posts.
  *   - deliverables       = Σ (reels + static_posts + stories) over live posts.
- *   - current_stage      = workflow_status of the creator's MOST-RECENT live
- *                          post (by post_date → onboard_date → reach_out_date).
+ *   - current_stage      = workflow_status of the creator's MOST-RECENT post
+ *                          across live ∪ historic (by post_date → onboard_date
+ *                          → reach_out_date); strictly later date wins, ties go
+ *                          to live. Historic-only creators show their historic
+ *                          stage instead of "—".
  *   - historic collab    = distinct collab_id (same coalesce) across
  *                          historic_posts.
  *   - collab history list = posts ∪ historic_posts, newest first.
@@ -121,13 +124,13 @@ export async function fetchCreatorAnalytics(
     (supabase as any)
       .from("posts")
       .select(
-        "inf_id, collab_id, collab_number, post_id, post_id_short, workflow_status, content_type, collab_type, payment_status, reels, static_posts, stories, reach_out_date, onboard_date, post_date",
+        "inf_id, collab_id, collab_number, post_id, post_id_short, workflow_status, content_type, collab_type, payment_status, reels, static_posts, stories, reach_out_date, onboard_date, post_date, post_link",
       )
       .limit(FETCH_LIMIT),
     (supabase as any)
       .from("historic_posts")
       .select(
-        "inf_id, collab_id, collab_number, post_id, post_id_short, workflow_status, content_type, collab_type, payment_status, reach_out_date, onboard_date, post_date",
+        "inf_id, collab_id, collab_number, post_id, post_id_short, workflow_status, content_type, collab_type, payment_status, reach_out_date, onboard_date, post_date, post_link",
       )
       .limit(FETCH_LIMIT),
   ]);
@@ -177,13 +180,15 @@ export async function fetchCreatorAnalytics(
         contentType: (p.content_type as string | null) ?? null,
         postDate: dateOf(p, "post_date", "onboard_date", "reach_out_date"),
         paymentStatus: (p.payment_status as string | null) ?? null,
+        postLink: (p.post_link as string | null) ?? null,
         source: "live",
       });
     }
   }
 
-  // Historic aggregation (no deliverable split in legacy → deliverables stay 0,
-  // and historic rows never set the live current stage).
+  // Historic aggregation (no deliverable split in legacy → deliverables stay 0).
+  // Historic rows ALSO drive current_stage via the same date-compared logic, so
+  // a historic-only creator surfaces their historic stage instead of "—".
   const histAgg = new Map<string, Agg>();
   for (const p of historicPosts) {
     const inf = String(p.inf_id ?? "").trim();
@@ -201,12 +206,20 @@ export async function fetchCreatorAnalytics(
     agg.lastPost = maxDate(agg.lastPost, dateOf(p, "post_date"));
     const ct = String(p.collab_type ?? "").trim();
     if (ct) agg.collabTypes[ct] = (agg.collabTypes[ct] ?? 0) + 1;
+    // Most-recent historic row drives the historic stage (same sort-date rule).
+    const sortDate =
+      dateOf(p, "post_date", "onboard_date", "reach_out_date") ?? "";
+    if (agg.currentStageDate == null || sortDate >= agg.currentStageDate) {
+      agg.currentStageDate = sortDate;
+      agg.currentStage = (p.workflow_status as string | null) ?? null;
+    }
     if (hasCollab(p)) {
       agg.collabs.push({
         collabId: collabLabel(p),
         contentType: (p.content_type as string | null) ?? null,
         postDate: dateOf(p, "post_date", "onboard_date", "reach_out_date"),
         paymentStatus: (p.payment_status as string | null) ?? null,
+        postLink: (p.post_link as string | null) ?? null,
         source: "historic",
       });
     }
@@ -233,6 +246,20 @@ export async function fetchCreatorAnalytics(
       (a, b) => String(b.postDate ?? "").localeCompare(String(a.postDate ?? "")),
     );
 
+    // Current stage = most-recent stage across live ∪ historic by sort date.
+    // The strictly later-dated source wins; ties (and live-only / historic-only
+    // creators) resolve to live, the newer system. So a live re-reach-out beats
+    // an older historic post, while a historic-only creator still surfaces its
+    // historic stage instead of "—".
+    const liveStageDate = live?.currentStageDate ?? null;
+    const histStageDate = hist?.currentStageDate ?? null;
+    const historicWins =
+      histStageDate != null &&
+      (liveStageDate == null || histStageDate > liveStageDate);
+    const currentStage = historicWins
+      ? (hist?.currentStage ?? null)
+      : (live?.currentStage ?? hist?.currentStage ?? null);
+
     return {
       inf_id: inf,
       username: String(c.username ?? ""),
@@ -241,7 +268,7 @@ export async function fetchCreatorAnalytics(
       category: (c.category as string | null) ?? null,
       profile_pic: (c.profile_pic as string | null) ?? null,
       creator_type: (c.creator_type as string | null) ?? null,
-      current_stage: live?.currentStage ?? null,
+      current_stage: currentStage,
       live_collab_count: liveCount,
       historic_collab_count: histCount,
       total_collab_count: liveCount + histCount,
