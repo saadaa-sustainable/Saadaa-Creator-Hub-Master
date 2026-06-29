@@ -35,8 +35,9 @@ import type { DashboardData } from "./types";
  * `archival` (default false) is for the archive-only Historic Analytics page:
  * it drops every spend-derived widget (Spotlight Spend, Spend per Campaign),
  * threads the flag into the Campaign KPIs so its Total Spend card is hidden too,
- * and removes the live-only framing rows — the Hero insight headline (Row A) and
- * Today's Pulse (Row B) — so the archive opens straight on the Stage Snapshot.
+ * and removes the live-only operational rows — the Hero insight headline (Row A),
+ * Today's Pulse (Row B) and the Stage Snapshot kanban (Row C, "where every collab
+ * is stuck") — so the archive opens straight on the trend/breakdown widgets.
  * The live dashboard never passes it, so its bento is byte-for-byte unchanged.
  */
 export function DashboardBento({
@@ -85,10 +86,17 @@ export function DashboardBento({
         </div>
       )}
 
-      {/* Row C — Stage Snapshot (managerial mini-kanban) */}
-      <div className="lg:col-span-12">
-        <DashboardStageBoard board={data.stageBoard} counts={data.stageCounts} />
-      </div>
+      {/* Row C — Stage Snapshot (managerial mini-kanban). Live-only: "where every
+          collab is stuck" is an operational view of the active pipeline, not the
+          frozen archive. */}
+      {!archival && (
+        <div className="lg:col-span-12">
+          <DashboardStageBoard
+            board={data.stageBoard}
+            counts={data.stageCounts}
+          />
+        </div>
+      )}
 
       {/* Row D */}
       <div className="lg:col-span-8">

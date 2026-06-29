@@ -251,8 +251,8 @@
     <div class="n">a</div><div>
       <div class="h"><span class="ht">Collab id</span><span class="fmt">{sif}-C{collab_number}</span><span class="tag k">both</span></div>
       <div class="pe">All deliverables of one order &mdash; a single reel, or three reels plus two posts &mdash; carry the same <code>collab_id</code>. Re-onboarding the same order is idempotent: it reuses the stored id, never minting a duplicate.</div>
-      <div class="lg"><b>mint_onboarding_block</b>: normalize order_id; if it already maps to a collab for this creator, reuse that collab_number; else <code>max(collab_number over posts &cup; historic) + 1</code>. collab_id = <code>inf_id||'-C'||n</code>.</div>
-      <div class="ex"><span class="tag">SIF-1-C1 (order #123)</span><span class="tag">SIF-1-C2 (order #456)</span><span class="tag k">re-onboard #123 &rarr; C1</span></div>
+      <div class="lg"><b>mint_onboarding_block</b>: normalize order_id; if it already maps to a collab for this creator, reuse that collab_number; else <code>max(collab_number over posts &cup; historic) + 1</code>. collab_id = <code>inf_id||'-C'||n</code>. <b>Exception &mdash; reach-out-only historic creator:</b> one whose archive holds <em>only</em> a reach-out (no prior collab) starts at <b>C2</b>; that legacy reach-out batch counts as the implicit C1. Brand-new creators still start at C1.</div>
+      <div class="ex"><span class="tag">SIF-1-C1 (order #123)</span><span class="tag">SIF-1-C2 (order #456)</span><span class="tag k">re-onboard #123 &rarr; C1</span><span class="tag">reach-out-only historic &rarr; first onboard C2</span></div>
     </div>
   </div>
   <div class="spec">
