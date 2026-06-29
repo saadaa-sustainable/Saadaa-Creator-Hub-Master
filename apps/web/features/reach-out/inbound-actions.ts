@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
+import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
 import { isVoidedStatus } from "@/lib/workflow";
@@ -40,6 +41,7 @@ export async function submitInboundBatch(
   input: unknown,
 ): Promise<InboundBatchResult> {
   const actor = await assertPermission("reachout_inbound");
+  await assertCreateAllowed("creator", actor, "Creators (Reach Out)");
 
   const parsed = InboundBatchSchema.safeParse(input);
   if (!parsed.success) {

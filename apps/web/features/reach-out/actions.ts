@@ -5,6 +5,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { ReachOutSchema } from "./schema";
 import { assertPermission } from "@/lib/rbac.server";
+import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
 import {
@@ -76,6 +77,7 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
   const actor = await assertPermission(
     direction === "inbound" ? "reachout_inbound" : "reachout_outbound",
   );
+  await assertCreateAllowed("creator", actor, "Creators (Reach Out)");
 
   const parsed = ReachOutSchema.safeParse(input);
   if (!parsed.success) {

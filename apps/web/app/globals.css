@@ -11497,3 +11497,64 @@ input[type="date"]::-webkit-clear-button {
   animation: none;
   transition: width 0.3s ease;
 }
+
+/* Global Test Mode banner (shown above every view while a scope is active). */
+.test-mode-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.7rem 0.95rem;
+  margin-bottom: 1.1rem;
+  border: 1px solid rgba(181, 117, 20, 0.38);
+  background: #faf1dc;
+  border-radius: var(--radius);
+}
+.test-mode-banner__icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #b57514;
+}
+.test-mode-banner__body {
+  flex: 1;
+  min-width: 0;
+}
+.test-mode-banner__title {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #8a5a10;
+}
+.test-mode-banner__sub {
+  margin: 2px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: #6e695e;
+}
+.test-mode-banner__cta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(181, 117, 20, 0.38);
+  background: #fff;
+  color: #8a5a10;
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
+}
+.test-mode-banner__cta:hover {
+  background: #fbf6e9;
+}
+@media (max-width: 640px) {
+  .test-mode-banner {
+    flex-wrap: wrap;
+  }
+  .test-mode-banner__cta {
+    width: 100%;
+    justify-content: center;
+  }
+}

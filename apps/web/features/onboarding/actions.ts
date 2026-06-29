@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { readTermsAttachmentFile, TERMS_ATTACHMENT } from "@/lib/attachments";
 import { assertPermission } from "@/lib/rbac.server";
+import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
 import { isOnboardedActive } from "@/lib/workflow";
@@ -165,6 +166,7 @@ export async function submitOnboarding(
   input: unknown,
 ): Promise<OnboardingResult> {
   const actor = await assertPermission("onboarding_write");
+  await assertCreateAllowed("collab", actor, "Collabs (Onboarding)");
 
   const parsed = OnboardingSchema.safeParse(input);
   if (!parsed.success) {

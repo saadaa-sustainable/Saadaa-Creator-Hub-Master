@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
+import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
 import {
@@ -120,6 +121,7 @@ export async function submitPayments(
   input: unknown,
 ): Promise<SubmitPaymentResult> {
   const actor = await assertPermission("accounts_write");
+  await assertCreateAllowed("payment", actor, "Payments");
 
   // Schema validate.
   const parsed = PaymentBatchSchema.safeParse(input);

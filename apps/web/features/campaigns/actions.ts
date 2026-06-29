@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
+import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { voidUnonboardedForCampaign } from "@/lib/campaign-lifecycle";
 import { stampTestRows } from "@/features/settings/actions";
@@ -52,6 +53,7 @@ export async function submitCampaign(
   input: unknown,
 ): Promise<CampaignCreateResult> {
   const actor = await assertPermission("campaign_create");
+  await assertCreateAllowed("campaign", actor, "Campaigns");
 
   const parsed = CampaignCreateSchema.safeParse(input);
   if (!parsed.success) {
