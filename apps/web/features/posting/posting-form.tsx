@@ -471,7 +471,7 @@ export function PostingModal({
                   {previewShortcode && (
                     <button
                       type="button"
-                      className="pt-verify-strip__open"
+                      className="pt-verify-strip__open ml-auto"
                       onClick={() => setShowPreview(true)}
                     >
                       <Eye size={11} aria-hidden />
@@ -806,9 +806,8 @@ function PostPreviewModal({
               </>
             ) : (
               <p className="text-[0.82rem] leading-relaxed text-text-tertiary">
-                Live stats aren&apos;t available for this account (private /
-                personal, or Instagram fetch is cooling down). The embedded post
-                is the live Instagram post.
+                {details?.note ??
+                  "Live stats aren't available for this post. The embed above is the live Instagram post."}
               </p>
             )}
             <a

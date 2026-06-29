@@ -56,6 +56,8 @@ export type PostDetailsResult =
       commentsCount: number | null;
       mediaType: string | null;
       permalink: string | null;
+      /** Why live stats are unavailable (only when metaMatched=false). */
+      note: string | null;
     }
   | { ok: false; reason: string };
 
@@ -74,9 +76,20 @@ export async function fetchPostDetails(input: {
   const handle = (input.username ?? "").trim().replace(/^@/, "");
   const bitshift = postDateFromUrl(link);
 
-  if (handle && isMetaGraphConfigured()) {
+  // Accurate reason when we can't pull live stats — distinguishes "old post" from
+  // "private account" from "cooling down", instead of a misleading catch-all.
+  let note: string | null = null;
+  if (!handle) {
+    note =
+      "Live stats need the creator's @handle — confirm ownership below. The embed is the live post.";
+  } else if (!isMetaGraphConfigured()) {
+    note =
+      "Live stats need the Instagram fetch configured. The embed is the live post.";
+  } else {
     const gate = await checkMetaGate();
-    if (!gate.coolingDown) {
+    if (gate.coolingDown) {
+      note = `Instagram fetch is cooling down (try again in ~${gate.retryAfterSec}s). The embed is the live post.`;
+    } else {
       const r = await fetchPostByShortcode(handle, shortcode);
       await recordMetaUsage(1, r.usagePct ?? 0);
       if (r.status === "ok" && r.node) {
@@ -93,8 +106,12 @@ export async function fetchPostDetails(input: {
           commentsCount: n.commentsCount,
           mediaType: n.mediaType,
           permalink: n.permalink,
+          note: null,
         };
       }
+      note = r.accountResolved
+        ? `This post isn't in @${handle}'s recent Instagram media (older than the window Instagram exposes), so live stats can't be pulled. The embed is the live post.`
+        : `Instagram didn't return live stats for @${handle} — only business / creator accounts expose them. The embed is the live post.`;
     }
   }
 
@@ -112,6 +129,7 @@ export async function fetchPostDetails(input: {
       commentsCount: null,
       mediaType: null,
       permalink: null,
+      note,
     };
   }
   return { ok: false, reason: "Could not read this post." };

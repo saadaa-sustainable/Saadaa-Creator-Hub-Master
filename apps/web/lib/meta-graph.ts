@@ -271,9 +271,10 @@ export async function fetchBusinessDiscovery(
   }
 }
 
-/** media.limit for the single-post probe — enough recent posts to cover a
- *  just-published collab without an expensive deep pull. */
-const POST_PROBE_MEDIA_LIMIT = 50;
+/** media.limit for the single-post probe — covers a just-published collab. Meta
+ *  only exposes a creator's RECENT media via business_discovery, so a post older
+ *  than this window can't be matched (caller reports that distinctly). */
+const POST_PROBE_MEDIA_LIMIT = 90;
 
 /** Rich node for the matched post (powers the post-date auto-fill + preview). */
 export interface MetaPostNode {
@@ -291,6 +292,9 @@ export interface MetaPostResult {
   /** ok = matched the shortcode in the creator's media (we have the real data). */
   status: "ok" | "notfound" | "error";
   node?: MetaPostNode;
+  /** True when business_discovery resolved the account (so a notfound means the
+   *  post is older than the recent window — NOT that the account is private). */
+  accountResolved?: boolean;
   error?: string;
   usagePct?: number;
 }
@@ -374,10 +378,12 @@ export async function fetchPostByShortcode(
       if (isNotFound(msg)) return { status: "notfound", usagePct };
       return { status: "error", error: msg.slice(0, 200), usagePct };
     }
+    const accountResolved = !!json.business_discovery;
     const media = json.business_discovery?.media?.data ?? [];
     const hit = media.find((m) => extractShortcode(m.permalink) === sc);
-    if (hit) return { status: "ok", node: buildPostNode(hit), usagePct };
-    return { status: "notfound", usagePct };
+    if (hit)
+      return { status: "ok", node: buildPostNode(hit), accountResolved, usagePct };
+    return { status: "notfound", accountResolved, usagePct };
   } catch (e) {
     return {
       status: "error",
