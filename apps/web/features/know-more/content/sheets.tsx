@@ -134,6 +134,14 @@ export default function SheetsKM() {
             anyone with admin scope can resolve/re-open. Resolution surfaces in
             the per-cell badge state.
           </li>
+          <li>
+            <strong>All comments panel</strong> · the toolbar{" "}
+            <KMCode>Comments</KMCode> button (with the open-count badge) opens a
+            table-wide roll-up split into <strong>Open</strong> /{" "}
+            <strong>Resolved</strong> tabs. Each entry shows its Row · Column,
+            resolves / reopens in place, and clicking it jumps to that cell&apos;s
+            thread.
+          </li>
         </KMList>
       </KMSection>
 

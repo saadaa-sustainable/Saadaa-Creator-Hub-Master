@@ -51,6 +51,7 @@ import {
   fetchCellComments,
   fetchRecentCellEdits,
   fetchRecentDeletions,
+  resolveCellComment,
   restoreDeletedRows,
   updateSheetCell,
   type CellCommentRow,
@@ -58,6 +59,7 @@ import {
   type RecentEdit,
 } from "./actions";
 import { CellCommentThread } from "./cell-comment-thread";
+import { AllCommentsPanel, type FlatComment } from "./all-comments-panel";
 import {
   mergeColumns,
   type ColDef,
@@ -161,6 +163,7 @@ export function SheetGrid({
     column: string;
     label: string;
   } | null>(null);
+  const [showAllComments, setShowAllComments] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,6 +234,57 @@ export function SheetGrid({
     () => mergeColumns(table.columns, rows),
     [table.columns, rows],
   );
+
+  // Flatten every cell comment for the "All comments" roll-up panel, stamping
+  // each with its row key + a human column label.
+  const flatComments = useMemo<FlatComment[]>(() => {
+    const labelOf = new Map(mergedAll.map((c) => [c.key, c.label]));
+    const out: FlatComment[] = [];
+    for (const [key, list] of commentsByCell) {
+      const [rowKey, column] = key.split("::");
+      for (const c of list) {
+        out.push({
+          ...c,
+          rowKey,
+          column,
+          columnLabel: labelOf.get(column) ?? column,
+        });
+      }
+    }
+    return out;
+  }, [commentsByCell, mergedAll]);
+  const openCommentCount = useMemo(
+    () => flatComments.filter((c) => !c.resolved).length,
+    [flatComments],
+  );
+
+  // Resolve / reopen from the All-comments panel — writes via the action, then
+  // mirrors the change into the grid's comment map so badges update everywhere.
+  const handlePanelResolveToggle = (c: FlatComment, resolved: boolean) => {
+    void (async () => {
+      const res = await resolveCellComment({ id: c.id, resolved });
+      if (!res.ok) {
+        toast.error(res.error);
+        return;
+      }
+      const key = `${c.rowKey}::${c.column}`;
+      const cur = commentsByCell.get(key) ?? [];
+      applyCommentChange(
+        c.rowKey,
+        c.column,
+        cur.map((x) =>
+          x.id === c.id
+            ? {
+                ...x,
+                resolved,
+                resolved_by: resolved ? currentUserEmail : null,
+                resolved_at: resolved ? new Date().toISOString() : null,
+              }
+            : x,
+        ),
+      );
+    })();
+  };
 
   const allVisibleCols = useMemo(
     () => mergedAll.filter((c) => !c.hidden),
@@ -657,6 +711,20 @@ export function SheetGrid({
             <Download size={11} aria-hidden /> CSV
           </button>
 
+          <button
+            type="button"
+            onClick={() => setShowAllComments(true)}
+            title="All comments on this table (open + resolved)"
+            className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-border bg-bg-white text-text-secondary text-[0.65rem] font-extrabold hover:bg-bg-muted/40 hover:border-[--accent] transition-colors"
+          >
+            <MessageSquareIcon size={11} aria-hidden /> Comments
+            {openCommentCount > 0 && (
+              <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[--accent] px-1 text-[0.6rem] font-extrabold text-text-primary tabular">
+                {openCommentCount}
+              </span>
+            )}
+          </button>
+
           {rowsDeletable && (
             <>
               <button
@@ -1058,6 +1126,20 @@ export function SheetGrid({
               next,
             )
           }
+        />
+      )}
+
+      {showAllComments && (
+        <AllCommentsPanel
+          comments={flatComments}
+          currentUserEmail={currentUserEmail}
+          pending={false}
+          onResolveToggle={handlePanelResolveToggle}
+          onOpenCell={(rowKey, column, label) => {
+            setShowAllComments(false);
+            setOpenCommentCell({ rowKey, column, label });
+          }}
+          onClose={() => setShowAllComments(false)}
         />
       )}
 
