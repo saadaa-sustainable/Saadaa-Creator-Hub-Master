@@ -19,6 +19,7 @@ import {
   Sheet,
   Settings,
   History,
+  ScrollText,
   LogOut,
   X,
   type LucideIcon,
@@ -124,6 +125,12 @@ const NAV: NavSection[] = [
         show: (a) => hasPermission(a, "admin"),
       },
       { label: "Error Portal", href: "/errors", icon: ShieldAlert },
+      {
+        label: "Audit Log",
+        href: "/audit-log",
+        icon: ScrollText,
+        show: (a) => hasPermission(a, "admin"),
+      },
       {
         label: "Settings",
         href: "/settings",
