@@ -20,6 +20,7 @@ import {
   Settings,
   History,
   ScrollText,
+  LifeBuoy,
   LogOut,
   X,
   type LucideIcon,
@@ -131,6 +132,7 @@ const NAV: NavSection[] = [
         icon: ScrollText,
         show: (a) => hasPermission(a, "admin"),
       },
+      { label: "Issue Desk", href: "/issue-desk", icon: LifeBuoy },
       {
         label: "Settings",
         href: "/settings",

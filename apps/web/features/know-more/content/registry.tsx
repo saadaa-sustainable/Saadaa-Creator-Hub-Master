@@ -16,6 +16,7 @@ import ErrorsKM from "./errors";
 import FunnelKM from "./funnel";
 import HistoricAnalyticsKM from "./historic-analytics";
 import InternalDashboardKM from "./internal-dashboard";
+import IssueDeskKM from "./issue-desk";
 import JourneyKM from "./journey";
 import MyDashboardKM from "./my-dashboard";
 import OffboardingKM from "./offboarding";
@@ -53,6 +54,7 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   "internal-dashboard": InternalDashboardKM,
   errors: ErrorsKM,
   "audit-log": AuditLogKM,
+  "issue-desk": IssueDeskKM,
   sheets: SheetsKM,
   "user-panel": UserPanelKM,
   settings: SettingsKM,
