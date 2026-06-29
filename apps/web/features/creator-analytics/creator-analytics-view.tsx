@@ -179,7 +179,13 @@ function CreatorListTable({
                 <th
                   key={h}
                   scope="col"
-                  className="border-b border-border px-2.5 py-2.5 text-left text-[0.7rem] font-bold uppercase tracking-[0.04em] text-text-secondary"
+                  className={cn(
+                    "border-b border-border px-2.5 py-2.5 text-left text-[0.7rem] font-bold uppercase tracking-[0.04em] text-text-secondary",
+                    // Freeze the History action column to the right edge so it
+                    // stays reachable while the wide roster scrolls sideways.
+                    h === "History" &&
+                      "sticky right-0 z-[2] bg-bg-ecru shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]",
+                  )}
                 >
                   {h}
                 </th>
@@ -223,7 +229,15 @@ function CreatorListTable({
                     {collabSummary(r)}
                   </span>
                 </td>
-                <td className="px-2.5 py-1.5 align-middle">
+                <td
+                  className={cn(
+                    "px-2.5 py-1.5 align-middle sticky right-0 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]",
+                    // Opaque bg so scrolled cells don't bleed under the frozen
+                    // column; matches the row's zebra stripe as closely as alpha
+                    // allows.
+                    idx % 2 === 1 ? "bg-bg-alt" : "bg-bg-white",
+                  )}
+                >
                   <button
                     type="button"
                     className="action-btn action-btn--view"
@@ -348,7 +362,7 @@ function CreatorCell({ r }: { r: CreatorAnalyticsRow }) {
         className="ob-creator-avatar"
       />
       <div className="min-w-0">
-        <div className="creator-name">{r.inf_name ?? "—"}</div>
+        <div className="creator-name">{r.inf_name ?? (r.username || "—")}</div>
         <div className="creator-handle">@{r.username || "—"}</div>
       </div>
     </div>

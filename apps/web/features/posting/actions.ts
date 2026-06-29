@@ -10,7 +10,13 @@ import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
 } from "@/lib/notifications";
-import { postDateFromUrl } from "@/lib/instagram-shortcode";
+import {
+  extractShortcode,
+  formatIstDate,
+  postDateFromUrl,
+} from "@/lib/instagram-shortcode";
+import { fetchPostByShortcode, isMetaGraphConfigured } from "@/lib/meta-graph";
+import { checkMetaGate, recordMetaUsage } from "@/lib/meta-rate-limit";
 import {
   nextPayableCycleDate,
   paymentDueDateFor,
@@ -23,6 +29,92 @@ export type PostingResult =
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Live post lookup for the Posting form. On a pasted Instagram link we hit Meta
+ * `business_discovery` for the creator's recent media and match the shortcode —
+ * which yields the AUTHORITATIVE post date (Meta's timestamp, not the ±1-day
+ * shortcode estimate), confirms the post belongs to that creator, and returns
+ * the caption / like / comment / media-type details for the in-app preview.
+ *
+ * Graceful fallback: when Meta is rate-limited / the account is personal / the
+ * post is older than the recent window, `metaMatched=false` and `date` falls
+ * back to the local shortcode decode (`dateSource:"shortcode"`). The preview
+ * popup still renders via the public Instagram embed (no token needed).
+ */
+export type PostDetailsResult =
+  | {
+      ok: true;
+      shortcode: string;
+      date: string;
+      dateSource: "instagram" | "shortcode";
+      ownerConfirmed: boolean;
+      metaMatched: boolean;
+      caption: string | null;
+      likeCount: number | null;
+      commentsCount: number | null;
+      mediaType: string | null;
+      permalink: string | null;
+    }
+  | { ok: false; reason: string };
+
+export async function fetchPostDetails(input: {
+  postLink: string;
+  username?: string | null;
+}): Promise<PostDetailsResult> {
+  await assertPermission("posting_submit");
+
+  const link = (input.postLink ?? "").trim();
+  const shortcode = extractShortcode(link);
+  if (!shortcode) {
+    return { ok: false, reason: "No Instagram post link detected." };
+  }
+
+  const handle = (input.username ?? "").trim().replace(/^@/, "");
+  const bitshift = postDateFromUrl(link);
+
+  if (handle && isMetaGraphConfigured()) {
+    const gate = await checkMetaGate();
+    if (!gate.coolingDown) {
+      const r = await fetchPostByShortcode(handle, shortcode);
+      await recordMetaUsage(1, r.usagePct ?? 0);
+      if (r.status === "ok" && r.node) {
+        const n = r.node;
+        return {
+          ok: true,
+          shortcode,
+          date: n.timestamp ? formatIstDate(new Date(n.timestamp)) : (bitshift ?? todayIso()),
+          dateSource: n.timestamp ? "instagram" : "shortcode",
+          ownerConfirmed: true,
+          metaMatched: true,
+          caption: n.caption,
+          likeCount: n.likeCount,
+          commentsCount: n.commentsCount,
+          mediaType: n.mediaType,
+          permalink: n.permalink,
+        };
+      }
+    }
+  }
+
+  // Fallback: no Meta match — local shortcode decode only (popup still embeds).
+  if (bitshift) {
+    return {
+      ok: true,
+      shortcode,
+      date: bitshift,
+      dateSource: "shortcode",
+      ownerConfirmed: false,
+      metaMatched: false,
+      caption: null,
+      likeCount: null,
+      commentsCount: null,
+      mediaType: null,
+      permalink: null,
+    };
+  }
+  return { ok: false, reason: "Could not read this post." };
 }
 
 /**

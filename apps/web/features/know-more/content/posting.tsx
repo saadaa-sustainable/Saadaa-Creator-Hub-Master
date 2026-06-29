@@ -5,7 +5,7 @@ export default function PostingKM() {
     <>
       <KMHeader
         title="Posting"
-        subtitle="Log live IG content per deliverable. Auto-decoded post date, ownership verification, partnership key, raw-footage drop."
+        subtitle="Log live IG content per deliverable. Live Instagram post fetch (real date + in-app preview), ownership verification, partnership key, raw-footage drop."
       />
 
       <KMSection tag="Page layout">
@@ -119,21 +119,35 @@ export default function PostingKM() {
       <KMSection tag="Verify Strip">
         <KMList>
           <li>
-            <strong>Post Date pill</strong> — auto-decoded from the IG
-            shortcode via <KMCode>(id &gt;&gt; 23) + 1314220021721</KMCode>.
-            Carries a <KMCode>±1d</KMCode> note because the snowflake
-            timestamp is the IG ID-mint time, not the publish time.
+            <strong>Live Instagram fetch</strong> — on link entry we look the
+            post up in <em>this creator&apos;s</em> Instagram media (Meta{" "}
+            <KMCode>business_discovery</KMCode>, matched by shortcode). A match
+            fills the <strong>authoritative</strong> publish date (no{" "}
+            <KMCode>±1d</KMCode>), shows a <KMCode>Verified on Instagram</KMCode>{" "}
+            pill, and auto-clears the manual ticks — because being in the
+            creator&apos;s own media <em>proves</em> the post is theirs.
+          </li>
+          <li>
+            <strong>View Post</strong> — opens the native Instagram embed in a
+            popup (videos play inline, carousels swipe) with the fetched stats
+            (likes, comments, caption, media type, date).
+          </li>
+          <li>
+            <strong>Post Date pill (fallback)</strong> — when Meta can&apos;t
+            reach the post (personal account / older than the recent window /
+            fetch cooling down) the date falls back to the shortcode decode
+            <KMCode>(id &gt;&gt; 23) + 1314220021721</KMCode> with the{" "}
+            <KMCode>±1d</KMCode> note + the manual date tickmark.
           </li>
           <li>
             <strong>URL pill</strong> — parses the username from the pasted
-            link. Same handle as the creator = green ok pill. Same-domain
-            mismatch = blocked outright.
+            link. Same handle as the creator = green ok pill. Handle mismatch =
+            blocked outright.
           </li>
           <li>
-            <strong>Ownership tickmark</strong> — required for bare{" "}
-            <KMCode>/p/</KMCode> URLs that don&apos;t expose a username.
-            Operator must check &quot;I confirm this is the creator&apos;s
-            post.&quot;
+            <strong>Ownership tickmark</strong> — fallback for bare{" "}
+            <KMCode>/p/</KMCode> URLs Meta couldn&apos;t confirm. Operator must
+            check &quot;I confirm this is the creator&apos;s post.&quot;
           </li>
         </KMList>
       </KMSection>

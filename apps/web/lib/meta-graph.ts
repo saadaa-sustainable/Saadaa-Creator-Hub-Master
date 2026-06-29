@@ -1,4 +1,5 @@
 import "server-only";
+import { extractShortcode } from "./instagram-shortcode";
 
 /**
  * Meta Graph `business_discovery` — INSTANT public-profile lookup for a handle.
@@ -262,6 +263,121 @@ export async function fetchBusinessDiscovery(
     }
     const json = JSON.parse(text) as Parameters<typeof parseBody>[0];
     return { ...parseBody(json, clean), usagePct };
+  } catch (e) {
+    return {
+      status: "error",
+      error: e instanceof Error ? e.message.slice(0, 200) : "fetch failed",
+    };
+  }
+}
+
+/** media.limit for the single-post probe — enough recent posts to cover a
+ *  just-published collab without an expensive deep pull. */
+const POST_PROBE_MEDIA_LIMIT = 50;
+
+/** Rich node for the matched post (powers the post-date auto-fill + preview). */
+export interface MetaPostNode {
+  permalink: string | null;
+  timestamp: string | null; // ISO 8601 publish time
+  caption: string | null;
+  likeCount: number | null;
+  commentsCount: number | null;
+  mediaType: string | null; // IMAGE | VIDEO | CAROUSEL_ALBUM
+  thumbnailUrl: string | null; // poster for VIDEO (signed, short-lived)
+  mediaUrl: string | null; // CDN media (signed, short-lived)
+}
+
+export interface MetaPostResult {
+  /** ok = matched the shortcode in the creator's media (we have the real data). */
+  status: "ok" | "notfound" | "error";
+  node?: MetaPostNode;
+  error?: string;
+  usagePct?: number;
+}
+
+function postProbeField(handle: string): string {
+  return (
+    `business_discovery.username(${cleanHandle(handle)})` +
+    `{username,media.limit(${POST_PROBE_MEDIA_LIMIT})` +
+    `{permalink,timestamp,caption,like_count,comments_count,media_type,thumbnail_url,media_url}}`
+  );
+}
+
+type RawMedia = {
+  permalink?: string;
+  timestamp?: string;
+  caption?: string;
+  like_count?: number;
+  comments_count?: number;
+  media_type?: string;
+  thumbnail_url?: string;
+  media_url?: string;
+};
+
+function buildPostNode(m: RawMedia): MetaPostNode {
+  return {
+    permalink: m.permalink ?? null,
+    timestamp: m.timestamp ?? null,
+    caption: typeof m.caption === "string" && m.caption ? m.caption : null,
+    likeCount: typeof m.like_count === "number" ? m.like_count : null,
+    commentsCount: typeof m.comments_count === "number" ? m.comments_count : null,
+    mediaType: m.media_type ?? null,
+    thumbnailUrl: m.thumbnail_url ?? null,
+    mediaUrl: m.media_url ?? null,
+  };
+}
+
+/**
+ * Resolve a single Instagram post by looking it up in the creator's own recent
+ * media via business_discovery, matched on shortcode. Returns the post's REAL
+ * published timestamp + caption / like_count / comments_count / media_type.
+ *
+ * A match proves BOTH facts the posting form needs: the authoritative post date
+ * (Meta's `timestamp`, not the ±1-day shortcode estimate) AND that the post
+ * actually belongs to `handle` (it's in that account's media edge). READ-ONLY —
+ * `status:"notfound"` when the handle resolves but the post isn't among its
+ * recent ~50 media (older post / wrong creator / personal account), so the caller
+ * can fall back to the local shortcode decode.
+ */
+export async function fetchPostByShortcode(
+  handle: string,
+  shortcode: string,
+): Promise<MetaPostResult> {
+  const c = creds();
+  if (!c) return { status: "error", error: "Meta Graph not configured" };
+  const clean = cleanHandle(handle);
+  const sc = shortcode.trim();
+  if (!clean || !sc) return { status: "error", error: "missing handle/shortcode" };
+
+  const url =
+    `https://graph.facebook.com/${GRAPH_VERSION}/${c.ownId}?` +
+    `fields=${encodeURIComponent(postProbeField(clean))}&access_token=${encodeURIComponent(c.token)}`;
+
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    const text = await res.text();
+    const usagePct = usageMaxPct(res.headers.get("x-app-usage"));
+
+    if (!res.ok) {
+      if (isNotFound(text)) return { status: "notfound", usagePct };
+      return { status: "error", error: text.slice(0, 200), usagePct };
+    }
+    const json = JSON.parse(text) as {
+      business_discovery?: { media?: { data?: RawMedia[] } };
+      error?: { message?: string; code?: number };
+    };
+    if (json.error) {
+      const msg = json.error.message ?? "unknown";
+      if (json.error.code === 4 || /request limit/i.test(msg)) {
+        return { status: "error", error: `rate_limited: ${msg}`, usagePct };
+      }
+      if (isNotFound(msg)) return { status: "notfound", usagePct };
+      return { status: "error", error: msg.slice(0, 200), usagePct };
+    }
+    const media = json.business_discovery?.media?.data ?? [];
+    const hit = media.find((m) => extractShortcode(m.permalink) === sc);
+    if (hit) return { status: "ok", node: buildPostNode(hit), usagePct };
+    return { status: "notfound", usagePct };
   } catch (e) {
     return {
       status: "error",

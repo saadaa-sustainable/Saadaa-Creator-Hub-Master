@@ -33,10 +33,11 @@ import type { DashboardData } from "./types";
  * Mobile (< lg): single column.
  *
  * `archival` (default false) is for the archive-only Historic Analytics page:
- * it drops every spend-derived widget (Spotlight Spend, Spend per Campaign) and
- * threads the flag into the Campaign KPIs so its Total Spend card is hidden too.
- * The Hero then spans the full top row in place of the removed spotlight. The
- * live dashboard never passes it, so its bento is byte-for-byte unchanged.
+ * it drops every spend-derived widget (Spotlight Spend, Spend per Campaign),
+ * threads the flag into the Campaign KPIs so its Total Spend card is hidden too,
+ * and removes the live-only framing rows — the Hero insight headline (Row A) and
+ * Today's Pulse (Row B) — so the archive opens straight on the Stage Snapshot.
+ * The live dashboard never passes it, so its bento is byte-for-byte unchanged.
  */
 export function DashboardBento({
   data,
@@ -54,28 +55,35 @@ export function DashboardBento({
         </div>
       )}
 
-      {/* Row A — Hero spans full width in archival mode (no spend spotlight). */}
-      <div className={archival ? "lg:col-span-12" : "lg:col-span-8"}>
-        <DashboardHero
-          totalReachOut={data.pipeline.reachOut}
-          totalPosted={data.pipeline.posted}
-          conversionPct={data.pipeline.conversionPct}
-          postRatePct={data.pipeline.postRatePct}
-        />
-      </div>
+      {/* Row A — Hero + Spotlight Spend. Both hidden in archival mode: the
+          "pipeline pulse" insight headline and the spend spotlight are
+          live-only framing that doesn't belong on the archive. */}
       {!archival && (
-        <div className="lg:col-span-4">
-          <DashboardSpotlight
-            totalSpend={data.spotlight.totalSpend}
-            spendSpark={data.spotlight.spendSpark}
-          />
-        </div>
+        <>
+          <div className="lg:col-span-8">
+            <DashboardHero
+              totalReachOut={data.pipeline.reachOut}
+              totalPosted={data.pipeline.posted}
+              conversionPct={data.pipeline.conversionPct}
+              postRatePct={data.pipeline.postRatePct}
+            />
+          </div>
+          <div className="lg:col-span-4">
+            <DashboardSpotlight
+              totalSpend={data.spotlight.totalSpend}
+              spendSpark={data.spotlight.spendSpark}
+            />
+          </div>
+        </>
       )}
 
-      {/* Row B — Today's Pulse */}
-      <div className="lg:col-span-12">
-        <DashboardPulseStrip pulse={data.pulse} />
-      </div>
+      {/* Row B — Today's Pulse (live-only; "today" is meaningless on the
+          archive, where every "…today" count is always 0). */}
+      {!archival && (
+        <div className="lg:col-span-12">
+          <DashboardPulseStrip pulse={data.pulse} />
+        </div>
+      )}
 
       {/* Row C — Stage Snapshot (managerial mini-kanban) */}
       <div className="lg:col-span-12">

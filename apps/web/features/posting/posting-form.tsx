@@ -20,13 +20,24 @@ import {
   Film,
   Handshake,
   ExternalLink,
+  Eye,
+  Heart,
+  MessageCircle,
+  Instagram,
+  Play,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
-import { postDateFromUrl, usernameFromUrl } from "@/lib/instagram-shortcode";
+import {
+  extractShortcode,
+  postDateFromUrl,
+  usernameFromUrl,
+} from "@/lib/instagram-shortcode";
 import { PostingSchema, type PostingInput } from "./schema";
-import { submitPosting } from "./actions";
+import { fetchPostDetails, submitPosting, type PostDetailsResult } from "./actions";
+
+type PostDetails = Extract<PostDetailsResult, { ok: true }>;
 
 interface PostingFormProps {
   postId: string;
@@ -64,6 +75,13 @@ export function PostingModal({
   const [ownerVerified, setOwnerVerified] = useState(false);
   /** True when URL form is /{user}/p/{code}/ AND user === expected creator. */
   const [ownerAutoConfirmed, setOwnerAutoConfirmed] = useState(false);
+  // Live Instagram lookup (Meta business_discovery on the creator's media).
+  const [dateSource, setDateSource] = useState<"instagram" | "approx" | null>(
+    null,
+  );
+  const [fetchingDate, setFetchingDate] = useState(false);
+  const [postDetails, setPostDetails] = useState<PostDetails | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const driveBtnRef = useRef<HTMLButtonElement>(null);
 
   const requiresDownload = adsUsageRights === "Yes";
@@ -152,6 +170,10 @@ export function PostingModal({
       setPostUrlWarning(null);
       setPostUrlError(null);
       setOwnerAutoConfirmed(false);
+      setDateSource(null);
+      setPostDetails(null);
+      setShowPreview(false);
+      setFetchingDate(false);
       return;
     }
     if (!url.toLowerCase().includes("instagram.com")) {
@@ -159,6 +181,10 @@ export function PostingModal({
       setPostUrlWarning(null);
       setPostUrlError("Not an Instagram URL.");
       setOwnerAutoConfirmed(false);
+      setDateSource(null);
+      setPostDetails(null);
+      setShowPreview(false);
+      setFetchingDate(false);
       return;
     }
     const date = postDateFromUrl(url);
@@ -196,6 +222,52 @@ export function PostingModal({
     }
   }, [watchedPostLink, username, setValue]);
 
+  // Live: fetch the REAL post from Instagram (Meta business_discovery on the
+  // creator's own media, matched by shortcode). A match upgrades the ±1-day
+  // shortcode estimate to Instagram's authoritative published date, PROVES the
+  // post belongs to this creator (it's in their media), and loads the caption /
+  // likes / comments / media-type for the in-app preview. Debounced; degrades
+  // gracefully to the shortcode estimate when Meta can't reach the post.
+  useEffect(() => {
+    const url = watchedPostLink?.trim() ?? "";
+    const sc = extractShortcode(url);
+    if (!sc || !url.toLowerCase().includes("instagram.com")) {
+      setFetchingDate(false);
+      return;
+    }
+    let cancelled = false;
+    setDateSource("approx");
+    setFetchingDate(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetchPostDetails({ postLink: url, username });
+        if (cancelled) return;
+        if (res.ok) {
+          setPostDetails(res);
+          if (res.dateSource === "instagram") {
+            setValue("postDate", res.date, { shouldValidate: true });
+            setDecodedDate(res.date);
+            setDateSource("instagram");
+            if (res.ownerConfirmed) {
+              setOwnerAutoConfirmed(true);
+              setPostUrlWarning(null);
+            }
+          } else {
+            setDateSource("approx");
+          }
+        }
+      } catch {
+        // keep the provisional shortcode estimate on any failure
+      } finally {
+        if (!cancelled) setFetchingDate(false);
+      }
+    }, 600);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [watchedPostLink, username, setValue]);
+
   // Close Drive info popover on Escape / outside click.
   useEffect(() => {
     if (!showDriveInfo) return;
@@ -217,7 +289,12 @@ export function PostingModal({
     };
   }, [showDriveInfo]);
 
-  const ownershipOk = ownerAutoConfirmed || ownerVerified;
+  // Instagram-verified = authoritative: the post was matched in THIS creator's
+  // media, so both the date and ownership are confirmed without manual ticks.
+  const apiVerified = dateSource === "instagram";
+  const ownershipOk = apiVerified || ownerAutoConfirmed || ownerVerified;
+  const dateOk = apiVerified || dateVerified;
+  const previewShortcode = extractShortcode(watchedPostLink ?? "");
 
   const onSubmit = (values: PostingInput) => {
     // Hard block at submit if URL owner doesn't match creator.
@@ -231,7 +308,7 @@ export function PostingModal({
       );
       return;
     }
-    if (!dateVerified) {
+    if (!dateOk) {
       toast.error(
         "Confirm the post date matches Instagram before submitting.",
       );
@@ -257,10 +334,22 @@ export function PostingModal({
 
   if (!open || !mounted) return null;
 
-  return createPortal(
-    <div className="modal-backdrop modal-backdrop--onboarding">
-      <div className="modal-panel modal-panel--lg modal-panel--onboarding">
-        <header className="modal-head">
+  return (
+    <>
+      {showPreview && previewShortcode && (
+        <PostPreviewModal
+          shortcode={previewShortcode}
+          link={watchedPostLink}
+          details={postDetails}
+          fetching={fetchingDate}
+          username={username}
+          onClose={() => setShowPreview(false)}
+        />
+      )}
+      {createPortal(
+        <div className="modal-backdrop modal-backdrop--onboarding">
+          <div className="modal-panel modal-panel--lg modal-panel--onboarding">
+            <header className="modal-head">
           <div className="flex items-center gap-2 min-w-0">
             <Send size={16} />
             <h2 className="font-semibold">Submit Posting</h2>
@@ -357,13 +446,37 @@ export function PostingModal({
                   <span className="pt-verify-pill pt-verify-pill--date">
                     <CalendarCheck size={11} aria-hidden />
                     <strong className="tabular">{decodedDate}</strong>
-                    <span className="pt-verify-pill__note">±1d</span>
+                    {!apiVerified && (
+                      <span className="pt-verify-pill__note">±1d</span>
+                    )}
                   </span>
-                  {ownerAutoConfirmed && (
+                  {fetchingDate && (
+                    <span className="pt-verify-pill">
+                      <Loader2 size={11} className="animate-spin" aria-hidden />
+                      Fetching from Instagram…
+                    </span>
+                  )}
+                  {apiVerified && (
+                    <span className="pt-verify-pill pt-verify-pill--ok">
+                      <Instagram size={11} aria-hidden />
+                      Verified on Instagram
+                    </span>
+                  )}
+                  {!apiVerified && ownerAutoConfirmed && (
                     <span className="pt-verify-pill pt-verify-pill--ok">
                       <CheckCircle2 size={11} aria-hidden />
                       @{username} verified
                     </span>
+                  )}
+                  {previewShortcode && (
+                    <button
+                      type="button"
+                      className="pt-verify-strip__open"
+                      onClick={() => setShowPreview(true)}
+                    >
+                      <Eye size={11} aria-hidden />
+                      View Post
+                    </button>
                   )}
                   {watchedPostLink && (
                     <a
@@ -378,7 +491,7 @@ export function PostingModal({
                   )}
                 </div>
 
-                {!ownerAutoConfirmed && (
+                {!ownerAutoConfirmed && !apiVerified && (
                   <label className="pt-verify-check pt-verify-check--danger">
                     <input
                       type="checkbox"
@@ -388,23 +501,24 @@ export function PostingModal({
                     <span>
                       I confirm the live post belongs to{" "}
                       <strong>@{username ?? "this creator"}</strong>{" "}
-                      (URL path has no handle, ownership cannot be
-                      auto-verified).
+                      (couldn&apos;t auto-verify ownership from Instagram).
                     </span>
                   </label>
                 )}
 
-                <label className="pt-verify-check">
-                  <input
-                    type="checkbox"
-                    checked={dateVerified}
-                    onChange={(e) => setDateVerified(e.target.checked)}
-                  />
-                  <span>
-                    I checked the live post and the Post Date matches what
-                    Instagram shows.
-                  </span>
-                </label>
+                {!apiVerified && (
+                  <label className="pt-verify-check">
+                    <input
+                      type="checkbox"
+                      checked={dateVerified}
+                      onChange={(e) => setDateVerified(e.target.checked)}
+                    />
+                    <span>
+                      I checked the live post and the Post Date matches what
+                      Instagram shows.
+                    </span>
+                  </label>
+                )}
               </div>
             )}
 
@@ -540,13 +654,13 @@ export function PostingModal({
               disabled={
                 submitting ||
                 !!postUrlError ||
-                !!decodedDate && (!dateVerified || !ownershipOk)
+                (!!decodedDate && (!dateOk || !ownershipOk))
               }
               title={
                 postUrlError ??
                 (!!decodedDate && !ownershipOk
                   ? "Confirm post belongs to this creator."
-                  : !!decodedDate && !dateVerified
+                  : !!decodedDate && !dateOk
                     ? "Tick the date-match checkbox to enable submit."
                     : undefined)
               }
@@ -564,7 +678,150 @@ export function PostingModal({
               )}
             </button>
           </footer>
-        </form>
+            </form>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+/**
+ * Instagram-style post preview. Renders the post's NATIVE Instagram embed (the
+ * real IG UI — videos play inline, carousels swipe) inside a popup, alongside
+ * the fetched details (date, likes, comments, caption, media type). The embed
+ * needs no token (public oEmbed iframe); the stats come from the Meta lookup we
+ * already ran on link entry, so opening this is free. Falls back to embed-only
+ * when stats couldn't be fetched (personal account / rate-limited).
+ */
+function PostPreviewModal({
+  shortcode,
+  link,
+  details,
+  fetching,
+  username,
+  onClose,
+}: {
+  shortcode: string;
+  link?: string | null;
+  details: PostDetails | null;
+  fetching: boolean;
+  username?: string | null;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  if (!mounted) return null;
+
+  const embedSrc = `https://www.instagram.com/p/${shortcode}/embed/captioned/`;
+  const igUrl = link?.trim() || `https://www.instagram.com/p/${shortcode}/`;
+  const isVideo = details?.mediaType === "VIDEO";
+  const matched = details?.metaMatched ?? false;
+  const fmtNum = (n: number | null | undefined) =>
+    typeof n === "number" ? n.toLocaleString("en-IN") : "—";
+
+  return createPortal(
+    <div
+      className="modal-backdrop modal-backdrop--onboarding"
+      onClick={onClose}
+    >
+      <div
+        className="modal-panel modal-panel--lg modal-panel--onboarding"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-head">
+          <div className="flex items-center gap-2 min-w-0">
+            <Instagram size={16} aria-hidden />
+            <h2 className="font-semibold">Post Preview</h2>
+            {details?.mediaType && (
+              <span className="chip text-[10px] inline-flex items-center gap-1">
+                {isVideo && <Play size={9} aria-hidden />}
+                {details.mediaType.replace(/_/g, " ")}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+
+        <div className="modal-body flex flex-col gap-4 sm:flex-row">
+          <div className="w-full sm:w-[400px] sm:shrink-0">
+            <iframe
+              src={embedSrc}
+              title="Instagram post preview"
+              loading="lazy"
+              allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
+              allowFullScreen
+              className="w-full h-[480px] sm:h-[560px] rounded-[var(--radius)] border border-border bg-white"
+            />
+          </div>
+
+          <aside className="flex-1 min-w-0 flex flex-col gap-3">
+            {fetching ? (
+              <div className="flex items-center gap-2 py-4 text-text-tertiary">
+                <Loader2 size={14} className="animate-spin" aria-hidden />
+                <span className="text-[0.8rem]">
+                  Fetching post details from Instagram…
+                </span>
+              </div>
+            ) : matched ? (
+              <>
+                <div className="flex flex-wrap gap-3 text-[0.85rem] text-text-secondary">
+                  <span className="inline-flex items-center gap-1">
+                    <Heart size={14} aria-hidden /> {fmtNum(details?.likeCount)}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <MessageCircle size={14} aria-hidden />{" "}
+                    {fmtNum(details?.commentsCount)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 tabular">
+                    <CalendarCheck size={14} aria-hidden /> {details?.date}
+                  </span>
+                </div>
+                {details?.ownerConfirmed && (
+                  <div className="inline-flex items-center gap-1 text-[0.78rem] font-semibold text-success-text">
+                    <CheckCircle2 size={13} aria-hidden />
+                    Confirmed this is @{username}&apos;s post
+                  </div>
+                )}
+                {details?.caption && (
+                  <p className="max-h-[220px] overflow-auto whitespace-pre-wrap text-[0.82rem] leading-relaxed text-text-primary">
+                    {details.caption}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-[0.82rem] leading-relaxed text-text-tertiary">
+                Live stats aren&apos;t available for this account (private /
+                personal, or Instagram fetch is cooling down). The embedded post
+                is the live Instagram post.
+              </p>
+            )}
+            <a
+              href={igUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-auto inline-flex items-center gap-1 text-[0.8rem] font-semibold text-[#3B6FD4] hover:underline"
+            >
+              <ExternalLink size={13} aria-hidden />
+              Open on Instagram
+            </a>
+          </aside>
+        </div>
       </div>
     </div>,
     document.body,
