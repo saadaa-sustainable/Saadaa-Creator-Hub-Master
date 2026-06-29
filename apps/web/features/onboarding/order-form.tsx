@@ -143,6 +143,11 @@ export function OrderCreationModal({
     reValidateMode: "onChange",
     shouldFocusError: true,
     defaultValues: {
+      // The bigserial row id identifies a reach-out row (post_id still NULL,
+      // minted at onboarding). It MUST be in form state, else the resolver +
+      // missing-fields check validate id=undefined and demand a Post ID that
+      // doesn't exist yet ("Kindly fill the Post ID column").
+      id,
       postId: repeatMode ? "PENDING" : postId,
       agency: initial?.agency ?? "",
       collabType: initial?.collabType ?? "Barter",
