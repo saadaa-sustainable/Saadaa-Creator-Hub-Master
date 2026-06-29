@@ -231,10 +231,10 @@
   </div>
   <div class="spec">
     <div class="n">e</div><div>
-      <div class="h"><span class="ht">profile_id &mdash; identity across handle changes</span><span class="fmt">Instagram numeric id</span><span class="tag k">both</span></div>
-      <div class="pe">The creator&rsquo;s Instagram numeric account id (legacy <code>ig_id</code>), stored on the creator beside the SIF. Handles change; the numeric id does not &mdash; so a returning creator under a new @handle is re-identified by <code>profile_id</code>, keeping the same SIF with no renumber.</div>
-      <div class="lg">Copied from the Meta / historic lookup onto <code>creators.profile_id</code> and <code>historic_posts.profile_id</code>. <b>~95% backfilled</b> on the historic registry; NULL where enrichment failed (~5%).</div>
-      <div class="ex"><span class="tag">8489263759</span><span class="tag k">survives @handle change</span></div>
+      <div class="h"><span class="ht">profile_id &mdash; the SIF&rsquo;s uniqueness anchor</span><span class="fmt">Instagram numeric id</span><span class="tag k">both</span></div>
+      <div class="pe">The creator&rsquo;s Instagram numeric id (the <code>ig_id</code> from Meta), stored beside the SIF. Handles change; this number doesn&rsquo;t &mdash; so the SIF is <b>anchored to it</b>: a creator matched on <code>profile_id</code> can never get a second SIF, and one returning under a new @handle keeps their SIF with no renumber.</div>
+      <div class="lg">Resolved from Meta <code>business_discovery</code> onto <code>creators.profile_id</code> / <code>historic_posts.profile_id</code>; reach-out de-dupes on it. <b>~95% backfilled</b> historically; NULL where enrichment failed (~5%).</div>
+      <div class="ex"><span class="tag">8489263759</span><span class="tag k">one creator = one SIF</span></div>
     </div>
   </div>
   <div class="folio"><span>Saadaa CreatorHub &middot; Identity &amp; Naming</span><span>02</span></div>
@@ -294,7 +294,7 @@
   <div class="nom">
     <span class="seg pid">SIF-15-P42<span class="t">post id &middot; no -C</span></span><span class="seg d">-</span>
     <span class="seg usr">johndoe<span class="t">username</span></span><span class="seg d">-</span>
-    <span class="seg ct">Reel<span class="t">content type</span></span><span class="seg d">-</span>
+    <span class="seg ct">UGC<span class="t">content code</span></span><span class="seg d">-</span>
     <span class="seg dt">2026-06-15<span class="t">reach-out date</span></span>
   </div>
 
@@ -303,7 +303,7 @@
       <div class="h"><span class="ht">Format string</span><span class="fmt">{post_id}-{username}-{content_type}-{reach_out_date}</span></div>
       <div class="pe">Four segments joined by dashes. The first is the deliverable <code>post_id</code> (<code>SIF-N-P{n}</code>, <em>no&nbsp;-C</em>); the&nbsp;-C lives only on the separate collab_id column, never inside the name.</div>
       <div class="lg"><b>buildLegacyNomenclature</b>(postId, username, contentType, date) &rarr; the four-part string; returns NULL if post_id, username or content_type is missing. Applied to the parent and every child at onboarding.</div>
-      <div class="ex"><span class="tag">SIF-15-P42-johndoe-Reel-2026-06-15</span></div>
+      <div class="ex"><span class="tag">SIF-15-P42-johndoe-UGC-2026-06-15</span></div>
     </div>
   </div>
   <div class="spec">
