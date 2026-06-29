@@ -148,11 +148,14 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     .select("status")
     .eq("campaign_id", v.campaignId)
     .maybeSingle();
-  if (String(campRow?.status ?? "").trim().toLowerCase() === "closed") {
+  const campStatus = String(campRow?.status ?? "").trim().toLowerCase();
+  if (campStatus !== "active") {
     return {
       ok: false,
-      error: `Campaign ${v.campaignId} is closed. Reopen it (Campaign Owner / Global Admin) to add creators.`,
-      fieldErrors: { campaignId: "Campaign is closed" },
+      error: campStatus.startsWith("pending")
+        ? `Campaign ${v.campaignId} is awaiting approval — it can't take reach-outs until an admin approves it.`
+        : `Campaign ${v.campaignId} is ${campRow?.status ?? "not active"}. Only approved (active) campaigns accept reach-outs.`,
+      fieldErrors: { campaignId: "Campaign not approved" },
     };
   }
 

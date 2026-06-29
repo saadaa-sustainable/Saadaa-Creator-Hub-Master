@@ -499,7 +499,9 @@ export async function GET(req: NextRequest) {
         .update({ status: "Closed", auto_closed_at: nowIso() })
         .lt("end_date", today)
         .is("auto_closed_at", null)
-        .not("status", "ilike", "closed")
+        // Only auto-close ACTIVE campaigns — never a pending-approval / rejected
+        // one (those aren't live and shouldn't be swept to Closed by end-date).
+        .ilike("status", "active")
         .select("campaign_id");
       if (error) {
         console.error("[cron/notifications] campaign auto-close failed:", error.message);

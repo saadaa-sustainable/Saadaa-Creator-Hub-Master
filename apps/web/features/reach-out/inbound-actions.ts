@@ -75,12 +75,15 @@ export async function submitInboundBatch(
     .select("status")
     .eq("campaign_id", campaignId)
     .maybeSingle();
-  if (String(campRow?.status ?? "").trim().toLowerCase() === "closed") {
+  const campStatus = String(campRow?.status ?? "").trim().toLowerCase();
+  if (campStatus !== "active") {
     return {
       ok: false,
       created: 0,
       failures: [],
-      error: `Campaign ${campaignId} is closed. Reopen it (Campaign Owner / Global Admin) to add creators.`,
+      error: campStatus.startsWith("pending")
+        ? `Campaign ${campaignId} is awaiting approval — it can't take reach-outs until an admin approves it.`
+        : `Campaign ${campaignId} is ${campRow?.status ?? "not active"}. Only approved (active) campaigns accept reach-outs.`,
     };
   }
 

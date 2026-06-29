@@ -33,7 +33,7 @@ function humanize(action: string): string {
 export async function fetchAuditLogData(): Promise<AuditLogData> {
   const svc = createServiceClient() as any;
 
-  const [cellEdits, comments, deletions, userLog, sysErrors] =
+  const [cellEdits, comments, deletions, userLog, sysErrors, approvalLogs] =
     await Promise.all([
       svc
         .from("cell_edits")
@@ -59,6 +59,11 @@ export async function fetchAuditLogData(): Promise<AuditLogData> {
         .from("system_errors")
         .select("id, type, key, message, source, resolved, resolved_at, resolved_by, created_at")
         .order("created_at", { ascending: false })
+        .limit(PER_SOURCE),
+      svc
+        .from("approval_logs")
+        .select("id, action_type, action, entity_id, admin_email, admin_name, notes, timestamp")
+        .order("timestamp", { ascending: false })
         .limit(PER_SOURCE),
     ]);
 
@@ -143,6 +148,21 @@ export async function fetchAuditLogData(): Promise<AuditLogData> {
     });
   }
 
+  for (const r of (approvalLogs.data ?? []) as Raw[]) {
+    const action = str(r.action);
+    const approved = action.toLowerCase() === "approved";
+    entries.push({
+      id: `ap-${str(r.id)}`,
+      source: "Approval",
+      at: (r.timestamp as string | null) ?? null,
+      actor: str(r.admin_name) || str(r.admin_email) || "Admin",
+      action: `${action} ${str(r.action_type) || "item"}`,
+      target: str(r.entity_id) || "—",
+      detail: trim(r.notes),
+      tone: approved ? "resolve" : "delete",
+    });
+  }
+
   // Newest first across every source.
   entries.sort((a, b) => {
     const ta = a.at ? Date.parse(a.at) : 0;
@@ -150,7 +170,12 @@ export async function fetchAuditLogData(): Promise<AuditLogData> {
     return tb - ta;
   });
 
-  const counts: Record<AuditSource, number> = { Sheet: 0, User: 0, System: 0 };
+  const counts: Record<AuditSource, number> = {
+    Sheet: 0,
+    User: 0,
+    System: 0,
+    Approval: 0,
+  };
   for (const e of entries) counts[e.source] += 1;
 
   return { entries, counts, total: entries.length };

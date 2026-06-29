@@ -8,6 +8,7 @@ import {
   ScrollText,
   Search,
   ShieldAlert,
+  ShieldCheck,
   Table2,
   Trash2,
   UserCog,
@@ -30,6 +31,7 @@ const SOURCE_META: Record<
   Sheet: { label: "Sheet View", icon: Table2, color: "#3B6FD4", bg: "#ECF1FB" },
   User: { label: "Users & Access", icon: UserCog, color: "#7B4FBF", bg: "#F3EDFB" },
   System: { label: "System", icon: ShieldAlert, color: "#C0392B", bg: "#FDECEA" },
+  Approval: { label: "Approvals", icon: ShieldCheck, color: "#B57514", bg: "#FAF1DC" },
 };
 
 const TONE_META: Record<AuditTone, { icon: Icon; color: string; bg: string }> = {
@@ -108,7 +110,7 @@ export function AuditLogBody({ data }: { data: AuditLogData }) {
       <div
         role="tablist"
         aria-label="Filter the audit log by source"
-        className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+        className="grid grid-cols-2 gap-3 lg:grid-cols-5"
       >
         {tiles.map((t) => {
           const active = source === t.key;

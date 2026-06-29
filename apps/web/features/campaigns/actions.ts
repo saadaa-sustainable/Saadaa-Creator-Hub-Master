@@ -125,9 +125,11 @@ export async function submitCampaign(
   // we set created_by in a follow-up service-role UPDATE. The owner (+ Global
   // Admins) can edit/close/reopen, and the Campaign Ending alert targets them.
   // Best-effort: a failed stamp leaves created_by NULL (owner "unknown").
+  // New campaigns land as 'Pending Approval' (Approvals gate) — an admin must
+  // approve before the campaign goes live. Stamped together with the owner.
   const { error: ownerErr } = await (supabase as any)
     .from("campaigns")
-    .update({ created_by: actor.email })
+    .update({ created_by: actor.email, status: "Pending Approval" })
     .eq("campaign_id", row.campaign_id);
   if (ownerErr) {
     console.error("[campaigns] created_by stamp failed:", ownerErr.message);
@@ -504,6 +506,88 @@ export async function reopenCampaign(
     .eq("campaign_id", id);
   if (error) return { ok: false, error: error.message };
 
+  revalidatePath("/campaigns");
+  return { ok: true };
+}
+
+/**
+ * Approve a pending campaign (Approvals gate). Global Admin only. Flips
+ * 'Pending Approval' → 'Active' atomically (only matches pending rows, so a
+ * double-approve is a no-op) and logs to approval_logs (feeds the Audit Log).
+ */
+export async function approveCampaign(
+  campaignId: string,
+): Promise<CampaignStatusResult> {
+  const actor = await assertPermission("admin");
+  const id = (campaignId ?? "").trim();
+  if (!id) return { ok: false, error: "Campaign ID is required." };
+
+  const supabase = createServiceClient();
+  const now = new Date().toISOString();
+  const { data, error } = await (supabase as any)
+    .from("campaigns")
+    .update({ status: "Active", updated_at: now })
+    .eq("campaign_id", id)
+    .ilike("status", "pending%")
+    .select("campaign_id")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data)
+    return {
+      ok: false,
+      error: "Campaign isn't pending approval (already approved or rejected).",
+    };
+
+  await (supabase as any).from("approval_logs").insert({
+    action_type: "Campaign",
+    action: "Approved",
+    entity_id: id,
+    admin_email: (actor as any).email ?? null,
+    admin_name: (actor as any).name ?? null,
+  });
+
+  revalidatePath("/approvals");
+  revalidatePath("/campaigns");
+  revalidatePath("/dashboard");
+  revalidatePath("/reach-out");
+  return { ok: true };
+}
+
+/**
+ * Reject a pending campaign. Global Admin only. Flips 'Pending Approval' →
+ * 'Rejected' atomically + logs the reason to approval_logs.
+ */
+export async function rejectCampaign(
+  campaignId: string,
+  notes?: string,
+): Promise<CampaignStatusResult> {
+  const actor = await assertPermission("admin");
+  const id = (campaignId ?? "").trim();
+  if (!id) return { ok: false, error: "Campaign ID is required." };
+
+  const supabase = createServiceClient();
+  const now = new Date().toISOString();
+  const { data, error } = await (supabase as any)
+    .from("campaigns")
+    .update({ status: "Rejected", updated_at: now })
+    .eq("campaign_id", id)
+    .ilike("status", "pending%")
+    .select("campaign_id")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data)
+    return { ok: false, error: "Campaign isn't pending approval." };
+
+  await (supabase as any).from("approval_logs").insert({
+    action_type: "Campaign",
+    action: "Rejected",
+    entity_id: id,
+    admin_email: (actor as any).email ?? null,
+    admin_name: (actor as any).name ?? null,
+    notes: (notes ?? "").trim() || null,
+  });
+
+  revalidatePath("/approvals");
   revalidatePath("/campaigns");
   return { ok: true };
 }

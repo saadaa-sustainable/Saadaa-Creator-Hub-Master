@@ -14,6 +14,9 @@ export const fetchCampaignsForSelect = unstable_cache(
     const { data, error } = await supabase
       .from("campaigns")
       .select("campaign_id, campaign_name, status, brief_link, internal_brief_link")
+      // Only APPROVED (active) campaigns are pickable — pending-approval, rejected
+      // and closed campaigns never appear in the reach-out campaign dropdown.
+      .ilike("status", "active")
       .order("campaign_num", { ascending: false, nullsFirst: false })
       .limit(200);
     if (error) throw error;

@@ -21,6 +21,7 @@ import {
   History,
   ScrollText,
   LifeBuoy,
+  ShieldCheck,
   LogOut,
   X,
   type LucideIcon,
@@ -118,6 +119,12 @@ const NAV: NavSection[] = [
         href: "/historic-analytics",
         icon: History,
         show: (a) => hasPermission(a, "performance_view"),
+      },
+      {
+        label: "Approvals",
+        href: "/approvals",
+        icon: ShieldCheck,
+        show: (a) => hasPermission(a, "admin"),
       },
       {
         label: "User Panel",

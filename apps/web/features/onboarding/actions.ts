@@ -701,7 +701,7 @@ export async function listOnboardableCreators(): Promise<OnboardableCreator[]> {
   return ((data ?? []) as OnboardableCreator[]).filter((c) => c.inf_id);
 }
 
-/** Open (non-closed) campaigns, for the repeat-collab campaign dropdown. */
+/** Approved (active) campaigns, for the repeat-collab campaign dropdown. */
 export async function listOpenCampaigns(): Promise<
   Array<{ campaign_id: string; campaign_name: string | null }>
 > {
@@ -719,7 +719,7 @@ export async function listOpenCampaigns(): Promise<
     }>
   )
     .filter(
-      (c) => c.campaign_id && String(c.status ?? "").toLowerCase() !== "closed",
+      (c) => c.campaign_id && String(c.status ?? "").toLowerCase() === "active",
     )
     .map((c) => ({ campaign_id: c.campaign_id, campaign_name: c.campaign_name }));
 }

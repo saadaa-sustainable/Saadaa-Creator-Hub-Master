@@ -6,6 +6,7 @@
 import type { ComponentType } from "react";
 import AccountsHubKM from "./accounts-hub";
 import AdStatusKM from "./ad-status";
+import ApprovalsKM from "./approvals";
 import AuditLogKM from "./audit-log";
 import CampaignsKM from "./campaigns";
 import ComplianceKM from "./compliance";
@@ -54,6 +55,7 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   "internal-dashboard": InternalDashboardKM,
   errors: ErrorsKM,
   "audit-log": AuditLogKM,
+  approvals: ApprovalsKM,
   "issue-desk": IssueDeskKM,
   sheets: SheetsKM,
   "user-panel": UserPanelKM,
