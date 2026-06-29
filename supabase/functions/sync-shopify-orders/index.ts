@@ -148,7 +148,11 @@ function mapOrder(o: ShopifyOrder): Record<string, unknown> {
   const refundedAt = (o.refunds ?? []).map((r) => r.created_at).filter(Boolean).sort().pop() ?? null;
 
   return {
-    order_id: String(o.id),
+    // Key on the order NUMBER (what the team uses + what posts.order_id stores),
+    // NOT the Shopify internal id. Storing String(o.id) caused id-format
+    // mismatches → duplicate rows (one per number, one per internal id) and broke
+    // creator linkage. Fallback to the internal id only if order_number is absent.
+    order_id: String(o.order_number ?? o.id),
     customer_name: customerName,
     email: o.email ?? null,
     phone: o.phone ?? o.shipping_address?.phone ?? null,
@@ -253,7 +257,7 @@ async function handleSingleOrder(
     .upsert(mapOrder(order), { onConflict: "order_id" });
   if (error) return json({ ok: false, error: error.message }, 500);
 
-  return json({ ok: true, found: true, matched: 1, tagged: true, order_id: String(order.id) });
+  return json({ ok: true, found: true, matched: 1, tagged: true, order_id: String(order.order_number ?? order.id) });
 }
 
 Deno.serve(async (req) => {
