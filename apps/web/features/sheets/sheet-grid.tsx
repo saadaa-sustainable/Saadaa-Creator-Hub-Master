@@ -1625,32 +1625,55 @@ function Cell({
         </span>
       )}
       {renderValue(value, col, search)}
-      {openComments && (commentCount ?? 0) > 0 && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            openComments();
-          }}
-          className="absolute top-0 right-0 inline-flex items-center gap-0.5 px-1 h-4 text-[0.55rem] font-extrabold rounded-bl-md bg-[--accent]/95 text-text-primary border-l border-b border-[--accent] hover:brightness-95 transition"
-          title={`${commentCount} comment${commentCount === 1 ? "" : "s"}`}
-        >
-          <MessageSquareIcon size={8} aria-hidden />
-          {commentCount}
-        </button>
-      )}
-      {openComments && (commentCount ?? 0) === 0 && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            openComments();
-          }}
-          className="absolute top-0.5 right-0.5 inline-flex items-center justify-center w-4 h-4 rounded text-text-tertiary opacity-0 group-hover/cell:opacity-100 hover:bg-bg-muted hover:text-text-primary transition"
-          title="Add comment"
-        >
-          <MessageSquareIcon size={9} aria-hidden />
-        </button>
+
+      {/* Per-cell action icons (DAM-style): a subtle, always-present edit pencil
+          + comment trigger on every editable cell, brighter on hover. A cell
+          with comments shows the accent count badge instead of the ghost icon. */}
+      {(canEdit || (commentCount ?? 0) > 0) && (
+        <span className="absolute top-0 right-0 flex items-center gap-px">
+          {canEdit && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartEdit();
+              }}
+              className="inline-flex h-4 w-4 items-center justify-center rounded text-text-tertiary opacity-35 transition hover:bg-bg-muted hover:text-warning hover:opacity-100 group-hover/cell:opacity-70"
+              title="Edit cell"
+              tabIndex={-1}
+            >
+              <Pencil size={9} aria-hidden />
+            </button>
+          )}
+          {openComments &&
+            ((commentCount ?? 0) > 0 ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openComments();
+                }}
+                className="inline-flex h-4 items-center gap-0.5 rounded-bl-md border-b border-l border-[--accent] bg-[--accent]/95 px-1 text-[0.55rem] font-extrabold text-text-primary transition hover:brightness-95"
+                title={`${commentCount} comment${commentCount === 1 ? "" : "s"}`}
+              >
+                <MessageSquareIcon size={8} aria-hidden />
+                {commentCount}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openComments();
+                }}
+                className="inline-flex h-4 w-4 items-center justify-center rounded text-text-tertiary opacity-35 transition hover:bg-bg-muted hover:text-text-primary hover:opacity-100 group-hover/cell:opacity-70"
+                title="Add comment"
+                tabIndex={-1}
+              >
+                <MessageSquareIcon size={9} aria-hidden />
+              </button>
+            ))}
+        </span>
       )}
       {recentEdit && <EditedBadge edit={recentEdit} />}
     </td>
