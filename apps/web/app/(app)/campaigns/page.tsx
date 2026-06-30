@@ -2,7 +2,12 @@ import Link from "next/link";
 import { Plus, Rocket } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ExistingCampaigns } from "@/features/campaigns/existing-campaigns";
+import { BulkAssignCampaignPanel } from "@/features/campaigns/bulk-assign-panel";
 import { fetchCampaigns } from "@/features/campaigns/queries";
+import {
+  fetchAssignableCampaigns,
+  fetchUnassignedReachOuts,
+} from "@/features/campaigns/bulk-assign-queries";
 import { assertPermission } from "@/lib/rbac.server";
 import { hasPermission } from "@/lib/rbac";
 
@@ -14,7 +19,11 @@ export default async function CampaignsPage() {
   const canManage =
     hasPermission(actor, "campaign_create") ||
     hasPermission(actor, "campaign_edit");
-  const campaigns = await fetchCampaigns();
+  const [campaigns, unassigned, assignable] = await Promise.all([
+    fetchCampaigns(),
+    canManage ? fetchUnassignedReachOuts() : Promise.resolve([]),
+    canManage ? fetchAssignableCampaigns() : Promise.resolve([]),
+  ]);
 
   return (
     <div className="campaign-list-page space-y-4">
@@ -40,6 +49,10 @@ export default async function CampaignsPage() {
         showCreateAction={canManage}
         canManage={canManage}
       />
+
+      {canManage && (
+        <BulkAssignCampaignPanel rows={unassigned} campaigns={assignable} />
+      )}
     </div>
   );
 }

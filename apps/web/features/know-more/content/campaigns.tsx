@@ -136,6 +136,37 @@ export default function CampaignsKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Assign unassigned reach-outs">
+        <p>
+          Below the campaign list, managers see{" "}
+          <strong>Assign unassigned reach-outs to a campaign</strong> — a tool
+          for reach-out rows that landed without a campaign (bulk-ingested or
+          migrated creators). Filter by handle / SIF / callout-by, tick the
+          rows, pick a live campaign, and <strong>Assign</strong>.
+        </p>
+        <KMList>
+          <li>
+            Lists <KMCode>posts</KMCode> where{" "}
+            <KMCode>campaign_id IS NULL</KMCode> and stage is{" "}
+            <strong>Reach Out</strong>. Select-all respects the current filter.
+          </li>
+          <li>
+            Target dropdown shows live campaigns only (Pending Approval and
+            Rejected are hidden). The selected rows&apos; <KMCode>campaign_id</KMCode>{" "}
+            is set in one write.
+          </li>
+          <li>
+            Safe by design — only rows still unassigned move. A row already tied
+            to another campaign is never reassigned, so a double-click can&apos;t
+            steal it.
+          </li>
+          <li>
+            Needs <KMCode>campaign_edit</KMCode> (Campaign Owner / Global Admin).
+            Read-only roles don&apos;t see the panel.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>

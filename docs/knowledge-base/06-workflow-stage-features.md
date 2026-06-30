@@ -71,6 +71,7 @@ Creates `campaigns` (`IFC{NNN}`) + `campaign_budget` rows that gate downstream R
 | `fetchCampaignForEdit` | `campaign_edit` | Prefill loader |
 | `closeCampaign` | `campaign_edit` | sets `status='Closed'` |
 | `reopenCampaign` | `campaign_edit` | sets `status='Active'` + stamps `auto_closed_at` so daily cron won't re-close |
+| `bulkAssignPostsToCampaign` | `campaign_edit` | bulk-set `campaign_id` on unassigned reach-outs; only moves rows where `campaign_id IS NULL` (never reassigns); target must be live (not Pending/Rejected) |
 
 ### Validation & budget rows
 - **Required:** `campaignName`, `keyMessage`, **`startDate`** and **`endDate`** (both `min(1)` required — 2026-06-07, red `*` + inline errors), `briefLink` (valid URL). `superRefine`: allocated > 0; allocated ≤ numCreators cap; `endDate >= startDate`.
@@ -85,6 +86,9 @@ Creates `campaigns` (`IFC{NNN}`) + `campaign_budget` rows that gate downstream R
 - **On close, un-onboarded reach-outs are voided** — `voidUnonboardedForCampaign` (`lib/campaign-lifecycle.ts`) flips every non-onboarded, non-terminal reach-out on the campaign to `Cancelled`. Wired into all three close paths (end-date cron #7, completion close, manual `closeCampaign`). Data is kept (Cancelled rows stay in Sheet View + per-campaign dashboard metrics). Since the onboard cap counts only onboarded-active creators, leftovers stay live as backups until close (so a freed slot from an offboard can still onboard one).
 - **D8:** editing avg_comp/num_influencers does NOT retroactively rewrite existing posts' `commercial_amount`; returns a `warning` with the count of tied reach-outs. Preserves original `month_label`.
 - `submitCampaign` fires CAMPAIGN_CREATED (active Global Admins, actor excluded) + CAMPAIGN_CONFIRMATION (actor) via `after()`.
+
+### Bulk campaign-assign tool (2026-06-30)
+`features/campaigns/bulk-assign-{queries,actions,panel}.tsx`. Panel under the campaign list (rendered when `canManage`). `fetchUnassignedReachOuts` lists `posts` where `campaign_id IS NULL` + stage `Reach Out`; `fetchAssignableCampaigns` returns live campaigns (filters out Pending/Rejected). `BulkAssignCampaignPanel` = collapsible card, filter (handle/SIF/callout-by) + select-all + campaign picker + Assign. `bulkAssignPostsToCampaign(postIds, campaignId)` validates the target is live then `UPDATE posts SET campaign_id … WHERE id IN (…) AND campaign_id IS NULL` (idempotent, never reassigns). Built to attach the 2026-06-30 historic-creator reach-out ingest (252 rows, campaign-null; see repo-root `sheet-ingest/INGEST_LOG.md`) to real campaigns once the team maps them.
 
 ---
 
