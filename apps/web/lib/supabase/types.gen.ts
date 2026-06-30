@@ -93,6 +93,11 @@ export interface PostsRow {
   raw_dump: string | null;
   partnership_id: string | null;
   ad_partnership_valid: boolean | null;
+  /** Normalized branded-content permission state (pending/approved/rejected/revoked/none). */
+  partnership_status?: string | null;
+  partnership_sent_at?: string | null;
+  partnership_approved_at?: string | null;
+  partnership_declined_at?: string | null;
   content_type: string | null;
   collab_email_sent_at: string | null;
   collab_email_skipped: boolean | null;

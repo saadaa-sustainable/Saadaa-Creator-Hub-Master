@@ -51,14 +51,20 @@ function cleanHandle(h: string): string {
   return (h ?? "").trim().replace(/^@/, "").toLowerCase();
 }
 
-/** Map Meta's permission_status text → our normalized state. */
+/** Map Meta's permission_status text → our normalized state.
+ *
+ * ORDER MATTERS: "Pending Approval" contains the substring "approv", so the
+ * pending / rejected / revoked checks MUST run before the approved check —
+ * otherwise a still-pending invite (request sent, awaiting creator) is
+ * mis-read as "approved". Meta values: Approved / Pending Approval /
+ * Rejected / Revoked (Declined seen on some surfaces). */
 function toState(raw: string | null | undefined): PartnershipState {
   const s = (raw ?? "").trim().toLowerCase();
   if (!s) return "none";
-  if (s.includes("approv")) return "approved";
   if (s.includes("pending")) return "pending";
-  if (s.includes("reject")) return "rejected";
+  if (s.includes("reject") || s.includes("declin")) return "rejected";
   if (s.includes("revok")) return "revoked";
+  if (s.includes("approv")) return "approved";
   return "unknown";
 }
 
