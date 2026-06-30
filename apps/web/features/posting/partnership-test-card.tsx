@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   CheckCircle2,
   Clock3,
@@ -43,6 +43,16 @@ export function PartnershipTestCard() {
       if (!res.ok) toast.error(res.error);
     });
   };
+
+  // Auto-load the live status on open so a decline/approval shows without a
+  // manual click (read-only). Silent on error — the Check status button surfaces it.
+  useEffect(() => {
+    start(async () => {
+      const res = await checkTestPartnershipStatus();
+      setResult(res);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sendInvite = () => {
     if (
