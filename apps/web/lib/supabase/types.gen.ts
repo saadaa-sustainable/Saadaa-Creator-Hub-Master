@@ -136,6 +136,10 @@ export interface CreatorsRow {
   inf_id: string;
   sif_number: number | null;
   creator_type: "historic_creator" | "new_creator";
+  /** false = deactivated (dead/mangled IG handle, no profile_id). */
+  is_active?: boolean | null;
+  deactivated_reason?: string | null;
+  deactivated_at?: string | null;
   username: string;
   inf_name: string | null;
   instagram_link: string | null;

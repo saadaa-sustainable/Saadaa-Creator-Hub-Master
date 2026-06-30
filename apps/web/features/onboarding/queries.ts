@@ -62,7 +62,7 @@ export async function fetchOnboardingTable(
       collab_id,
       inf_id,
       campaign:campaigns ( campaign_id, campaign_name ),
-      creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link )
+      creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link, is_active )
     `,
     )
     .in("workflow_status", ONBOARDING_STATUS_SET);

@@ -49,6 +49,7 @@ export interface OnboardingRow {
     | "state"
     | "profile_pic"
     | "instagram_link"
+    | "is_active"
   > | null;
   /**
    * Presentation-only: total deliverables across the whole collab

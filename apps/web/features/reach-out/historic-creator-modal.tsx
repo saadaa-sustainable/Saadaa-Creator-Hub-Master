@@ -11,7 +11,7 @@ import {
   ChevronRight,
   Plus,
 } from "lucide-react";
-import { Avatar } from "@/components/ui";
+import { Avatar, DeactivatedBadge } from "@/components/ui";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { OrderCreationModal } from "@/features/onboarding/order-form";
 import {
@@ -355,6 +355,9 @@ export function HistoricCreatorButton() {
                             </div>
                           )}
                         </div>
+                        {c.is_active === false && (
+                          <DeactivatedBadge isActive={c.is_active} />
+                        )}
                         <span
                           className={`shrink-0 rounded-full px-2 py-0.5 text-[0.6rem] font-semibold ${
                             isHistoric

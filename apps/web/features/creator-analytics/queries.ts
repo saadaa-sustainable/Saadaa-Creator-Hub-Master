@@ -82,6 +82,7 @@ export async function fetchCreatorAnalyticsPage(
     reach_out_to: (r.reach_out_to as string | null) ?? null,
     state: (r.state as string | null) ?? null,
     instagram_link: (r.instagram_link as string | null) ?? null,
+    is_active: r.is_active == null ? null : Boolean(r.is_active),
   }));
 
   const total = Number(records[0]?.total_count ?? 0) || 0;

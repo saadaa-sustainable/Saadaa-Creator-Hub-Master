@@ -71,7 +71,7 @@ export async function fetchPostingTable(
       collab_id,
       inf_id,
       campaign:campaigns ( campaign_id, campaign_name ),
-      creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link )
+      creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link, is_active )
     `,
     )
     .in("workflow_status", POSTING_STATUS_SET);

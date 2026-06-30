@@ -1,4 +1,5 @@
 import { Avatar } from "@/components/ui/avatar";
+import { DeactivatedBadge } from "@/components/ui/status-pill";
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { JourneyCard as JourneyCardType, JourneyColumnId } from "./types";
 import { cn } from "@/lib/cn";
@@ -159,6 +160,9 @@ export function JourneyCardItem({
       </div>
 
       <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+        {card.creator?.is_active === false && (
+          <DeactivatedBadge isActive={card.creator?.is_active} />
+        )}
         <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[0.6rem] font-bold bg-[--bg-ecru] border border-[--border] text-text-secondary tabular whitespace-nowrap">
           {card.post_id}
         </span>

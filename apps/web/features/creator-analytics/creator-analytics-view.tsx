@@ -15,7 +15,12 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { Avatar, StatusPill, WorkflowStatusPill } from "@/components/ui";
+import {
+  Avatar,
+  DeactivatedBadge,
+  StatusPill,
+  WorkflowStatusPill,
+} from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { WorkflowStatus } from "@/lib/supabase/types.gen";
@@ -364,6 +369,9 @@ function CreatorCell({ r }: { r: CreatorAnalyticsRow }) {
       <div className="min-w-0">
         <div className="creator-name">{r.inf_name ?? (r.username || "—")}</div>
         <div className="creator-handle">@{r.username || "—"}</div>
+        {r.is_active === false && (
+          <DeactivatedBadge isActive={r.is_active} className="mt-1" />
+        )}
       </div>
     </div>
   );
@@ -393,6 +401,7 @@ function CreatorCard({
       </div>
 
       <div className="ob-card-pills">
+        <DeactivatedBadge isActive={r.is_active} />
         <CreatorTypeChip type={r.creator_type} />
         {r.current_stage && <StageCell stage={r.current_stage} />}
         <span className="post-id tabular">{r.inf_id}</span>

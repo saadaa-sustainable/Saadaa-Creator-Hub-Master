@@ -45,6 +45,8 @@ export interface CreatorAnalyticsRow {
   /** Region (creators.state) — also used by the region filter. */
   state: string | null;
   instagram_link: string | null;
+  /** false = deactivated creator (dead/mangled IG handle, no profile_id). */
+  is_active: boolean | null;
 }
 
 export interface CreatorAnalyticsFilters {

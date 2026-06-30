@@ -1,6 +1,6 @@
 "use client";
 import { AlertTriangle, Handshake, ShieldCheck } from "lucide-react";
-import { Avatar } from "@/components/ui";
+import { Avatar, DeactivatedBadge } from "@/components/ui";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import { computeMatchStatus, type MatchStatus } from "@/lib/payable-cycle";
 import type { AccountsRow } from "./types";
@@ -154,6 +154,9 @@ export function CreatorCell({ row }: { row: AccountsRow }) {
       <div className="min-w-0">
         <div className="creator-name">{row.creator?.inf_name ?? "—"}</div>
         <div className="creator-handle">@{row.creator?.username ?? "—"}</div>
+        {row.creator?.is_active === false && (
+          <DeactivatedBadge isActive={row.creator?.is_active} className="mt-1" />
+        )}
       </div>
     </div>
   );

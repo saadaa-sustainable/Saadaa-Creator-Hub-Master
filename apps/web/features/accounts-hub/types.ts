@@ -53,6 +53,7 @@ export interface AccountsRow {
     | "category"
     | "followers"
     | "verification"
+    | "is_active"
   > | null;
 
   /** Latest non-Done payment row + any Done row(s). Latest by created_at. */

@@ -40,6 +40,7 @@ const CREATORS_SELECT = [
   "category",
   "followers",
   "state",
+  "is_active",
 ].join(",");
 
 /** Ordered column definitions — left → right in the kanban. */
@@ -130,6 +131,7 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
             category: (c.category as string | null) ?? null,
             followers: typeof c.followers === "number" ? c.followers : null,
             state: (c.state as string | null) ?? null,
+            is_active: c.is_active == null ? null : Boolean(c.is_active),
           });
         }
       }

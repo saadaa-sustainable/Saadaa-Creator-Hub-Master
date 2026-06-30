@@ -75,7 +75,7 @@ export async function fetchAccountsHubData(
       bank_number,
       ifsc,
       campaign:campaigns ( campaign_id, campaign_name ),
-      creator:creators  ( inf_id, username, inf_name, profile_pic, category, followers, verification )
+      creator:creators  ( inf_id, username, inf_name, profile_pic, category, followers, verification, is_active )
     `,
     )
     .in("workflow_status", stages);

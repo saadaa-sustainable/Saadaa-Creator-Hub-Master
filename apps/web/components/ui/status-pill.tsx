@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import { Ban } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { workflowStatusLabel } from "@/lib/formatters";
 import type {
@@ -37,6 +38,28 @@ export interface StatusPillProps extends VariantProps<typeof pill> {
 
 export function StatusPill({ tone, className, children }: StatusPillProps) {
   return <span className={cn(pill({ tone }), className)}>{children}</span>;
+}
+
+/**
+ * Deactivated badge — shown on any creator surface (cards, analytics, pickers)
+ * when `creators.is_active = false` (dead/mangled IG handle, no profile_id, or
+ * Meta Invalid-user-id). Renders nothing when the creator is active or unknown.
+ * One shared component so the label stays identical everywhere.
+ */
+export function DeactivatedBadge({
+  isActive,
+  className,
+}: {
+  isActive?: boolean | null;
+  className?: string;
+}) {
+  if (isActive !== false) return null;
+  return (
+    <StatusPill tone="danger" className={className}>
+      <Ban size={10} aria-hidden />
+      Deactivated
+    </StatusPill>
+  );
 }
 
 // ---------- domain-mapped helpers (so callers don't repeat the switch) ---------

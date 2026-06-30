@@ -31,6 +31,7 @@ export interface JourneyCreator {
   category: string | null;
   followers: number | null;
   state: string | null;
+  is_active: boolean | null;
 }
 
 /** Enriched post row — base post + creator lookup merged in. */

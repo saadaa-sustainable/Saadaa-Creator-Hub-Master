@@ -82,6 +82,14 @@ export default function CreatorAnalyticsKM() {
             <KMCode>historic_creator</KMCode> reads &ldquo;Historic&rdquo;,{" "}
             <KMCode>new_creator</KMCode> reads &ldquo;New&rdquo;.
           </li>
+          <li>
+            <strong>Deactivated</strong> badge — shown on the card + row (and
+            every other creator surface) when{" "}
+            <KMCode>creators.is_active = false</KMCode>: a dead/mangled IG handle
+            (no <KMCode>profile_id</KMCode>) or a Meta &ldquo;Invalid user
+            id&rdquo;. The creator&apos;s history is kept; the badge just flags it
+            as unusable.
+          </li>
         </KMList>
       </KMSection>
 

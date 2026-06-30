@@ -9,7 +9,7 @@ import {
   Send,
   SlashSquare,
 } from "lucide-react";
-import { Avatar, WorkflowStatusPill } from "@/components/ui";
+import { Avatar, DeactivatedBadge, WorkflowStatusPill } from "@/components/ui";
 import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
 import type { OnboardingRow } from "./types";
 
@@ -384,6 +384,9 @@ export function CreatorCell({ r }: { r: OnboardingRow }) {
       <div className="min-w-0">
         <div className="creator-name">{r.creator?.inf_name ?? "—"}</div>
         <div className="creator-handle">@{r.creator?.username ?? "—"}</div>
+        {r.creator?.is_active === false && (
+          <DeactivatedBadge isActive={r.creator?.is_active} className="mt-1" />
+        )}
       </div>
     </div>
   );

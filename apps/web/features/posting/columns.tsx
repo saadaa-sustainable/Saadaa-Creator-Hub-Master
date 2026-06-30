@@ -1,7 +1,12 @@
 "use client";
 import type { ColumnDef } from "@tanstack/react-table";
 import { AlertTriangle, Download, ExternalLink, Layers } from "lucide-react";
-import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
+import {
+  Avatar,
+  DeactivatedBadge,
+  PartnershipKeyEdit,
+  WorkflowStatusPill,
+} from "@/components/ui";
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { PostingRow } from "./types";
 
@@ -94,6 +99,9 @@ export function CreatorCell({ r }: { r: PostingRow }) {
       <div className="min-w-0">
         <div className="creator-name">{r.creator?.inf_name ?? "—"}</div>
         <div className="creator-handle">@{r.creator?.username ?? "—"}</div>
+        {r.creator?.is_active === false && (
+          <DeactivatedBadge isActive={r.creator?.is_active} className="mt-1" />
+        )}
       </div>
     </div>
   );

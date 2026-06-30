@@ -27,6 +27,7 @@ export {
   WorkflowStatusPill,
   AdResultPill,
   PaymentStatusPill,
+  DeactivatedBadge,
 } from "./status-pill";
 export { ViewModeToggle } from "./view-mode-toggle";
 export type { ViewMode } from "./view-mode-toggle";

@@ -44,6 +44,7 @@ export interface PostingRow {
     | "state"
     | "profile_pic"
     | "instagram_link"
+    | "is_active"
   > | null;
 }
 

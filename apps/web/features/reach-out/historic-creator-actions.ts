@@ -34,6 +34,8 @@ export interface HistoricCreatorRow {
   category: string | null;
   profile_pic: string | null;
   creator_type: string;
+  /** false = deactivated creator (dead/mangled IG handle, no profile_id). */
+  is_active: boolean | null;
 }
 
 export interface HistoricCreatorFilters {
@@ -88,6 +90,7 @@ export async function listHistoricCreators(
     category: r.category,
     profile_pic: r.profile_pic,
     creator_type: r.creator_type,
+    is_active: (r as { is_active?: boolean | null }).is_active ?? null,
   }));
 
   return { rows, total, page, pageSize: PAGE_SIZE };
