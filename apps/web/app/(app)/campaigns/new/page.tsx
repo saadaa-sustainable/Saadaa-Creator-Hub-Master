@@ -2,6 +2,10 @@ import { Rocket } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { CampaignCreateSwitcher } from "@/features/campaigns/create-switcher";
 import { fetchCampaigns } from "@/features/campaigns/queries";
+import {
+  fetchAssignableCampaigns,
+  fetchUnassignedReachOuts,
+} from "@/features/campaigns/bulk-assign-queries";
 import { assertPermission } from "@/lib/rbac.server";
 import { hasPermission } from "@/lib/rbac";
 
@@ -14,7 +18,11 @@ export default async function NewCampaignPage() {
   const canManage =
     hasPermission(actor, "campaign_create") ||
     hasPermission(actor, "campaign_edit");
-  const campaigns = await fetchCampaigns();
+  const [campaigns, unassigned, assignable] = await Promise.all([
+    fetchCampaigns(),
+    canManage ? fetchUnassignedReachOuts() : Promise.resolve([]),
+    canManage ? fetchAssignableCampaigns() : Promise.resolve([]),
+  ]);
 
   return (
     <div className="campaign-create-page space-y-4">
@@ -22,7 +30,12 @@ export default async function NewCampaignPage() {
       <p className="text-sm text-text-secondary">
         Server generates the IFC{"{NNN}"} ID. Budget rolls up automatically.
       </p>
-      <CampaignCreateSwitcher campaigns={campaigns} canManage={canManage} />
+      <CampaignCreateSwitcher
+        campaigns={campaigns}
+        canManage={canManage}
+        unassigned={unassigned}
+        assignableCampaigns={assignable}
+      />
     </div>
   );
 }

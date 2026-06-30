@@ -5,16 +5,27 @@ import { FileText, PlusCircle } from "lucide-react";
 import type { CampaignListRow } from "./queries";
 import { CampaignCreateForm } from "./create-form";
 import { ExistingCampaigns } from "./existing-campaigns";
+import { BulkAssignCampaignPanel } from "./bulk-assign-panel";
+import type {
+  AssignableCampaign,
+  UnassignedReachOut,
+} from "./bulk-assign-queries";
 
 interface CampaignCreateSwitcherProps {
   campaigns: CampaignListRow[];
   /** Campaign Owner + Global Admin: may edit / close / reopen. */
   canManage?: boolean;
+  /** Reach-outs with no campaign yet (for the bulk-assign tool). */
+  unassigned?: UnassignedReachOut[];
+  /** Live campaigns a reach-out can be attached to. */
+  assignableCampaigns?: AssignableCampaign[];
 }
 
 export function CampaignCreateSwitcher({
   campaigns,
   canManage = false,
+  unassigned = [],
+  assignableCampaigns = [],
 }: CampaignCreateSwitcherProps) {
   const [mode, setMode] = useState<"create" | "existing">("create");
 
@@ -51,7 +62,15 @@ export function CampaignCreateSwitcher({
       {mode === "create" ? (
         <CampaignCreateForm />
       ) : (
-        <ExistingCampaigns campaigns={campaigns} canManage={canManage} />
+        <div className="space-y-4">
+          <ExistingCampaigns campaigns={campaigns} canManage={canManage} />
+          {canManage && (
+            <BulkAssignCampaignPanel
+              rows={unassigned}
+              campaigns={assignableCampaigns}
+            />
+          )}
+        </div>
       )}
     </div>
   );
