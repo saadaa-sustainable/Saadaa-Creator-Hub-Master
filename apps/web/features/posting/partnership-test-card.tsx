@@ -24,11 +24,17 @@ const STATE_META: Record<
 > = {
   approved: { label: "Approved — partner exists", color: "#4F7C4D", bg: "#ECF1E9", icon: CheckCircle2 },
   pending: { label: "Pending — invite sent", color: "#B57514", bg: "#FAF1DC", icon: Clock3 },
-  rejected: { label: "Rejected — can resend", color: "#C0392B", bg: "#FDECEA", icon: XCircle },
-  revoked: { label: "Revoked — can resend", color: "#C0392B", bg: "#FDECEA", icon: XCircle },
+  rejected: { label: "Rejected by the creator — can resend", color: "#C0392B", bg: "#FDECEA", icon: XCircle },
+  revoked: { label: "Revoked by the creator — can resend", color: "#C0392B", bg: "#FDECEA", icon: XCircle },
   none: { label: "No partnership yet", color: "#6E695E", bg: "#F0EDE6", icon: RotateCcw },
-  unknown: { label: "Unknown", color: "#6E695E", bg: "#F0EDE6", icon: RotateCcw },
+  unknown: { label: "Status unavailable", color: "#6E695E", bg: "#F0EDE6", icon: RotateCcw },
 };
+
+/** Meta reports "Canceled" for a creator-declined request — show it as "Rejected". */
+function prettyRawStatus(raw: string | null): string | null {
+  if (!raw) return null;
+  return /cancel/i.test(raw) ? "Rejected" : raw;
+}
 
 export function PartnershipTestCard() {
   const [pending, start] = useTransition();
@@ -129,7 +135,9 @@ export function PartnershipTestCard() {
           {result?.ok && result.status.permissionId && (
             <span className="font-mono text-[0.68rem] text-text-tertiary">
               perm {result.status.permissionId}
-              {result.status.rawStatus ? ` · ${result.status.rawStatus}` : ""}
+              {result.status.rawStatus
+                ? ` · ${prettyRawStatus(result.status.rawStatus)}`
+                : ""}
             </span>
           )}
           {result && !result.ok && (

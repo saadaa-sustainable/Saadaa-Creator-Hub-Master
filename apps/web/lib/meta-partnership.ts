@@ -62,7 +62,10 @@ function toState(raw: string | null | undefined): PartnershipState {
   const s = (raw ?? "").trim().toLowerCase();
   if (!s) return "none";
   if (s.includes("pending")) return "pending";
-  if (s.includes("reject") || s.includes("declin")) return "rejected";
+  // "Canceled" is what Meta reports when the creator DECLINES a brand-initiated
+  // branded_content_ad_permission request → treat as rejected.
+  if (s.includes("reject") || s.includes("declin") || s.includes("cancel"))
+    return "rejected";
   if (s.includes("revok")) return "revoked";
   if (s.includes("approv")) return "approved";
   return "unknown";
