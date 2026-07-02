@@ -92,12 +92,13 @@ export async function fetchCreatorAnalyticsPage(
   // simply renders without partnership badges.
   const infIds = [...new Set(rows.map((r) => r.inf_id).filter(Boolean))];
   if (infIds.length > 0) {
+    // is_test rows included on purpose — test entries stay visible until their
+    // Test Mode scope purges them (project convention).
     const { data: statusData, error: statusError } = await (supabase as any)
       .from("posts")
       .select("inf_id, partnership_status")
       .in("inf_id", infIds)
-      .not("partnership_status", "is", null)
-      .eq("is_test", false);
+      .not("partnership_status", "is", null);
 
     if (!statusError) {
       const statusByInf = new Map<string, string>();

@@ -71,13 +71,15 @@ export async function fetchPartnershipBoard(
 ): Promise<PartnershipBoardData> {
   const supabase = createServiceClient();
 
+  // NOTE: is_test rows are intentionally INCLUDED — project convention is that
+  // test entries stay visible until their Test Mode scope purges them, and the
+  // @saadaa_women test rig relies on appearing here.
   const { data: postRows, error } = await (supabase as any)
     .from("posts")
     .select(
       "inf_id, username, campaign_id, partnership_status, partnership_sent_at, partnership_approved_at, partnership_declined_at",
     )
-    .not("partnership_status", "is", null)
-    .eq("is_test", false);
+    .not("partnership_status", "is", null);
   if (error) throw new Error(error.message);
 
   // Collapse to one aggregate per creator (inf_id; username fallback for any

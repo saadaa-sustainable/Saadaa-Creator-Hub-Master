@@ -36,6 +36,8 @@ export interface HistoricCreatorRow {
   creator_type: string;
   /** false = deactivated creator (dead/mangled IG handle, no profile_id). */
   is_active: boolean | null;
+  /** Meta partnership state mirrored from posts (creator-level, nullable). */
+  partnership_status: string | null;
 }
 
 export interface HistoricCreatorFilters {
@@ -91,7 +93,37 @@ export async function listHistoricCreators(
     profile_pic: r.profile_pic,
     creator_type: r.creator_type,
     is_active: (r as { is_active?: boolean | null }).is_active ?? null,
+    partnership_status: null,
   }));
+
+  // Meta partnership status lives on posts.partnership_status (stamped
+  // creator-level, uniform across a creator's rows) and isn't part of the RPC —
+  // one batched lookup covers the page. Fail-soft: on error the picker simply
+  // renders without partnership badges. Same pattern as Creator Analytics.
+  const infIds = [...new Set(rows.map((r) => r.inf_id).filter(Boolean))];
+  if (infIds.length > 0) {
+    const { data: statusData, error: statusError } = await (
+      createServiceClient() as any
+    )
+      .from("posts")
+      .select("inf_id, partnership_status")
+      .in("inf_id", infIds)
+      .not("partnership_status", "is", null);
+    if (!statusError) {
+      const statusByInf = new Map<string, string>();
+      for (const p of (statusData ?? []) as Array<{
+        inf_id: string | null;
+        partnership_status: string | null;
+      }>) {
+        const id = String(p.inf_id ?? "");
+        const status = String(p.partnership_status ?? "").trim();
+        if (id && status && !statusByInf.has(id)) statusByInf.set(id, status);
+      }
+      for (const row of rows) {
+        row.partnership_status = statusByInf.get(row.inf_id) ?? null;
+      }
+    }
+  }
 
   return { rows, total, page, pageSize: PAGE_SIZE };
 }
