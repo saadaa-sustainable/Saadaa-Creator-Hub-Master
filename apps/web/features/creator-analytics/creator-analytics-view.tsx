@@ -220,7 +220,7 @@ function CreatorListTable({
                 <td className="px-2.5 py-1.5 align-middle">
                   <div className="flex flex-wrap items-center gap-1">
                     <StageCell stage={r.current_stage} />
-                    <PartnershipBadge status={r.partnership_status} />
+                    <PartnershipBadge status={r.partnership_status} compact />
                   </div>
                 </td>
                 <td className="px-2.5 py-1.5 align-middle">
@@ -408,7 +408,7 @@ function CreatorCard({
         <DeactivatedBadge isActive={r.is_active} />
         <CreatorTypeChip type={r.creator_type} />
         {r.current_stage && <StageCell stage={r.current_stage} />}
-        <PartnershipBadge status={r.partnership_status} />
+        <PartnershipBadge status={r.partnership_status} compact />
         <span className="post-id tabular">{r.inf_id}</span>
         {r.category && <span className="campaign-chip">{r.category}</span>}
       </div>

@@ -150,7 +150,8 @@ export function PartnershipFlowModal({
   const stateVisual = (() => {
     if (phase === "error")
       return {
-        icon: <AlertCircle size={30} className="text-danger" aria-hidden />,
+        icon: AlertCircle,
+        iconWrap: "bg-danger-bg text-danger",
         label: "Couldn't fetch the partnership status",
         sub: error,
       };
@@ -158,7 +159,8 @@ export function PartnershipFlowModal({
     switch (state) {
       case "approved":
         return {
-          icon: <CheckCircle2 size={30} className="text-success" aria-hidden />,
+          icon: CheckCircle2,
+          iconWrap: "bg-success-bg text-success",
           label: alreadyExisted
             ? "Partner already exists — approved"
             : PARTNERSHIP_STATE_LABELS.approved,
@@ -166,77 +168,109 @@ export function PartnershipFlowModal({
         };
       case "pending":
         return {
-          icon: <Clock3 size={30} className="text-warning" aria-hidden />,
+          icon: Clock3,
+          iconWrap: "bg-warning-bg text-warning",
           label: alreadyExisted
-            ? "Invite already sent — pending the creator's approval"
-            : "Invite sent — pending the creator's approval",
-          sub: "The creator approves it from their Instagram professional dashboard.",
+            ? "Invite already sent — awaiting the creator"
+            : "Invite sent — awaiting the creator",
+          sub: "The creator approves it from their Instagram professional dashboard. Track it on the Partnership Status tab.",
         };
       case "rejected":
       case "revoked":
         return {
-          icon: <XCircle size={30} className="text-danger" aria-hidden />,
-          label: PARTNERSHIP_STATE_LABELS[state],
-          sub: "You can send a fresh request with the Resend button.",
+          icon: XCircle,
+          iconWrap: "bg-danger-bg text-danger",
+          label:
+            state === "rejected"
+              ? "Rejected by the creator"
+              : "Revoked by the creator",
+          sub: "You can send a fresh request with the Resend button, or close and resend later from the Partnership Status tab.",
         };
       default:
         return {
-          icon: <Handshake size={30} className="text-text-tertiary" aria-hidden />,
+          icon: Handshake,
+          iconWrap: "bg-bg-muted text-text-tertiary",
           label: PARTNERSHIP_STATE_LABELS[state],
           sub: null,
         };
     }
   })();
 
+  // Ghost + primary button styles are self-contained: the global `.btn` /
+  // `.modal-foot` rules are scoped to `.modal-panel--onboarding` and don't
+  // reach this panel.
+  const ghostBtn =
+    "inline-flex min-h-[2.35rem] items-center justify-center gap-1.5 rounded-[10px] border border-border bg-bg-white px-4 py-2 text-[0.8rem] font-semibold text-text-secondary transition-colors hover:bg-bg-surface hover:text-text-primary";
+
   return createPortal(
     <div className="modal-backdrop modal-backdrop--onboarding z-[120]">
       <div
-        className="modal-panel w-[min(94vw,430px)] p-0"
+        className="w-[min(94vw,440px)] overflow-hidden rounded-[16px] border border-border bg-bg-white shadow-[0_18px_50px_-12px_rgba(22,21,19,0.28)]"
         role="alertdialog"
         aria-modal="true"
-        aria-label="Partnership status"
+        aria-busy={busy}
+        aria-label="Partnership request status"
       >
-        <header className="modal-head">
-          <div className="flex items-center gap-2 min-w-0">
-            <Handshake size={16} aria-hidden />
-            <h2 className="font-semibold">Partnership request</h2>
-            {username && (
-              <span className="chip text-[10px] tabular">@{username}</span>
-            )}
-          </div>
+        <header className="flex items-center gap-2.5 border-b border-border-soft px-5 py-3.5">
+          <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-bg-ecru text-text-secondary">
+            <Handshake size={14} aria-hidden />
+          </span>
+          <h2 className="min-w-0 truncate text-[0.9rem] font-bold text-text-primary">
+            Partnership request
+          </h2>
+          {username && (
+            <span className="ml-auto shrink-0 rounded-full border border-border bg-bg-surface px-2.5 py-1 font-mono text-[0.68rem] text-text-secondary">
+              @{username}
+            </span>
+          )}
           {/* No close control while fetching — by design. */}
         </header>
 
-        <div className="flex flex-col items-center gap-3 px-6 py-7 text-center">
+        <div className="flex min-h-[172px] flex-col items-center justify-center gap-3.5 px-7 py-8 text-center">
           {busy ? (
             <>
-              <Loader2 size={30} className="animate-spin text-text-tertiary" />
-              <p className="text-[0.9rem] font-semibold text-text-primary">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-bg-muted text-text-tertiary">
+                <Loader2 size={22} className="animate-spin" aria-hidden />
+              </span>
+              <p className="text-[0.92rem] font-bold text-text-primary">
                 {PHASE_TITLES[phase]}
               </p>
-              {phase === "sending" && (
+              {phase === "checking" ? (
+                <p className="max-w-[36ch] text-[0.76rem] leading-relaxed text-text-secondary">
+                  Fetching the live status from Instagram…
+                </p>
+              ) : (
                 <div className="w-full max-w-[280px]">
-                  <div className="h-2 w-full overflow-hidden rounded-full bg-bg-muted">
-                    <div
-                      className="h-full rounded-full bg-accent transition-[width] duration-200"
-                      style={{ width: `${progress}%` }}
-                    />
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg-muted">
+                      <div
+                        className="h-full rounded-full bg-accent transition-[width] duration-200 ease-out"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <span className="w-9 shrink-0 text-right text-[0.72rem] font-semibold tabular text-text-secondary">
+                      {progress}%
+                    </span>
                   </div>
-                  <p className="mt-1 text-[0.72rem] tabular text-text-tertiary">
-                    {progress}%
-                  </p>
                 </div>
               )}
             </>
           ) : (
             stateVisual && (
               <>
-                {stateVisual.icon}
-                <p className="text-[0.9rem] font-semibold text-text-primary">
+                <span
+                  className={cn(
+                    "inline-flex h-11 w-11 items-center justify-center rounded-full",
+                    stateVisual.iconWrap,
+                  )}
+                >
+                  <stateVisual.icon size={22} aria-hidden />
+                </span>
+                <p className="text-[0.92rem] font-bold text-text-primary">
                   {stateVisual.label}
                 </p>
                 {stateVisual.sub && (
-                  <p className="text-[0.76rem] leading-relaxed text-text-secondary">
+                  <p className="max-w-[40ch] text-[0.76rem] leading-relaxed text-text-secondary">
                     {stateVisual.sub}
                   </p>
                 )}
@@ -245,37 +279,43 @@ export function PartnershipFlowModal({
           )}
         </div>
 
-        <footer className="modal-foot justify-center gap-2">
-          {phase === "rejected" && (
-            <button type="button" className="btn-primary-cta" onClick={resend}>
-              <Send size={13} aria-hidden />
-              Resend request
-            </button>
-          )}
-          {phase === "error" && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => void runFlow()}
-            >
-              <RotateCcw size={13} aria-hidden />
-              Retry
-            </button>
-          )}
-          {!busy && (
-            <button
-              type="button"
-              className={cn(
-                phase === "rejected" || phase === "error"
-                  ? "btn btn-ghost"
-                  : "btn-primary-cta",
-              )}
-              onClick={onDone}
-            >
-              OK
-            </button>
-          )}
-        </footer>
+        {!busy && (
+          <footer className="flex items-center justify-end gap-2 border-t border-border-soft bg-bg-surface px-5 py-3.5">
+            {phase === "error" && (
+              <button
+                type="button"
+                className={ghostBtn}
+                onClick={() => void runFlow()}
+              >
+                <RotateCcw size={13} aria-hidden />
+                Retry
+              </button>
+            )}
+            {phase === "rejected" ? (
+              <>
+                <button type="button" className={ghostBtn} onClick={onDone}>
+                  OK
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary-cta"
+                  onClick={resend}
+                >
+                  <Send size={13} aria-hidden />
+                  Resend request
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btn-primary-cta"
+                onClick={onDone}
+              >
+                OK
+              </button>
+            )}
+          </footer>
+        )}
       </div>
     </div>,
     document.body,

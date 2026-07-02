@@ -243,20 +243,26 @@ export const postingColumns: ColumnDef<PostingRow>[] = [
     id: "partnership_key",
     accessorFn: (r) => r.partnership_id ?? "",
     header: "Partnership",
-    // Live Meta permission state on top; inline key edit below is the admin
-    // override (kept editable). Stacked like CreatorCell's name + badge.
+    // Live Meta permission state on top (compact label — the full text moves
+    // to the title attr, so nothing truncates mid-word); inline key edit below
+    // is the admin override (kept editable). min-w keeps the column from
+    // crushing the badge; the key edit truncates instead of spilling over.
     cell: ({ row }) =>
       (row.original.ads_usage_rights ?? "").trim() ? (
-        <div className="flex flex-col items-start gap-1">
+        <div className="flex min-w-[8.5rem] max-w-[11rem] flex-col items-start gap-1">
           <PartnershipBadge
             status={row.original.partnership_status}
             showEmpty
+            compact
           />
-          <PartnershipKeyEdit
-            postId={row.original.post_id!}
-            value={row.original.partnership_id}
-            isPosted={isPosted(row.original)}
-          />
+          <div className="w-full min-w-0 overflow-hidden">
+            <PartnershipKeyEdit
+              postId={row.original.post_id!}
+              value={row.original.partnership_id}
+              compact
+              isPosted={isPosted(row.original)}
+            />
+          </div>
         </div>
       ) : (
         <span className="text-text-tertiary text-xs">—</span>

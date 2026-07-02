@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Eye, Grid3X3, Inbox, List as ListIcon, Send } from "lucide-react";
 import { DataTable } from "@/components/data-table/data-table";
 import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
+import { PartnershipBadge } from "@/components/ui/status-pill";
 import {
   formatDate,
   formatFollowers,
@@ -274,8 +275,9 @@ function PostingCard({
         </div>
         {(r.ads_usage_rights ?? "").trim() && (
           <div className="ob-card-meta ob-card-meta--full">
-            <span className="ob-card-meta-label">Partnership Key</span>
-            <span className="ob-card-meta-val">
+            <span className="ob-card-meta-label">Partnership</span>
+            <span className="ob-card-meta-val flex flex-wrap items-center gap-1.5">
+              <PartnershipBadge status={r.partnership_status} showEmpty compact />
               <PartnershipKeyEdit postId={r.post_id!} value={r.partnership_id} compact isPosted={posted} />
             </span>
           </div>

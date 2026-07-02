@@ -361,6 +361,7 @@ export function HistoricCreatorButton() {
                         )}
                         <PartnershipBadge
                           status={c.partnership_status}
+                          compact
                           className="shrink-0"
                         />
                         <span

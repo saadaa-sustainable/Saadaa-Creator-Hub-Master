@@ -57,6 +57,18 @@ export const PARTNERSHIP_STATE_LABELS: Record<PartnershipState, string> = {
   unknown: "Partnership status unavailable",
 };
 
+/** Short labels for dense cells (table rows, picker rows). Full label goes in
+ * the title attribute so nothing is lost, and nothing truncates mid-word. */
+export const PARTNERSHIP_STATE_LABELS_SHORT: Record<PartnershipState, string> =
+  {
+    approved: "Approved",
+    pending: "Invite pending",
+    rejected: "Rejected",
+    revoked: "Revoked",
+    none: "No partnership",
+    unknown: "Unknown",
+  };
+
 /**
  * Payment / ads gate — a deliverable's partnership counts as valid ONLY when
  * the creator has APPROVED the request (or an admin explicitly validated via

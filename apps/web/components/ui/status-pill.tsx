@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import { workflowStatusLabel } from "@/lib/formatters";
 import {
   PARTNERSHIP_STATE_LABELS,
+  PARTNERSHIP_STATE_LABELS_SHORT,
   parseStoredPartnershipState,
   type PartnershipState,
 } from "@/lib/partnership";
@@ -39,10 +40,15 @@ export type PillTone = NonNullable<VariantProps<typeof pill>["tone"]>;
 export interface StatusPillProps extends VariantProps<typeof pill> {
   children: React.ReactNode;
   className?: string;
+  title?: string;
 }
 
-export function StatusPill({ tone, className, children }: StatusPillProps) {
-  return <span className={cn(pill({ tone }), className)}>{children}</span>;
+export function StatusPill({ tone, className, title, children }: StatusPillProps) {
+  return (
+    <span className={cn(pill({ tone }), className)} title={title}>
+      {children}
+    </span>
+  );
 }
 
 /**
@@ -86,27 +92,37 @@ const partnershipToneMap: Record<PartnershipState, PillTone> = {
 export function PartnershipBadge({
   status,
   showEmpty = false,
+  compact = false,
   className,
 }: {
   /** Raw posts.partnership_status value (or a PartnershipState). */
   status?: string | null;
   showEmpty?: boolean;
+  /** Short label for dense cells; the full label moves to the title attr. */
+  compact?: boolean;
   className?: string;
 }) {
   const state = parseStoredPartnershipState(status);
+  const labels = compact
+    ? PARTNERSHIP_STATE_LABELS_SHORT
+    : PARTNERSHIP_STATE_LABELS;
   if (!state) {
     if (!showEmpty) return null;
     return (
       <StatusPill tone="neutral" className={className}>
         <Handshake size={10} aria-hidden />
-        {PARTNERSHIP_STATE_LABELS.none}
+        {labels.none}
       </StatusPill>
     );
   }
   return (
-    <StatusPill tone={partnershipToneMap[state]} className={className}>
+    <StatusPill
+      tone={partnershipToneMap[state]}
+      className={className}
+      title={compact ? PARTNERSHIP_STATE_LABELS[state] : undefined}
+    >
       <Handshake size={10} aria-hidden />
-      {PARTNERSHIP_STATE_LABELS[state]}
+      {labels[state]}
     </StatusPill>
   );
 }
