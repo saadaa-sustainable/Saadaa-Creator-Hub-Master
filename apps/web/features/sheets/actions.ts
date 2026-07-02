@@ -7,8 +7,14 @@ import { sendMail } from "@/lib/email";
 import { logSystemError } from "@/lib/system-errors";
 import { createServiceClient } from "@/lib/supabase/server";
 import { serverEnv } from "@/lib/env.server";
-import { getSheetTableById } from "./queries";
-import type { ColType, SheetTable } from "./types";
+import { fetchSheetPage, getSheetTableById } from "./queries";
+import {
+  mergeColumns,
+  type ColDef,
+  type ColType,
+  type SheetRow,
+  type SheetTable,
+} from "./types";
 
 /**
  * Columns whose change is material enough to notify the creator + the
@@ -249,6 +255,66 @@ export async function fetchRecentCellEdits(args: {
   } catch {
     return { ok: true, edits: {} };
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Server-mode CSV export — big tables never hold the full set client-side, so
+// the export walks the FULL filtered/sorted set in Postgres (reusing the same
+// sanitised search + whitelisted sort as fetchSheetPage) and returns the CSV
+// string for the client to download. Admin-gated like every other action here.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const EXPORT_PAGE_SIZE = 1000;
+const EXPORT_MAX_ROWS = 50_000;
+
+export async function exportSheetCsv(args: {
+  tableId: string;
+  q?: string;
+  sortKey?: string;
+  sortDir?: "asc" | "desc";
+}): Promise<
+  { ok: true; csv: string; rowCount: number } | { ok: false; error: string }
+> {
+  await assertPermission("admin");
+
+  const tbl = getSheetTableById(args.tableId);
+  if (!tbl) return { ok: false, error: "Unknown table" };
+
+  const rows: SheetRow[] = [];
+  let page = 0;
+  for (;;) {
+    const res = await fetchSheetPage(tbl.id, {
+      q: args.q,
+      sortKey: args.sortKey,
+      sortDir: args.sortDir,
+      page,
+      pageSize: EXPORT_PAGE_SIZE,
+    });
+    rows.push(...res.rows);
+    if (res.rows.length < EXPORT_PAGE_SIZE) break;
+    if (rows.length >= Math.min(res.rowCount, EXPORT_MAX_ROWS)) break;
+    page += 1;
+  }
+  if (rows.length > EXPORT_MAX_ROWS) rows.length = EXPORT_MAX_ROWS;
+
+  // Same column set the grid renders by default: curated + discovered extras,
+  // minus hidden and virtual (virtual values only resolve client-side).
+  const cols = mergeColumns(tbl.columns, rows).filter(
+    (c) => !c.hidden && !c.virtual,
+  );
+  return { ok: true, csv: buildCsv(cols, rows), rowCount: rows.length };
+}
+
+/** Mirrors the client-side toCsv escaping (sheet-grid.tsx). */
+function buildCsv(cols: ColDef[], rows: SheetRow[]): string {
+  const esc = (v: unknown) => {
+    if (v == null) return "";
+    const s = String(v).replace(/"/g, '""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const header = cols.map((c) => esc(c.label)).join(",");
+  const lines = rows.map((r) => cols.map((c) => esc(r[c.key])).join(","));
+  return [header, ...lines].join("\n");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

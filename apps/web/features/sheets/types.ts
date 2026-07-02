@@ -396,3 +396,16 @@ export interface SheetData {
   rowCount: number;
   tableId: string;
 }
+
+/**
+ * URL-driven query state for server-mode tabs (search/sort/pagination run in
+ * Postgres and the client only ever holds one page of rows). `page` is the
+ * EFFECTIVE zero-based page the server actually returned (a stale `?p=`
+ * beyond the row count self-heals back to 0).
+ */
+export interface SheetServerParams {
+  q?: string;
+  sortKey?: string;
+  sortDir?: "asc" | "desc";
+  page: number;
+}

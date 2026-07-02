@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ClipboardList,
@@ -22,7 +22,7 @@ import {
 import { cn } from "@/lib/cn";
 import { SheetGrid } from "./sheet-grid";
 import { BudgetSheet } from "./budget-sheet";
-import type { SheetData, SheetTable } from "./types";
+import type { SheetData, SheetServerParams, SheetTable } from "./types";
 
 interface Props {
   tables: SheetTable[];
@@ -32,6 +32,12 @@ interface Props {
   canEdit: boolean;
   canDelete?: boolean;
   currentUserEmail?: string | null;
+  /** Server mode — `data.rows` is ONE Postgres page, pre-filtered/sorted. */
+  serverMode?: boolean;
+  /** Exact filtered row count in server mode (drives the pager). */
+  serverTotal?: number;
+  /** Echo of the URL params that produced the current server page. */
+  serverParams?: SheetServerParams;
 }
 
 const TAB_ICONS: Record<string, LucideIcon> = {
@@ -55,6 +61,9 @@ export function SheetsBody({
   canEdit,
   canDelete = false,
   currentUserEmail = null,
+  serverMode = false,
+  serverTotal,
+  serverParams,
 }: Props) {
   const [optimisticActiveId, setOptimisticActiveId] = useState(active.id);
 
@@ -90,6 +99,9 @@ export function SheetsBody({
             canEdit={canEdit}
             canDelete={canDelete}
             currentUserEmail={currentUserEmail}
+            serverMode={serverMode}
+            serverTotal={serverTotal}
+            serverParams={serverParams}
           />
         )}
       </div>
@@ -112,17 +124,13 @@ function TabBar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const params = useSearchParams();
   const tabRefs = useRef<(HTMLAnchorElement | null)[]>([]);
 
+  // Bare ?tab= link — switching tab intentionally clears q/sort/dir/p so a
+  // server-mode search/sort never leaks into the next table.
   const hrefFor = useCallback(
-    (tabId: string) => {
-      const next = new URLSearchParams(params.toString());
-      next.set("tab", tabId);
-      const qs = next.toString();
-      return `${pathname}${qs ? `?${qs}` : ""}`;
-    },
-    [params, pathname],
+    (tabId: string) => `${pathname}?tab=${encodeURIComponent(tabId)}`,
+    [pathname],
   );
 
   const onKeyDown = useCallback(

@@ -92,15 +92,32 @@ export default function SheetsKM() {
         </KMList>
       </KMSection>
 
-      <KMSection tag="Pagination">
+      <KMSection tag="Pagination + big-table mode">
         <KMCallout tone="info">
-          PostgREST caps responses at 1000 rows. Sheet View streams the entire
-          table by looping <KMCode>.range(from, to)</KMCode> with{" "}
-          <KMCode>PAGE_SIZE=1000</KMCode> and{" "}
-          <KMCode>MAX_ROWS=50000</KMCode> until an empty page lands. Counts are
-          fetched via parallel <KMCode>head:true</KMCode> queries so the tab
-          badge reflects the true row count.
+          Only 100 rows render at a time (Prev/Next pager below the grid) —
+          search, sort, select-all and CSV still cover the whole set.
         </KMCallout>
+        <KMList>
+          <li>
+            <strong>Small tables</strong> (≤2,000 rows): the full table streams
+            to the browser (looped <KMCode>.range()</KMCode>, cap 50k), so
+            search and sort respond instantly with no server round-trip.
+          </li>
+          <li>
+            <strong>Big tables</strong> (Creators, and anything that grows past
+            2,000 rows): the browser only ever receives ONE page. Search, sort
+            and the pager run in the database — typing in Search quietly
+            re-queries after you pause, the grid dims while the new page
+            streams, and the row count shown is the exact filtered total. CSV
+            export assembles the full filtered file on the server (admin only
+            there, since it can pull tens of thousands of rows).
+          </li>
+          <li>
+            The first (identifier) column comes frozen by default on every tab
+            so horizontal scrolling never loses row context — unfreeze it with
+            its pin toggle.
+          </li>
+        </KMList>
       </KMSection>
 
       <KMSection tag="Cell comments + @-mentions">

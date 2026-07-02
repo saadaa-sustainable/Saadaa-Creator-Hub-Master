@@ -48,6 +48,7 @@ import { formatDate, formatRupees } from "@/lib/formatters";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   deleteSheetRows,
+  exportSheetCsv,
   fetchCellComments,
   fetchRecentCellEdits,
   fetchRecentDeletions,
@@ -65,6 +66,7 @@ import {
   type ColDef,
   type ColType,
   type SheetRow,
+  type SheetServerParams,
   type SheetTable,
 } from "./types";
 
@@ -75,6 +77,17 @@ interface Props {
   /** Global-Admin-only row delete. Independent of canEdit. */
   canDelete?: boolean;
   currentUserEmail?: string | null;
+  /**
+   * Server mode — `rows` is ONE Postgres page, already filtered + sorted.
+   * Search / sort / pagination round-trip through the URL instead of the
+   * client memos; cell editing, comments and delete flows are unchanged
+   * (they key on PK values which exist on server-page rows too).
+   */
+  serverMode?: boolean;
+  /** Exact filtered row count in server mode (drives the pager). */
+  serverTotal?: number;
+  /** Echo of the URL params that produced the current server page. */
+  serverParams?: SheetServerParams;
 }
 
 type Density = "cozy" | "compact";
@@ -109,18 +122,88 @@ export function SheetGrid({
   canEdit,
   canDelete = false,
   currentUserEmail = null,
+  serverMode = false,
+  serverTotal,
+  serverParams,
 }: Props) {
   const router = useRouter();
+  const isServer = serverMode === true;
+  const serverPage = serverParams?.page ?? 0;
   // Row delete is gated on BOTH the table opting in AND the actor being a
   // Global Admin (canDelete). Edit permission is intentionally not enough.
   const rowsDeletable = canDelete && table.deletable === true;
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() =>
+    isServer ? (serverParams?.q ?? "") : "",
+  );
+  // True only while the CURRENT search text came from user typing (not a URL
+  // sync) — gates the debounced URL push so mount / external param changes
+  // never trigger a replace loop.
+  const searchDirty = useRef(false);
   const [sortKey, setSortKey] = useState<string | null>(
     table.defaultSort?.col ?? null,
   );
   const [sortDir, setSortDir] = useState<"asc" | "desc">(
     table.defaultSort?.dir ?? "asc",
   );
+
+  // Patch the URL query in place (server mode) — preserves untouched params,
+  // never scrolls. `null`/empty deletes the key so URLs stay clean. Wrapped in
+  // a transition: the Suspense boundary is keyed on the TAB only, so React
+  // keeps the current rows mounted (search input keeps focus) and
+  // `navPending` dims the table while the new page streams in.
+  const [navPending, startNav] = useTransition();
+  const replaceParams = useCallback(
+    (patch: Record<string, string | null>) => {
+      const sp = new URLSearchParams(window.location.search);
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null || v === "") sp.delete(k);
+        else sp.set(k, v);
+      }
+      const qs = sp.toString();
+      startNav(() => {
+        router.replace(
+          `${window.location.pathname}${qs ? `?${qs}` : ""}` as never,
+          { scroll: false },
+        );
+      });
+    },
+    [router],
+  );
+
+  const onSearchChange = (value: string) => {
+    setSearch(value);
+    if (isServer) searchDirty.current = true;
+  };
+
+  // Server mode: re-anchor the input to the URL when the tab changes…
+  useEffect(() => {
+    if (!isServer) return;
+    searchDirty.current = false;
+    setSearch(serverParams?.q ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table.id, isServer]);
+
+  // …and when ?q= changes externally (back/forward nav) while not typing.
+  // Functional update + trim-compare so the post-debounce echo (URL carries
+  // the trimmed term) never rewrites what the user has in the input.
+  useEffect(() => {
+    if (!isServer || searchDirty.current) return;
+    setSearch((cur) => {
+      const urlQ = serverParams?.q ?? "";
+      return cur.trim() === urlQ ? cur : urlQ;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverParams?.q]);
+
+  // Debounced URL push — 400ms after the last keystroke; lands on page 0.
+  useEffect(() => {
+    if (!isServer || !searchDirty.current) return;
+    const t = setTimeout(() => {
+      searchDirty.current = false;
+      replaceParams({ q: search.trim() ? search.trim() : null, p: null });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [search, isServer, replaceParams]);
   const [selected, setSelected] = useState<{ row: number; col: number } | null>(
     null,
   );
@@ -349,7 +432,8 @@ export function SheetGrid({
   const normalizedQuery = search.trim().toLowerCase();
 
   const filteredRows = useMemo(() => {
-    if (!normalizedQuery) return rows;
+    // Server mode: rows arrive pre-filtered from Postgres — pass through.
+    if (isServer || !normalizedQuery) return rows;
     return rows.filter((r) => {
       for (const c of cols) {
         const v = String(resolveValue(c, r) ?? "").toLowerCase();
@@ -357,10 +441,11 @@ export function SheetGrid({
       }
       return false;
     });
-  }, [rows, normalizedQuery, cols]);
+  }, [rows, normalizedQuery, cols, isServer]);
 
   const sortedRows = useMemo(() => {
-    if (!sortKey) return filteredRows;
+    // Server mode: rows arrive pre-sorted from Postgres — pass through.
+    if (isServer || !sortKey) return filteredRows;
     const dir = sortDir === "asc" ? 1 : -1;
     const col = cols.find((c) => c.key === sortKey);
     return [...filteredRows].sort((a, b) => {
@@ -374,7 +459,27 @@ export function SheetGrid({
       }
       return String(av).localeCompare(String(bv)) * dir;
     });
-  }, [filteredRows, sortKey, sortDir, table.columns]);
+  }, [filteredRows, sortKey, sortDir, table.columns, isServer]);
+
+  // Columns the SERVER can sort by — real (non-virtual) curated keys. Matches
+  // the whitelist inside fetchSheetPage; extras discovered from row data get
+  // no sort affordance in server mode (the server would silently ignore them).
+  const serverSortable = useMemo(
+    () => new Set(table.columns.filter((c) => !c.virtual).map((c) => c.key)),
+    [table.columns],
+  );
+
+  // Effective sort for display — URL-driven in server mode (falling back to
+  // the table default, which the server always applies), local state in
+  // client mode.
+  const effSortKey = isServer
+    ? (serverParams?.sortKey ?? table.defaultSort?.col ?? null)
+    : sortKey;
+  const effSortDir: "asc" | "desc" = isServer
+    ? serverParams?.sortKey
+      ? (serverParams.sortDir ?? "asc")
+      : (table.defaultSort?.dir ?? "asc")
+    : sortDir;
 
   // ── Render pagination ──────────────────────────────────────────────────────
   // The grid used to mount EVERY row (posts ≈ 870×68 ≈ 59k cells; creators
@@ -382,17 +487,24 @@ export function SheetGrid({
   // route skeleton was long gone, so the tab looked dead. Search / sort /
   // select-all / CSV still operate on the FULL sorted set; only the DOM is
   // windowed to one page at a time.
+  // Server mode: the render page IS the server page — `rows` already holds
+  // exactly one page, and Prev/Next navigate via ?p= instead of local state.
   const RENDER_PAGE_SIZE = 100;
   const [renderPage, setRenderPage] = useState(0);
-  const pageCount = Math.max(1, Math.ceil(sortedRows.length / RENDER_PAGE_SIZE));
-  const safePage = Math.min(renderPage, pageCount - 1);
+  const totalRows = isServer ? (serverTotal ?? rows.length) : sortedRows.length;
+  const pageCount = Math.max(1, Math.ceil(totalRows / RENDER_PAGE_SIZE));
+  const safePage = isServer
+    ? Math.min(Math.max(0, serverPage), pageCount - 1)
+    : Math.min(renderPage, pageCount - 1);
   const pagedRows = useMemo(
     () =>
-      sortedRows.slice(
-        safePage * RENDER_PAGE_SIZE,
-        (safePage + 1) * RENDER_PAGE_SIZE,
-      ),
-    [sortedRows, safePage],
+      isServer
+        ? sortedRows
+        : sortedRows.slice(
+            safePage * RENDER_PAGE_SIZE,
+            (safePage + 1) * RENDER_PAGE_SIZE,
+          ),
+    [sortedRows, safePage, isServer],
   );
   const pageFirstIdx = safePage * RENDER_PAGE_SIZE;
   const pageLastIdx = pageFirstIdx + pagedRows.length - 1;
@@ -400,8 +512,26 @@ export function SheetGrid({
   useEffect(() => {
     setRenderPage(0);
   }, [normalizedQuery, sortKey, sortDir, table.id]);
+  // Cell selection is an ABSOLUTE row index — moving to another page (or
+  // table) would leave it pointing at an unmounted row, so clear it.
+  useEffect(() => {
+    setSelected(null);
+    setEditing(null);
+  }, [safePage, table.id]);
+
+  const gotoServerPage = (p: number) => {
+    const next = Math.min(Math.max(0, p), pageCount - 1);
+    replaceParams({ p: next > 0 ? String(next) : null });
+  };
 
   const handleSort = (key: string) => {
+    if (isServer) {
+      if (!serverSortable.has(key)) return;
+      const nextDir =
+        effSortKey === key && effSortDir === "asc" ? "desc" : "asc";
+      replaceParams({ sort: key, dir: nextDir, p: null });
+      return;
+    }
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
     } else {
@@ -410,8 +540,9 @@ export function SheetGrid({
     }
   };
 
-  const handleExport = () => {
-    const csv = toCsv(cols, sortedRows);
+  const [exporting, startExporting] = useTransition();
+
+  const downloadCsv = (csv: string) => {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -419,6 +550,35 @@ export function SheetGrid({
     a.download = `${table.id}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExport = () => {
+    if (isServer) {
+      // The client only holds one page — the server action walks the FULL
+      // filtered/sorted set (same sanitised search + whitelisted sort).
+      if (exporting) return;
+      startExporting(async () => {
+        try {
+          const res = await exportSheetCsv({
+            tableId: table.id,
+            q: serverParams?.q,
+            sortKey: serverParams?.sortKey,
+            sortDir: serverParams?.sortDir,
+          });
+          if (!res.ok) {
+            toast.error(res.error ?? "Export failed");
+            return;
+          }
+          downloadCsv(res.csv);
+          toast.success(`Exported ${res.rowCount} rows`);
+        } catch (e) {
+          // assertPermission THROWS for non-admins — surface it, don't swallow.
+          toast.error(e instanceof Error ? e.message : "Export failed");
+        }
+      });
+      return;
+    }
+    downloadCsv(toCsv(cols, sortedRows));
     toast.success(`Exported ${sortedRows.length} rows`);
   };
 
@@ -587,7 +747,9 @@ export function SheetGrid({
         }
         return;
       } else if ((e.metaKey || e.ctrlKey) && e.key === "c") {
-        const r = sortedRows[row];
+        // Row indexes are absolute; only the current page is mounted — index
+        // into the page window (identical to sortedRows[row] in client mode).
+        const r = pagedRows[row - pageFirstIdx];
         const c = cols[col];
         if (r && c) {
           const v = String(resolveValue(c, r) ?? "");
@@ -603,7 +765,7 @@ export function SheetGrid({
       e.preventDefault();
       setSelected({ row, col });
     },
-    [editing, selected, sortedRows, cols, canEdit, pageFirstIdx, pageLastIdx],
+    [editing, selected, pagedRows, cols, canEdit, pageFirstIdx, pageLastIdx],
   );
 
   useEffect(() => {
@@ -663,13 +825,13 @@ export function SheetGrid({
               type="text"
               value={search}
               placeholder="Search…"
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => onSearchChange(e.target.value)}
               className="h-8 w-full pl-8 pr-2.5 rounded-lg border border-border bg-bg-white text-[0.72rem] font-bold text-text-primary min-w-0 sm:min-w-[160px] focus:outline-none focus:border-[--accent] focus:ring-2 focus:ring-[--accent]/20 transition-all"
             />
             {search && (
               <button
                 type="button"
-                onClick={() => setSearch("")}
+                onClick={() => onSearchChange("")}
                 className="absolute right-1 inline-flex h-5 w-5 items-center justify-center rounded text-text-tertiary hover:text-text-primary"
               >
                 <X size={10} aria-hidden />
@@ -741,13 +903,23 @@ export function SheetGrid({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-border bg-bg-white text-text-primary text-[0.65rem] font-extrabold hover:bg-bg-muted/40 hover:border-[--accent] transition-colors"
-          >
-            <Download size={11} aria-hidden /> CSV
-          </button>
+          {/* Server-mode export runs through the admin-gated server action —
+              hide the button from non-admins there (client mode stays open,
+              the data is already in the browser). */}
+          {(!isServer || canEdit) && (
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={isServer && exporting}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 h-8 rounded-lg border border-border bg-bg-white text-text-primary text-[0.65rem] font-extrabold hover:bg-bg-muted/40 hover:border-[--accent] transition-colors",
+                isServer && exporting && "opacity-60 cursor-wait",
+              )}
+            >
+              <Download size={11} aria-hidden />{" "}
+              {isServer && exporting ? "Exporting…" : "CSV"}
+            </button>
+          )}
 
           <button
             type="button"
@@ -799,10 +971,21 @@ export function SheetGrid({
 
       {/* Stats strip */}
       <div className="px-3 sm:px-4 py-1.5 border-b border-border bg-bg-surface/40 flex items-center gap-3 text-[0.58rem] uppercase tracking-[0.06em] font-extrabold text-text-tertiary flex-wrap">
-        <span>
-          <span className="text-text-primary tabular">{sortedRows.length}</span>{" "}
-          / {rows.length} rows
-        </span>
+        {isServer ? (
+          <span>
+            <span className="text-text-primary tabular">
+              {totalRows.toLocaleString("en-IN")}
+            </span>{" "}
+            rows{serverParams?.q ? " (filtered)" : ""}
+          </span>
+        ) : (
+          <span>
+            <span className="text-text-primary tabular">
+              {sortedRows.length}
+            </span>{" "}
+            / {rows.length} rows
+          </span>
+        )}
         <span>·</span>
         <span>
           <span className="text-text-primary tabular">{cols.length}</span> /{" "}
@@ -817,24 +1000,27 @@ export function SheetGrid({
             </span>
           </>
         )}
-        {sortKey && (
+        {effSortKey && (
           <>
             <span>·</span>
             <span className="inline-flex items-center gap-1 text-text-secondary">
               Sort
-              {sortDir === "asc" ? (
+              {effSortDir === "asc" ? (
                 <ArrowUp size={9} aria-hidden />
               ) : (
                 <ArrowDown size={9} aria-hidden />
               )}
-              {cols.find((c) => c.key === sortKey)?.label ?? sortKey}
-              <button
-                type="button"
-                onClick={() => setSortKey(null)}
-                className="ml-0.5 text-text-tertiary hover:text-text-primary"
-              >
-                <X size={9} aria-hidden />
-              </button>
+              {cols.find((c) => c.key === effSortKey)?.label ?? effSortKey}
+              {/* Server mode always sorts (default fallback) — nothing to clear. */}
+              {!isServer && (
+                <button
+                  type="button"
+                  onClick={() => setSortKey(null)}
+                  className="ml-0.5 text-text-tertiary hover:text-text-primary"
+                >
+                  <X size={9} aria-hidden />
+                </button>
+              )}
             </span>
           </>
         )}
@@ -852,10 +1038,14 @@ export function SheetGrid({
         )}
       </div>
 
-      {/* Grid */}
+      {/* Grid — dimmed while a server-mode page/search/sort streams in. */}
       <div
         ref={gridRef}
-        className="overflow-auto max-h-[calc(100vh-340px)] relative"
+        className={cn(
+          "overflow-auto max-h-[calc(100vh-340px)] relative transition-opacity duration-150",
+          navPending && "opacity-50 pointer-events-none",
+        )}
+        aria-busy={navPending || undefined}
       >
         {sortedRows.length === 0 ? (
           <EmptyState />
@@ -896,6 +1086,9 @@ export function SheetGrid({
                 </th>
                 {cols.map((c, idx) => {
                   const isPinned = pinnedCols.includes(c.key);
+                  // Server mode: only whitelisted (real, curated) columns get
+                  // the sort affordance; client mode sorts anything.
+                  const sortable = !isServer || serverSortable.has(c.key);
                   const stickyLeft = pinnedLeftOffsets.get(c.key);
                   const stickyStyle: CSSProperties = isPinned
                     ? {
@@ -925,14 +1118,19 @@ export function SheetGrid({
                         </span>
                         <ColIcon type={c.type} />
                         <span
-                          className="cursor-pointer flex-1 min-w-0 truncate"
-                          onClick={() => handleSort(c.key)}
-                          title="Sort by this column"
+                          className={cn(
+                            "flex-1 min-w-0 truncate",
+                            sortable && "cursor-pointer",
+                          )}
+                          onClick={
+                            sortable ? () => handleSort(c.key) : undefined
+                          }
+                          title={sortable ? "Sort by this column" : undefined}
                         >
                           {c.label}
                         </span>
-                        {sortKey === c.key &&
-                          (sortDir === "asc" ? (
+                        {effSortKey === c.key &&
+                          (effSortDir === "asc" ? (
                             <ArrowUp
                               size={9}
                               aria-hidden
@@ -1126,12 +1324,17 @@ export function SheetGrid({
         )}
       </div>
 
-      {/* Pager — only the current window of rows is mounted (perf). */}
-      {sortedRows.length > RENDER_PAGE_SIZE && (
+      {/* Pager — only the current window of rows is mounted (perf). In server
+          mode Prev/Next patch ?p= (URL is the pagination source of truth). */}
+      {totalRows > RENDER_PAGE_SIZE && (
         <div className="flex items-center justify-between gap-2 border-t border-border bg-bg-surface/50 px-3 py-2 sm:px-4">
           <button
             type="button"
-            onClick={() => setRenderPage((p) => Math.max(0, p - 1))}
+            onClick={() =>
+              isServer
+                ? gotoServerPage(safePage - 1)
+                : setRenderPage((p) => Math.max(0, p - 1))
+            }
             disabled={safePage === 0}
             className="inline-flex min-h-[2.2rem] items-center gap-1 rounded-[9px] border border-border bg-bg-white px-3 text-[0.72rem] font-bold text-text-secondary transition-colors hover:bg-bg-alt disabled:opacity-40"
           >
@@ -1139,12 +1342,16 @@ export function SheetGrid({
           </button>
           <span className="text-[0.68rem] tabular text-text-secondary">
             Rows {pageFirstIdx + 1}–{pageLastIdx + 1} of{" "}
-            {sortedRows.length.toLocaleString("en-IN")} · page {safePage + 1}/
+            {totalRows.toLocaleString("en-IN")} · page {safePage + 1}/
             {pageCount}
           </span>
           <button
             type="button"
-            onClick={() => setRenderPage((p) => Math.min(pageCount - 1, p + 1))}
+            onClick={() =>
+              isServer
+                ? gotoServerPage(safePage + 1)
+                : setRenderPage((p) => Math.min(pageCount - 1, p + 1))
+            }
             disabled={safePage >= pageCount - 1}
             className="inline-flex min-h-[2.2rem] items-center gap-1 rounded-[9px] border border-border bg-bg-white px-3 text-[0.72rem] font-bold text-text-secondary transition-colors hover:bg-bg-alt disabled:opacity-40"
           >
