@@ -83,7 +83,34 @@ export async function fetchCreatorAnalyticsPage(
     state: (r.state as string | null) ?? null,
     instagram_link: (r.instagram_link as string | null) ?? null,
     is_active: r.is_active == null ? null : Boolean(r.is_active),
+    partnership_status: null,
   }));
+
+  // Meta partnership status lives on `posts.partnership_status` (stamped
+  // creator-level, uniform across a creator's rows) and isn't part of the RPC,
+  // so one extra lookup covers the whole page. Fail-soft: on error the page
+  // simply renders without partnership badges.
+  const infIds = [...new Set(rows.map((r) => r.inf_id).filter(Boolean))];
+  if (infIds.length > 0) {
+    const { data: statusData, error: statusError } = await (supabase as any)
+      .from("posts")
+      .select("inf_id, partnership_status")
+      .in("inf_id", infIds)
+      .not("partnership_status", "is", null)
+      .eq("is_test", false);
+
+    if (!statusError) {
+      const statusByInf = new Map<string, string>();
+      for (const p of (statusData ?? []) as Raw[]) {
+        const id = String(p.inf_id ?? "");
+        const status = String(p.partnership_status ?? "").trim();
+        if (id && status && !statusByInf.has(id)) statusByInf.set(id, status);
+      }
+      for (const row of rows) {
+        row.partnership_status = statusByInf.get(row.inf_id) ?? null;
+      }
+    }
+  }
 
   const total = Number(records[0]?.total_count ?? 0) || 0;
   return { rows, total };

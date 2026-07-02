@@ -47,6 +47,13 @@ export interface CreatorAnalyticsRow {
   instagram_link: string | null;
   /** false = deactivated creator (dead/mangled IG handle, no profile_id). */
   is_active: boolean | null;
+  /**
+   * Meta branded-content permission state (posts.partnership_status —
+   * pending | approved | rejected | revoked | none). Stamped creator-level,
+   * so any of the creator's posts rows carries the same value. Null when the
+   * creator has no stored state (or the lookup failed — fail-soft).
+   */
+  partnership_status: string | null;
 }
 
 export interface CreatorAnalyticsFilters {

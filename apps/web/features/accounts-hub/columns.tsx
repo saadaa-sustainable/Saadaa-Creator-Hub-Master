@@ -1,7 +1,9 @@
 "use client";
 import { AlertTriangle, Handshake, ShieldCheck } from "lucide-react";
 import { Avatar, DeactivatedBadge } from "@/components/ui";
+import { PartnershipBadge } from "@/components/ui/status-pill";
 import { formatDate, formatRupees } from "@/lib/formatters";
+import { partnershipApproved } from "@/lib/partnership";
 import { computeMatchStatus, type MatchStatus } from "@/lib/payable-cycle";
 import type { AccountsRow } from "./types";
 
@@ -93,31 +95,29 @@ export function MatchStatusPill({ row }: { row: AccountsRow }) {
 }
 
 /**
- * Ads-rights pill — legacy "Partnered" / "No Partnership" badge.
- * Shown only when ads_usage_rights ≠ none, with danger tone when no
- * partnership_id + not validated.
+ * Ads-rights pill — partnership state for ad-eligible collabs.
+ * Shown only when ads_usage_rights ≠ none. Approved (creator accepted the
+ * Meta request, or admin override) keeps the info pill; anything else renders
+ * the shared PartnershipBadge so the exact state (invite pending / rejected /
+ * no partnership yet) is visible while Done payments stay blocked.
  */
 export function AdsPartnershipPill({ row }: { row: AccountsRow }) {
   const raw = String(row.ads_usage_rights ?? "").trim().toLowerCase();
   if (!raw || ["no", "none", "n/a", "0", "false"].includes(raw)) return null;
-  const hasPartnership =
-    row.ad_partnership_valid === true ||
-    (row.partnership_id ?? "").trim().length > 0;
-  if (hasPartnership) {
+  if (partnershipApproved(row)) {
     return (
-      <span className="kb-pill kb-pill--info" title="Ad partnership validated">
+      <span
+        className="kb-pill kb-pill--info"
+        title="Partnership approved by the creator — payments unblocked"
+      >
         <ShieldCheck size={10} aria-hidden />
-        Partnered
+        Partnership approved
       </span>
     );
   }
   return (
-    <span
-      className="kb-pill kb-pill--danger"
-      title="Ads Usage Rights = Yes but no partnership_id set. Done payments are blocked."
-    >
-      <AlertTriangle size={10} aria-hidden />
-      No Partnership
+    <span title="Done payments blocked until the creator approves">
+      <PartnershipBadge status={row.partnership_status} showEmpty />
     </span>
   );
 }

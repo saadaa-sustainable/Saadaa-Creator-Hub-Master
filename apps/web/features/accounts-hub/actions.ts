@@ -12,6 +12,7 @@ import {
   sendNotification,
 } from "@/lib/notifications";
 import { fetchMetaAdsCoveredPostIds } from "@/lib/supabase/meta-ads";
+import { partnershipApproved } from "@/lib/partnership";
 import { isAdTested, isPostedButNotTested } from "@/lib/ad-tested";
 import {
   nextPayableCycleDate,
@@ -67,6 +68,7 @@ interface PostContext {
   ads_results: string | null;
   partnership_id: string | null;
   ad_partnership_valid: boolean | null;
+  partnership_status: string | null;
   bank_name: string | null;
   bank_number: string | null;
   ifsc: string | null;
@@ -104,8 +106,10 @@ const POSTED_STATES = new Set(["Posted", "Delivered"]);
  * - §7.2 Reel rule: per (inf_id, collab_number), at least one Reel deliverable
  *   must have BOTH post_link AND post_date.
  * - §8.2 Ad partnership gate: when ads_usage_rights = "yes" AND a UTR is
- *   present (Done attempt), post must have ad_partnership_valid=true OR a
- *   non-empty partnership_id.
+ *   present (Done attempt), the creator must have APPROVED the partnership
+ *   request (partnership_status='approved') or an admin must have explicitly
+ *   overridden (ad_partnership_valid=true). A bare partnership_id no longer
+ *   passes — the invite is auto-sent at posting time.
  *
  * Dedup key: (post_id, lower(utr)). Same UTR across multiple post_ids is
  * allowed (one bank transfer can cover multiple collabs).
@@ -146,7 +150,7 @@ export async function submitPayments(
   const { data: postRows, error: postsErr } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, collab_id, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, bank_name, bank_number, ifsc",
+      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, collab_id, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, partnership_status, bank_name, bank_number, ifsc",
     )
     .in("post_id", postIds);
   if (postsErr) return { ok: false, error: postsErr.message };
@@ -256,7 +260,8 @@ export async function submitPayments(
   //   (a) `collabUnpostedByKey` — siblings that are missing post_link or
   //       post_date. Any single unposted sibling locks the entire collab.
   //   (b) `collabPartnershipMissingByKey` — siblings with ads_usage_rights=Yes
-  //       but no partnership_id. Same collab-wide lock.
+  //       whose partnership the creator hasn't APPROVED (and no admin
+  //       override). Same collab-wide lock.
   // Both maps store the offending sibling post_id_short so the toast can call
   // them out by name. Saadaa pays per-collab, not per-deliverable, so any
   // sibling deficiency blocks every payment in the collab.
@@ -273,7 +278,7 @@ export async function submitPayments(
       const { data: collabRows } = await (supabase as any)
         .from("posts")
         .select(
-          "post_id, post_id_short, inf_id, collab_number, collab_id, commercial_amount, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
+          "post_id, post_id_short, inf_id, collab_number, collab_id, commercial_amount, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status",
         )
         .in("inf_id", infIds);
       for (const cr of (collabRows ?? []) as Array<{
@@ -288,6 +293,7 @@ export async function submitPayments(
         ads_usage_rights: string | null;
         partnership_id: string | null;
         ad_partnership_valid: boolean | null;
+        partnership_status: string | null;
       }>) {
         const key = collabKeyOf(cr);
         collabTotalByKey.set(
@@ -301,10 +307,9 @@ export async function submitPayments(
           collabUnpostedByKey.set(key, arr);
         }
         if (ADS_YES(cr.ads_usage_rights)) {
-          const hasKey =
-            cr.ad_partnership_valid === true ||
-            (cr.partnership_id ?? "").trim().length > 0;
-          if (!hasKey) {
+          // Creator must have APPROVED the partnership (or admin override) —
+          // key presence alone no longer counts.
+          if (!partnershipApproved(cr)) {
             const arr = collabPartnershipMissingByKey.get(key) ?? [];
             arr.push(sibLabel);
             collabPartnershipMissingByKey.set(key, arr);
@@ -362,13 +367,12 @@ export async function submitPayments(
     }
 
     // §8.2 — collab-level partnership gate. ANY sibling with ads_usage_rights
-    // =Yes but no partnership_id blocks all payments in the collab. Only fires
-    // for Done attempts (UTR provided); draft writes still pass.
+    // =Yes whose partnership the creator hasn't APPROVED (and no admin
+    // override) blocks all payments in the collab. Only fires for Done
+    // attempts (UTR provided); draft writes still pass.
     if (hasUtr) {
       const ownAdsRequired = ADS_YES(p.ads_usage_rights);
-      const ownHasPartnership =
-        p.ad_partnership_valid === true ||
-        (p.partnership_id ?? "").trim().length > 0;
+      const ownHasPartnership = partnershipApproved(p);
       if (
         (ownAdsRequired && !ownHasPartnership) ||
         partnershipMissing.length > 0

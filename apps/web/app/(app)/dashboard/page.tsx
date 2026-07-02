@@ -17,6 +17,7 @@ import {
   InternalTabBody,
   JourneyTabBody,
   OverviewTabBody,
+  PartnershipTabBody,
   TatTabBody,
   type TabSearchParams,
 } from "@/features/dashboard/tab-bodies";
@@ -143,6 +144,8 @@ function TabBody({
       );
     case "creators":
       return <CreatorAnalyticsTabBody sp={sp} />;
+    case "partnerships":
+      return <PartnershipTabBody sp={sp} />;
     case "journey":
       return <JourneyTabBody sp={sp} />;
     case "tat":

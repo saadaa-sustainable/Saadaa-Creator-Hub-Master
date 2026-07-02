@@ -13,6 +13,7 @@
 export const DASHBOARD_TABS = [
   "overview",
   "creators",
+  "partnerships",
   "journey",
   "tat",
   "ad-status",
@@ -29,6 +30,7 @@ export const DEFAULT_TAB: DashboardTab = "overview";
 export const TAB_LABELS: Record<DashboardTab, string> = {
   overview: "Overview",
   creators: "Creator Analytics",
+  partnerships: "Partnership Status",
   journey: "Influencer Journey",
   tat: "TAT Analytics",
   "ad-status": "Ad Status",
@@ -55,6 +57,7 @@ export function resolveTab(raw: string | undefined | null): DashboardTab {
 export const TAB_KM_SLUGS: Record<DashboardTab, string> = {
   overview: "dashboard",
   creators: "creator-analytics",
+  partnerships: "partnership-status",
   journey: "journey",
   tat: "tat",
   "ad-status": "ad-status",

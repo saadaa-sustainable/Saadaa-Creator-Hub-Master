@@ -21,6 +21,7 @@ import {
   nextPayableCycleDate,
   paymentDueDateFor,
 } from "@/lib/payable-cycle";
+import { partnershipApproved } from "@/lib/partnership";
 import { PostingSchema } from "./schema";
 
 export type PostingResult =
@@ -137,9 +138,16 @@ export async function fetchPostDetails(input: {
 
 /**
  * Server action — submit posting data for one deliverable. Mirrors legacy
- * submitPosting: writes post_date / post_link / download_link / raw_dump /
- * partnership_id, flips workflow_status='Posted'. Hard-rejects missing
- * download link when ads_usage_rights='Yes' (legacy §7.1).
+ * submitPosting: writes post_date / post_link / download_link / raw_dump,
+ * flips workflow_status='Posted'. Hard-rejects missing download link when
+ * ads_usage_rights='Yes' (legacy §7.1).
+ *
+ * Partnership auto-invite (2026-07-02): after the write, the creator's Meta
+ * branded-content permission is synced — and when NO record exists yet, the
+ * invite is sent automatically (the creator approves it in their IG
+ * professional dashboard). Runs before the draft-payment init so an
+ * already-approved creator passes the payment gate in the same submit.
+ * Fail-soft: a Meta error never blocks the posting.
  *
  * post_date resolution (legacy parity):
  *   1. Form value if supplied
@@ -159,14 +167,7 @@ export async function submitPosting(input: unknown) {
     return { ok: false as const, error: "Validation failed", fieldErrors };
   }
 
-  const {
-    postId,
-    postDate,
-    postLink,
-    downloadLink,
-    rawDump,
-    partnershipId,
-  } = parsed.data;
+  const { postId, postDate, postLink, downloadLink, rawDump } = parsed.data;
 
   // Resolve post_date: form > shortcode decode > today
   let resolvedDate = postDate?.trim() || "";
@@ -191,15 +192,19 @@ export async function submitPosting(input: unknown) {
       post_link: postLink,
       download_link: downloadLink || null,
       raw_dump: rawDump || null,
-      partnership_id: partnershipId || null,
-      ad_partnership_valid:
-        (partnershipId ?? "").trim().length > 0 ? true : undefined,
       workflow_status: "Posted",
       payment_status: "Not Due",
     })
     .eq("post_id", postId);
 
   if (updErr) return { ok: false as const, error: updErr.message };
+
+  // Partnership auto-invite happens CLIENT-DRIVEN right after this action
+  // returns: the posting form opens a blocking status popup that checks the
+  // creator's live Meta permission, auto-sends the invite when none exists,
+  // and offers Resend on a rejection (see partnership-flow-modal.tsx +
+  // syncPartnershipForPost). Kept out of this write path so a slow Meta
+  // response can never hang the posting submit.
 
   // §8.1 — auto-init draft payment row on every Posted transition. Idempotent
   // (skips when a non-Done row already exists for this post). Child
@@ -251,7 +256,6 @@ export async function submitPosting(input: unknown) {
         { label: "Post Link", value: postLink },
         { label: "Drive / Download Link", value: downloadLink || null },
         { label: "Raw Footage Dump", value: rawDump || null },
-        { label: "Partnership Key", value: partnershipId || null },
       ],
       postId,
       collabId,
@@ -310,6 +314,7 @@ async function autoInitDraftPayment(
     commercial_amount: number | null;
     ads_usage_rights: string | null;
     partnership_id: string | null;
+    partnership_status: string | null;
     ad_partnership_valid: boolean | null;
     collab_id: string | null;
     inf_id: string | null;
@@ -319,7 +324,7 @@ async function autoInitDraftPayment(
     const { data: sibs } = await (supabase as any)
       .from("posts")
       .select(
-        "post_id, post_link, post_date, commercial_amount, ads_usage_rights, partnership_id, ad_partnership_valid, collab_id, inf_id, collab_number",
+        "post_id, post_link, post_date, commercial_amount, ads_usage_rights, partnership_id, partnership_status, ad_partnership_valid, collab_id, inf_id, collab_number",
       )
       .eq("inf_id", postRow.inf_id);
     collabDeliverables = ((sibs ?? []) as typeof collabDeliverables).filter(
@@ -337,6 +342,7 @@ async function autoInitDraftPayment(
         commercial_amount: postRow.commercial_amount ?? null,
         ads_usage_rights: postRow.ads_usage_rights ?? null,
         partnership_id: null,
+        partnership_status: null,
         ad_partnership_valid: null,
         collab_id: postRow.collab_id ?? null,
         inf_id: postRow.inf_id ?? null,
@@ -362,7 +368,8 @@ async function autoInitDraftPayment(
 
   // Collab-level eligibility: don't create a draft until the whole collab is
   // payable. A collab is payable when EVERY deliverable has been posted (link +
-  // date) AND no deliverable with ads_usage_rights=Yes is missing a partnership.
+  // date) AND every deliverable with ads_usage_rights=Yes has the partnership
+  // APPROVED by the creator (partnershipApproved — status or admin override).
   // Otherwise we'd leak a phantom UTR-less row that the operator can't act on.
   const adsYes = (raw: string | null | undefined) => {
     if (!raw) return false;
@@ -371,12 +378,7 @@ async function autoInitDraftPayment(
   };
   for (const s of collabDeliverables) {
     if (!s.post_link || !s.post_date) return;
-    if (adsYes(s.ads_usage_rights)) {
-      const hasKey =
-        s.ad_partnership_valid === true ||
-        (s.partnership_id ?? "").trim().length > 0;
-      if (!hasKey) return;
-    }
+    if (adsYes(s.ads_usage_rights) && !partnershipApproved(s)) return;
   }
 
   // Full collab amount = sum of per-row splits across all deliverables.
@@ -411,6 +413,11 @@ async function autoInitDraftPayment(
 /**
  * Patch partnership_id on a single post. Called from inline edit in the
  * Posting Overview modal, Accounts Hub kanban card, and list view.
+ *
+ * Since the auto-invite rollout this is the ADMIN OVERRIDE path: entering a
+ * key also sets ad_partnership_valid=true so the payment/ads gates pass even
+ * when Meta status isn't approved (escape hatch for API gaps). Clearing the
+ * key withdraws the override.
  */
 export async function savePartnershipKey(
   postId: string,
@@ -418,9 +425,10 @@ export async function savePartnershipKey(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   await assertPermission("posting_submit");
   const supabase = createServiceClient();
+  const key = partnershipId.trim();
   const { error } = await (supabase as any)
     .from("posts")
-    .update({ partnership_id: partnershipId.trim() || null })
+    .update({ partnership_id: key || null, ad_partnership_valid: key.length > 0 })
     .eq("post_id", postId);
   if (error) return { ok: false, error: error.message };
   revalidateTag("posts");

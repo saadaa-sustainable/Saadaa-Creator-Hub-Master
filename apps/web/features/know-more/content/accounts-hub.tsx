@@ -106,14 +106,19 @@ export default function AccountsHubKM() {
           </li>
           <li>
             <strong>Partnership</strong> — when ads_usage_rights = Yes on any
-            deliverable of the collab, every deliverable needs a partnership_id
-            before any payment can settle.
+            deliverable of the collab, the creator must have{" "}
+            <strong>accepted</strong> the partnership request
+            (partnership_status = approved, or an explicit admin override via
+            the inline Partnership Key edit) before any payment can settle. A
+            pending or rejected request blocks the Done payment. The request
+            itself is sent automatically at posting time; track it on the
+            Dashboard&apos;s <strong>Partnership Status</strong> tab.
           </li>
         </KMList>
         <p>
           Blocked rows surface in the toast with the exact reason per post
           (e.g. <KMCode>not posted yet: SIF-1-P2, SIF-1-P3</KMCode>
-          or <KMCode>partnership key missing on: SIF-1-P2</KMCode>).
+          or <KMCode>partnership not approved on: SIF-1-P2</KMCode>).
         </p>
       </KMSection>
 

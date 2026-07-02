@@ -21,6 +21,7 @@ import {
   StatusPill,
   WorkflowStatusPill,
 } from "@/components/ui";
+import { PartnershipBadge } from "@/components/ui/status-pill";
 import { cn } from "@/lib/cn";
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { WorkflowStatus } from "@/lib/supabase/types.gen";
@@ -217,7 +218,10 @@ function CreatorListTable({
                   <CreatorTypeChip type={r.creator_type} />
                 </td>
                 <td className="px-2.5 py-1.5 align-middle">
-                  <StageCell stage={r.current_stage} />
+                  <div className="flex flex-wrap items-center gap-1">
+                    <StageCell stage={r.current_stage} />
+                    <PartnershipBadge status={r.partnership_status} />
+                  </div>
                 </td>
                 <td className="px-2.5 py-1.5 align-middle">
                   {r.category ? (
@@ -404,6 +408,7 @@ function CreatorCard({
         <DeactivatedBadge isActive={r.is_active} />
         <CreatorTypeChip type={r.creator_type} />
         {r.current_stage && <StageCell stage={r.current_stage} />}
+        <PartnershipBadge status={r.partnership_status} />
         <span className="post-id tabular">{r.inf_id}</span>
         {r.category && <span className="campaign-chip">{r.category}</span>}
       </div>

@@ -75,6 +75,13 @@ import { FunnelBody } from "@/features/funnel/page-client";
 import { fetchInternalDashboardData } from "@/features/internal-dashboard/queries";
 import { InternalDashboardBody } from "@/features/internal-dashboard/page-client";
 
+// ── Partnership Status ─────────────────────────────────────────────────────────
+import { PartnershipBoard } from "./partnership-board";
+import {
+  fetchPartnershipBoard,
+  type PartnershipFilters,
+} from "./partnership-queries";
+
 // ── Creator Analytics ──────────────────────────────────────────────────────────
 import { CreatorAnalyticsFiltersBar } from "@/features/creator-analytics/filters";
 import { CreatorAnalyticsView } from "@/features/creator-analytics/creator-analytics-view";
@@ -156,6 +163,26 @@ export async function CreatorAnalyticsTabBody({ sp }: { sp: TabSearchParams }) {
         pageSize={CREATOR_PAGE_SIZE}
         initialView={sp.view === "cards" ? "cards" : "list"}
       />
+    </div>
+  );
+}
+
+// ── Partnership Status ───────────────────────────────────────────────────────
+// Dashboard-native 3-lane kanban (Requested / Accepted / Rejected) over the
+// per-creator Meta branded-content permission mirrored on posts. The client
+// board owns the filter bar + KPI strip + lanes and live-refreshes pending
+// creators against Meta on mount (stamping approved_at / declined_at in DB).
+export async function PartnershipTabBody({ sp }: { sp: TabSearchParams }) {
+  const filters: PartnershipFilters = {
+    q: sp.q,
+    campaign: sp.campaign,
+    sentFrom: sp.sentFrom,
+    sentTo: sp.sentTo,
+  };
+  const data = await fetchPartnershipBoard(filters);
+  return (
+    <div className="onboarding-stage partnership-stage">
+      <PartnershipBoard data={data} initialFilters={filters} />
     </div>
   );
 }

@@ -710,7 +710,6 @@ export function MyDashboardWorkloadBoard({
             postLink: postingPost.post_link ?? "",
             downloadLink: postingPost.download_link ?? "",
             rawDump: postingPost.raw_dump ?? "",
-            partnershipId: postingPost.partnership_id ?? "",
           }}
           onClose={() => setPostingPost(null)}
         />

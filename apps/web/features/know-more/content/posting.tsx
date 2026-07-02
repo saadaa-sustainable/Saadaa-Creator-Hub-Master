@@ -5,7 +5,7 @@ export default function PostingKM() {
     <>
       <KMHeader
         title="Posting"
-        subtitle="Log live IG content per deliverable. Live Instagram post fetch (real date + in-app preview), ownership verification, partnership key, raw-footage drop."
+        subtitle="Log live IG content per deliverable. Live Instagram post fetch (real date + in-app preview), ownership verification, automatic partnership invite, raw-footage drop."
       />
 
       <KMSection tag="Page layout">
@@ -82,16 +82,17 @@ export default function PostingKM() {
             <strong>Inline alerts</strong> — red alert if the pasted URL
             host isn&apos;t instagram.com; amber warning if the URL is a
             bare <KMCode>/p/</KMCode> shortcode with no username to verify
-            against; amber if ads_usage_rights=Yes but partnership_id is
-            blank.
+            against.
           </li>
           <li>
             <strong>Field rows</strong> — Post Link, Post Date,{" "}
             <strong>Download Link (mandatory, red *)</strong>, Raw Footage Dump
-            (with a Drive info popover explaining folder structure), Partnership
-            Key. The Drive Download Link is now required on{" "}
-            <strong>every</strong> post (not just ad posts) — the content asset
-            must always be captured.
+            (with a Drive info popover explaining folder structure). The Drive
+            Download Link is now required on <strong>every</strong> post (not
+            just ad posts) — the content asset must always be captured. There is
+            no Partnership Key input anymore — the partnership request is sent
+            automatically after submit (see Partnership popup below), and the
+            creator&apos;s live status shows as a pill in the modal header.
           </li>
         </KMList>
       </KMSection>
@@ -157,8 +158,10 @@ export default function PostingKM() {
           <li>
             <strong>posts</strong> · workflow_status <KMCode>Posted</KMCode>,
             post_link, post_date, download_link (raw IG download URL),
-            raw_dump (Drive footage folder), partnership_id,
-            ad_partnership_valid (derived from partnership_id presence).
+            raw_dump (Drive footage folder). The partnership columns
+            (partnership_status, partnership_id, partnership_sent_at /
+            approved_at / declined_at, ad_partnership_valid) are stamped by the
+            automatic partnership sync, not by the form.
           </li>
           <li>
             <strong>payments</strong> · auto-init draft row (status{" "}
@@ -170,26 +173,54 @@ export default function PostingKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Partnership popup (after submit)">
+        <KMList>
+          <li>
+            Right after a successful submit, a <strong>blocking popup</strong>{" "}
+            checks the creator&apos;s live partnership-ad permission on
+            Instagram. It cannot be dismissed mid-flight — the OK button appears
+            only once the final status is known.
+          </li>
+          <li>
+            <strong>No request yet</strong> → the invite is sent automatically
+            (progress bar). <strong>Already approved</strong> → &quot;Partner
+            already exists&quot;. <strong>Already pending</strong> → invite
+            previously sent, still awaiting the creator.
+          </li>
+          <li>
+            <strong>Rejected / revoked</strong> → shown with a{" "}
+            <strong>Resend request</strong> button. Resending is always manual —
+            a creator who declined is never re-invited automatically.
+          </li>
+          <li>
+            The same status appears everywhere: posting board pill, Journey
+            cards, Accounts Hub ledger, Creator Analytics and the Dashboard{" "}
+            <strong>Partnership Status</strong> kanban tab.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Auto-Init Gate (autoInitDraftPayment)">
         <p>
           Draft payment rows only spawn when every deliverable sharing the{" "}
-          <KMCode>collab_id</KMCode> has both post_link AND post_date, AND no
-          deliverable with ads_usage_rights=Yes is missing a partnership_id. The
-          single draft is keyed on the collab representative (lowest post_id) and
-          carries the full collab amount (sum of the per-row splits). Prevents
-          UTR-less ghost rows in Accounts Hub before the collab is actually
-          payable.
+          <KMCode>collab_id</KMCode> has both post_link AND post_date, AND every
+          deliverable with ads_usage_rights=Yes has the partnership{" "}
+          <strong>approved</strong> by the creator (or an explicit admin
+          override). The single draft is keyed on the collab representative
+          (lowest post_id) and carries the full collab amount (sum of the
+          per-row splits). Prevents UTR-less ghost rows in Accounts Hub before
+          the collab is actually payable.
         </p>
       </KMSection>
 
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>
-            Partnership Key is required to submit whenever ad usage rights are
-            granted (any non-empty ads_usage_rights, e.g. &quot;5 Months&quot;)
-            and, when present, must be the numeric Meta partnership code (digits
-            only). Submit blocks until both hold. Non-ad posts are exempt — no
-            Meta code exists for them.
+            The inline Partnership Key edit on the board is the{" "}
+            <strong>admin override</strong>: entering a numeric Meta code marks
+            the partnership as valid even when the API status isn&apos;t
+            approved (escape hatch for API gaps). Clearing it withdraws the
+            override.
           </li>
           <li>
             Date drift of ±1 day is real (snowflake ≠ publish time). The
@@ -204,14 +235,12 @@ export default function PostingKM() {
           </li>
           <li>
             Re-submit overwrites post_link / post_date / raw_dump /
-            download_link / partnership_id. Audit trail preserved via
-            updated_at.
+            download_link. Audit trail preserved via updated_at.
           </li>
           <li>
             Red <KMCode>MissingFieldsAlert</KMCode> sits above the submit
             button — lists every required field still empty (Post Date, Post
-            Link, Download Link, Partnership Key when ad usage rights granted).
-            Uses Zod{" "}
+            Link, Download Link). Uses Zod{" "}
             <KMCode>safeParse(watch())</KMCode> so all blockers surface in a
             single pass.
           </li>

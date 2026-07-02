@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   Info,
   Film,
-  Handshake,
   ExternalLink,
   Eye,
   Heart,
@@ -34,8 +33,11 @@ import {
   postDateFromUrl,
   usernameFromUrl,
 } from "@/lib/instagram-shortcode";
+import { PartnershipBadge } from "@/components/ui/status-pill";
 import { PostingSchema, type PostingInput } from "./schema";
 import { fetchPostDetails, submitPosting, type PostDetailsResult } from "./actions";
+import { checkCreatorPartnership } from "./partnership-actions";
+import { PartnershipFlowModal } from "./partnership-flow-modal";
 
 type PostDetails = Extract<PostDetailsResult, { ok: true }>;
 
@@ -82,15 +84,12 @@ export function PostingModal({
   const [fetchingDate, setFetchingDate] = useState(false);
   const [postDetails, setPostDetails] = useState<PostDetails | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  // Partnership: live per-creator status chip + the post-submit blocking popup.
+  const [partnershipState, setPartnershipState] = useState<string | null>(null);
+  const [flowActive, setFlowActive] = useState(false);
   const driveBtnRef = useRef<HTMLButtonElement>(null);
 
   const requiresDownload = adsUsageRights === "Yes";
-  // Ad-rights truthiness — values are durations like "12 Months", not "Yes".
-  const adRightsGranted =
-    !!adsUsageRights &&
-    !["", "no", "n/a", "none", "0", "false"].includes(
-      String(adsUsageRights).trim().toLowerCase(),
-    );
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const {
@@ -110,7 +109,6 @@ export function PostingModal({
       postLink: initial?.postLink ?? "",
       downloadLink: initial?.downloadLink ?? "",
       rawDump: initial?.rawDump ?? "",
-      partnershipId: initial?.partnershipId ?? "",
       adsUsageRights: adsUsageRights || "",
     },
     mode: "onBlur",
@@ -125,7 +123,6 @@ export function PostingModal({
     postLink: "Post Link",
     downloadLink: "Download Link",
     rawDump: "Raw Dump",
-    partnershipId: "Partnership Key",
     adsUsageRights: "Ads Usage Rights",
   };
   const allPostingValues = watch();
@@ -152,6 +149,24 @@ export function PostingModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Live per-creator partnership status chip (read-only). The heavy lifting —
+  // auto-invite + resend — happens in the post-submit popup.
+  useEffect(() => {
+    if (!open || !username) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await checkCreatorPartnership(username);
+        if (!cancelled && res.ok) setPartnershipState(res.status.state);
+      } catch {
+        // silent — the popup after submit is the authoritative surface
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, username]);
 
   useEffect(() => {
     if (!open) return;
@@ -327,12 +342,28 @@ export function PostingModal({
             ? ` Post date defaulted to today (${res.postDate}).`
             : "";
       toast.success(`${postIdShort ?? postId} marked Posted.${dateNote}`);
-      onClose();
-      router.refresh();
+      // Hand over to the blocking partnership popup — it checks the live Meta
+      // status, auto-sends the invite when none exists, and only then lets the
+      // operator close (OK). The form itself is done at this point.
+      setFlowActive(true);
     });
   };
 
   if (!open || !mounted) return null;
+
+  if (flowActive) {
+    return (
+      <PartnershipFlowModal
+        postId={postId}
+        username={username}
+        onDone={() => {
+          setFlowActive(false);
+          onClose();
+          router.refresh();
+        }}
+      />
+    );
+  }
 
   return (
     <>
@@ -361,6 +392,7 @@ export function PostingModal({
                 · {collabId}
               </span>
             )}
+            <PartnershipBadge status={partnershipState} />
           </div>
           <button
             type="button"
@@ -619,24 +651,9 @@ export function PostingModal({
               </label>
             </div>
 
-            <div className="form-floating pt-grid-full">
-              <input
-                type="text"
-                className="form-control"
-                id="pt_partId"
-                placeholder=" "
-                {...register("partnershipId")}
-              />
-              <label htmlFor="pt_partId">
-                <Handshake size={11} className="inline mr-1" />
-                Partnership Key
-                {adRightsGranted && <span className="req">*</span>}
-              </label>
-              <p className="px-1 pt-1.5 text-[11px] leading-relaxed text-text-tertiary">
-                Numeric Meta partnership code, required when ad usage rights are
-                granted.
-              </p>
-            </div>
+            {/* Partnership Key input removed (2026-07-02): the partnership-ad
+                invite is auto-sent right after submit via the blocking status
+                popup, and the status chip in the header shows the live state. */}
           </div>
 
           <MissingFieldsAlert

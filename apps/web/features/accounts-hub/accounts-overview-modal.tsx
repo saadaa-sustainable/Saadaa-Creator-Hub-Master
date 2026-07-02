@@ -18,6 +18,7 @@ import {
 import { Avatar, WorkflowStatusPill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDate, formatRupees } from "@/lib/formatters";
+import { partnershipApproved } from "@/lib/partnership";
 import type { WorkflowStatus } from "@/lib/supabase/types.gen";
 import { PaymentStatusPill } from "./columns";
 
@@ -37,6 +38,7 @@ interface DeliverableRow {
   ads_usage_rights: string | null;
   partnership_id: string | null;
   ad_partnership_valid: boolean | null;
+  partnership_status: string | null;
   post_link: string | null;
   post_date: string | null;
   payment_status: string | null;
@@ -161,14 +163,12 @@ export function AccountsOverviewModal({
         (d.workflow_status === "Posted" || d.workflow_status === "Delivered"),
     );
   const adsRequired = data?.summary.hasAdsRights ?? false;
+  // Gate = creator approved the partnership (or admin override) — mirrors
+  // partnershipApproved() in submitPayments / autoInitDraftPayment.
   const allPartnershipped =
     !adsRequired ||
     !data ||
-    data.deliverables.every(
-      (d) =>
-        d.ad_partnership_valid === true ||
-        (d.partnership_id ?? "").trim().length > 0,
-    );
+    data.deliverables.every((d) => partnershipApproved(d));
   const collabBlocked = isPostedStage && (!allPosted || !allPartnershipped);
 
   return createPortal(
@@ -320,7 +320,7 @@ export function AccountsOverviewModal({
                     <strong>Payment locked for this collab.</strong>{" "}
                     {!allPosted && "Some deliverables haven't been posted yet. "}
                     {!allPartnershipped &&
-                      "Some deliverables are missing a partnership key. "}
+                      "The creator hasn't approved the partnership request yet. "}
                     Complete all deliverables before logging payment.
                   </div>
                 </div>
@@ -390,10 +390,7 @@ function DeliverableCard({
     !["", "no", "n/a", "none", "0", "false"].includes(
       adsRights.trim().toLowerCase(),
     );
-  const hasPartnership =
-    d.ad_partnership_valid === true ||
-    (d.partnership_id ?? "").trim().length > 0;
-  const blockedByPartnership = adsRequired && !hasPartnership;
+  const blockedByPartnership = adsRequired && !partnershipApproved(d);
 
   return (
     <article
@@ -499,10 +496,10 @@ function DeliverableCard({
         {blockedByPartnership && (
           <span
             className="acc-overview-deliverable__block"
-            title="Ads Usage Rights = Yes but no partnership_id set. Payments are blocked at submit until a partnership key is added."
+            title="Ads Usage Rights = Yes but the creator hasn't approved the partnership request. Payments are blocked at submit until it's accepted (or an admin override key is set)."
           >
             <Handshake size={11} aria-hidden />
-            Partnership required
+            Partnership approval pending
           </span>
         )}
 

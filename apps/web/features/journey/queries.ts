@@ -31,6 +31,7 @@ const POSTS_SELECT = [
   "collab_id",
   "inf_id",
   "onboarded_by",
+  "partnership_status",
 ].join(",");
 
 const CREATORS_SELECT = [
@@ -220,6 +221,7 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
       collab_id: (p.collab_id as string | null) ?? null,
       inf_id: (p.inf_id as string | null) ?? null,
       onboarded_by: (p.onboarded_by as string | null) ?? null,
+      partnership_status: (p.partnership_status as string | null) ?? null,
       inf_name: creator?.inf_name ?? null,
       creator,
     };

@@ -34,7 +34,7 @@ export async function GET(
       post_id, post_id_short, workflow_status, content_type, nomenclature,
       collab_type, commercial_amount, barter_amount,
       reels, static_posts, stories,
-      ads_usage_rights, partnership_id, ad_partnership_valid,
+      ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status,
       post_link, post_date, onboard_date, est_delivery,
       deliverable_index, deliverable_type, collab_number, collab_id, inf_id, campaign_id,
       bank_name, bank_number, ifsc,
@@ -72,7 +72,7 @@ export async function GET(
         `
         post_id, post_id_short, workflow_status, deliverable_index, deliverable_type,
         reels, static_posts, stories, ads_usage_rights, partnership_id,
-        ad_partnership_valid, post_link, post_date, payment_status,
+        ad_partnership_valid, partnership_status, post_link, post_date, payment_status,
         commercial_amount, content_type, nomenclature, collab_id, collab_number, inf_id
       `,
       )

@@ -27,6 +27,8 @@ export interface PostingRow {
   download_link?: string | null;
   raw_dump?: string | null;
   partnership_id?: string | null;
+  /** Normalized branded-content permission state (posts.partnership_status). */
+  partnership_status?: PostsRow["partnership_status"];
   deliverable_index?: number | null;
   deliverable_type?: PostsRow["deliverable_type"];
   collab_number?: number | null;

@@ -17,15 +17,14 @@ import "server-only";
  * META_IG_BUSINESS_ID || ID.
  */
 
+import {
+  toPartnershipState,
+  type PartnershipState,
+} from "./partnership";
+
 const GRAPH_VERSION = "v22.0";
 
-export type PartnershipState =
-  | "approved"
-  | "pending"
-  | "rejected"
-  | "revoked"
-  | "none"
-  | "unknown";
+export type { PartnershipState };
 
 export interface PartnershipStatus {
   state: PartnershipState;
@@ -51,25 +50,9 @@ function cleanHandle(h: string): string {
   return (h ?? "").trim().replace(/^@/, "").toLowerCase();
 }
 
-/** Map Meta's permission_status text → our normalized state.
- *
- * ORDER MATTERS: "Pending Approval" contains the substring "approv", so the
- * pending / rejected / revoked checks MUST run before the approved check —
- * otherwise a still-pending invite (request sent, awaiting creator) is
- * mis-read as "approved". Meta values: Approved / Pending Approval /
- * Rejected / Revoked (Declined seen on some surfaces). */
-function toState(raw: string | null | undefined): PartnershipState {
-  const s = (raw ?? "").trim().toLowerCase();
-  if (!s) return "none";
-  if (s.includes("pending")) return "pending";
-  // "Canceled" is what Meta reports when the creator DECLINES a brand-initiated
-  // branded_content_ad_permission request → treat as rejected.
-  if (s.includes("reject") || s.includes("declin") || s.includes("cancel"))
-    return "rejected";
-  if (s.includes("revok")) return "revoked";
-  if (s.includes("approv")) return "approved";
-  return "unknown";
-}
+// State mapping (order-sensitive "Pending Approval" fix) lives in
+// lib/partnership.ts so client badges and DB gates share one source of truth.
+const toState = toPartnershipState;
 
 /** READ — current partnership permission for a creator (per-creator). */
 export async function getPartnershipStatus(

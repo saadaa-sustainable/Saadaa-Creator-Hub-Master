@@ -132,23 +132,31 @@ Count COLLABS (grouped by `collab_id`): totalOnboarded, pendingOnboardings (Reac
 ## 4. Posting (`features/posting/`)
 
 ### Purpose & route
-Records the live post (link, date, download/raw links, partnership key), flips `workflow_status='Posted'`, auto-inits the draft payment. Route `/posting`, gate `posting_submit`. **Counts are PER POST_ID** (one deliverable per row — no collab grouping).
+Records the live post (link, date, download/raw links), flips `workflow_status='Posted'`, auto-inits the draft payment, then hands over to the **blocking partnership popup** (auto-invite). Route `/posting`, gate `posting_submit`. **Counts are PER POST_ID** (one deliverable per row — no collab grouping).
 
 ### Server action
 | Action | Gate | Notes |
 |---|---|---|
-| `submitPosting` | `posting_submit` | Writes posting fields, `workflow_status='Posted'`, `payment_status='Not Due'`; calls `autoInitDraftPayment` |
-| `savePartnershipKey` | `posting_submit` | Inline partnership_id patch (also from Accounts Hub) |
+| `submitPosting` | `posting_submit` | Writes posting fields, `workflow_status='Posted'`, `payment_status='Not Due'`; calls `autoInitDraftPayment`. No partnership write — that's the popup's job |
+| `syncPartnershipForPost` | `posting_submit` | Popup step: live Meta check + stamp; `{autoInvite:true}` sends the invite when NO record exists |
+| `resendPartnershipForPost` / `resendPartnershipForCreator` | `posting_submit` | Explicit resend after a rejection (popup / kanban button) — never automatic |
+| `refreshPartnershipForCreator` | `performance_view` | Kanban sweep: re-read Meta state, stamp approved_at/declined_at |
+| `savePartnershipKey` | `posting_submit` | Inline partnership_id patch = **admin override** — non-empty key also sets `ad_partnership_valid=true` (clearing withdraws it) |
+
+### Partnership auto-invite (2026-07-02)
+- **Partnership Key input removed** from the form. After a successful submit, `partnership-flow-modal.tsx` blocks: live-check (`lib/partnership-sync.ts#syncCreatorPartnership`) → none = auto-send with progress bar → approved/pending = informational → rejected/revoked = **Resend** button. OK appears only once the final state is known.
+- Creator-level Meta state fans onto ALL of the creator's `posts` rows: `partnership_status` (normalized), `partnership_id`, `ad_partnership_valid` (true on approve / false on reject-revoke / untouched otherwise), first-transition `partnership_sent_at` / `_approved_at` / `_declined_at` (resend overwrites sent_at). Mapping lives in client-safe `lib/partnership.ts` (`toPartnershipState`, `partnershipApproved`, `PARTNERSHIP_STATE_LABELS`); `PartnershipBadge` in `status-pill.tsx` is the one shared pill (posting form header + board, Journey cards, Accounts Hub, Creator Analytics, Dashboard kanban).
+- Fail-soft: Meta/API errors log to `system_errors` type `partnership_sync` and never block a posting submit.
 
 ### Validation
 - `postId`, `postLink` (`http(s)://`) required.
 - `downloadLink` (Drive Link) **MANDATORY for every post** (2026-06-10) — red `*`, always required + valid URL, not just ad posts. The content asset must always be captured.
-- **Partnership key (REQ #9):** required when ad usage rights granted (truthiness, since `ads_usage_rights` stores durations); when present must be the numeric Meta partnership code (`/^\d{6,}$/`).
+- ~~Partnership key (REQ #9)~~ removed 2026-07-02 — the invite is auto-sent; gates now key on **creator approval**, not key presence.
 - **post_date resolution:** form value → decode from IG shortcode (no API) → today. Returns `postDateSource`.
 - **Live Instagram fetch (2026-06-29):** on link entry the form calls `fetchPostDetails({postLink, username})` (debounced) → `fetchPostByShortcode` in `lib/meta-graph.ts` hits Meta `business_discovery` for THIS creator's recent media and matches the shortcode. A match returns the **authoritative** post date (Meta `timestamp`, replacing the ±1d estimate), **proves ownership** (the post is in the creator's own media → auto-clears the manual date/owner ticks), and loads caption/likes/comments/media_type for the **View Post** preview (native IG embed iframe — videos play inline). Reuses the `lib/meta-rate-limit` gate; falls back to the shortcode estimate + manual verify when Meta is cooling down / the account is personal / the post is older than the recent window. Ownership: URL-handle-path mismatch still hard-blocks; the Meta match is the stronger positive confirmation for bare `/p/` links.
 
 ### autoInitDraftPayment §8.1
-Spawns one Not-Due `payments` row per collab on the representative deliverable. Idempotent. Collab-level gate: every deliverable must have post_link + post_date, no ads-rights deliverable may lack a partnership. Amount = sum of per-row split. Sets `due_date` + `estimated_payable_date` (15th/30th cycle).
+Spawns one Not-Due `payments` row per collab on the representative deliverable. Idempotent. Collab-level gate: every deliverable must have post_link + post_date, and every ads-rights deliverable must be `partnershipApproved()` (creator approved OR admin override — key presence alone no longer passes, 2026-07-02). Amount = sum of per-row split. Sets `due_date` + `estimated_payable_date` (15th/30th cycle).
 
 ### KPIs
 Per post_id over `["On Board","Order Sent","Posted"]`: **Posts Due** (not Posted), **Submitted** (Posted), Completion Rate, **Delayed** (Posted where `post_date > est_delivery`). Ad-rights filter applied in JS via `ADS_YES` truthiness (never `.eq("ads_usage_rights","Yes")` — would drop durations).

@@ -1,7 +1,12 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { Ban } from "lucide-react";
+import { Ban, Handshake } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { workflowStatusLabel } from "@/lib/formatters";
+import {
+  PARTNERSHIP_STATE_LABELS,
+  parseStoredPartnershipState,
+  type PartnershipState,
+} from "@/lib/partnership";
 import type {
   WorkflowStatus,
   AdResult,
@@ -58,6 +63,50 @@ export function DeactivatedBadge({
     <StatusPill tone="danger" className={className}>
       <Ban size={10} aria-hidden />
       Deactivated
+    </StatusPill>
+  );
+}
+
+/**
+ * Partnership badge — the creator's Meta branded-content permission state
+ * (posts.partnership_status, stamped by lib/partnership-sync.ts). One shared
+ * component so the labels stay identical on every surface (posting form,
+ * board, journey, accounts hub). Renders nothing when no state is stored —
+ * pass showEmpty to render the "No partnership yet" neutral pill instead.
+ */
+const partnershipToneMap: Record<PartnershipState, PillTone> = {
+  approved: "success",
+  pending: "warning",
+  rejected: "danger",
+  revoked: "danger",
+  none: "neutral",
+  unknown: "neutral",
+};
+
+export function PartnershipBadge({
+  status,
+  showEmpty = false,
+  className,
+}: {
+  /** Raw posts.partnership_status value (or a PartnershipState). */
+  status?: string | null;
+  showEmpty?: boolean;
+  className?: string;
+}) {
+  const state = parseStoredPartnershipState(status);
+  if (!state) {
+    if (!showEmpty) return null;
+    return (
+      <StatusPill tone="neutral" className={className}>
+        <Handshake size={10} aria-hidden />
+        {PARTNERSHIP_STATE_LABELS.none}
+      </StatusPill>
+    );
+  }
+  return (
+    <StatusPill tone={partnershipToneMap[state]} className={className}>
+      <Handshake size={10} aria-hidden />
+      {PARTNERSHIP_STATE_LABELS[state]}
     </StatusPill>
   );
 }

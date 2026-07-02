@@ -415,13 +415,13 @@ export function PaymentEntryPanel() {
         if (adBlocked.has(pid)) {
           if (d && d.partnershipMissingSiblings.length > 0) {
             reasons.push(
-              `partnership key missing on: ${d.partnershipMissingSiblings.join(
+              `partnership not approved on: ${d.partnershipMissingSiblings.join(
                 ", ",
               )}`,
             );
           } else {
             reasons.push(
-              "partnership key missing (required when Ads Usage Rights = Yes)",
+              "partnership not approved by the creator (required when Ads Usage Rights = Yes)",
             );
           }
         }

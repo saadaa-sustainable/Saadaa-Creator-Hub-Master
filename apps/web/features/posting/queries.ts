@@ -64,6 +64,7 @@ export async function fetchPostingTable(
       download_link,
       raw_dump,
       partnership_id,
+      partnership_status,
       est_delivery,
       deliverable_index,
       deliverable_type,

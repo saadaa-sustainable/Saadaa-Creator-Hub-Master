@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { partnershipApproved } from "@/lib/partnership";
 import {
   nextPayableCycleDate,
   paymentDueDateFor,
@@ -62,6 +63,7 @@ export async function fetchAccountsHubData(
       ads_usage_rights,
       partnership_id,
       ad_partnership_valid,
+      partnership_status,
       username,
       post_link,
       post_date,
@@ -213,7 +215,8 @@ export async function fetchAccountsHubData(
   // that have no payment row yet, BUT only for collabs that are fully
   // payment-eligible. A collab is payment-eligible when:
   //   1. EVERY deliverable of the collab is posted (post_link + post_date), and
-  //   2. NO deliverable with ads_usage_rights=Yes is missing a partnership_id.
+  //   2. EVERY deliverable with ads_usage_rights=Yes has a creator-APPROVED
+  //      partnership (or the admin override) — see partnershipApproved.
   // If either condition fails, we skip the draft so the operator doesn't see
   // a phantom UTR-less row for a collab that can't be paid yet. Mirrors the
   // collab-level gate in `submitPayments`. Keyed on collab_id.
@@ -247,7 +250,7 @@ export async function fetchAccountsHubData(
       const { data: sibs } = await (supabase as any)
         .from("posts")
         .select(
-          "inf_id, collab_number, collab_id, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid",
+          "inf_id, collab_number, collab_id, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status",
         )
         .in("inf_id", candidateInfIds);
       for (const s of (sibs ?? []) as Array<{
@@ -259,6 +262,7 @@ export async function fetchAccountsHubData(
         ads_usage_rights: string | null;
         partnership_id: string | null;
         ad_partnership_valid: boolean | null;
+        partnership_status: string | null;
       }>) {
         const key = collabKeyOf(s as unknown as Record<string, unknown>);
         if (s.post_date) {
@@ -270,10 +274,11 @@ export async function fetchAccountsHubData(
           continue;
         }
         if (adsYes(s.ads_usage_rights)) {
-          const hasKey =
-            s.ad_partnership_valid === true ||
-            (s.partnership_id ?? "").trim().length > 0;
-          if (!hasKey) collabLocked.add(key);
+          // Gate: the creator must have APPROVED the partnership request (or
+          // an admin override via ad_partnership_valid) — a bare
+          // partnership_id no longer passes since the invite is auto-sent at
+          // posting time.
+          if (!partnershipApproved(s)) collabLocked.add(key);
         }
       }
     }
@@ -504,7 +509,8 @@ const ADS_YES = (raw: string | null | undefined): boolean => {
 /**
  * Posts eligible for a new payment submit. Enforces collab-level readiness:
  *   1. Every deliverable in the collab must have a post_link (posting form submitted).
- *   2. If ANY deliverable has ads_usage_rights, ALL must have a partnership_id.
+ *   2. If ANY deliverable has ads_usage_rights, ALL must have a creator-APPROVED
+ *      partnership (partnership_status='approved', or the admin override).
  *
  * Fetches all Posted/Delivered deliverables, groups by collab_id, and returns
  * ONE representative row per ready collab (payment is raised per collab_id).
@@ -523,6 +529,7 @@ export async function fetchPayableEligiblePosts(): Promise<
     ads_usage_rights: string | null;
     partnership_id: string | null;
     ad_partnership_valid: boolean | null;
+    partnership_status: string | null;
   }>
 > {
   const supabase = createServiceClient();
@@ -532,7 +539,7 @@ export async function fetchPayableEligiblePosts(): Promise<
     .select(
       `
       post_id, post_id_short, commercial_amount, campaign_id, workflow_status,
-      ads_usage_rights, partnership_id, ad_partnership_valid, deliverable_index,
+      ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status, deliverable_index,
       post_link, inf_id, collab_number, collab_id,
       creator:creators ( username, inf_name, profile_pic )
     `,
@@ -558,18 +565,15 @@ export async function fetchPayableEligiblePosts(): Promise<
     collabMap.get(key)!.push(r);
   }
 
-  // Collab is payment-ready when every deliverable has post_link AND (if ads) partnership.
+  // Collab is payment-ready when every deliverable has post_link AND (if ads)
+  // the creator approved the partnership (or admin override) — a bare
+  // partnership_id no longer passes (invite is auto-sent at posting time).
   const readyKeys = new Set<string>();
   for (const [key, deliverables] of collabMap) {
     const allPosted = deliverables.every((d) => (d.post_link ?? "").trim().length > 0);
     const adsRequired = deliverables.some((d) => ADS_YES(d.ads_usage_rights));
     const allPartnershipped =
-      !adsRequired ||
-      deliverables.every(
-        (d) =>
-          d.ad_partnership_valid === true ||
-          (d.partnership_id ?? "").trim().length > 0,
-      );
+      !adsRequired || deliverables.every((d) => partnershipApproved(d));
     if (allPosted && allPartnershipped) readyKeys.add(key);
   }
 
@@ -605,6 +609,7 @@ export async function fetchPayableEligiblePosts(): Promise<
       ads_usage_rights: r.ads_usage_rights ?? null,
       partnership_id: r.partnership_id ?? null,
       ad_partnership_valid: r.ad_partnership_valid ?? null,
+      partnership_status: r.partnership_status ?? null,
       inf_name: r.creator?.inf_name ?? null,
       username: r.creator?.username ?? null,
       profile_pic: r.creator?.profile_pic ?? null,

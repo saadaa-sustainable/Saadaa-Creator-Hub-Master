@@ -34,6 +34,8 @@ export interface AccountsRow {
   ads_usage_rights: PostsRow["ads_usage_rights"];
   partnership_id: PostsRow["partnership_id"];
   ad_partnership_valid?: boolean | null;
+  /** Normalized Meta partnership state (pending/approved/rejected/revoked/none). */
+  partnership_status: string | null;
   post_link: PostsRow["post_link"];
   post_date: PostsRow["post_date"];
   onboard_date: PostsRow["onboard_date"];

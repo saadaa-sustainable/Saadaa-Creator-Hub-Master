@@ -7,6 +7,7 @@ import {
   PartnershipKeyEdit,
   WorkflowStatusPill,
 } from "@/components/ui";
+import { PartnershipBadge } from "@/components/ui/status-pill";
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { PostingRow } from "./types";
 
@@ -167,7 +168,7 @@ export function AdsRightsCell({ r }: { r: PostingRow }) {
 }
 
 /** Column order: Creator | Post ID | Collab ID | INF ID | Campaign |
- *  Deliverables | Ads Rights | Partnership Key | Stage | Followers | Onboarded |
+ *  Deliverables | Ads Rights | Partnership | Stage | Followers | Onboarded |
  *  Post Date | Live Link | Drive. Action appended by table. */
 export const postingColumns: ColumnDef<PostingRow>[] = [
   {
@@ -241,14 +242,22 @@ export const postingColumns: ColumnDef<PostingRow>[] = [
   {
     id: "partnership_key",
     accessorFn: (r) => r.partnership_id ?? "",
-    header: "Partnership Key",
+    header: "Partnership",
+    // Live Meta permission state on top; inline key edit below is the admin
+    // override (kept editable). Stacked like CreatorCell's name + badge.
     cell: ({ row }) =>
       (row.original.ads_usage_rights ?? "").trim() ? (
-        <PartnershipKeyEdit
-          postId={row.original.post_id!}
-          value={row.original.partnership_id}
-          isPosted={isPosted(row.original)}
-        />
+        <div className="flex flex-col items-start gap-1">
+          <PartnershipBadge
+            status={row.original.partnership_status}
+            showEmpty
+          />
+          <PartnershipKeyEdit
+            postId={row.original.post_id!}
+            value={row.original.partnership_id}
+            isPosted={isPosted(row.original)}
+          />
+        </div>
       ) : (
         <span className="text-text-tertiary text-xs">—</span>
       ),

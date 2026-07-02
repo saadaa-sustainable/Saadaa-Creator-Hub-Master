@@ -24,6 +24,7 @@ import OffboardingKM from "./offboarding";
 import OnboardingKM from "./onboarding";
 import OrdersKM from "./orders";
 import OrderStatusKM from "./order-status";
+import PartnershipStatusKM from "./partnership-status";
 import PostingKM from "./posting";
 import ReachOutInboundKM from "./reach-out-inbound";
 import ReachOutOutboundKM from "./reach-out-outbound";
@@ -51,6 +52,7 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   funnel: FunnelKM,
   "cost-analytics": CostAnalyticsKM,
   "creator-analytics": CreatorAnalyticsKM,
+  "partnership-status": PartnershipStatusKM,
   "historic-analytics": HistoricAnalyticsKM,
   "internal-dashboard": InternalDashboardKM,
   errors: ErrorsKM,
