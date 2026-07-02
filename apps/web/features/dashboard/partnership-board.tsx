@@ -10,7 +10,6 @@ import {
   RefreshCcw,
   Search,
   Send,
-  Users,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -301,13 +300,8 @@ export function PartnershipBoard({
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <PartnershipKpi
-          icon={Users}
-          label="Creators with requests"
-          value={kpi.total}
-        />
+      {/* KPI strip — one tile per lane (a "total" tile just restated their sum). */}
+      <div className="grid grid-cols-3 gap-3">
         <PartnershipKpi
           icon={Clock3}
           label="Requested"
