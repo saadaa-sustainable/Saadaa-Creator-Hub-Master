@@ -11,6 +11,8 @@
 
 **Tab registry** (`features/dashboard/tab-config.ts`): `DASHBOARD_TABS` = `overview, creators, partnerships, journey, tat, ad-status, compliance, cost, funnel, internal`; `TAB_LABELS`; `TAB_KM_SLUGS` (per-tab Know More); `resolveTab()`. Pill tab bar (`tabs.tsx`) uses Next `<Link prefetch>` per tab (not buttons) for instant RSC switching, ARIA tablist + roving Arrow/Home/End nav.
 
+**Bento kit (2026-07-02)** — `features/dashboard/bento-kit.tsx`, DAM (Workflow Optimizer) port: `HeroKpi` (top accent + tinted corner + CountUp + InfoDot), interactive `DonutTile` (hover→centre swap, legend %), `ActivityTrendTile` (stacked 30-day area chart, legend chip toggles; fed by additive `activity30` in `fetchDashboardData`), glass `ChartTip`. recharts scoped to dashboard routes (shared bundle unchanged); CSS motion only. Overview KPI strips + both split donuts + My Dashboard KPIs use it. Historic Analytics hides the trend (empty on archive), centres the stage donut with archive wording.
+
 **Tab bodies** (`tab-bodies.tsx`): each non-Overview body re-creates its standalone route below the title — same outer `<div className="onboarding-stage <name>-stage">` wrapper (load-bearing; scoped CSS keys off it) holding the same filter bar + KPI strips + boards in the same order, reusing the same feature components & fetchers:
 
 | Tab | Reuses |
