@@ -11,7 +11,6 @@ import {
   Crown,
   Filter,
   Instagram,
-  PackageX,
   RefreshCw,
   Send,
   Sparkles,
@@ -19,9 +18,9 @@ import {
   Truck,
   UserCheck,
   Users,
-  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { FunnelChart } from "@/features/funnel/funnel-chart";
 import type { FunnelMetrics } from "@/features/funnel/types";
@@ -154,7 +153,7 @@ export function InternalDashboardBody({ data }: { data: InternalDashboardData })
       <KpiStrip totals={scoped.totals} />
 
       {/* ── Bento layout — desktop 12-col mosaic, mobile 1-col stack ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 bento-stagger">
         <div className="lg:col-span-8 min-w-0">
           <FunnelChart totals={scoped.totals} />
         </div>
@@ -317,110 +316,80 @@ function FilterRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KPI Strip — shared .acc-kpi chrome
+// KPI Strip — bento-kit HeroKpi tiles (DAM-style: top accent bar + tinted
+// corner + count-up). Same labels/values/subs as the old .acc-kpi strip;
+// hues are semantic — volume indigo, series purple, success green, pending
+// amber, risk red (gold stays CTA-only, so no gold here).
 // ─────────────────────────────────────────────────────────────────────────────
 
 function KpiStrip({ totals }: { totals: FunnelMetrics }) {
   return (
-    <div className="acc-kpi-grid acc-kpi-grid--9">
-      <KpiTile
-        tone="accent"
-        icon={Send}
+    <div className="acc-kpi-grid acc-kpi-grid--9 bento-stagger max-[480px]:grid-cols-2!">
+      <HeroKpi
+        color="#3B6FD4"
+        icon={<Send size={14} aria-hidden />}
         label="Reach"
-        primary={String(totals.r)}
-        secondary="Total outreach"
+        value={totals.r}
+        sub="Total outreach"
       />
-      <KpiTile
-        tone="info"
-        icon={UserCheck}
+      <HeroKpi
+        color="#7B4FBF"
+        icon={<UserCheck size={14} aria-hidden />}
         label="Onboarded"
-        primary={String(totals.o)}
-        secondary={`${pct(totals.o, totals.r)}% of reach`}
+        value={totals.o}
+        sub={`${pct(totals.o, totals.r)}% of reach`}
       />
-      <KpiTile
-        tone="warning"
-        icon={Sparkles}
+      <HeroKpi
+        color="#B57514"
+        icon={<Sparkles size={14} aria-hidden />}
         label="Barter"
-        primary={String(totals.b)}
-        secondary={`${pct(totals.b, totals.o)}% barter mix`}
+        value={totals.b}
+        sub={`${pct(totals.b, totals.o)}% barter mix`}
       />
-      <KpiTile
-        tone="success"
-        icon={Truck}
+      <HeroKpi
+        color="#4F7C4D"
+        icon={<Truck size={14} aria-hidden />}
         label="Delivered"
-        primary={String(totals.d)}
-        secondary={`${pct(totals.d, totals.o)}% delivery rate`}
+        value={totals.d}
+        sub={`${pct(totals.d, totals.o)}% delivery rate`}
       />
-      <KpiTile
-        tone="muted"
-        icon={Clock}
+      {/* Ghosted stays neutral grey — matches the Funnel page's Ghosted hue
+          (red would read as an actionable failure; ghosting is attrition). */}
+      <HeroKpi
+        color="#9A9384"
+        icon={<Clock size={14} aria-hidden />}
         label="Ghosted"
-        primary={String(totals.g)}
-        secondary={totals.g > 0 ? "Lost touch" : "—"}
+        value={totals.g}
+        sub={totals.g > 0 ? "Lost touch" : "—"}
       />
-      <KpiTile
-        tone="warning"
-        icon={Activity}
+      <HeroKpi
+        color="#B57514"
+        icon={<Activity size={14} aria-hidden />}
         label="Pending"
-        primary={String(totals.pend)}
-        secondary="Awaiting post"
+        value={totals.pend}
+        sub="Awaiting post"
       />
-      <KpiTile
-        tone="danger"
-        icon={AlertTriangle}
+      <HeroKpi
+        color="#C0392B"
+        icon={<AlertTriangle size={14} aria-hidden />}
         label="Overdue"
-        primary={String(totals.overdue)}
-        secondary=">15 days"
+        value={totals.overdue}
+        sub=">15 days"
       />
-      <KpiTile
-        tone="info"
-        icon={Instagram}
+      <HeroKpi
+        color="#3B6FD4"
+        icon={<Instagram size={14} aria-hidden />}
         label="All Posted"
-        primary={String(totals.p)}
-        secondary="Deliverables live"
+        value={totals.p}
+        sub="Deliverables live"
       />
-      <KpiTile
-        tone="success"
-        icon={CheckCircle2}
+      <HeroKpi
+        color="#4F7C4D"
+        icon={<CheckCircle2 size={14} aria-hidden />}
         label="Curated"
-        primary={String(totals.p)}
-        secondary={`${pct(totals.p, totals.o)}% post rate`}
+        value={totals.p}
+        sub={`${pct(totals.p, totals.o)}% post rate`}
       />
-    </div>
-  );
-}
-
-function KpiTile({
-  tone,
-  icon: Icon,
-  label,
-  primary,
-  secondary,
-}: {
-  tone: "accent" | "info" | "warning" | "success" | "danger" | "muted";
-  icon: LucideIcon;
-  label: string;
-  primary: string;
-  secondary: string;
-}) {
-  const toneCls = {
-    accent: "acc-kpi--accent",
-    info: "acc-kpi--info",
-    warning: "acc-kpi--warning",
-    success: "acc-kpi--success",
-    danger: "acc-kpi--danger",
-    muted: "acc-kpi--muted",
-  }[tone];
-  return (
-    <div className={cn("acc-kpi", toneCls)}>
-      <div className="acc-kpi__head">
-        <span className="acc-kpi__icon" aria-hidden>
-          <Icon size={14} />
-        </span>
-        <span className="acc-kpi__label">{label}</span>
-      </div>
-      <div className="acc-kpi__primary">{primary}</div>
-      <div className="acc-kpi__secondary">{secondary}</div>
     </div>
   );
 }
@@ -442,7 +411,7 @@ function ActivityMix({ totals }: { totals: FunnelMetrics }) {
   const total = segments.reduce((acc, s) => acc + s.value, 0);
 
   return (
-    <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
+    <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header>
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Activity Mix
@@ -455,7 +424,9 @@ function ActivityMix({ totals }: { totals: FunnelMetrics }) {
         <p className="text-xs text-text-tertiary">No activity yet.</p>
       ) : (
         <>
-          <div className="flex h-3 rounded-full overflow-hidden">
+          {/* Whole stacked track grows once as one unit — segment shares stay
+              exact; animating segments individually would open gaps mid-flight. */}
+          <div className="bento-bar flex h-3 rounded-full overflow-hidden">
             {segments.map((s) => (
               <div
                 key={s.label}
@@ -524,10 +495,11 @@ function StageHealth({ totals }: { totals: FunnelMetrics }) {
     },
   ];
   return (
-    <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-3">
+    <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-3">
       <header>
-        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
+        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           Stage Health
+          <InfoDot text="Bar tone: ≥80% green, ≥50% amber, else red. Overdue is inverted — lower is better (≤5% green, ≤20% amber)." />
         </h3>
         <p className="text-[0.6rem] text-text-tertiary">
           Conversion + timing pulse
@@ -572,7 +544,10 @@ function StageHealth({ totals }: { totals: FunnelMetrics }) {
               </div>
               <div className="h-1.5 rounded-full bg-bg-muted overflow-hidden">
                 <div
-                  className={cn("h-full transition-all duration-500", barCls)}
+                  className={cn(
+                    "bento-bar h-full transition-all duration-500",
+                    barCls,
+                  )}
                   style={{ width: `${widthPct}%` }}
                 />
               </div>
@@ -594,7 +569,7 @@ function TeamLeaderboard({
 }) {
   if (rows.length === 0) {
     return (
-      <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
+      <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Team Leaderboard
         </h3>
@@ -607,10 +582,11 @@ function TeamLeaderboard({
   const top = rows[0];
   const max = Math.max(1, ...rows.map((r) => scoreOf(r.metrics)));
   return (
-    <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
+    <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           <Trophy size={12} aria-hidden /> Team Leaderboard
+          <InfoDot text="Score = 5×Posted + 3×Delivered + 1×Onboarded − 2×Overdue" />
         </h3>
         <span className="text-[0.6rem] text-text-tertiary">
           {rows.length} contributors · sorted by score
@@ -653,7 +629,7 @@ function TeamLeaderboard({
                 </span>
                 <div className="h-1.5 rounded-full bg-bg-muted overflow-hidden">
                   <div
-                    className="h-full bg-[--accent] transition-all duration-500"
+                    className="bento-bar h-full bg-[--accent] transition-all duration-500"
                     style={{ width: `${widthPct}%` }}
                   />
                 </div>
@@ -682,7 +658,7 @@ function TeamMatrix({
 }) {
   if (rows.length === 0) {
     return (
-      <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
+      <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Team Workload
         </h3>
@@ -693,7 +669,7 @@ function TeamMatrix({
     );
   }
   return (
-    <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
+    <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Team Workload
@@ -759,7 +735,7 @@ function CampaignPerformance({
 }) {
   if (rows.length === 0) {
     return (
-      <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
+      <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Campaign Performance
         </h3>
@@ -770,7 +746,7 @@ function CampaignPerformance({
     );
   }
   return (
-    <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
+    <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Campaign Performance
@@ -827,7 +803,7 @@ function PeriodPerformanceTable({
 }) {
   if (buckets.length === 0) {
     return (
-      <section className="rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
+      <section className="bento-tile rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
           {mode === "month" ? "Monthly" : "Weekly"} Performance
         </h3>
@@ -838,7 +814,7 @@ function PeriodPerformanceTable({
     );
   }
   return (
-    <section className="rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
+    <section className="bento-tile rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
           {mode === "month" ? "Monthly" : "Weekly"} Performance

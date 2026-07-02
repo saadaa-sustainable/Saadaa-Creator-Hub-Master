@@ -22,8 +22,8 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { PartnershipKeyEdit } from "@/components/ui/partnership-key-edit";
-import { DashboardDonut } from "@/features/dashboard/widgets/donut-card";
-import type { BreakdownSlice } from "@/features/dashboard/types";
+import { TileHead } from "@/features/dashboard/bento-kit";
+import { DonutTile, type DonutSeg } from "@/features/dashboard/bento-charts";
 import { cn } from "@/lib/cn";
 import { formatDate, workflowStatusLabel } from "@/lib/formatters";
 import type { AdStatusFilters, AdStatusRow } from "./types";
@@ -267,10 +267,13 @@ function AdPerformanceStats({
   ];
 
   return (
-    <article className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-4">
-      <header className="flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
-        <BarChart3 size={12} aria-hidden /> Performance Stats
-      </header>
+    <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-2">
+      <TileHead
+        icon={<BarChart3 size={12} aria-hidden />}
+        info="Win Rate = Winners ÷ classified ads. Class. Rate = classified ÷ all eligible posts. In Meta Ads = posts found on the Meta platform."
+      >
+        Performance Stats
+      </TileHead>
       <div className="grid grid-cols-3 gap-3 flex-1">
         {tiles.map((t) => (
           <div
@@ -566,7 +569,7 @@ function UntestedListTable({
 }) {
   if (!rows.length)
     return (
-      <div className="ob-list-wrap ad-status-list-wrap">
+      <div className="bento-tile ob-list-wrap ad-status-list-wrap">
         <table className="ob-list-table">
           <tbody>
             <tr>
@@ -582,7 +585,7 @@ function UntestedListTable({
       </div>
     );
   return (
-    <div className="ob-list-wrap ad-status-list-wrap">
+    <div className="bento-tile ob-list-wrap ad-status-list-wrap">
       <div>
         <table className="ob-list-table">
           <colgroup>
@@ -786,7 +789,7 @@ function AdRunListTable({
 }) {
   if (!rows.length)
     return (
-      <div className="ob-list-wrap ad-status-list-wrap">
+      <div className="bento-tile ob-list-wrap ad-status-list-wrap">
         <table className="ob-list-table">
           <tbody>
             <tr>
@@ -802,7 +805,7 @@ function AdRunListTable({
       </div>
     );
   return (
-    <div className="ob-list-wrap ad-status-list-wrap">
+    <div className="bento-tile ob-list-wrap ad-status-list-wrap">
       <div>
         <table className="ob-list-table">
           <colgroup>
@@ -1073,26 +1076,26 @@ export function AdStatusBoard({
   const total = filteredUntested.length + filteredAdRun.length;
 
   // Analytics bento — classification breakdown
-  const classSlices: BreakdownSlice[] = [
-    { label: "Untested", value: untested.length, color: "#9A9384" },
+  const classSlices: DonutSeg[] = [
+    { name: "Untested", value: untested.length, color: "#9A9384" },
     {
-      label: "Winner",
+      name: "Winner",
       value: adRun.filter((r) => r.adsResults === "Winner").length,
       color: "#4F7C4D",
     },
     {
-      label: "ITE",
+      name: "ITE",
       value: adRun.filter((r) => r.adsResults === "ITE").length,
       color: "#B57514",
     },
     {
-      label: "Analyse",
+      name: "Analyse",
       value: adRun.filter((r) => r.adsResults === "Discarded but analyse")
         .length,
       color: "#3B6FD4",
     },
     {
-      label: "Discarded",
+      name: "Discarded",
       value: adRun.filter((r) => r.adsResults === "Discarded").length,
       color: "#C0392B",
     },
@@ -1101,11 +1104,12 @@ export function AdStatusBoard({
   return (
     <>
       {/* Analytics bento — sits between KPI strip and board */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4">
-        <DashboardDonut
-          icon={Trophy}
+      <section className="bento-stagger grid grid-cols-1 sm:grid-cols-2 gap-4 my-4">
+        <DonutTile
+          icon={<Trophy size={12} aria-hidden />}
           title="Ad Classification"
-          slices={classSlices}
+          segs={classSlices}
+          centreLabel="Total"
           emptyHint="No eligible posts yet"
         />
         <AdPerformanceStats untested={untested} adRun={adRun} />

@@ -1,4 +1,5 @@
 import { BarChart3 } from "lucide-react";
+import { TileHead } from "@/features/dashboard/bento-kit";
 import type { CampaignTat } from "./types";
 
 function barColor(avg: number): string {
@@ -10,10 +11,13 @@ function barColor(avg: number): string {
 export function CampaignTatChart({ data }: { data: CampaignTat[] }) {
   if (!data.length) {
     return (
-      <div className="rounded-2xl border bg-bg-white p-5">
-        <div className="flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary mb-3">
-          <BarChart3 size={12} aria-hidden /> Campaign TAT Benchmark
-        </div>
+      <div className="bento-tile rounded-2xl border border-border bg-bg-white p-5">
+        <TileHead
+          icon={<BarChart3 size={12} aria-hidden />}
+          info="Average days from reach-out to first post, per campaign."
+        >
+          Campaign TAT Benchmark
+        </TileHead>
         <p className="text-sm text-text-tertiary italic">
           No campaign data with complete reach-out and post dates yet.
         </p>
@@ -30,15 +34,16 @@ export function CampaignTatChart({ data }: { data: CampaignTat[] }) {
   const totalH = data.length * (BAR_HEIGHT + GAP) - GAP;
 
   return (
-    <div className="rounded-2xl border bg-bg-white p-5">
-      <div className="mb-3">
-        <div className="flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
-          <BarChart3 size={12} aria-hidden /> Campaign TAT Benchmark
-        </div>
-        <p className="text-[0.72rem] text-text-tertiary mt-0.5">
-          Avg days Reach Out → Posted, per campaign · Green ≤30d · Amber ≤60d · Red &gt;60d
-        </p>
-      </div>
+    <div className="bento-tile rounded-2xl border border-border bg-bg-white p-5">
+      <TileHead
+        icon={<BarChart3 size={12} aria-hidden />}
+        info="Average days from reach-out to first post, per campaign."
+      >
+        Campaign TAT Benchmark
+      </TileHead>
+      <p className="-mt-1.5 mb-3 text-[0.72rem] text-text-tertiary">
+        Avg days Reach Out → Posted, per campaign · Green ≤30d · Amber ≤60d · Red &gt;60d
+      </p>
 
       <div className="overflow-x-auto">
         <svg
@@ -76,8 +81,10 @@ export function CampaignTatChart({ data }: { data: CampaignTat[] }) {
                   fill="var(--color-bg-surface)"
                 />
 
-                {/* Value bar */}
+                {/* Value bar — .bento-bar scaleX grow; fill-box keeps the
+                    transform origin on the bar's own left edge (SVG). */}
                 <rect
+                  className="bento-bar"
                   x={LABEL_W}
                   y={y}
                   width={barW}
@@ -85,6 +92,7 @@ export function CampaignTatChart({ data }: { data: CampaignTat[] }) {
                   rx="6"
                   fill={color}
                   opacity="0.85"
+                  style={{ transformBox: "fill-box" }}
                 />
 
                 {/* Value label */}

@@ -35,8 +35,8 @@ export function TatCard({
   if (!stats || stats.count === 0) {
     return (
       <div
-        className="rounded-2xl p-5 flex flex-col gap-2 border border-dashed"
-        style={{ background: "var(--color-bg-surface)", borderColor: "var(--color-border)" }}
+        className="bento-tile rounded-2xl p-5 flex flex-col gap-2 border border-dashed border-border"
+        style={{ background: "var(--color-bg-surface)" }}
       >
         <div className="flex items-center gap-2.5 mb-1">
           <div
@@ -66,11 +66,8 @@ export function TatCard({
 
   return (
     <div
-      className="rounded-2xl border p-5 flex flex-col gap-0 transition-shadow hover:shadow-md"
-      style={{
-        background: "var(--color-bg-white)",
-        borderColor: "var(--color-border)",
-      }}
+      className="bento-tile rounded-2xl border border-border p-5 flex flex-col gap-0"
+      style={{ background: "var(--color-bg-white)" }}
     >
       {/* Header */}
       <div className="flex items-flex-start gap-2.5 mb-4">
@@ -132,7 +129,7 @@ export function TatCard({
           style={{ background: "var(--color-border)", height: "6px" }}
         >
           <div
-            className="h-full rounded-full transition-all duration-700"
+            className="bento-bar h-full rounded-full"
             style={{ width: `${barPct}%`, background: healthColor(avg) }}
           />
         </div>

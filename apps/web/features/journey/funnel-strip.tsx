@@ -1,75 +1,75 @@
-import { CreditCard, Instagram, TrendingDown, UserRoundCheck } from "lucide-react";
+import {
+  CreditCard,
+  Instagram,
+  TrendingDown,
+  UserRoundCheck,
+} from "lucide-react";
+import { HeroKpi } from "@/features/dashboard/bento-kit";
 import type { JourneyFunnel } from "./types";
 
 /**
  * Journey funnel conversion strip — Reachout → Onboarding → Posting → Payment.
  * Closes the Analytics-Matrix gap (the existing Journey KPI strip showed only
- * absolute counts, no conversion rates). Reuses the shared `.acc-kpi-grid` /
- * `.acc-kpi--{tone}` classes so it matches the responsive bento pattern.
+ * absolute counts, no conversion rates). Renders bento-kit `HeroKpi` tiles in
+ * the shared `.acc-kpi-grid`; stage colors follow STAGE_SERIES (reach indigo,
+ * onboard purple, posted green) with the overall reach→paid tile in amber.
  * Rates are stage-to-stage; the secondary line shows the raw collab counts.
  */
-export function JourneyFunnelStrip({ funnel }: { funnel: JourneyFunnel }) {
-  return (
-    <div className="acc-kpi-grid">
-      <KpiCard
-        tone="warning"
-        icon={<UserRoundCheck size={16} aria-hidden />}
-        label="Reach → Onboard"
-        primary={`${funnel.reachToOnboard}%`}
-        secondary={`${funnel.onboarded}/${funnel.reached} collabs`}
-      />
-      <KpiCard
-        tone="info"
-        icon={<Instagram size={16} aria-hidden />}
-        label="Onboard → Posted"
-        primary={`${funnel.onboardToPost}%`}
-        secondary={`${funnel.posted}/${funnel.onboarded} collabs`}
-      />
-      <KpiCard
-        tone="success"
-        icon={<CreditCard size={16} aria-hidden />}
-        label="Posted → Paid"
-        primary={`${funnel.postToPayment}%`}
-        secondary={`${funnel.paid}/${funnel.posted} collabs`}
-      />
-      <KpiCard
-        tone="accent"
-        icon={<TrendingDown size={16} aria-hidden />}
-        label="Overall"
-        primary={
-          funnel.reached > 0
-            ? `${Math.round((funnel.paid / funnel.reached) * 1000) / 10}%`
-            : "0%"
-        }
-        secondary={`${funnel.paid}/${funnel.reached} reach → paid`}
-      />
-    </div>
-  );
+
+/**
+ * Split a one-decimal percentage so HeroKpi's integer count-up renders the
+ * exact same string as `${v}%` — the integer part animates, `.d%` rides the
+ * static suffix (suffix is just "%" when the rate has no decimal).
+ */
+function pctParts(v: number): { value: number; suffix: string } {
+  const tenths = Math.round(v * 10) % 10;
+  return { value: Math.trunc(v), suffix: tenths ? `.${tenths}%` : "%" };
 }
 
-function KpiCard({
-  tone,
-  icon,
-  label,
-  primary,
-  secondary,
-}: {
-  tone: "accent" | "muted" | "warning" | "success" | "info" | "danger";
-  icon: React.ReactNode;
-  label: string;
-  primary: string;
-  secondary: string;
-}) {
+export function JourneyFunnelStrip({ funnel }: { funnel: JourneyFunnel }) {
+  const reachOnboard = pctParts(funnel.reachToOnboard);
+  const onboardPost = pctParts(funnel.onboardToPost);
+  const postPaid = pctParts(funnel.postToPayment);
+  const overall = pctParts(
+    funnel.reached > 0
+      ? Math.round((funnel.paid / funnel.reached) * 1000) / 10
+      : 0,
+  );
+
   return (
-    <div className={`acc-kpi acc-kpi--${tone}`}>
-      <div className="acc-kpi__head">
-        <span className="acc-kpi__icon" aria-hidden>
-          {icon}
-        </span>
-        <span className="acc-kpi__label">{label}</span>
-      </div>
-      <div className="acc-kpi__primary tabular">{primary}</div>
-      <div className="acc-kpi__secondary tabular">{secondary}</div>
+    <div className="acc-kpi-grid bento-stagger">
+      <HeroKpi
+        color="#3B6FD4"
+        icon={<UserRoundCheck size={14} aria-hidden />}
+        label="Reach → Onboard"
+        value={reachOnboard.value}
+        suffix={reachOnboard.suffix}
+        sub={`${funnel.onboarded}/${funnel.reached} collabs`}
+      />
+      <HeroKpi
+        color="#7B4FBF"
+        icon={<Instagram size={14} aria-hidden />}
+        label="Onboard → Posted"
+        value={onboardPost.value}
+        suffix={onboardPost.suffix}
+        sub={`${funnel.posted}/${funnel.onboarded} collabs`}
+      />
+      <HeroKpi
+        color="#4F7C4D"
+        icon={<CreditCard size={14} aria-hidden />}
+        label="Posted → Paid"
+        value={postPaid.value}
+        suffix={postPaid.suffix}
+        sub={`${funnel.paid}/${funnel.posted} collabs`}
+      />
+      <HeroKpi
+        color="#B57514"
+        icon={<TrendingDown size={14} aria-hidden />}
+        label="Overall"
+        value={overall.value}
+        suffix={overall.suffix}
+        sub={`${funnel.paid}/${funnel.reached} reach → paid`}
+      />
     </div>
   );
 }

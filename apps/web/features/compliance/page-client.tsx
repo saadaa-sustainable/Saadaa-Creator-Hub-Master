@@ -29,13 +29,19 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { CountUp } from "@/components/ui/count-up";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
 import type { ComplianceData, RateBreakdown } from "./types";
 
 /**
  * Layout mirrors legacy `#view-compliance` (Index.html:7478-7533).
  * Five sections: Pipeline Health · Conversion Rates · Avg TAT · Data Coverage
  * · Campaign Breakdown · Onboarded By (Team).
+ *
+ * Visual layer: bento-kit `HeroKpi` tiles for counts, a matching local
+ * `PctTile` (same DNA + `.bento-bar` progress) for percent metrics. All
+ * values/labels come straight from `ComplianceData` — presentation only.
  */
 export function ComplianceBody({ data }: { data: ComplianceData }) {
   const router = useRouter();
@@ -101,92 +107,93 @@ export function ComplianceBody({ data }: { data: ComplianceData }) {
 
       {show("pipeline") && (
         <Section title="Pipeline Health" icon={Filter}>
-          <Card
+          <HeroKpi
+            color="#3B6FD4"
+            icon={<Users size={14} aria-hidden />}
             label="Total Creators"
             value={data.pipeline.total}
-            hint="All records"
-            icon={Users}
-            accent="text-text-primary"
+            sub="All records"
           />
-          <Card
+          <HeroKpi
+            color="#3B6FD4"
+            icon={<Send size={14} aria-hidden />}
             label="Reach Out"
             value={data.pipeline.reachOut}
-            hint="Contacted"
-            icon={Send}
-            accent="text-text-secondary"
+            sub="Contacted"
           />
-          <Card
+          <HeroKpi
+            color="#B57514"
+            icon={<User2 size={14} aria-hidden />}
             label="Onboard"
             value={data.pipeline.onBoard}
-            hint="Awaiting post"
-            icon={User2}
-            accent="text-warning"
+            sub="Awaiting post"
           />
-          <Card
+          <HeroKpi
+            color="#7B4FBF"
+            icon={<Instagram size={14} aria-hidden />}
             label="Posted"
             value={data.pipeline.posted}
-            hint="Live"
-            icon={Instagram}
-            accent="text-[#E1306C]"
+            sub="Live"
           />
-          <Card
+          <HeroKpi
+            color="#4F7C4D"
+            icon={<Truck size={14} aria-hidden />}
             label="Delivered"
             value={data.pipeline.delivered}
-            hint="Garment done"
-            icon={Truck}
-            accent="text-success"
+            sub="Garment done"
           />
-          <Card
+          <HeroKpi
+            color="#C0392B"
+            icon={<ArrowUpRight size={14} aria-hidden />}
             label="RTO"
             value={data.pipeline.rto}
-            hint="Returned"
-            icon={ArrowUpRight}
-            accent="text-danger"
+            sub="Returned"
           />
-          <Card
+          <HeroKpi
+            color="#C0392B"
+            icon={<XCircle size={14} aria-hidden />}
             label="Cancelled"
             value={data.pipeline.cancelled}
-            hint=""
-            icon={XCircle}
-            accent="text-danger"
+            sub=""
+            info="Collabs marked cancelled"
           />
-          <Card
+          <HeroKpi
+            color="#3B6FD4"
+            icon={<Activity size={14} aria-hidden />}
             label="Active"
             value={data.pipeline.active}
-            hint="Excl RTO/Cancel"
-            icon={Activity}
-            accent="text-text-primary"
+            sub="Excl RTO/Cancel"
           />
         </Section>
       )}
 
       {show("rates") && (
         <Section title="Conversion Rates" icon={Percent}>
-          <RateCard
+          <RateTile
             label="Onboard Rate"
             rate={data.rates.onboardConvRate}
             hint="RO → Onboard"
             icon={BarChart3}
           />
-          <RateCard
+          <RateTile
             label="Posting Rate"
             rate={data.rates.postingRate}
             hint="Active → Posted"
             icon={Camera}
           />
-          <RateCard
+          <RateTile
             label="Delivery Rate"
             rate={data.rates.deliveryRate}
             hint="Posted → Delivered"
             icon={Truck}
           />
-          <RateCard
+          <RateTile
             label="Payment Rate"
             rate={data.rates.paymentRate}
             hint="Posted/Delivered paid"
             icon={Banknote}
           />
-          <RateCard
+          <RateTile
             label="RTO Rate"
             rate={data.rates.rtoRate}
             hint="Of orders placed"
@@ -198,59 +205,61 @@ export function ComplianceBody({ data }: { data: ComplianceData }) {
 
       {show("tat") && (
         <Section title="Avg Turnaround Times" icon={Timer}>
-          <Card
-            label="RO → Onboard"
-            value={fmtDays(data.tat.roToOb)}
-            hint=""
+          <TatKpi
+            color="#3B6FD4"
             icon={Timer}
-            accent="text-[#3B6FD4]"
+            label="RO → Onboard"
+            days={data.tat.roToOb}
+            info="Avg days from reach out to onboard date"
           />
-          <Card
-            label="Onboard → Post"
-            value={fmtDays(data.tat.obToPost)}
-            hint=""
+          <TatKpi
+            color="#B57514"
             icon={CheckCircle2}
-            accent="text-warning"
+            label="Onboard → Post"
+            days={data.tat.obToPost}
+            info="Avg days from onboard to post date"
           />
-          <Card
-            label="RO → Post"
-            value={fmtDays(data.tat.roToPost)}
-            hint=""
+          <TatKpi
+            color="#7B4FBF"
             icon={Clock}
-            accent="text-text-primary"
+            label="RO → Post"
+            days={data.tat.roToPost}
+            info="Avg days from reach out to post date"
           />
         </Section>
       )}
 
       {show("coverage") && (
         <Section title="Data Coverage" icon={Database}>
-          <CoverageCard
+          <PctTile
             label="Email Coverage"
             pct={data.coverage.emailCoveragePct}
-            primary={data.coverage.withEmail}
-            totalLabel={`of ${data.pipeline.total}`}
+            hero={data.coverage.withEmail}
+            sub={`${data.coverage.emailCoveragePct}% · of ${data.pipeline.total}`}
             icon={Mail}
           />
-          <CoverageCard
+          <PctTile
             label="Bank Coverage"
             pct={data.coverage.bankCoveragePct}
-            primary={data.coverage.withBank}
-            totalLabel={`of ${data.pipeline.active} active`}
+            hero={data.coverage.withBank}
+            sub={`${data.coverage.bankCoveragePct}% · of ${data.pipeline.active} active`}
             icon={Banknote}
           />
-          <Card
+          <HeroKpi
+            color="#3B6FD4"
+            icon={<Box size={14} aria-hidden />}
             label="Order Placed"
             value={data.coverage.withOrder}
-            hint=""
-            icon={Box}
-            accent="text-text-primary"
+            sub=""
+            info="Unique order IDs on posts"
           />
-          <Card
+          <HeroKpi
+            color="#3B6FD4"
+            icon={<QrCode size={14} aria-hidden />}
             label="Tracking IDs"
             value={data.coverage.withTracking}
-            hint=""
-            icon={QrCode}
-            accent="text-text-primary"
+            sub=""
+            info="Unique orders with a tracking ID"
           />
         </Section>
       )}
@@ -417,67 +426,98 @@ function Section({
         </span>
         {title}
       </h2>
-      <div className="acc-kpi-grid compliance-kpi-grid">{children}</div>
+      <div className="acc-kpi-grid compliance-kpi-grid bento-stagger">
+        {children}
+      </div>
     </section>
   );
 }
 
-function Card({
+/** Tone → accent hex (sanctioned semantic palette — never gold). */
+const TONE_HEX = {
+  success: "#4F7C4D",
+  warning: "#B57514",
+  danger: "#C0392B",
+} as const;
+
+/**
+ * Percent tile — HeroKpi visual DNA (top accent bar, tinted corner, icon
+ * chip, count-up) plus the compliance progress bar (`.bento-bar` grow).
+ * Local because the shipped `HeroKpi` primitive has no bar slot.
+ *
+ * VALUE HIERARCHY (legacy parity): the HERO number is the absolute count —
+ * exactly what the old cards led with — and the percent lives in the sub
+ * line + drives the bar/tone. Pass `hero` for the big number; `heroStatic`
+ * renders un-animated after it (e.g. the "/120" of a fraction).
+ */
+function PctTile({
   label,
-  value,
-  hint,
+  pct,
+  hero,
+  heroStatic,
+  sub,
   icon: Icon,
-  accent,
+  tone,
 }: {
   label: string;
-  value: string | number;
-  hint: string;
+  pct: number;
+  hero: number;
+  heroStatic?: string;
+  sub: string;
   icon: LucideIcon;
-  accent: string;
+  tone?: "success" | "warning" | "danger";
 }) {
+  const color = TONE_HEX[tone ?? toneRate(pct)];
   return (
-    <article
-      className={cn(
-        "acc-kpi compliance-metric-card cursor-default",
-        metricToneFromAccent(accent),
-      )}
-    >
-      <header className="flex items-center justify-between gap-1.5">
-        <span className="text-[0.5rem] sm:text-[0.6rem] uppercase tracking-[0.06em] sm:tracking-[0.08em] font-extrabold text-text-tertiary truncate">
+    <div className="bento-tile relative overflow-hidden rounded-[16px] border border-border bg-bg-white p-3.5">
+      <span
+        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-[0.10]"
+        style={{ background: color }}
+        aria-hidden
+      />
+      <span
+        className="absolute inset-x-0 top-0 h-[3px]"
+        style={{ background: color }}
+        aria-hidden
+      />
+      <div className="mb-2 flex items-center gap-1.5 text-text-secondary">
+        <span
+          className="inline-flex h-6 w-6 items-center justify-center rounded-[8px]"
+          style={{ background: `${color}1A`, color }}
+        >
+          <Icon size={14} aria-hidden />
+        </span>
+        <span className="truncate text-[0.64rem] font-bold uppercase tracking-[0.05em]">
           {label}
         </span>
-        <span
-          className={cn(
-            "inline-flex h-4 w-4 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-bg-muted shrink-0",
-            accent,
-          )}
-        >
-          <Icon size={9} aria-hidden className="sm:hidden" />
-          <Icon size={11} aria-hidden className="hidden sm:block" />
-        </span>
-      </header>
-      <div
-        className={cn(
-          "text-base sm:text-[1.7rem] font-extrabold tabular leading-none",
-          accent,
-        )}
-      >
-        {value}
       </div>
-      {hint && (
-        <span className="text-[0.52rem] sm:text-[0.6rem] text-text-tertiary truncate">
-          {hint}
-        </span>
-      )}
-    </article>
+      <div className="text-[1.7rem] font-bold leading-none tracking-[-0.01em] tabular-nums text-text-primary">
+        <CountUp
+          value={hero}
+          format={(x) => Math.round(x).toLocaleString("en-IN")}
+        />
+        {heroStatic}
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-bg-muted">
+        <div
+          className="bento-bar h-full rounded-full"
+          style={{ width: `${Math.min(100, pct)}%`, background: color }}
+        />
+      </div>
+      <div className="mt-1.5 truncate text-[0.68rem] leading-snug tabular-nums text-text-tertiary">
+        {sub}
+      </div>
+    </div>
   );
 }
 
-function RateCard({
+/** Conversion-rate tile — num/den hero (legacy hierarchy) + pct detail/bar,
+ * legacy tone rules. */
+function RateTile({
   label,
   rate,
   hint,
-  icon: Icon,
+  icon,
   invert = false,
 }: {
   label: string;
@@ -487,140 +527,82 @@ function RateCard({
   invert?: boolean;
 }) {
   const tone = invert ? toneRtoRate(rate.pct) : toneRate(rate.pct);
-  const toneText = {
-    success: "text-success",
-    warning: "text-warning",
-    danger: "text-danger",
-  }[tone];
-  const toneBar = {
-    success: "bg-success",
-    warning: "bg-warning",
-    danger: "bg-danger",
-  }[tone];
   return (
-    <article
-      className={cn(
-        "acc-kpi compliance-metric-card cursor-default",
-        {
-          success: "acc-kpi--success",
-          warning: "acc-kpi--warning",
-          danger: "acc-kpi--danger",
-        }[tone],
-      )}
-    >
-      <header className="flex items-center justify-between gap-1.5">
-        <span className="text-[0.5rem] sm:text-[0.6rem] uppercase tracking-[0.06em] sm:tracking-[0.08em] font-extrabold text-text-tertiary truncate">
-          {label}
-        </span>
-        <span
-          className={cn(
-            "inline-flex h-4 w-4 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-bg-muted shrink-0",
-            toneText,
-          )}
-        >
-          <Icon size={9} aria-hidden className="sm:hidden" />
-          <Icon size={11} aria-hidden className="hidden sm:block" />
-        </span>
-      </header>
-      <div className="flex items-baseline gap-1">
-        <span
-          className={cn(
-            "text-base sm:text-[1.7rem] font-extrabold tabular leading-none",
-            toneText,
-          )}
-        >
-          {rate.num}
-          <span className="text-text-tertiary font-bold mx-0.5 sm:mx-1">/</span>
-          {rate.den}
-        </span>
-      </div>
-      <div className="h-1 sm:h-1.5 rounded-full bg-bg-muted overflow-hidden">
-        <div
-          className={cn("h-full transition-all duration-500", toneBar)}
-          style={{ width: `${Math.min(100, rate.pct)}%` }}
-        />
-      </div>
-      <span className="text-[0.52rem] sm:text-[0.6rem] text-text-tertiary truncate">
-        <strong className={toneText}>{rate.pct}%</strong> · {hint}
-      </span>
-    </article>
+    <PctTile
+      label={label}
+      pct={rate.pct}
+      hero={rate.num}
+      heroStatic={`/${rate.den}`}
+      sub={`${rate.pct}% · ${hint}`}
+      icon={icon}
+      tone={tone}
+    />
   );
 }
 
-function CoverageCard({
-  label,
-  pct,
-  primary,
-  totalLabel,
+/** TAT tile — HeroKpi with a "d" suffix; em-dash placeholder when null. */
+function TatKpi({
+  color,
   icon: Icon,
+  label,
+  days,
+  info,
 }: {
-  label: string;
-  pct: number;
-  primary: number;
-  totalLabel: string;
+  color: string;
   icon: LucideIcon;
+  label: string;
+  days: number | null;
+  info?: string;
 }) {
-  const tone = toneRate(pct);
-  const toneText = {
-    success: "text-success",
-    warning: "text-warning",
-    danger: "text-danger",
-  }[tone];
-  const toneBar = {
-    success: "bg-success",
-    warning: "bg-warning",
-    danger: "bg-danger",
-  }[tone];
-  return (
-    <article
-      className={cn(
-        "acc-kpi compliance-metric-card cursor-default",
-        {
-          success: "acc-kpi--success",
-          warning: "acc-kpi--warning",
-          danger: "acc-kpi--danger",
-        }[tone],
-      )}
-    >
-      <header className="flex items-center justify-between gap-1.5">
-        <span className="text-[0.5rem] sm:text-[0.6rem] uppercase tracking-[0.06em] sm:tracking-[0.08em] font-extrabold text-text-tertiary truncate">
-          {label}
-        </span>
+  if (days == null) {
+    return (
+      <div className="bento-tile relative overflow-hidden rounded-[16px] border border-border bg-bg-white p-3.5">
         <span
-          className={cn(
-            "inline-flex h-4 w-4 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-bg-muted shrink-0",
-            toneText,
-          )}
-        >
-          <Icon size={9} aria-hidden className="sm:hidden" />
-          <Icon size={11} aria-hidden className="hidden sm:block" />
-        </span>
-      </header>
-      <div
-        className={cn(
-          "text-base sm:text-[1.7rem] font-extrabold tabular leading-none",
-          toneText,
-        )}
-      >
-        {primary}
-      </div>
-      <div className="h-1 sm:h-1.5 rounded-full bg-bg-muted overflow-hidden">
-        <div
-          className={cn("h-full transition-all duration-500", toneBar)}
-          style={{ width: `${Math.min(100, pct)}%` }}
+          className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-[0.10]"
+          style={{ background: color }}
+          aria-hidden
         />
+        <span
+          className="absolute inset-x-0 top-0 h-[3px]"
+          style={{ background: color }}
+          aria-hidden
+        />
+        <div className="mb-2 flex items-center gap-1.5 text-text-secondary">
+          <span
+            className="inline-flex h-6 w-6 items-center justify-center rounded-[8px]"
+            style={{ background: `${color}1A`, color }}
+          >
+            <Icon size={14} aria-hidden />
+          </span>
+          <span className="truncate text-[0.64rem] font-bold uppercase tracking-[0.05em]">
+            {label}
+          </span>
+          {info && <InfoDot text={info} />}
+        </div>
+        <div className="text-[1.7rem] font-bold leading-none tracking-[-0.01em] tabular-nums text-text-primary">
+          —
+        </div>
+        <div className="mt-1.5 text-[0.68rem] leading-snug tabular-nums text-text-tertiary" />
       </div>
-      <span className="text-[0.52rem] sm:text-[0.6rem] text-text-tertiary truncate">
-        <strong className={toneText}>{pct}%</strong> · {totalLabel}
-      </span>
-    </article>
+    );
+  }
+  return (
+    <HeroKpi
+      color={color}
+      icon={<Icon size={14} aria-hidden />}
+      label={label}
+      value={days}
+      suffix="d"
+      sub=""
+      info={info}
+    />
   );
 }
 
 function CampaignBreakdown({ rows }: { rows: ComplianceData["campaigns"] }) {
   if (rows.length === 0) {
     return (
-      <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:rounded-2xl sm:p-4">
+      <section className="bento-tile min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:rounded-2xl sm:p-4">
         <h2 className="text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Campaign Breakdown
         </h2>
@@ -629,7 +611,7 @@ function CampaignBreakdown({ rows }: { rows: ComplianceData["campaigns"] }) {
     );
   }
   return (
-    <section className="flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
+    <section className="bento-tile flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <h2 className="flex items-center gap-2 text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-bg-surface border border-border text-text-secondary">
@@ -702,7 +684,7 @@ function CampaignBreakdown({ rows }: { rows: ComplianceData["campaigns"] }) {
 function TeamCards({ entries }: { entries: ComplianceData["team"] }) {
   if (entries.length === 0) {
     return (
-      <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:rounded-2xl sm:p-4">
+      <section className="bento-tile min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:rounded-2xl sm:p-4">
         <h2 className="text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Onboarded By (Team)
         </h2>
@@ -713,7 +695,7 @@ function TeamCards({ entries }: { entries: ComplianceData["team"] }) {
     );
   }
   return (
-    <section className="flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
+    <section className="bento-tile flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <h2 className="flex items-center gap-2 text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
           <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-bg-surface border border-border text-text-secondary">
@@ -742,22 +724,6 @@ function TeamCards({ entries }: { entries: ComplianceData["team"] }) {
       </div>
     </section>
   );
-}
-
-function fmtDays(value: number | null): string {
-  if (value == null) return "—";
-  return `${value}d`;
-}
-
-function metricToneFromAccent(accent: string): string {
-  if (accent.includes("danger")) return "acc-kpi--danger";
-  if (accent.includes("warning")) return "acc-kpi--warning";
-  if (accent.includes("success")) return "acc-kpi--success";
-  if (accent.includes("3B6FD4")) return "acc-kpi--info";
-  if (accent.includes("tertiary") || accent.includes("secondary")) {
-    return "acc-kpi--muted";
-  }
-  return "acc-kpi--accent";
 }
 
 function toneRate(value: number): "success" | "warning" | "danger" {

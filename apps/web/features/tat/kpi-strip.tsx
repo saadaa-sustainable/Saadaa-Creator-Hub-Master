@@ -1,73 +1,113 @@
 import { ArrowLeft, CheckCircle, Clock, Send } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/cn";
+import type { ReactNode } from "react";
+import { HeroKpi } from "@/features/dashboard/bento-kit";
 import type { TatKpi } from "./types";
 
-type Tone = "accent" | "success" | "warning" | "danger" | "info";
-
-function KpiCard({
-  tone,
-  icon: Icon,
+/**
+ * Fallback twin of `HeroKpi` for the "no data yet" case — same shell,
+ * renders an em-dash instead of a count-up (HeroKpi only takes numbers).
+ * Structure/classes mirror bento-kit's HeroKpi exactly; keep in sync.
+ */
+function HeroKpiDash({
+  color,
+  icon,
   label,
-  primary,
-  secondary,
+  sub,
 }: {
-  tone: Tone;
-  icon: LucideIcon;
+  color: string;
+  icon: ReactNode;
   label: string;
-  primary: string;
-  secondary: string;
+  sub: string;
 }) {
   return (
-    <div className={cn("acc-kpi", `acc-kpi--${tone}`)}>
-      <div className="acc-kpi__head">
-        <span className="acc-kpi__icon" aria-hidden>
-          <Icon size={16} />
+    <div className="bento-tile relative overflow-hidden rounded-[16px] border border-border bg-bg-white p-3.5">
+      <span
+        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-[0.10]"
+        style={{ background: color }}
+        aria-hidden
+      />
+      <span
+        className="absolute inset-x-0 top-0 h-[3px]"
+        style={{ background: color }}
+        aria-hidden
+      />
+      <div className="mb-2 flex items-center gap-1.5 text-text-secondary">
+        <span
+          className="inline-flex h-6 w-6 items-center justify-center rounded-[8px]"
+          style={{ background: `${color}1A`, color }}
+        >
+          {icon}
         </span>
-        <span className="acc-kpi__label">{label}</span>
+        <span className="truncate text-[0.64rem] font-bold uppercase tracking-[0.05em]">
+          {label}
+        </span>
       </div>
-      <div className="acc-kpi__primary tabular">{primary}</div>
-      <div className="acc-kpi__secondary tabular">{secondary}</div>
+      <div className="text-[1.7rem] font-bold leading-none tracking-[-0.01em] tabular-nums text-text-primary">
+        —
+      </div>
+      <div className="mt-1.5 text-[0.68rem] leading-snug tabular-nums text-text-tertiary">
+        {sub}
+      </div>
     </div>
   );
 }
 
 export function TatKpiStrip({ kpi }: { kpi: TatKpi }) {
-  const rtoRate =
+  const rtoPct =
     kpi.postsWithOrder > 0
-      ? `${Math.round((kpi.rto / kpi.postsWithOrder) * 100)}%`
-      : "—";
+      ? Math.round((kpi.rto / kpi.postsWithOrder) * 100)
+      : null;
 
   return (
-    <div className="acc-kpi-grid">
-      <KpiCard
-        tone="accent"
-        icon={Send}
+    <div className="acc-kpi-grid bento-stagger">
+      <HeroKpi
+        color="#3B6FD4"
+        icon={<Send size={14} aria-hidden />}
         label="Total Posts"
-        primary={String(kpi.totalPosts)}
-        secondary="Posted + Delivered"
+        value={kpi.totalPosts}
+        sub="Posted + Delivered"
       />
-      <KpiCard
-        tone="info"
-        icon={Clock}
-        label="Avg RO → Post"
-        primary={kpi.avgEndToEnd != null ? `${kpi.avgEndToEnd}d` : "—"}
-        secondary="End-to-end TAT"
-      />
-      <KpiCard
-        tone="success"
-        icon={CheckCircle}
+      {kpi.avgEndToEnd != null ? (
+        <HeroKpi
+          color="#7B4FBF"
+          icon={<Clock size={14} aria-hidden />}
+          label="Avg RO → Post"
+          value={kpi.avgEndToEnd}
+          suffix="d"
+          sub="End-to-end TAT"
+        />
+      ) : (
+        <HeroKpiDash
+          color="#7B4FBF"
+          icon={<Clock size={14} aria-hidden />}
+          label="Avg RO → Post"
+          sub="End-to-end TAT"
+        />
+      )}
+      <HeroKpi
+        color="#4F7C4D"
+        icon={<CheckCircle size={14} aria-hidden />}
         label="Delivered"
-        primary={String(kpi.delivered)}
-        secondary="Orders delivered"
+        value={kpi.delivered}
+        sub="Orders delivered"
       />
-      <KpiCard
-        tone="danger"
-        icon={ArrowLeft}
-        label="RTO Rate"
-        primary={rtoRate}
-        secondary={`${kpi.rto} of ${kpi.postsWithOrder} orders`}
-      />
+      {rtoPct != null ? (
+        <HeroKpi
+          color="#C0392B"
+          icon={<ArrowLeft size={14} aria-hidden />}
+          label="RTO Rate"
+          value={rtoPct}
+          suffix="%"
+          sub={`${kpi.rto} of ${kpi.postsWithOrder} orders`}
+        />
+      ) : (
+        <HeroKpiDash
+          color="#C0392B"
+          icon={<ArrowLeft size={14} aria-hidden />}
+          label="RTO Rate"
+          sub={`${kpi.rto} of ${kpi.postsWithOrder} orders`}
+        />
+      )}
     </div>
   );
 }

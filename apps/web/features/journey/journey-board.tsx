@@ -14,7 +14,7 @@ export function JourneyBoard({ columns }: { columns: JourneyColumn[] }) {
 
   return (
     <>
-      <article className="rounded-2xl bg-bg-white border border-border p-2.5 sm:p-4 flex flex-col gap-2.5 sm:gap-3 min-w-0 overflow-hidden">
+      <article className="bento-tile rounded-2xl bg-bg-white border border-border p-2.5 sm:p-4 flex flex-col gap-2.5 sm:gap-3 min-w-0 overflow-hidden">
         <header className="flex items-center justify-between gap-2 flex-wrap">
           <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
             Stage Snapshot · Where every collab is stuck
@@ -36,7 +36,7 @@ export function JourneyBoard({ columns }: { columns: JourneyColumn[] }) {
           }}
         >
           <div
-            className="dashboard-kanban-track"
+            className="dashboard-kanban-track bento-stagger"
             style={{
               display: "grid",
               gridAutoFlow: "column",

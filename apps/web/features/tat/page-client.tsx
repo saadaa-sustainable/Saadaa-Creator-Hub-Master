@@ -62,7 +62,7 @@ export function TatPageClient({
         title="Base: Reach Out"
         subtitle="How long after initial reach-out does each milestone get hit?"
       />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-2">
+      <div className="bento-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-2">
         <TatCard
           from="Reach Out"
           to="Onboarded"
@@ -94,7 +94,7 @@ export function TatPageClient({
         title="Base: Onboarding"
         subtitle="Time from on-boarding to key downstream events."
       />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-2">
+      <div className="bento-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-2">
         <TatCard
           from="Onboarding"
           to="Delivered"
@@ -119,7 +119,7 @@ export function TatPageClient({
         title="Base: Order & Delivery"
         subtitle="Product journey from order placed → delivered → live content."
       />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="bento-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <TatCard
           from="Order Created"
           to="Delivered"

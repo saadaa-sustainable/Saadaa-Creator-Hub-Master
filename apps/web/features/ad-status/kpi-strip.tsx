@@ -1,66 +1,44 @@
-"use client";
-
 import { HourglassIcon, Megaphone, Trophy, XCircle } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { HeroKpi } from "@/features/dashboard/bento-kit";
 import type { AdStatusKpi } from "./types";
 
-type Tone = "accent" | "muted" | "warning" | "success" | "info" | "danger";
-
-interface KpiCardProps {
-  tone: Tone;
-  icon: LucideIcon;
-  label: string;
-  primary: string;
-  secondary: string;
-}
-
-function KpiCard({ tone, icon: Icon, label, primary, secondary }: KpiCardProps) {
-  return (
-    <div className={cn("acc-kpi", `acc-kpi--${tone}`)}>
-      <div className="acc-kpi__head">
-        <span className="acc-kpi__icon" aria-hidden>
-          <Icon size={16} />
-        </span>
-        <span className="acc-kpi__label">{label}</span>
-      </div>
-      <div className="acc-kpi__primary tabular">{primary}</div>
-      <div className="acc-kpi__secondary tabular">{secondary}</div>
-    </div>
-  );
-}
-
+/**
+ * KPI strip for the Ad Status stage — bento-kit `HeroKpi` tiles inside the
+ * shared `.acc-kpi-grid` (mobile stays paired 2-up). Labels/values/subs are
+ * byte-identical to the previous acc-kpi cards; only the visual layer changed.
+ * Semantic colors: volume indigo, pending amber, success green, risk red.
+ */
 export function AdStatusKpiStrip({ kpi }: { kpi: AdStatusKpi }) {
   return (
     <section>
-      <div className="acc-kpi-grid">
-        <KpiCard
-          tone="accent"
-          icon={Megaphone}
+      <div className="acc-kpi-grid bento-stagger">
+        <HeroKpi
+          color="#3B6FD4"
+          icon={<Megaphone size={14} aria-hidden />}
           label="Eligible"
-          primary={String(kpi.totalEligible)}
-          secondary="Posted + ads rights"
+          value={kpi.totalEligible}
+          sub="Posted + ads rights"
         />
-        <KpiCard
-          tone="warning"
-          icon={HourglassIcon}
+        <HeroKpi
+          color="#B57514"
+          icon={<HourglassIcon size={14} aria-hidden />}
           label="Untested"
-          primary={String(kpi.pendingClassification)}
-          secondary="Awaiting warehouse sync"
+          value={kpi.pendingClassification}
+          sub="Awaiting warehouse sync"
         />
-        <KpiCard
-          tone="success"
-          icon={Trophy}
+        <HeroKpi
+          color="#4F7C4D"
+          icon={<Trophy size={14} aria-hidden />}
           label="Winners"
-          primary={String(kpi.winners)}
-          secondary="Top-performing creatives"
+          value={kpi.winners}
+          sub="Top-performing creatives"
         />
-        <KpiCard
-          tone="danger"
-          icon={XCircle}
+        <HeroKpi
+          color="#C0392B"
+          icon={<XCircle size={14} aria-hidden />}
           label="Discarded"
-          primary={String(kpi.discarded)}
-          secondary="Failed performance"
+          value={kpi.discarded}
+          sub="Failed performance"
         />
       </div>
     </section>

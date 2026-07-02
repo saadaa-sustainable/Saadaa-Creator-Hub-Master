@@ -105,7 +105,7 @@ export function JourneyCardItem({
 
   return (
     <article
-      className="rounded-xl bg-bg-white border border-border p-2 sm:p-2.5 flex flex-col gap-1.5 shadow-[0_1px_3px_rgba(22,21,19,0.05)] min-w-0 cursor-pointer hover:shadow-[0_2px_8px_rgba(22,21,19,0.10)] transition-shadow"
+      className="rounded-xl bg-bg-white border border-border p-2 sm:p-2.5 flex flex-col gap-1.5 shadow-[0_1px_3px_rgba(22,21,19,0.05)] min-w-0 cursor-pointer transition-[box-shadow,transform,border-color] duration-150 hover:shadow-[0_2px_8px_rgba(22,21,19,0.10)] hover:-translate-y-0.5 hover:border-[#DCD6C4] outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
       onClick={onClick}
       role="button"
       tabIndex={0}

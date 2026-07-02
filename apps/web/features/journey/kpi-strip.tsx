@@ -1,68 +1,44 @@
 import { Send, Users, Instagram, XCircle } from "lucide-react";
+import { HeroKpi } from "@/features/dashboard/bento-kit";
 import type { JourneyKpi } from "./types";
 
 /**
- * 4-card Journey KPI strip — mirrors structure of accounts-hub kpi-strip.tsx.
- * Tone classes use the acc-kpi-* pattern from globals.css.
+ * 4-card Journey KPI strip — bento-kit `HeroKpi` tiles inside the shared
+ * `.acc-kpi-grid` (the `.journey-stage` mobile override keeps phones paired
+ * 2-up). Semantic colors: pipeline volume indigo, active purple, posted
+ * green, closed red — gold stays CTA-only.
  */
 export function JourneyKpiStrip({ kpi }: { kpi: JourneyKpi }) {
   return (
-    <div className="acc-kpi-grid">
-      <KpiCard
-        tone="accent"
-        icon={<Send size={16} aria-hidden />}
+    <div className="acc-kpi-grid bento-stagger">
+      <HeroKpi
+        color="#3B6FD4"
+        icon={<Send size={14} aria-hidden />}
         label="In Pipeline"
-        primary={String(kpi.inPipeline)}
-        secondary="total posts tracked"
+        value={kpi.inPipeline}
+        sub="total posts tracked"
       />
-      <KpiCard
-        tone="info"
-        icon={<Users size={16} aria-hidden />}
+      <HeroKpi
+        color="#7B4FBF"
+        icon={<Users size={14} aria-hidden />}
         label="Active"
-        primary={String(kpi.active)}
-        secondary="reach out + on board"
+        value={kpi.active}
+        sub="reach out + on board"
       />
-      <KpiCard
-        tone="success"
-        icon={<Instagram size={16} aria-hidden />}
+      <HeroKpi
+        color="#4F7C4D"
+        icon={<Instagram size={14} aria-hidden />}
         label="Posted"
-        primary={String(kpi.posted)}
-        secondary="posted + delivered"
+        value={kpi.posted}
+        sub="posted + delivered"
       />
-      <KpiCard
-        tone="danger"
-        icon={<XCircle size={16} aria-hidden />}
+      <HeroKpi
+        color="#C0392B"
+        icon={<XCircle size={14} aria-hidden />}
         label="Closed"
-        primary={String(kpi.closed)}
-        secondary="RTO + cancelled"
+        value={kpi.closed}
+        sub="RTO + cancelled"
       />
-    </div>
-  );
-}
-
-function KpiCard({
-  tone,
-  icon,
-  label,
-  primary,
-  secondary,
-}: {
-  tone: "accent" | "info" | "success" | "danger";
-  icon: React.ReactNode;
-  label: string;
-  primary: string;
-  secondary: string;
-}) {
-  return (
-    <div className={`acc-kpi acc-kpi--${tone}`}>
-      <div className="acc-kpi__head">
-        <span className="acc-kpi__icon" aria-hidden>
-          {icon}
-        </span>
-        <span className="acc-kpi__label">{label}</span>
-      </div>
-      <div className="acc-kpi__primary tabular">{primary}</div>
-      <div className="acc-kpi__secondary tabular">{secondary}</div>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { InfoDot } from "@/features/dashboard/bento-kit";
 import type { FunnelMetrics } from "./types";
 
 /**
@@ -24,11 +25,14 @@ export function FunnelChart({ totals }: { totals: FunnelMetrics }) {
   const ticks = Array.from({ length: tickCount }, (_, i) => niceMax - i * step);
 
   return (
-    <section className="flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
+    <section className="bento-tile flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
-        <h2 className="text-[0.7rem] sm:text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
-          Performance Funnel
-        </h2>
+        <span className="inline-flex items-center gap-1.5">
+          <h2 className="text-[0.7rem] sm:text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
+            Performance Funnel
+          </h2>
+          <InfoDot text="Bar heights scale against the largest stage on a nice round-step axis. Hover a bar for its exact count." />
+        </span>
         <span className="text-[0.55rem] sm:text-[0.6rem] text-text-tertiary">
           Lifetime totals across pipeline stages
         </span>
@@ -60,9 +64,10 @@ export function FunnelChart({ totals }: { totals: FunnelMetrics }) {
                   />
                 ))}
               </div>
-              {/* Bars */}
+              {/* Bars — .bento-bar one-shot grow on mount (keyed by stage
+                  label, so team/period filter changes never replay it). */}
               <div className="absolute inset-0 flex items-end justify-between gap-1 sm:gap-2 px-0.5">
-                {rows.map((row) => {
+                {rows.map((row, i) => {
                   const heightPct = (row.value / niceMax) * 100;
                   return (
                     <div
@@ -73,10 +78,11 @@ export function FunnelChart({ totals }: { totals: FunnelMetrics }) {
                         {row.value}
                       </span>
                       <div
-                        className={`w-full max-w-[22px] sm:max-w-[44px] rounded-t-md ${row.tone} transition-all duration-500 hover:opacity-80`}
+                        className={`bento-bar w-full max-w-[22px] sm:max-w-[44px] rounded-t-md ${row.tone} transition-all duration-500 hover:opacity-80`}
                         style={{
                           height: row.value === 0 ? "2px" : `${heightPct}%`,
                           opacity: row.value === 0 ? 0.3 : 1,
+                          animationDelay: `${0.15 + i * 0.045}s`,
                         }}
                       />
                     </div>

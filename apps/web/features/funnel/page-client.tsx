@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
 import { FunnelChart } from "./funnel-chart";
 import type { FunnelData, FunnelMetrics, FunnelPeriodMode } from "./types";
 
@@ -193,91 +194,95 @@ function FilterRow({
   );
 }
 
+/**
+ * 9-card KPI strip — bento-kit `HeroKpi` tiles inside the shared
+ * `.acc-kpi-grid.funnel-kpi-grid` (keeps the 4/5-col desktop layout and the
+ * 2-up phone pairing). Colors keep the previous tone semantics:
+ * info→indigo, warning→amber, success→green, muted→gray, danger→red.
+ */
 function KpiStrip({ totals }: { totals: FunnelMetrics }) {
   const cards: Array<{
     label: string;
     value: number;
-    tone: "accent" | "info" | "warning" | "success" | "muted" | "danger";
+    color: string;
     icon: React.ReactNode;
     secondary: string;
   }> = [
     {
       label: "Reach",
       value: totals.r,
-      tone: "info",
-      icon: <Send size={16} aria-hidden />,
+      color: "#3B6FD4",
+      icon: <Send size={14} aria-hidden />,
       secondary: "contacted",
     },
     {
       label: "Onboarded",
       value: totals.o,
-      tone: "info",
-      icon: <Users size={16} aria-hidden />,
+      color: "#3B6FD4",
+      icon: <Users size={14} aria-hidden />,
       secondary: "onboarding complete",
     },
     {
       label: "Barter",
       value: totals.b,
-      tone: "warning",
-      icon: <PackageCheck size={16} aria-hidden />,
+      color: "#B57514",
+      icon: <PackageCheck size={14} aria-hidden />,
       secondary: "barter sent",
     },
     {
       label: "Delivered",
       value: totals.d,
-      tone: "success",
-      icon: <Truck size={16} aria-hidden />,
+      color: "#4F7C4D",
+      icon: <Truck size={14} aria-hidden />,
       secondary: "orders delivered",
     },
     {
       label: "Ghosted",
       value: totals.g,
-      tone: "muted",
-      icon: <Ghost size={16} aria-hidden />,
+      color: "#9A9384",
+      icon: <Ghost size={14} aria-hidden />,
       secondary: "no response",
     },
     {
       label: "Pending",
       value: totals.pend,
-      tone: "warning",
-      icon: <Hourglass size={16} aria-hidden />,
+      color: "#B57514",
+      icon: <Hourglass size={14} aria-hidden />,
       secondary: "awaiting action",
     },
     {
       label: "Overdue",
       value: totals.overdue,
-      tone: "danger",
-      icon: <AlertTriangle size={16} aria-hidden />,
+      color: "#C0392B",
+      icon: <AlertTriangle size={14} aria-hidden />,
       secondary: "needs attention",
     },
     {
       label: "All Posted",
       value: totals.p,
-      tone: "info",
-      icon: <Instagram size={16} aria-hidden />,
+      color: "#3B6FD4",
+      icon: <Instagram size={14} aria-hidden />,
       secondary: "posted content",
     },
     {
       label: "Curated Posted",
       value: totals.p,
-      tone: "success",
-      icon: <ShieldCheck size={16} aria-hidden />,
+      color: "#4F7C4D",
+      icon: <ShieldCheck size={14} aria-hidden />,
       secondary: "curated set",
     },
   ];
   return (
-    <div className="acc-kpi-grid funnel-kpi-grid">
+    <div className="acc-kpi-grid funnel-kpi-grid bento-stagger">
       {cards.map((c) => (
-        <article key={c.label} className={`acc-kpi acc-kpi--${c.tone}`}>
-          <div className="acc-kpi__head">
-            <span className="acc-kpi__icon" aria-hidden>
-              {c.icon}
-            </span>
-            <span className="acc-kpi__label">{c.label}</span>
-          </div>
-          <div className="acc-kpi__primary tabular">{c.value}</div>
-          <div className="acc-kpi__secondary">{c.secondary}</div>
-        </article>
+        <HeroKpi
+          key={c.label}
+          color={c.color}
+          icon={c.icon}
+          label={c.label}
+          value={c.value}
+          sub={c.secondary}
+        />
       ))}
     </div>
   );
@@ -294,7 +299,7 @@ function PeriodTable({
 }) {
   if (buckets.length === 0) {
     return (
-      <section className="min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:rounded-2xl sm:p-4">
+      <section className="bento-tile min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:rounded-2xl sm:p-4">
         <h2 className="text-[0.7rem] sm:text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Period Breakdown
         </h2>
@@ -309,11 +314,14 @@ function PeriodTable({
     minute: "2-digit",
   });
   return (
-    <section className="flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
+    <section className="bento-tile flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
-        <h2 className="text-[0.7rem] sm:text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
-          Period Breakdown
-        </h2>
+        <span className="inline-flex items-center gap-1.5">
+          <h2 className="text-[0.7rem] sm:text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
+            Period Breakdown
+          </h2>
+          <InfoDot text="Reachouts–Overdue bucket by reach-out date; the Posted columns bucket by post date — the same collab can land in different periods." />
+        </span>
         <span className="text-[0.55rem] sm:text-[0.6rem] text-text-tertiary">
           Updated {lastUpdated}
         </span>
@@ -434,11 +442,14 @@ function TodayActivity({
     .map(([user, m]) => ({ user, ...m }))
     .sort((a, b) => b.r + b.o + b.p - (a.r + a.o + a.p));
   return (
-    <section className="flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
+    <section className="bento-tile flex min-w-0 max-w-full flex-col gap-2.5 overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:gap-3 sm:rounded-2xl sm:p-4">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
-        <h2 className="text-[0.7rem] sm:text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
-          Today's Activity by Team Member
-        </h2>
+        <span className="inline-flex items-center gap-1.5">
+          <h2 className="text-[0.7rem] sm:text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
+            Today's Activity by Team Member
+          </h2>
+          <InfoDot text="Current-month team breakdown — per-member reach-outs, onboards, barters, posts and ghosted counts. Sorted by combined activity." />
+        </span>
         <span className="text-[0.55rem] sm:text-[0.6rem] text-text-tertiary">
           {rows.length} contributors this month
         </span>

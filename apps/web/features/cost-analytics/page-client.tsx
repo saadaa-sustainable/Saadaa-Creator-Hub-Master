@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatRupees } from "@/lib/formatters";
+import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type {
   CampaignTotalsRow,
@@ -197,7 +198,7 @@ export function CostAnalyticsBody({ data }: { data: CostAnalyticsData }) {
       <KpiStrip kpis={filteredKpis} />
 
       {/* ── Bento mosaic — desktop 12-col, mobile 1-col ──────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 bento-stagger">
         <div className="lg:col-span-8 min-w-0">
           <BudgetVsActualChart rows={filteredCampaignTotals} />
         </div>
@@ -345,7 +346,10 @@ function FilterRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KPI Strip — 6 cards with shared .acc-kpi chrome
+// KPI Strip — 5 bento-kit HeroKpi tiles (DAM-style: accent bar, tinted corner,
+// count-up). Same labels/values/subs as the old .acc-kpi tiles; semantic
+// colors — volume indigo, budget series purple, in-flight spend amber,
+// healthy remaining green, risk red.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function KpiStrip({ kpis }: { kpis: CostKpis }) {
@@ -356,91 +360,71 @@ function KpiStrip({ kpis }: { kpis: CostKpis }) {
       : 0;
   const remaining = kpis.budgetCost - kpis.actualCost;
   return (
-    <div className="acc-kpi-grid">
-      <KpiTile
-        tone="info"
-        icon={Users}
+    <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
+      <HeroKpi
+        color="#3B6FD4"
+        icon={<Users size={16} aria-hidden />}
         label="Budget Creators"
-        primary={String(kpis.budgetCreators)}
-        secondary={`${kpis.actualCreators} actual onboarded`}
+        value={kpis.budgetCreators}
+        sub={`${kpis.actualCreators} actual onboarded`}
+        info="Planned creator count across campaign budgets in scope"
       />
-      <KpiTile
-        tone="success"
-        icon={Wallet}
+      <HeroKpi
+        color="#7B4FBF"
+        icon={<Wallet size={16} aria-hidden />}
         label="Budget Cost"
-        primary={formatRupees(kpis.budgetCost)}
-        secondary={
+        rupees
+        value={kpis.budgetCost}
+        sub={
           kpis.totalWithGarments > kpis.budgetCost
             ? `${formatRupees(kpis.totalWithGarments)} incl. garments`
             : "Compensation budget"
         }
+        info="Planned compensation budget for campaigns in scope"
       />
-      <KpiTile
-        tone="warning"
-        icon={IndianRupee}
+      <HeroKpi
+        color="#B57514"
+        icon={<IndianRupee size={16} aria-hidden />}
         label="Actual Cost"
-        primary={formatRupees(kpis.actualCost)}
-        secondary={`${kpis.utilPct}% utilised`}
+        rupees
+        value={kpis.actualCost}
+        sub={`${kpis.utilPct}% utilised`}
+        info="Actual compensation committed via onboarded collabs"
       />
-      <KpiTile
-        tone="accent"
-        icon={Target}
+      <HeroKpi
+        color={remaining >= 0 ? "#4F7C4D" : "#C0392B"}
+        icon={<Target size={16} aria-hidden />}
         label="Remaining"
-        primary={formatRupees(Math.max(0, remaining))}
-        secondary={
+        rupees
+        value={Math.max(0, remaining)}
+        sub={
           remaining >= 0
             ? `${100 - kpis.utilPct}% of budget left`
             : "Budget exhausted"
         }
+        info="Budget cost minus actual cost"
       />
-      <KpiTile
-        tone={overBudget ? "danger" : "success"}
-        icon={overBudget ? TrendingUp : TrendingDown}
+      <HeroKpi
+        color={overBudget ? "#C0392B" : "#4F7C4D"}
+        icon={
+          overBudget ? (
+            <TrendingUp size={16} aria-hidden />
+          ) : (
+            <TrendingDown size={16} aria-hidden />
+          )
+        }
         label="Variance"
-        primary={formatRupees(Math.abs(kpis.variance))}
-        secondary={
+        rupees
+        value={Math.abs(kpis.variance)}
+        sub={
           kpis.variance === 0
             ? "On budget"
             : overBudget
               ? `${variancePct}% over`
               : `${variancePct}% under`
         }
+        info="Actual minus budget — positive means over budget"
       />
-    </div>
-  );
-}
-
-function KpiTile({
-  tone,
-  icon: Icon,
-  label,
-  primary,
-  secondary,
-}: {
-  tone: "accent" | "info" | "warning" | "success" | "danger" | "muted";
-  icon: LucideIcon;
-  label: string;
-  primary: string;
-  secondary: string;
-}) {
-  const toneCls = {
-    accent: "acc-kpi--accent",
-    info: "acc-kpi--info",
-    warning: "acc-kpi--warning",
-    success: "acc-kpi--success",
-    danger: "acc-kpi--danger",
-    muted: "acc-kpi--muted",
-  }[tone];
-  return (
-    <div className={cn("acc-kpi", toneCls)}>
-      <div className="acc-kpi__head">
-        <span className="acc-kpi__icon" aria-hidden>
-          <Icon size={14} />
-        </span>
-        <span className="acc-kpi__label">{label}</span>
-      </div>
-      <div className="acc-kpi__primary">{primary}</div>
-      <div className="acc-kpi__secondary">{secondary}</div>
     </div>
   );
 }
@@ -497,7 +481,7 @@ function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
                   title={`Budget: ${formatRupees(r.budgetCost)}`}
                 >
                   <div
-                    className="h-full bg-[#3B6FD4] transition-all duration-500"
+                    className="bento-bar h-full bg-[#3B6FD4] transition-all duration-500"
                     style={{ width: `${budgetPct}%` }}
                   />
                 </div>
@@ -510,7 +494,7 @@ function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
                 >
                   <div
                     className={cn(
-                      "h-full transition-all duration-500",
+                      "bento-bar h-full transition-all duration-500",
                       over ? "bg-danger" : "bg-success",
                     )}
                     style={{ width: `${actualPct}%` }}
@@ -551,7 +535,7 @@ function TierMixDonut({ rows }: { rows: TierSummaryRow[] }) {
   const sorted = [...rows].sort((a, b) => b.actualCost - a.actualCost);
   return (
     <Card title="Tier Mix" icon={Layers} subtitle="Share of actual spend">
-      <div className="flex h-3 rounded-full overflow-hidden">
+      <div className="bento-bar flex h-3 rounded-full overflow-hidden">
         {sorted.map((r) => (
           <div
             key={r.tier}
@@ -673,7 +657,11 @@ function GarmentSpendCard({ kpis }: { kpis: CostKpis }) {
       ? Math.round((garmentCost / kpis.totalWithGarments) * 100)
       : 0;
   return (
-    <Card title="Cost Composition" icon={Shirt}>
+    <Card
+      title="Cost Composition"
+      icon={Shirt}
+      info="Compensation budget vs garment cost share of total spend"
+    >
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -693,7 +681,7 @@ function GarmentSpendCard({ kpis }: { kpis: CostKpis }) {
             </div>
           </div>
         </div>
-        <div className="flex h-3 rounded-full overflow-hidden">
+        <div className="bento-bar flex h-3 rounded-full overflow-hidden">
           <div
             className="bg-success"
             style={{
@@ -982,18 +970,21 @@ function Card({
   title,
   subtitle,
   icon: Icon,
+  info,
   children,
 }: {
   title: string;
   subtitle?: string;
   icon?: LucideIcon;
+  info?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 min-w-0">
+    <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 min-w-0">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           {Icon && <Icon size={12} aria-hidden />} {title}
+          {info && <InfoDot text={info} />}
         </h3>
         {subtitle && (
           <span className="text-[0.6rem] text-text-tertiary">{subtitle}</span>
@@ -1040,7 +1031,7 @@ function UtilCell({ pct }: { pct: number }) {
       <div className="flex items-center gap-1.5 justify-end">
         <div className="h-1 w-16 sm:w-20 rounded-full bg-bg-muted overflow-hidden">
           <div
-            className={cn("h-full transition-all duration-500", barTone)}
+            className={cn("bento-bar h-full transition-all duration-500", barTone)}
             style={{ width: `${Math.min(100, pct)}%` }}
           />
         </div>

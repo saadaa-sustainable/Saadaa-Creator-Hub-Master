@@ -4,7 +4,7 @@ import { DashboardCampaignKpis } from "./campaign-kpis";
 import { DashboardPipelineKpis } from "./pipeline-kpis";
 import { DashboardPulseStrip } from "./pulse-strip";
 import { DashboardSpotlight } from "./spotlight-spend";
-import { ActivityTrendTile, DonutTile } from "./bento-kit";
+import { ActivityTrendTile, DonutTile } from "./bento-charts";
 import { DashboardHero } from "./widgets/hero-insights";
 import { DashboardMonthlyTrend } from "./widgets/monthly-trend";
 import { DashboardPostingGoal } from "./widgets/posting-goal";

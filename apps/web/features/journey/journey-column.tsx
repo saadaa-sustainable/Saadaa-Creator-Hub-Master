@@ -41,7 +41,7 @@ export function JourneyColumnView({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-border overflow-hidden flex flex-col snap-start min-w-0",
+        "rounded-2xl border border-border overflow-hidden flex flex-col snap-start min-w-0 transition-colors duration-150 hover:border-[#DCD6C4]",
         style.body,
       )}
     >
