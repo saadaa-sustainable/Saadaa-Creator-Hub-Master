@@ -16,6 +16,26 @@ export function Skeleton({
   );
 }
 
+/** One HeroKpi-shaped placeholder — 3px top accent bar + icon chip + label,
+ * big value, sub line. Mirrors `features/dashboard/bento-kit.tsx#HeroKpi`,
+ * which every converted KPI strip now renders. */
+export function HeroKpiSkeleton() {
+  return (
+    <div className="relative overflow-hidden rounded-[16px] border border-border bg-bg-white p-3.5 min-w-0">
+      <span
+        className="absolute inset-x-0 top-0 h-[3px] bg-bg-muted"
+        aria-hidden
+      />
+      <div className="mb-2 flex items-center gap-1.5">
+        <Skeleton className="h-6 w-6 rounded-[8px]" />
+        <Skeleton className="h-2.5 w-20" />
+      </div>
+      <Skeleton className="h-7 w-16" />
+      <Skeleton className="mt-1.5 h-2.5 w-24" />
+    </div>
+  );
+}
+
 export function KpiStripSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div
@@ -23,15 +43,105 @@ export function KpiStripSkeleton({ count = 4 }: { count?: number }) {
       aria-busy
     >
       {Array.from({ length: count }).map((_, i) => (
+        <HeroKpiSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
+/** Mirrors the shared `PageHeader` (icon chip + title + Know More pill) so the
+ * loading state and the loaded page share the exact same top row. */
+export function PageHeaderSkeleton() {
+  return (
+    <div className="flex items-center gap-3" aria-busy aria-hidden>
+      <Skeleton className="h-11 w-11 rounded-[14px]" />
+      <Skeleton className="h-8 w-44" />
+      <Skeleton className="h-7 w-28 rounded-full" />
+    </div>
+  );
+}
+
+/** Kanban-shaped body — N lanes of stacked cards (Journey, Accounts board,
+ * Partnership Status, workload boards). Lanes keep a real min-width and the
+ * container scrolls horizontally on small screens, mirroring the boards'
+ * `.dashboard-kanban-scroll` rail behaviour. */
+export function KanbanSkeleton({
+  lanes = 4,
+  cards = 3,
+}: {
+  lanes?: number;
+  cards?: number;
+}) {
+  return (
+    <div
+      className="grid gap-3 overflow-x-auto"
+      style={{
+        gridTemplateColumns: `repeat(${lanes}, minmax(min(240px, 80vw), 1fr))`,
+      }}
+      aria-busy
+    >
+      {Array.from({ length: lanes }).map((_, l) => (
         <div
-          key={i}
-          className="rounded-[var(--radius)] border border-border bg-bg-white px-4 py-3 min-w-[140px] space-y-2"
+          key={l}
+          className="rounded-[var(--radius)] border border-border bg-bg-surface p-2.5 space-y-2.5"
         >
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-6 w-24" />
-          <Skeleton className="h-3 w-16" />
+          <div className="flex items-center justify-between px-1">
+            <Skeleton className="h-3.5 w-20" />
+            <Skeleton className="h-4 w-6 rounded-full" />
+          </div>
+          {Array.from({ length: cards }).map((_, c) => (
+            <div
+              key={c}
+              className="rounded-[12px] border border-border bg-bg-white p-3 space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-7 w-7 rounded-full" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="h-2.5 w-1/2" />
+                </div>
+              </div>
+              <Skeleton className="h-2.5 w-full" />
+              <Skeleton className="h-2.5 w-2/3" />
+            </div>
+          ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Dashboard tab rail — the segmented pill bar under the page header. */
+export function TabRailSkeleton({ pills = 8 }: { pills?: number }) {
+  return (
+    <div className="flex items-center gap-1 overflow-hidden" aria-busy>
+      {Array.from({ length: pills }).map((_, i) => (
+        <Skeleton
+          key={i}
+          className="h-8 rounded-[7px]"
+          style={{ width: `${64 + ((i * 17) % 40)}px` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Overview-bento-shaped body: hero row (8/4 split) + a row of tiles. */
+export function BentoSkeleton() {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3" aria-busy>
+      <div className="lg:col-span-8">
+        <ChartSkeleton height={180} />
+      </div>
+      <div className="lg:col-span-4">
+        <ChartSkeleton height={180} />
+      </div>
+      <div className="lg:col-span-6">
+        <ChartSkeleton height={160} />
+      </div>
+      <div className="lg:col-span-6">
+        <ChartSkeleton height={160} />
+      </div>
     </div>
   );
 }
@@ -101,24 +211,10 @@ export function StageSkeleton({
         </div>
       )}
 
-      {/* 2 — KPI strip (mirrors .acc-kpi-grid of .acc-kpi cards) */}
+      {/* 2 — KPI strip (mirrors the HeroKpi cards every converted strip renders) */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
         {Array.from({ length: kpiCount }).map((_, i) => (
-          <div
-            key={i}
-            className="relative overflow-hidden rounded-[12px] border border-border bg-bg-white px-4 pb-4 pt-3.5 min-w-0"
-          >
-            {/* accent left-rail, like .acc-kpi::before */}
-            <span
-              className="absolute inset-y-0 left-0 w-[3px] rounded-l-[12px] bg-bg-muted"
-              aria-hidden
-            />
-            <div className="flex flex-col gap-1.5">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-7 w-24" />
-              <Skeleton className="h-2.5 w-16" />
-            </div>
-          </div>
+          <HeroKpiSkeleton key={i} />
         ))}
       </div>
 

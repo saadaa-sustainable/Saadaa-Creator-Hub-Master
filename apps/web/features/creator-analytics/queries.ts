@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import type {
   CreatorAnalyticsFilterOptions,
@@ -145,37 +146,41 @@ export async function fetchCreatorCollabHistory(
   }));
 }
 
-export async function fetchCreatorAnalyticsFilterOptions(): Promise<CreatorAnalyticsFilterOptions> {
-  const supabase = createServiceClient();
-  const [creatorsRes, postsRes] = await Promise.all([
-    (supabase as any)
-      .from("creators")
-      .select("category, state, creator_type")
-      .limit(FETCH_LIMIT),
-    (supabase as any).from("posts").select("workflow_status").limit(FETCH_LIMIT),
-  ]);
+export const fetchCreatorAnalyticsFilterOptions = unstable_cache(
+  async (): Promise<CreatorAnalyticsFilterOptions> => {
+    const supabase = createServiceClient();
+    const [creatorsRes, postsRes] = await Promise.all([
+      (supabase as any)
+        .from("creators")
+        .select("category, state, creator_type")
+        .limit(FETCH_LIMIT),
+      (supabase as any).from("posts").select("workflow_status").limit(FETCH_LIMIT),
+    ]);
 
-  const tiers = new Set<string>();
-  const regions = new Set<string>();
-  const creatorTypes = new Set<string>();
-  for (const c of (creatorsRes.data ?? []) as Raw[]) {
-    const cat = String(c.category ?? "").trim();
-    if (cat) tiers.add(cat);
-    const st = String(c.state ?? "").trim();
-    if (st) regions.add(st);
-    const t = String(c.creator_type ?? "").trim();
-    if (t) creatorTypes.add(t);
-  }
-  const statuses = new Set<string>();
-  for (const p of (postsRes.data ?? []) as Raw[]) {
-    const s = String(p.workflow_status ?? "").trim();
-    if (s) statuses.add(s);
-  }
+    const tiers = new Set<string>();
+    const regions = new Set<string>();
+    const creatorTypes = new Set<string>();
+    for (const c of (creatorsRes.data ?? []) as Raw[]) {
+      const cat = String(c.category ?? "").trim();
+      if (cat) tiers.add(cat);
+      const st = String(c.state ?? "").trim();
+      if (st) regions.add(st);
+      const t = String(c.creator_type ?? "").trim();
+      if (t) creatorTypes.add(t);
+    }
+    const statuses = new Set<string>();
+    for (const p of (postsRes.data ?? []) as Raw[]) {
+      const s = String(p.workflow_status ?? "").trim();
+      if (s) statuses.add(s);
+    }
 
-  return {
-    tiers: [...tiers].sort(),
-    regions: [...regions].sort(),
-    statuses: [...statuses].sort(),
-    creatorTypes: [...creatorTypes].sort(),
-  };
-}
+    return {
+      tiers: [...tiers].sort(),
+      regions: [...regions].sort(),
+      statuses: [...statuses].sort(),
+      creatorTypes: [...creatorTypes].sort(),
+    };
+  },
+  ["creator-analytics-filter-options"],
+  { revalidate: 300, tags: ["creators", "posts"] },
+);

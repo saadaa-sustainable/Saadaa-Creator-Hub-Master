@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import type {
   CampaignTat,
@@ -315,44 +316,48 @@ export async function fetchTatData(filters: TatFilters): Promise<{
   return { tatData, campaignTats, kpi };
 }
 
-export async function fetchTatFilterOptions(): Promise<TatFilterOptions> {
-  const supabase = createServiceClient();
+export const fetchTatFilterOptions = unstable_cache(
+  async (): Promise<TatFilterOptions> => {
+    const supabase = createServiceClient();
 
-  const [{ data: campaigns }, { data: creators }] = await Promise.all([
-    (supabase as any)
-      .from("campaigns")
-      .select("campaign_id, campaign_name")
-      .order("campaign_id", { ascending: false })
-      .limit(500),
-    (supabase as any)
-      .from("creators")
-      .select("category, followers")
-      .limit(2000),
-  ]);
+    const [{ data: campaigns }, { data: creators }] = await Promise.all([
+      (supabase as any)
+        .from("campaigns")
+        .select("campaign_id, campaign_name")
+        .order("campaign_id", { ascending: false })
+        .limit(500),
+      (supabase as any)
+        .from("creators")
+        .select("category, followers")
+        .limit(2000),
+    ]);
 
-  const tierSet = new Set<string>();
-  for (const c of (creators ?? []) as Array<{
-    category: string | null;
-    followers: number | null;
-  }>) {
-    const t = (c.category ?? "").trim() || tierFromFollowers(c.followers);
-    if (t) tierSet.add(t);
-  }
-  const tierOrder = ["Nano", "Micro", "Mid tier", "Macro", "Mega"];
-  const tiers = [...tierSet].sort(
-    (a, b) => (tierOrder.indexOf(a) + 999) - (tierOrder.indexOf(b) + 999),
-  );
+    const tierSet = new Set<string>();
+    for (const c of (creators ?? []) as Array<{
+      category: string | null;
+      followers: number | null;
+    }>) {
+      const t = (c.category ?? "").trim() || tierFromFollowers(c.followers);
+      if (t) tierSet.add(t);
+    }
+    const tierOrder = ["Nano", "Micro", "Mid tier", "Macro", "Mega"];
+    const tiers = [...tierSet].sort(
+      (a, b) => (tierOrder.indexOf(a) + 999) - (tierOrder.indexOf(b) + 999),
+    );
 
-  return {
-    campaigns: (
-      (campaigns ?? []) as Array<{
-        campaign_id: string;
-        campaign_name: string | null;
-      }>
-    ).map((c) => ({
-      id: c.campaign_id,
-      name: c.campaign_name ?? c.campaign_id,
-    })),
-    tiers,
-  };
-}
+    return {
+      campaigns: (
+        (campaigns ?? []) as Array<{
+          campaign_id: string;
+          campaign_name: string | null;
+        }>
+      ).map((c) => ({
+        id: c.campaign_id,
+        name: c.campaign_name ?? c.campaign_id,
+      })),
+      tiers,
+    };
+  },
+  ["tat-filter-options"],
+  { revalidate: 300, tags: ["campaigns", "creators"] },
+);

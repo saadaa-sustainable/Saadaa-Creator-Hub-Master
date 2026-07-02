@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isVoidedStatus } from "@/lib/workflow";
 import {
@@ -332,16 +333,20 @@ function extractFulfillmentChain(raw: unknown): string {
   return "";
 }
 
-export async function fetchOrderStatusFilterOptions(): Promise<OrderStatusFilterOptions> {
-  const supabase = createServiceClient();
-  const { data } = await (supabase as any)
-    .from("campaigns")
-    .select("campaign_id, campaign_name")
-    .order("campaign_id", { ascending: false })
-    .limit(500);
-  return {
-    campaigns: ((data ?? []) as Array<{ campaign_id: string; campaign_name: string | null }>).map(
-      (c) => ({ id: c.campaign_id, name: c.campaign_name ?? c.campaign_id }),
-    ),
-  };
-}
+export const fetchOrderStatusFilterOptions = unstable_cache(
+  async (): Promise<OrderStatusFilterOptions> => {
+    const supabase = createServiceClient();
+    const { data } = await (supabase as any)
+      .from("campaigns")
+      .select("campaign_id, campaign_name")
+      .order("campaign_id", { ascending: false })
+      .limit(500);
+    return {
+      campaigns: ((data ?? []) as Array<{ campaign_id: string; campaign_name: string | null }>).map(
+        (c) => ({ id: c.campaign_id, name: c.campaign_name ?? c.campaign_id }),
+      ),
+    };
+  },
+  ["order-status-filter-options"],
+  { revalidate: 300, tags: ["campaigns"] },
+);

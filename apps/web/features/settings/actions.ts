@@ -307,8 +307,15 @@ export async function setTestMode(
 // Saadaa runs a daily cron that auto-closes campaigns past their end. This flag lets
 // an admin pause that automation (stored as 'true'/'false' string in app_settings).
 
-/** Read the campaign auto-close flag (default ON when unset). */
-export async function getCampaignAutoCloseEnabled(): Promise<boolean> {
+// Cache tag for app_settings reads below. setCampaignAutoCloseEnabled
+// revalidates it, so the only staleness window is the ≤60s TTL when nothing
+// changed (i.e. never actually stale).
+const APP_SETTINGS_TAG = "app-settings";
+
+/** Uncached DB read of the campaign auto-close flag (default ON when unset).
+ * GLOBAL data — no user/actor input — read via the service client (env-only,
+ * no cookies) so it is safe inside `unstable_cache`. */
+async function readCampaignAutoCloseFromDb(): Promise<boolean> {
   const svc = createServiceClient();
   const { data } = await svc
     .from("app_settings")
@@ -319,6 +326,17 @@ export async function getCampaignAutoCloseEnabled(): Promise<boolean> {
   // Default ON: only an explicit 'false' disables it.
   if (typeof raw !== "string") return true;
   return raw.trim().toLowerCase() !== "false";
+}
+
+const getCampaignAutoCloseCached = unstable_cache(
+  readCampaignAutoCloseFromDb,
+  ["campaign-auto-close"],
+  { revalidate: 60, tags: [APP_SETTINGS_TAG] },
+);
+
+/** Read the campaign auto-close flag — cached (60s TTL + tag invalidation). */
+export async function getCampaignAutoCloseEnabled(): Promise<boolean> {
+  return getCampaignAutoCloseCached();
 }
 
 /** Toggle campaign auto-close (admin only). */
@@ -337,6 +355,9 @@ export async function setCampaignAutoCloseEnabled(
     { onConflict: "key" },
   );
   if (error) return { success: false, error: error.message };
+  // Bust the unstable_cache entry — revalidatePath alone does NOT drop
+  // Data-Cache entries, so the toggle must reflect immediately everywhere.
+  revalidateTag(APP_SETTINGS_TAG);
   revalidatePath("/campaigns");
   revalidatePath("/settings");
   return { success: true, enabled };
