@@ -54,6 +54,8 @@
 
 Other primitives: `card`, `label`, `skeleton` (Skeleton/KpiStripSkeleton/ChartSkeleton/TableSkeleton), `page-placeholder`, `partnership-key-edit`, `empty-state`, `count-up` (eased number count-up on first viewport entry; reduced-motion-safe; server tiles use `features/dashboard/count-up-stats.tsx` client wrappers since RSC can't pass format fns).
 
+**Bento kit split (2026-07-02):** `features/dashboard/bento-kit.tsx` = LIGHT (HeroKpi/TileHead/InfoDot, no recharts — safe for any route's KPI strip); `features/dashboard/bento-charts.tsx` = recharts (DonutTile/ActivityTrendTile/ChartTip — import ONLY on chart-bearing surfaces or the route bundle grows ~170kB). All dashboard tabs (Journey/TAT/Ad Status/Compliance/Cost/Funnel/Internal + Overview + My Dashboard) use HeroKpi for KPI strips; gold #F0C61E never appears on KPI accents (CTA-only).
+
 **Bento motion system (globals.css, 2026-07-02):** `.bento-tile` (one-shot entrance + hover lift/accent border), `.bento-stagger` (child stagger, cap 12), `.bento-bar` (scaleX grow), `.bento-donut-slice` (hover thicken), `.dash-tab-swap` (tab-panel rise). Rules: transform/opacity ONLY, mount-only (never replay on data/filter refresh), disabled under prefers-reduced-motion. Used across Dashboard bento/strips/widgets, My Dashboard, Partnership board. Gotcha pair: custom modals must self-style footers (`.modal-foot`/`.btn` are scoped to `.modal-panel--onboarding`); `.ob-list-wrap` tables are `table-layout:fixed` — every new column needs a `[data-column-id]` width rule.
 
 ### `components/nav/`
