@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isOnboardedActive, isVoidedStatus } from "@/lib/workflow";
 import type {
@@ -96,35 +97,37 @@ const adsRequired = (raw: string | null | undefined) => {
   return !["", "no", "n/a", "none", "0", "false"].includes(v);
 };
 
-export async function fetchDashboardFilterOptions(
-  tableName = "posts",
-): Promise<DashboardFilterOptions> {
-  const supabase = createServiceClient();
-  const [{ data: camps }, { data: posts }] = await Promise.all([
-    (supabase as any)
-      .from("campaigns")
-      .select("campaign_id, campaign_name")
-      .order("campaign_id", { ascending: false })
-      .limit(500),
-    (supabase as any)
-      .from(tableName)
-      .select("content_type, workflow_status")
-      .limit(50000),
-  ]);
-  const contentSet = new Set<string>();
-  const statusSet = new Set<string>();
-  for (const p of (posts ?? []) as Array<{ content_type?: string; workflow_status?: string }>) {
-    if (p.content_type) contentSet.add(p.content_type);
-    if (p.workflow_status) statusSet.add(p.workflow_status);
-  }
-  return {
-    campaigns: ((camps ?? []) as Array<{ campaign_id: string; campaign_name: string | null }>).map(
-      (c) => ({ id: c.campaign_id, name: c.campaign_name ?? c.campaign_id }),
-    ),
-    contentTypes: [...contentSet].sort(),
-    statuses: [...statusSet].sort(),
-  };
-}
+export const fetchDashboardFilterOptions = unstable_cache(
+  async (tableName = "posts"): Promise<DashboardFilterOptions> => {
+    const supabase = createServiceClient();
+    const [{ data: camps }, { data: posts }] = await Promise.all([
+      (supabase as any)
+        .from("campaigns")
+        .select("campaign_id, campaign_name")
+        .order("campaign_id", { ascending: false })
+        .limit(500),
+      (supabase as any)
+        .from(tableName)
+        .select("content_type, workflow_status")
+        .limit(50000),
+    ]);
+    const contentSet = new Set<string>();
+    const statusSet = new Set<string>();
+    for (const p of (posts ?? []) as Array<{ content_type?: string; workflow_status?: string }>) {
+      if (p.content_type) contentSet.add(p.content_type);
+      if (p.workflow_status) statusSet.add(p.workflow_status);
+    }
+    return {
+      campaigns: ((camps ?? []) as Array<{ campaign_id: string; campaign_name: string | null }>).map(
+        (c) => ({ id: c.campaign_id, name: c.campaign_name ?? c.campaign_id }),
+      ),
+      contentTypes: [...contentSet].sort(),
+      statuses: [...statusSet].sort(),
+    };
+  },
+  ["dashboard-filter-options"],
+  { revalidate: 300, tags: ["posts", "campaigns", "creators"] },
+);
 
 export async function fetchDashboardData(
   filters: DashboardFilters,

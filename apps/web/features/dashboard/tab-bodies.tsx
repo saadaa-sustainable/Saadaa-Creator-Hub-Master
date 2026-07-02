@@ -29,11 +29,11 @@
  */
 
 // ── Overview (dashboard-native aggregate) ───────────────────────────────────
-import { fetchDashboardData } from "./queries";
+import { fetchDashboardData, fetchDashboardFilterOptions } from "./queries";
 import { DashboardFiltersBar } from "./filters";
 import { DashboardOverviewStrip } from "./overview-strip";
 import { DashboardBento } from "./dashboard-bento";
-import type { DashboardFilterOptions, DashboardFilters } from "./types";
+import type { DashboardFilters } from "./types";
 
 // ── Influencer Journey ──────────────────────────────────────────────────────
 import { JourneyPageClient } from "@/features/journey/page-client";
@@ -108,14 +108,13 @@ export type TabSearchParams = Record<string, string | undefined> & {
 // bento command-centre. Wrapped in `.onboarding-stage` so its filter bar / KPI
 // strip / bento get the same grid rhythm (gap 1.25rem) as every standalone
 // page, keeping the Overview tab consistent with its siblings.
-export async function OverviewTabBody({
-  params,
-  options,
-}: {
-  params: DashboardFilters;
-  options: DashboardFilterOptions;
-}) {
-  const data = await fetchDashboardData(params);
+export async function OverviewTabBody({ params }: { params: DashboardFilters }) {
+  // Options fetched here (not at page level) so tab switches don't block the
+  // dashboard shell on a query only this tab consumes.
+  const [data, options] = await Promise.all([
+    fetchDashboardData(params),
+    fetchDashboardFilterOptions(),
+  ]);
   return (
     <div className="onboarding-stage dash-overview-stage">
       <DashboardFiltersBar initial={params} options={options} />

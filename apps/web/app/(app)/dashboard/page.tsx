@@ -21,11 +21,7 @@ import {
   TatTabBody,
   type TabSearchParams,
 } from "@/features/dashboard/tab-bodies";
-import { fetchDashboardFilterOptions } from "@/features/dashboard/queries";
-import type {
-  DashboardFilterOptions,
-  DashboardFilters,
-} from "@/features/dashboard/types";
+import type { DashboardFilters } from "@/features/dashboard/types";
 
 export const metadata = { title: "Dashboard" };
 
@@ -76,7 +72,6 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const { tab: tabParam, ...rest } = sp;
   const tab = resolveTab(tabParam);
-  const options = await fetchDashboardFilterOptions();
 
   // Overview tab is driven by the dashboard aggregate filter bar.
   const overviewFilters: DashboardFilters = {
@@ -116,12 +111,7 @@ export default async function DashboardPage({
             />
           }
         >
-          <TabBody
-            tab={tab}
-            sp={sp}
-            overviewFilters={overviewFilters}
-            overviewOptions={options}
-          />
+          <TabBody tab={tab} sp={sp} overviewFilters={overviewFilters} />
         </Suspense>
       </div>
     </div>
@@ -132,18 +122,14 @@ function TabBody({
   tab,
   sp,
   overviewFilters,
-  overviewOptions,
 }: {
   tab: DashboardTab;
   sp: TabSearchParams;
   overviewFilters: DashboardFilters;
-  overviewOptions: DashboardFilterOptions;
 }) {
   switch (tab) {
     case "overview":
-      return (
-        <OverviewTabBody params={overviewFilters} options={overviewOptions} />
-      );
+      return <OverviewTabBody params={overviewFilters} />;
     case "creators":
       return <CreatorAnalyticsTabBody sp={sp} />;
     case "partnerships":
@@ -163,8 +149,6 @@ function TabBody({
     case "internal":
       return <InternalTabBody />;
     default:
-      return (
-        <OverviewTabBody params={overviewFilters} options={overviewOptions} />
-      );
+      return <OverviewTabBody params={overviewFilters} />;
   }
 }

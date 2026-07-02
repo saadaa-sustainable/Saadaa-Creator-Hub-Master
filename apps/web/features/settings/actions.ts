@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { assertPermission } from "@/lib/rbac.server";
 import {
@@ -41,12 +41,22 @@ const REVALIDATE_PATHS = [
   "/settings",
 ];
 
+// Cache tag for the Test Mode scopes read below. Invalidated by setTestMode so
+// the (app)/layout banner flips immediately after an admin toggles a scope.
+const TEST_MODE_SCOPES_TAG = "test-mode-scopes";
+
 /**
- * Read the active Test Mode scopes. Stored as a JSON array string in the TEXT
- * `app_settings.value` column (e.g. '["creator"]'; '[]' = off). Service client so
- * it works in every context, including create actions running under caller RLS.
+ * Uncached DB read of the active Test Mode scopes. Stored as a JSON array string
+ * in the TEXT `app_settings.value` column (e.g. '["creator"]'; '[]' = off).
+ * GLOBAL data — no user/actor input — read via the service client (env-only, no
+ * cookies) so it is safe inside `unstable_cache` and works in every context,
+ * including create actions running under caller RLS.
+ *
+ * Used directly (bypassing the cache) by setTestMode/previewTestEntries, whose
+ * current-vs-next diff decides what gets DESTRUCTIVELY purged — that decision
+ * must never see a stale value.
  */
-export async function getTestModeScopes(): Promise<TestScope[]> {
+async function readTestModeScopesFromDb(): Promise<TestScope[]> {
   const svc = createServiceClient();
   const { data } = await svc
     .from("app_settings")
@@ -66,9 +76,28 @@ export async function getTestModeScopes(): Promise<TestScope[]> {
   }
 }
 
-/** Is a specific scope currently in Test Mode? Used by create paths to stamp is_test. */
+const getTestModeScopesCached = unstable_cache(
+  readTestModeScopesFromDb,
+  [TEST_MODE_SCOPES_TAG],
+  { revalidate: 60, tags: [TEST_MODE_SCOPES_TAG] },
+);
+
+/**
+ * Read the active Test Mode scopes — cached (60s TTL + tag invalidation) so the
+ * (app)/layout banner no longer costs a DB round-trip on every navigation.
+ * setTestMode revalidates the tag on every scope change, so the only staleness
+ * window is the ≤60s TTL when nothing changed (i.e. never actually stale).
+ */
+export async function getTestModeScopes(): Promise<TestScope[]> {
+  return getTestModeScopesCached();
+}
+
+/** Is a specific scope currently in Test Mode? Used by create paths to stamp is_test.
+ * WRITE-PATH gate → reads the DB directly (uncached): a stale-OFF read here
+ * would stamp a REAL row is_test=true and the next purge would delete it.
+ * Latency is irrelevant on a submit; correctness isn't. */
 export async function isScopeTest(scope: TestScope): Promise<boolean> {
-  const scopes = await getTestModeScopes();
+  const scopes = await readTestModeScopesFromDb();
   return scopes.includes(scope);
 }
 
@@ -94,7 +123,10 @@ export interface TestStamp {
 export async function stampTestRows(stamps: TestStamp[]): Promise<void> {
   const withIds = stamps.filter((s) => s.ids.length > 0);
   if (withIds.length === 0) return;
-  const active = await getTestModeScopes();
+  // Uncached read — same reasoning as isScopeTest: a stale-ON here would mark
+  // a real row for deletion by the next purge. Only the layout banner may
+  // tolerate the 60s cache.
+  const active = await readTestModeScopesFromDb();
   const toStamp = withIds.filter((s) => active.includes(s.scope));
   if (toStamp.length === 0) return;
   const svc = createServiceClient();
@@ -124,7 +156,8 @@ export async function previewTestEntries(
   const next = Array.from(
     new Set((scopes ?? []).filter(isTestScope)),
   ) as TestScope[];
-  const current = await getTestModeScopes();
+  // Uncached read: the preview must itemise exactly what setTestMode will purge.
+  const current = await readTestModeScopesFromDb();
   const turnedOff = current.filter((s) => !next.includes(s));
 
   if (turnedOff.length === 0) return { groups: [], total: 0 };
@@ -208,7 +241,9 @@ export async function setTestMode(
   ) as TestScope[];
 
   const svc = createServiceClient();
-  const current = await getTestModeScopes();
+  // Uncached read: the current-vs-next diff decides what gets destructively
+  // purged, so it must reflect the DB, never a cache entry.
+  const current = await readTestModeScopesFromDb();
 
   // 1. Persist the new scope set FIRST so no fresh test rows can be created in a
   //    scope we are about to clean up.
@@ -222,6 +257,11 @@ export async function setTestMode(
     { onConflict: "key" },
   );
   if (flagErr) return { success: false, error: flagErr.message };
+
+  // Flag persisted — drop the cached scopes NOW (before the purge loop, which can
+  // fail-and-return early) so the layout banner and create-gates pick up the new
+  // set immediately instead of waiting out the 60s TTL.
+  revalidateTag(TEST_MODE_SCOPES_TAG);
 
   // 2. Scopes turned OFF (in old, not in new) are purged — in FK-safe order.
   const turnedOff = current.filter((s) => !next.includes(s));
@@ -250,8 +290,15 @@ export async function setTestMode(
     }
   }
 
-  // 3. Refresh every surface that reads the scoped entities.
+  // 3. Refresh every surface that reads the scoped entities. revalidatePath
+  // alone does NOT drop unstable_cache Data-Cache entries, so also bust the
+  // entity tags the purge just mutated (filter-options caches etc.).
   for (const p of REVALIDATE_PATHS) revalidatePath(p);
+  if (deletedTotal > 0) {
+    for (const tag of ["posts", "campaigns", "creators", "payments"]) {
+      revalidateTag(tag);
+    }
+  }
 
   return { success: true, scopes: next, deleted, deletedTotal };
 }
