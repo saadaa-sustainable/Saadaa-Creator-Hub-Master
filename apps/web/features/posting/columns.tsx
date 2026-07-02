@@ -249,7 +249,7 @@ export const postingColumns: ColumnDef<PostingRow>[] = [
     // crushing the badge; the key edit truncates instead of spilling over.
     cell: ({ row }) =>
       (row.original.ads_usage_rights ?? "").trim() ? (
-        <div className="flex min-w-[8.5rem] max-w-[11rem] flex-col items-start gap-1">
+        <div className="flex w-full flex-col items-center gap-1">
           <PartnershipBadge
             status={row.original.partnership_status}
             showEmpty

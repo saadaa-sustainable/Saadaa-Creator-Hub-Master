@@ -5253,6 +5253,16 @@
   .ob-list-wrap [data-column-id="deliverables"] {
     width: 10.4rem;
   }
+  /* Partnership = badge + inline key-edit stacked. The table is
+     table-layout:fixed, so without an explicit width this column inherits
+     leftover space and the nowrap/overflow-hidden td hard-clips the pill
+     mid-word. Same for the ads-rights duration chip. */
+  .ob-list-wrap [data-column-id="partnership_key"] {
+    width: 12rem;
+  }
+  .ob-list-wrap [data-column-id="ads_rights"] {
+    width: 7.6rem;
+  }
   .ob-list-wrap [data-column-id="nomenclature"] {
     width: 14.2rem;
   }
