@@ -9,15 +9,20 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { CountUpInt, CountUpRupees } from "./count-up-stats";
+import { HeroKpi } from "./bento-kit";
 import type { DashboardData } from "./types";
 
 /**
  * Overview tab — cross-system headline KPIs. Pulls every number from the
  * single existing `fetchDashboardData` aggregate (no new query), grouped into
- * three labelled bands using the shared `.acc-kpi` chrome so it matches every
- * other stage strip. Rendered above the full bento command-centre in the
- * Overview tab body.
+ * three labelled bands. Cards render via the shared bento-kit `HeroKpi` tile
+ * (top accent bar + tinted corner + internal count-up) inside the same
+ * `.acc-kpi-grid` shells so grouping/stagger/mobile pairing are unchanged.
+ * Rendered above the full bento command-centre in the Overview tab body.
+ *
+ * Card hues follow the sanctioned secondary accents (gold stays CTA-only);
+ * the per-stage band mirrors the kit's STAGE_SERIES colors so the strip
+ * matches the trend/donut tiles below it.
  *
  * `archival` (default false) drops the spend-derived "Total Spend" card so the
  * archive-only Historic Analytics page can hide spend. The live dashboard never
@@ -41,34 +46,35 @@ export function DashboardOverviewStrip({
           <Megaphone size={13} aria-hidden /> Campaigns &amp; creators
         </div>
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
-          <KpiCard
-            tone="accent"
+          <HeroKpi
+            color="#B57514"
             icon={<Megaphone size={16} aria-hidden />}
             label="Active Campaigns"
-            primary={<CountUpInt value={campaign.activeCampaigns} />}
-            secondary="Campaigns in scope"
+            value={campaign.activeCampaigns}
+            sub="Campaigns in scope"
           />
-          <KpiCard
-            tone="info"
+          <HeroKpi
+            color="#3B6FD4"
             icon={<Users size={16} aria-hidden />}
             label="Creators in Pipeline"
-            primary={<CountUpInt value={campaign.totalCreators} />}
-            secondary="Unique creators"
+            value={campaign.totalCreators}
+            sub="Unique creators"
           />
-          <KpiCard
-            tone="success"
+          <HeroKpi
+            color="#4F7C4D"
             icon={<ClipboardList size={16} aria-hidden />}
             label="Total Collabs"
-            primary={<CountUpInt value={totalPipeline} />}
-            secondary="Across all stages"
+            value={totalPipeline}
+            sub="Across all stages"
           />
           {!archival && (
-            <KpiCard
-              tone="warning"
+            <HeroKpi
+              color="#B57514"
               icon={<Wallet size={16} aria-hidden />}
               label="Total Spend"
-              primary={<CountUpRupees value={campaign.totalSpend} />}
-              secondary="Σ commercial amount"
+              value={campaign.totalSpend}
+              sub="Σ commercial amount"
+              rupees
             />
           )}
         </div>
@@ -79,33 +85,33 @@ export function DashboardOverviewStrip({
           <UserRoundCheck size={13} aria-hidden /> Per-stage pipeline
         </div>
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
-          <KpiCard
-            tone="accent"
+          <HeroKpi
+            color="#3B6FD4"
             icon={<Send size={16} aria-hidden />}
             label="Reach Out"
-            primary={<CountUpInt value={pipeline.reachOut} />}
-            secondary="Awaiting onboarding"
+            value={pipeline.reachOut}
+            sub="Awaiting onboarding"
           />
-          <KpiCard
-            tone="info"
+          <HeroKpi
+            color="#7B4FBF"
             icon={<UserRoundCheck size={16} aria-hidden />}
             label="Onboarded"
-            primary={<CountUpInt value={pipeline.onboarded} />}
-            secondary={`${pipeline.conversionPct}% conversion`}
+            value={pipeline.onboarded}
+            sub={`${pipeline.conversionPct}% conversion`}
           />
-          <KpiCard
-            tone="success"
+          <HeroKpi
+            color="#4F7C4D"
             icon={<PackageCheck size={16} aria-hidden />}
             label="Posted"
-            primary={<CountUpInt value={pipeline.posted} />}
-            secondary={`${pipeline.postRatePct}% post rate`}
+            value={pipeline.posted}
+            sub={`${pipeline.postRatePct}% post rate`}
           />
-          <KpiCard
-            tone="muted"
+          <HeroKpi
+            color="#7B4FBF"
             icon={<Megaphone size={16} aria-hidden />}
             label="Ad Winners"
-            primary={<CountUpInt value={pipeline.adWinners} />}
-            secondary="Top-performing creatives"
+            value={pipeline.adWinners}
+            sub="Top-performing creatives"
           />
         </div>
       </div>
@@ -115,63 +121,38 @@ export function DashboardOverviewStrip({
           <Hourglass size={13} aria-hidden /> Needs attention
         </div>
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
-          <KpiCard
-            tone="warning"
+          <HeroKpi
+            color="#B57514"
             icon={<Hourglass size={16} aria-hidden />}
             label="Pending Onboardings"
-            primary={<CountUpInt value={data.actions.awaitingPost} />}
-            secondary="In Posting, awaiting post"
+            value={data.actions.awaitingPost}
+            sub="In Posting, awaiting post"
           />
-          <KpiCard
-            tone="warning"
+          {/* Same amber as Pending Onboardings on purpose — both are the same
+              "waiting on content" severity; semantic color beats variety. */}
+          <HeroKpi
+            color="#B57514"
             icon={<Send size={16} aria-hidden />}
             label="Pending Posts"
-            primary={<CountUpInt value={pipeline.pendingContent} />}
-            secondary="Onboarded, not yet posted"
+            value={pipeline.pendingContent}
+            sub="Onboarded, not yet posted"
           />
-          <KpiCard
-            tone="danger"
+          <HeroKpi
+            color="#C0392B"
             icon={<CircleDollarSign size={16} aria-hidden />}
             label="Pending Payments"
-            primary={<CountUpInt value={pipeline.paymentPending} />}
-            secondary="Due / Not Due collabs"
+            value={pipeline.paymentPending}
+            sub="Due / Not Due collabs"
           />
-          <KpiCard
-            tone="success"
+          <HeroKpi
+            color="#4F7C4D"
             icon={<Wallet size={16} aria-hidden />}
             label="Paid Collabs"
-            primary={<CountUpInt value={campaign.paidCount} />}
-            secondary="Settled payments"
+            value={campaign.paidCount}
+            sub="Settled payments"
           />
         </div>
       </div>
     </section>
-  );
-}
-
-function KpiCard({
-  tone,
-  icon,
-  label,
-  primary,
-  secondary,
-}: {
-  tone: "accent" | "muted" | "warning" | "success" | "info" | "danger";
-  icon: React.ReactNode;
-  label: string;
-  primary: React.ReactNode;
-  secondary: string;
-}) {
-  return (
-    <div className={`acc-kpi acc-kpi--${tone} bento-tile`}>
-      <div className="acc-kpi__head">
-        <span className="acc-kpi__icon" aria-hidden>
-          {icon}
-        </span>
-        <span className="acc-kpi__label">{label}</span>
-      </div>
-      <div className="acc-kpi__primary tabular">{primary}</div>
-      <div className="acc-kpi__secondary tabular">{secondary}</div>
-    </div>
   );
 }

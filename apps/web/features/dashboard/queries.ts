@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { isOnboardedActive, isVoidedStatus } from "@/lib/workflow";
 import type {
   ActionCounts,
+  ActivityPoint,
   BreakdownSlice,
   CampaignFocus,
   ChannelStats,
@@ -209,6 +210,21 @@ export async function fetchDashboardData(
   const spendByDay = new Map<string, number>();
   for (let i = 0; i < 30; i++) spendByDay.set(isoDaysAgo(29 - i), 0);
 
+  // 30-day activity trend (Overview area chart) — every stage EVENT in the
+  // window counted on the day it happened, independent of the row's current
+  // stage (a now-Posted row still counts its reach-out day as reach-out
+  // activity). Zero-seeded so the chart always renders a full month.
+  const activityByDay = new Map<
+    string,
+    { reachOut: number; onboarded: number; posted: number }
+  >();
+  for (let i = 0; i < 30; i++)
+    activityByDay.set(isoDaysAgo(29 - i), {
+      reachOut: 0,
+      onboarded: 0,
+      posted: 0,
+    });
+
   let reachOutCount = 0,
     onboardedCount = 0,
     postedCount = 0;
@@ -289,6 +305,14 @@ export async function fetchDashboardData(
     if (postDate >= sparkStart && commercials > 0) {
       spendByDay.set(postDate, (spendByDay.get(postDate) ?? 0) + commercials);
     }
+
+    // 30-day activity trend buckets (event-dated, stage-independent)
+    if (reachOutDate && activityByDay.has(reachOutDate))
+      activityByDay.get(reachOutDate)!.reachOut++;
+    if (onboardDate && activityByDay.has(onboardDate))
+      activityByDay.get(onboardDate)!.onboarded++;
+    if (postDate && activityByDay.has(postDate))
+      activityByDay.get(postDate)!.posted++;
 
     // Pipeline counters + monthly funnel bucket
     const month = reachOutDate ? reachOutDate.slice(0, 7) : "";
@@ -436,6 +460,9 @@ export async function fetchDashboardData(
     onboarded: v.onboarded,
     posted: v.posted,
   }));
+  const activity30: ActivityPoint[] = [...activityByDay.entries()].map(
+    ([date, v]) => ({ date, ...v }),
+  );
   const spendsPerCampaign: RankedRow[] = [...spendByCampaign.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
@@ -756,6 +783,7 @@ export async function fetchDashboardData(
       posted: postedCount,
     },
     monthlyFunnel,
+    activity30,
     spendsPerCampaign,
     postingGoal,
     topCreators,

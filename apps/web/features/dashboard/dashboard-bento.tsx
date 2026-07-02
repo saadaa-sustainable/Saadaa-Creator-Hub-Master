@@ -1,10 +1,10 @@
-import { Image, Layers } from "lucide-react";
+import { Activity, Image, Layers } from "lucide-react";
 import { DashboardActionStrip } from "./action-strip";
 import { DashboardCampaignKpis } from "./campaign-kpis";
 import { DashboardPipelineKpis } from "./pipeline-kpis";
 import { DashboardPulseStrip } from "./pulse-strip";
 import { DashboardSpotlight } from "./spotlight-spend";
-import { DashboardDonut } from "./widgets/donut-card";
+import { ActivityTrendTile, DonutTile } from "./bento-kit";
 import { DashboardHero } from "./widgets/hero-insights";
 import { DashboardMonthlyTrend } from "./widgets/monthly-trend";
 import { DashboardPostingGoal } from "./widgets/posting-goal";
@@ -21,6 +21,7 @@ import type { DashboardData } from "./types";
  * Desktop bento mosaic (≥ lg) — managerial command centre:
  *   Row A  | Hero (8) · Spotlight Spend (4)
  *   Row B  | Today's Pulse (full row, 4 equal)
+ *   Row B2 | Activity Trend — last 30 days (8) · Pipeline Stages donut (4)
  *   Row C  | Stage Snapshot — 4 mini kanban columns (full row)
  *   Row D  | Action Strip (8) · Posting Goal Radial (4)
  *   Row E  | Workflow Funnel (5) · Monthly Trend (7)
@@ -86,6 +87,48 @@ export function DashboardBento({
         </div>
       )}
 
+      {/* Row B2 — 30-day activity trend (8) + live pipeline-stage donut (4).
+          Only the trend is live-only: on the archive "last 30 days" is always
+          empty noise, but the stage donut still reads (stageCounts exists). */}
+      {!archival && (
+        <div className="lg:col-span-8">
+          <ActivityTrendTile
+            daily={data.activity30}
+            icon={<Activity size={13} aria-hidden />}
+            info="Daily pipeline events over the last 30 days — each reach-out, onboarding and post counted on the day it happened. Click a chip to show or hide a stage."
+          />
+        </div>
+      )}
+      {/* Archival copy differs (nothing is "live" on the archive) and the tile
+          centres itself in the row since the trend tile isn't beside it. */}
+      <div className={archival ? "lg:col-span-4 lg:col-start-5" : "lg:col-span-4"}>
+        <DonutTile
+          title="Pipeline Stages"
+          icon={<Layers size={13} aria-hidden />}
+          info={
+            archival
+              ? "Where every archived collab ended up, one count per deliverable stage."
+              : "Where every live collab sits right now, one count per deliverable stage."
+          }
+          centreLabel={archival ? "collabs" : "live collabs"}
+          segs={[
+            {
+              name: "Reach Out",
+              value: data.stageCounts.reachOut,
+              color: "#3B6FD4",
+            },
+            {
+              name: "On Board",
+              value: data.stageCounts.onBoard,
+              color: "#7B4FBF",
+            },
+            { name: "Posted", value: data.stageCounts.posted, color: "#4F7C4D" },
+            { name: "Paid", value: data.stageCounts.paid, color: "#B57514" },
+          ]}
+          emptyHint={archival ? "No collabs in scope" : "No live collabs in scope"}
+        />
+      </div>
+
       {/* Row C — Stage Snapshot (managerial mini-kanban). Live-only: "where every
           collab is stuck" is an operational view of the active pipeline, not the
           frozen archive. */}
@@ -129,18 +172,28 @@ export function DashboardBento({
 
       {/* Row F */}
       <div className="lg:col-span-6">
-        <DashboardDonut
-          icon={Image}
+        <DonutTile
+          icon={<Image size={13} aria-hidden />}
           title="Content Type Split"
-          slices={data.contentBreakdown}
+          segs={data.contentBreakdown.map((s) => ({
+            name: s.label,
+            value: s.value,
+            color: s.color,
+          }))}
+          centreLabel="total"
           emptyHint="No content types tagged yet"
         />
       </div>
       <div className="lg:col-span-6">
-        <DashboardDonut
-          icon={Layers}
+        <DonutTile
+          icon={<Layers size={13} aria-hidden />}
           title="Creator Tier Split"
-          slices={data.categoryBreakdown}
+          segs={data.categoryBreakdown.map((s) => ({
+            name: s.label,
+            value: s.value,
+            color: s.color,
+          }))}
+          centreLabel="total"
           emptyHint="No creators with tier yet"
         />
       </div>

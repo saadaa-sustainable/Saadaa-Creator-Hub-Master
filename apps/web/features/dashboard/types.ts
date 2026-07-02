@@ -50,6 +50,15 @@ export interface MonthlyPoint {
   posted: number;
 }
 
+/** One day of the 30-day Overview activity trend (event-dated: each stage
+ * event counts on the day it happened, independent of current stage). */
+export interface ActivityPoint {
+  date: string; // ISO yyyy-mm-dd
+  reachOut: number;
+  onboarded: number;
+  posted: number;
+}
+
 export interface RankedRow {
   label: string;
   value: number;
@@ -139,6 +148,8 @@ export interface DashboardData {
   };
   /** Last 6 months of RO / Onboarded / Posted for the trend chart. */
   monthlyFunnel: MonthlyPoint[];
+  /** Last 30 days of daily stage events for the Overview activity area chart. */
+  activity30: ActivityPoint[];
   /** Spend per campaign for the horizontal bar list (top 8). */
   spendsPerCampaign: RankedRow[];
   /** Goal-driven progress: % of onboarded that have shipped a post. */
