@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { SHEET_TABLES, type SheetData, type SheetTable } from "./types";
 
@@ -8,25 +9,31 @@ export function getSheetTableById(id: string): SheetTable | null {
 /**
  * Lightweight count fetch for tab badges. Runs all 10 tables in parallel
  * using `head: true` so PostgREST returns only the COUNT header — no rows
- * shipped. Each one ≈ 50ms.
+ * shipped. Cached 60s (global data, service client, no cookies) so switching
+ * sheet tabs doesn't re-count 10 tables per navigation; badge counts
+ * tolerate a minute's staleness.
  */
-export async function fetchTabCounts(): Promise<Record<string, number>> {
-  const supabase = createServiceClient();
-  const out: Record<string, number> = {};
-  await Promise.all(
-    SHEET_TABLES.map(async (t) => {
-      try {
-        const { count, error } = await (supabase as any)
-          .from(t.table)
-          .select("*", { count: "exact", head: true });
-        out[t.id] = error ? 0 : (count ?? 0);
-      } catch {
-        out[t.id] = 0;
-      }
-    }),
-  );
-  return out;
-}
+export const fetchTabCounts = unstable_cache(
+  async (): Promise<Record<string, number>> => {
+    const supabase = createServiceClient();
+    const out: Record<string, number> = {};
+    await Promise.all(
+      SHEET_TABLES.map(async (t) => {
+        try {
+          const { count, error } = await (supabase as any)
+            .from(t.table)
+            .select("*", { count: "exact", head: true });
+          out[t.id] = error ? 0 : (count ?? 0);
+        } catch {
+          out[t.id] = 0;
+        }
+      }),
+    );
+    return out;
+  },
+  ["sheets-tab-counts"],
+  { revalidate: 60, tags: ["posts", "creators", "campaigns", "payments"] },
+);
 
 /**
  * PostgREST caps each response at 1000 rows. To return the full table we

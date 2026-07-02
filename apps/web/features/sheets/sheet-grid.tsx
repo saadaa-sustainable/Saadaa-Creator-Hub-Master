@@ -130,9 +130,19 @@ export function SheetGrid({
   const [flashed, setFlashed] = useState<string | null>(null);
   const [density, setDensity] = useState<Density>("cozy");
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
-  const [pinnedCols, setPinnedCols] = useState<string[]>([]); // ordered
+  const [pinnedCols, setPinnedCols] = useState<string[]>(() =>
+    table.columns[0]?.key ? [table.columns[0].key] : [],
+  ); // ordered
   const [showColsMenu, setShowColsMenu] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
+
+  // Default-pin the table's first (identifier) column on every tab switch so
+  // horizontal scrolling through 60+ columns never loses row context. Users
+  // can still unfreeze it via the pin toggle.
+  useEffect(() => {
+    setPinnedCols(table.columns[0]?.key ? [table.columns[0].key] : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table.id]);
 
   // ── Row delete (Global-Admin only) ────────────────────────────────────────
   // Selection is keyed by primary-key value so it survives sort/filter.
@@ -366,6 +376,31 @@ export function SheetGrid({
     });
   }, [filteredRows, sortKey, sortDir, table.columns]);
 
+  // ── Render pagination ──────────────────────────────────────────────────────
+  // The grid used to mount EVERY row (posts ≈ 870×68 ≈ 59k cells; creators
+  // 8.3k rows) which froze the main thread for seconds on phones — the
+  // route skeleton was long gone, so the tab looked dead. Search / sort /
+  // select-all / CSV still operate on the FULL sorted set; only the DOM is
+  // windowed to one page at a time.
+  const RENDER_PAGE_SIZE = 100;
+  const [renderPage, setRenderPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / RENDER_PAGE_SIZE));
+  const safePage = Math.min(renderPage, pageCount - 1);
+  const pagedRows = useMemo(
+    () =>
+      sortedRows.slice(
+        safePage * RENDER_PAGE_SIZE,
+        (safePage + 1) * RENDER_PAGE_SIZE,
+      ),
+    [sortedRows, safePage],
+  );
+  const pageFirstIdx = safePage * RENDER_PAGE_SIZE;
+  const pageLastIdx = pageFirstIdx + pagedRows.length - 1;
+  // New search / sort / table always lands on page 1.
+  useEffect(() => {
+    setRenderPage(0);
+  }, [normalizedQuery, sortKey, sortDir, table.id]);
+
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -530,10 +565,13 @@ export function SheetGrid({
         return;
       }
       if (!selected) return;
-      const lastRow = sortedRows.length - 1;
+      // Row indexes are ABSOLUTE into sortedRows; only the current render
+      // page is mounted, so arrow-nav clamps to the page window.
+      const firstRow = pageFirstIdx;
+      const lastRow = pageLastIdx;
       const lastCol = cols.length - 1;
       let { row, col } = selected;
-      if (e.key === "ArrowUp" && row > 0) {
+      if (e.key === "ArrowUp" && row > firstRow) {
         row -= 1;
       } else if (e.key === "ArrowDown" && row < lastRow) {
         row += 1;
@@ -565,7 +603,7 @@ export function SheetGrid({
       e.preventDefault();
       setSelected({ row, col });
     },
-    [editing, selected, sortedRows, cols, canEdit],
+    [editing, selected, sortedRows, cols, canEdit, pageFirstIdx, pageLastIdx],
   );
 
   useEffect(() => {
@@ -950,7 +988,8 @@ export function SheetGrid({
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map((row, rowIdx) => {
+              {pagedRows.map((row, pageIdx) => {
+                const rowIdx = pageFirstIdx + pageIdx;
                 const rowKey = String(row[table.pk] ?? rowIdx);
                 const selectKey =
                   row[table.pk] == null ? "" : String(row[table.pk]);
@@ -1086,6 +1125,33 @@ export function SheetGrid({
           </table>
         )}
       </div>
+
+      {/* Pager — only the current window of rows is mounted (perf). */}
+      {sortedRows.length > RENDER_PAGE_SIZE && (
+        <div className="flex items-center justify-between gap-2 border-t border-border bg-bg-surface/50 px-3 py-2 sm:px-4">
+          <button
+            type="button"
+            onClick={() => setRenderPage((p) => Math.max(0, p - 1))}
+            disabled={safePage === 0}
+            className="inline-flex min-h-[2.2rem] items-center gap-1 rounded-[9px] border border-border bg-bg-white px-3 text-[0.72rem] font-bold text-text-secondary transition-colors hover:bg-bg-alt disabled:opacity-40"
+          >
+            ← Prev
+          </button>
+          <span className="text-[0.68rem] tabular text-text-secondary">
+            Rows {pageFirstIdx + 1}–{pageLastIdx + 1} of{" "}
+            {sortedRows.length.toLocaleString("en-IN")} · page {safePage + 1}/
+            {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => setRenderPage((p) => Math.min(pageCount - 1, p + 1))}
+            disabled={safePage >= pageCount - 1}
+            className="inline-flex min-h-[2.2rem] items-center gap-1 rounded-[9px] border border-border bg-bg-white px-3 text-[0.72rem] font-bold text-text-secondary transition-colors hover:bg-bg-alt disabled:opacity-40"
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       {/* Status bar */}
       <footer className="px-3 sm:px-4 py-2 border-t border-border text-[0.6rem] text-text-tertiary flex items-center justify-between gap-2 bg-bg-surface/30">
