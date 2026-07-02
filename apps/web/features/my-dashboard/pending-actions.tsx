@@ -36,7 +36,7 @@ export function PendingActionsSection({
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden sm:block overflow-x-auto rounded-[var(--radius)] border border-[--border]">
+          <div className="bento-tile hidden sm:block overflow-x-auto rounded-[var(--radius)] border border-[--border] bg-[--bg-white]">
             <table className="w-full text-[0.8rem]">
               <thead>
                 <tr className="border-b border-[--border] bg-[--bg-surface]">
@@ -57,7 +57,7 @@ export function PendingActionsSection({
                   </th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="bento-stagger">
                 {actions.map((a, i) => (
                   <PendingRow key={a.post_id ?? i} action={a} />
                 ))}
@@ -66,7 +66,7 @@ export function PendingActionsSection({
           </div>
 
           {/* Mobile cards */}
-          <div className="sm:hidden space-y-2">
+          <div className="sm:hidden space-y-2 bento-stagger">
             {actions.map((a, i) => (
               <PendingCard key={a.post_id ?? i} action={a} />
             ))}
@@ -83,7 +83,9 @@ function statusChipClass(status: string | null): string {
     return "bg-[--success-bg] text-[--success-text]";
   if (["On Board", "Order Sent"].includes(s))
     return "bg-[--warning-bg] text-[--warning-text]";
-  if (["RTO", "Cancelled", "RTO - Reverse Picked", "RTO - Delivered"].includes(s))
+  if (
+    ["RTO", "Cancelled", "RTO - Reverse Picked", "RTO - Delivered"].includes(s)
+  )
     return "bg-[--danger-bg] text-[--danger-text]";
   return "bg-[--bg-surface] text-[--text-secondary]";
 }
@@ -91,7 +93,7 @@ function statusChipClass(status: string | null): string {
 function PendingRow({ action: a }: { action: PendingAction }) {
   const isOverdue = a.label === "Overdue delivery";
   return (
-    <tr className="border-b border-[--border] last:border-0 hover:bg-[--bg-surface] transition-colors">
+    <tr className="border-b border-[--border] last:border-0 hover:bg-[--bg-surface] transition-colors duration-150">
       <td className="px-3 py-2">
         <div className="font-medium text-[--text-primary] leading-tight truncate max-w-[160px]">
           {a.inf_name ?? "—"}
@@ -148,6 +150,7 @@ function PendingCard({ action: a }: { action: PendingAction }) {
     <div
       className={cn(
         "rounded-[var(--radius)] border px-3 py-2.5 bg-[--bg-white]",
+        "transition-[transform,background-color] duration-150 hover:bg-[--bg-surface] motion-safe:hover:translate-x-0.5",
         isOverdue ? "border-[--danger-bg]" : "border-[--warning-bg]",
       )}
     >

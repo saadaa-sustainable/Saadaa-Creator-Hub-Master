@@ -104,6 +104,8 @@ export default async function DashboardPage({
         id="dash-tabpanel"
         role="tabpanel"
         aria-labelledby={`dash-tab-${tab}`}
+        key={tab}
+        className="dash-tab-swap"
       >
         <Suspense
           key={`${tab}:${JSON.stringify(rest)}`}

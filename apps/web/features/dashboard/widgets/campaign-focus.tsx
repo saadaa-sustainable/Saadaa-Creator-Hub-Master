@@ -43,7 +43,7 @@ export function DashboardCampaignFocus({ focus }: { focus: CampaignFocus }) {
   ];
 
   return (
-    <section className="rounded-2xl bg-bg-white border border-border p-4 sm:p-5">
+    <section className="bento-tile rounded-2xl bg-bg-white border border-border p-4 sm:p-5">
       <header className="flex items-center gap-2 mb-3">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-bg-surface border border-border text-text-secondary">
           <Megaphone size={15} aria-hidden />
@@ -57,13 +57,13 @@ export function DashboardCampaignFocus({ focus }: { focus: CampaignFocus }) {
           </p>
         </div>
       </header>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bento-stagger">
         {stats.map((s) => {
           const Icon = s.icon;
           return (
             <div
               key={s.label}
-              className="relative overflow-hidden rounded-xl border border-border bg-bg-surface/40 px-3 py-2.5"
+              className="bento-tile relative overflow-hidden rounded-xl border border-border bg-bg-surface/40 px-3 py-2.5"
             >
               <span
                 className="absolute inset-y-0 left-0 w-[3px]"

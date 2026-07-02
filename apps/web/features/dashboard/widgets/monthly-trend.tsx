@@ -32,7 +32,7 @@ export function DashboardMonthlyTrend({ data }: { data: MonthlyPoint[] }) {
       .join(" ");
 
   return (
-    <article className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <LineChart size={12} aria-hidden /> 6-month Trend

@@ -1,5 +1,5 @@
 import { Banknote, Shirt, Target, TrendingUp, Users, Wallet } from "lucide-react";
-import { formatRupees } from "@/lib/formatters";
+import { CountUpInt, CountUpRupees } from "./count-up-stats";
 import type { CostKpis } from "@/features/cost-analytics/types";
 
 /**
@@ -11,47 +11,47 @@ import type { CostKpis } from "@/features/cost-analytics/types";
 export function DashboardCostStrip({ kpis }: { kpis: CostKpis }) {
   const garmentCost = Math.max(0, kpis.totalWithGarments - kpis.actualCost);
   return (
-    <div className="acc-kpi-grid">
+    <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
       <KpiCard
         tone="accent"
         icon={<Wallet size={16} aria-hidden />}
         label="Budgeted Cost"
-        primary={formatRupees(kpis.budgetCost)}
+        primary={<CountUpRupees value={kpis.budgetCost} />}
         secondary={`${kpis.budgetCreators} planned creators`}
       />
       <KpiCard
         tone="info"
         icon={<Banknote size={16} aria-hidden />}
         label="Actual Cost"
-        primary={formatRupees(kpis.actualCost)}
+        primary={<CountUpRupees value={kpis.actualCost} />}
         secondary={`${kpis.actualCreators} actual creators`}
       />
       <KpiCard
         tone={kpis.variance > 0 ? "danger" : "success"}
         icon={<TrendingUp size={16} aria-hidden />}
         label="Variance"
-        primary={formatRupees(kpis.variance)}
+        primary={<CountUpRupees value={kpis.variance} />}
         secondary={kpis.variance > 0 ? "Over budget" : "Under budget"}
       />
       <KpiCard
         tone="warning"
         icon={<Target size={16} aria-hidden />}
         label="Utilisation"
-        primary={`${kpis.utilPct}%`}
+        primary={<><CountUpInt value={kpis.utilPct} />%</>}
         secondary="Actual ÷ budget"
       />
       <KpiCard
         tone="muted"
         icon={<Shirt size={16} aria-hidden />}
         label="Garment Cost"
-        primary={formatRupees(garmentCost)}
+        primary={<CountUpRupees value={garmentCost} />}
         secondary="Product seeding spend"
       />
       <KpiCard
         tone="info"
         icon={<Users size={16} aria-hidden />}
         label="Total w/ Garments"
-        primary={formatRupees(kpis.totalWithGarments)}
+        primary={<CountUpRupees value={kpis.totalWithGarments} />}
         secondary="Cash + product"
       />
     </div>
@@ -68,11 +68,11 @@ function KpiCard({
   tone: "accent" | "muted" | "warning" | "success" | "info" | "danger";
   icon: React.ReactNode;
   label: string;
-  primary: string;
+  primary: React.ReactNode;
   secondary: string;
 }) {
   return (
-    <div className={`acc-kpi acc-kpi--${tone}`}>
+    <div className={`acc-kpi acc-kpi--${tone} bento-tile`}>
       <div className="acc-kpi__head">
         <span className="acc-kpi__icon" aria-hidden>
           {icon}

@@ -7,6 +7,7 @@ import {
   Sparkles,
   Users2,
 } from "lucide-react";
+import { CountUp } from "@/components/ui/count-up";
 import type { MyDashboardKpi } from "./types";
 
 /**
@@ -19,56 +20,56 @@ import type { MyDashboardKpi } from "./types";
 export function MyDashboardKpiStrip({ kpi }: { kpi: MyDashboardKpi }) {
   return (
     <section className="flex flex-col gap-3">
-      <div className="acc-kpi-grid">
+      <div className="acc-kpi-grid bento-stagger">
         <KpiCard
           tone="accent"
           icon={<Users2 size={16} aria-hidden />}
           label="My Active"
-          primary={String(kpi.myActive)}
+          value={kpi.myActive}
           secondary="Reach Out · Onboarding · Posting"
         />
         <KpiCard
           tone="warning"
           icon={<Clock size={16} aria-hidden />}
           label="Pending Post"
-          primary={String(kpi.pendingPost)}
+          value={kpi.pendingPost}
           secondary="In the Posting stage"
         />
         <KpiCard
           tone="success"
           icon={<CheckCircle size={16} aria-hidden />}
           label="Posted"
-          primary={String(kpi.posted)}
+          value={kpi.posted}
           secondary="Posted · Delivered"
         />
         <KpiCard
           tone="danger"
           icon={<ArrowLeft size={16} aria-hidden />}
           label="RTOs"
-          primary={String(kpi.rtos)}
+          value={kpi.rtos}
           secondary="RTO · Cancelled"
         />
       </div>
-      <div className="acc-kpi-grid">
+      <div className="acc-kpi-grid bento-stagger">
         <KpiCard
           tone="info"
           icon={<Layers size={16} aria-hidden />}
           label="Campaigns Assigned"
-          primary={String(kpi.totalCampaigns)}
+          value={kpi.totalCampaigns}
           secondary="Distinct campaigns"
         />
         <KpiCard
           tone="accent"
           icon={<Sparkles size={16} aria-hidden />}
           label="Active Campaigns"
-          primary={String(kpi.activeCampaigns)}
+          value={kpi.activeCampaigns}
           secondary="With active posts"
         />
         <KpiCard
           tone="warning"
           icon={<Send size={16} aria-hidden />}
           label="Total Reachouts"
-          primary={String(kpi.totalReachouts)}
+          value={kpi.totalReachouts}
           secondary="In Reach Out stage"
         />
       </div>
@@ -80,24 +81,27 @@ function KpiCard({
   tone,
   icon,
   label,
-  primary,
+  value,
   secondary,
 }: {
   tone: "accent" | "muted" | "warning" | "success" | "info" | "danger";
   icon: React.ReactNode;
   label: string;
-  primary: string;
+  value: number;
   secondary: string;
 }) {
   return (
-    <div className={`acc-kpi acc-kpi--${tone}`}>
+    <div className={`acc-kpi acc-kpi--${tone} bento-tile min-h-11`}>
       <div className="acc-kpi__head">
         <span className="acc-kpi__icon" aria-hidden>
           {icon}
         </span>
         <span className="acc-kpi__label">{label}</span>
       </div>
-      <div className="acc-kpi__primary tabular">{primary}</div>
+      <div className="acc-kpi__primary tabular">
+        {/* Same text as the old String(value) render — count-up is visual only */}
+        <CountUp value={value} format={(n) => String(Math.round(n))} />
+      </div>
       <div className="acc-kpi__secondary tabular">{secondary}</div>
     </div>
   );

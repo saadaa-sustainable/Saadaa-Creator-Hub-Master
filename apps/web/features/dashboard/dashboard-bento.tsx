@@ -48,7 +48,7 @@ export function DashboardBento({
   archival?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mt-1">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 mt-1 bento-stagger">
       {/* Row 0 — per-campaign focus (only when a single campaign is filtered) */}
       {data.campaignFocus && (
         <div className="lg:col-span-12">

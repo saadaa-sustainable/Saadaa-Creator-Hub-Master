@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { CountUpInt } from "../count-up-stats";
 
 /**
  * Top-left bento hero — the "Growth insights ready" block (per dribbble ref),
@@ -21,7 +22,7 @@ export function DashboardHero({
   return (
     <article
       className={cn(
-        "relative h-full overflow-hidden rounded-2xl border border-border p-5",
+        "bento-tile relative h-full overflow-hidden rounded-2xl border border-border p-5",
         "bg-gradient-to-br from-bg-white via-bg-base to-[#F5EFD8]",
         "flex flex-col gap-3 min-h-[210px]",
       )}
@@ -42,9 +43,16 @@ export function DashboardHero({
         .
       </h2>
       <p className="relative z-10 text-[0.82rem] leading-relaxed text-text-secondary max-w-md">
-        {totalReachOut} reach-outs → {totalPosted} posts live. Conversion at{" "}
-        <strong className="text-text-primary">{conversionPct}%</strong>, post-rate at{" "}
-        <strong className="text-text-primary">{postRatePct}%</strong> across the live scope.
+        <CountUpInt value={totalReachOut} /> reach-outs → <CountUpInt value={totalPosted} />{" "}
+        posts live. Conversion at{" "}
+        <strong className="text-text-primary">
+          <CountUpInt value={conversionPct} />%
+        </strong>
+        , post-rate at{" "}
+        <strong className="text-text-primary">
+          <CountUpInt value={postRatePct} />%
+        </strong>{" "}
+        across the live scope.
       </p>
 
       <div className="relative z-10 mt-auto flex flex-wrap items-center gap-2">

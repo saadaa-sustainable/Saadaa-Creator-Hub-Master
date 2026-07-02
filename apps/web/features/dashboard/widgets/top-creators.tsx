@@ -15,7 +15,7 @@ export function DashboardTopCreators({
   creators: DashboardData["topCreators"];
 }) {
   return (
-    <article className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Trophy size={12} className="text-accent" aria-hidden /> Top Creators
@@ -29,7 +29,10 @@ export function DashboardTopCreators({
       ) : (
         <ul className="flex flex-col divide-y divide-border">
           {creators.map((c, i) => (
-            <li key={c.username} className="flex items-center gap-2.5 py-2">
+            <li
+              key={c.username}
+              className="flex items-center gap-2.5 py-2 rounded-lg -mx-1.5 px-1.5 hover:bg-bg-alt transition-colors"
+            >
               <span className="text-[0.62rem] font-extrabold tabular text-text-tertiary w-5">
                 #{i + 1}
               </span>

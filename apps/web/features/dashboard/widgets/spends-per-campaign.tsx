@@ -9,7 +9,7 @@ import type { RankedRow } from "../types";
 export function DashboardSpendsPerCampaign({ data }: { data: RankedRow[] }) {
   const max = Math.max(1, ...data.map((d) => d.value));
   return (
-    <article className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Megaphone size={12} aria-hidden /> Spend per Campaign
@@ -33,7 +33,7 @@ export function DashboardSpendsPerCampaign({ data }: { data: RankedRow[] }) {
                 </div>
                 <div className="relative h-2 rounded-full bg-bg-ecru overflow-hidden">
                   <div
-                    className="absolute inset-y-0 left-0 rounded-full bg-accent"
+                    className="bento-bar absolute inset-y-0 left-0 rounded-full bg-accent"
                     style={{ width: `${pct}%` }}
                   />
                 </div>

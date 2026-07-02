@@ -8,6 +8,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { CountUpInt } from "./count-up-stats";
 import type { DashboardData } from "./types";
 
 type Tone = "accent" | "muted" | "warning" | "success" | "info" | "danger";
@@ -31,11 +32,11 @@ function Tile({
   tone: Tone;
   icon: LucideIcon;
   label: string;
-  primary: string | number;
+  primary: React.ReactNode;
   secondary: string;
 }) {
   return (
-    <div className={cn("acc-kpi", TONE[tone])}>
+    <div className={cn("acc-kpi bento-tile", TONE[tone])}>
       <div className="acc-kpi__head">
         <span className="acc-kpi__icon" aria-hidden>
           <Icon size={16} />
@@ -56,47 +57,49 @@ export function DashboardPipelineKpis({
   return (
     <section>
       <div className="acc-kpi-group">Pipeline</div>
-      <div className="acc-kpi-grid acc-kpi-grid--six">
+      {/* max-[480px] override: global .acc-kpi-grid stacks 1-col there; project
+          rule is 2-up stat cards on phones. */}
+      <div className="acc-kpi-grid acc-kpi-grid--six bento-stagger max-[480px]:grid-cols-2!">
         <Tile
           tone="info"
           icon={Send}
           label="Reach Outs"
-          primary={pipeline.reachOut}
+          primary={<CountUpInt value={pipeline.reachOut} />}
           secondary="First contacts"
         />
         <Tile
           tone="accent"
           icon={UserCheck}
           label="Onboarded"
-          primary={pipeline.onboarded}
+          primary={<CountUpInt value={pipeline.onboarded} />}
           secondary={`Conversion ${pipeline.conversionPct}%`}
         />
         <Tile
           tone="success"
           icon={Instagram}
           label="Posted"
-          primary={pipeline.posted}
+          primary={<CountUpInt value={pipeline.posted} />}
           secondary={`Post rate ${pipeline.postRatePct}%`}
         />
         <Tile
           tone="warning"
           icon={Clock}
           label="Pending Content"
-          primary={pipeline.pendingContent}
+          primary={<CountUpInt value={pipeline.pendingContent} />}
           secondary="Onboarded · no post yet"
         />
         <Tile
           tone="danger"
           icon={Wallet}
           label="Payment Pending"
-          primary={pipeline.paymentPending}
+          primary={<CountUpInt value={pipeline.paymentPending} />}
           secondary="Awaiting UTR"
         />
         <Tile
           tone="muted"
           icon={Trophy}
           label="Ad Winners"
-          primary={pipeline.adWinners}
+          primary={<CountUpInt value={pipeline.adWinners} />}
           secondary="≥ 50K · ROAS ≥ 3"
         />
       </div>

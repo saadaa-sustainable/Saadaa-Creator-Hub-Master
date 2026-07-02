@@ -22,7 +22,7 @@ export function DashboardWorkflowFunnel({
     { label: "Posted", value: posted, color: "bg-success-bg", bar: "bg-success" },
   ];
   return (
-    <article className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <GitBranch size={12} aria-hidden /> Workflow Funnel
@@ -39,7 +39,7 @@ export function DashboardWorkflowFunnel({
               </div>
               <div className={`relative h-2.5 rounded-full ${s.color} overflow-hidden`}>
                 <div
-                  className={`absolute inset-y-0 left-0 ${s.bar} rounded-full`}
+                  className={`bento-bar absolute inset-y-0 left-0 ${s.bar} rounded-full`}
                   style={{ width: `${pct}%` }}
                 />
               </div>

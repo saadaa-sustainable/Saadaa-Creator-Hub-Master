@@ -11568,3 +11568,99 @@ input[type="date"]::-webkit-clear-button {
     justify-content: center;
   }
 }
+
+/* ═══ Bento motion system (2026-07-02) ═══════════════════════════════════════
+   Shared entrance + hover vocabulary for dashboard surfaces (main Dashboard
+   bento, My Dashboard, Partnership board). PERF RULES: transform/opacity
+   only (compositor-friendly, no layout thrash), short ease-out curves,
+   animations run once on mount — never on data refresh — and everything
+   collapses under prefers-reduced-motion. */
+
+@keyframes bentoRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* A bento card: one-shot entrance + calm hover lift. Apply on the tile root
+   (article/section with rounded border). */
+.bento-tile {
+  animation: bentoRise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bento-tile:hover {
+  border-color: color-mix(in oklab, var(--color-accent) 42%, var(--color-border));
+  box-shadow: 0 12px 32px -16px rgba(22, 21, 19, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Stagger container: direct children rise in sequence (caps at 12; anything
+   later shares the last delay — long lists shouldn't choreograph forever). */
+.bento-stagger > * {
+  animation: bentoRise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.bento-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.bento-stagger > *:nth-child(2) { animation-delay: 0.055s; }
+.bento-stagger > *:nth-child(3) { animation-delay: 0.09s; }
+.bento-stagger > *:nth-child(4) { animation-delay: 0.125s; }
+.bento-stagger > *:nth-child(5) { animation-delay: 0.16s; }
+.bento-stagger > *:nth-child(6) { animation-delay: 0.195s; }
+.bento-stagger > *:nth-child(7) { animation-delay: 0.23s; }
+.bento-stagger > *:nth-child(8) { animation-delay: 0.265s; }
+.bento-stagger > *:nth-child(9) { animation-delay: 0.3s; }
+.bento-stagger > *:nth-child(10) { animation-delay: 0.335s; }
+.bento-stagger > *:nth-child(11) { animation-delay: 0.37s; }
+.bento-stagger > *:nth-child(n + 12) { animation-delay: 0.4s; }
+
+/* Tab-panel swap: the dashboard keys this wrapper by tab, so switching tabs
+   replays one quick rise. Cheap (single node), makes the switch feel alive. */
+.dash-tab-swap {
+  animation: bentoRise 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Animated horizontal bars (leaderboards, funnels): transition the WIDTH is
+   a layout prop, so animate scaleX from the left edge instead. Start state
+   is applied by the .bento-bar-grow parent on mount via CSS only. */
+.bento-bar {
+  transform-origin: left center;
+  animation: bentoBarGrow 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.15s;
+}
+@keyframes bentoBarGrow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Donut slices: draw-in via stroke-dashoffset (SVG-safe, compositor cheap). */
+.bento-donut-slice {
+  transition: stroke-width 0.15s ease;
+}
+.bento-donut-slice:hover {
+  stroke-width: 17;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bento-tile,
+  .bento-stagger > *,
+  .dash-tab-swap,
+  .bento-bar {
+    animation: none !important;
+  }
+  .bento-tile,
+  .bento-tile:hover {
+    transition: none;
+    transform: none;
+  }
+}

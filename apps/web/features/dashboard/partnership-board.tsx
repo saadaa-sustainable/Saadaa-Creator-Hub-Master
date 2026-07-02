@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/avatar";
+import { CountUp } from "@/components/ui/count-up";
 import { DeactivatedBadge } from "@/components/ui/status-pill";
 import { formatFollowers } from "@/lib/formatters";
 import {
@@ -301,7 +302,7 @@ export function PartnershipBoard({
       </div>
 
       {/* KPI strip — one tile per lane (a "total" tile just restated their sum). */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="bento-stagger grid grid-cols-3 gap-3">
         <PartnershipKpi
           icon={Clock3}
           label="Requested"
@@ -323,7 +324,7 @@ export function PartnershipBoard({
       </div>
 
       {/* Kanban — reuses the Accounts Hub lane shell for visual consistency. */}
-      <div className="acc-kanban">
+      <div className="acc-kanban bento-stagger">
         {LANES.map((lane) => {
           const items = lanes.get(lane.id) ?? [];
           return (
@@ -342,7 +343,7 @@ export function PartnershipBoard({
                   items.map((card) => (
                     <article
                       key={card.infId}
-                      className="rounded-[12px] border border-border bg-bg-white p-3"
+                      className="bento-tile rounded-[12px] border border-border bg-bg-white p-3"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Avatar
@@ -437,7 +438,7 @@ function PartnershipKpi({
   className?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-[12px] border border-border bg-bg-white px-3.5 py-3">
+    <div className="bento-tile flex items-center gap-3 rounded-[12px] border border-border bg-bg-white px-3.5 py-3">
       <span
         className={cn(
           "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-bg-muted",
@@ -448,7 +449,7 @@ function PartnershipKpi({
       </span>
       <div className="min-w-0">
         <p className="text-[1.05rem] font-bold leading-tight tabular text-text-primary">
-          {value}
+          <CountUp value={value} />
         </p>
         <p className="truncate text-[0.68rem] text-text-secondary">{label}</p>
       </div>

@@ -1,4 +1,5 @@
 import { ArrowDownLeft, ArrowUpRight, Radio } from "lucide-react";
+import { CountUpInt } from "../count-up-stats";
 import type { ChannelStats } from "../types";
 
 /**
@@ -62,7 +63,7 @@ function ChannelCard({
             className="text-[1.35rem] font-extrabold tabular"
             style={{ color: theme.accent }}
           >
-            {stats.conversionPct}%
+            <CountUpInt value={stats.conversionPct} />%
           </div>
           <div className="text-[0.6rem] uppercase tracking-wide text-text-tertiary">
             converted
@@ -108,7 +109,7 @@ function ChannelCard({
                 style={{ background: theme.track }}
               >
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full"
+                  className="bento-bar absolute inset-y-0 left-0 rounded-full"
                   style={{ width: `${pct}%`, background: theme.accent }}
                 />
               </div>
@@ -132,7 +133,7 @@ export function DashboardChannelSplit({
   channels: { inbound: ChannelStats; outbound: ChannelStats };
 }) {
   return (
-    <section className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Radio size={12} aria-hidden /> Reach-Out Channels

@@ -17,7 +17,7 @@ export function DashboardTeamLeaderboard({
 }) {
   const max = Math.max(1, ...team.map((t) => t.onboardings));
   return (
-    <article className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Users size={12} className="text-[#B54F7A]" aria-hidden /> Team Leaderboard
@@ -33,7 +33,10 @@ export function DashboardTeamLeaderboard({
           {team.map((t, i) => {
             const pct = Math.round((t.onboardings / max) * 100);
             return (
-              <li key={t.name} className="flex items-center gap-2.5">
+              <li
+                key={t.name}
+                className="flex items-center gap-2.5 rounded-lg -mx-1.5 px-1.5 hover:bg-bg-alt transition-colors"
+              >
                 <span className="text-[0.62rem] font-extrabold tabular text-text-tertiary w-5">
                   #{i + 1}
                 </span>
@@ -52,7 +55,7 @@ export function DashboardTeamLeaderboard({
                   </div>
                   <div className="mt-1 relative h-1.5 rounded-full bg-bg-ecru overflow-hidden">
                     <div
-                      className="absolute inset-y-0 left-0 rounded-full bg-[#7B4FBF]"
+                      className="bento-bar absolute inset-y-0 left-0 rounded-full bg-[#7B4FBF]"
                       style={{ width: `${pct}%` }}
                     />
                   </div>

@@ -104,7 +104,7 @@ function StageCardItem({ card, stage }: { card: StageCard; stage: StageDef }) {
   const pillTone = settled ? stage.pillSettled : stage.pillPending;
 
   return (
-    <article className="rounded-xl bg-bg-white border border-border p-2.5 flex flex-col gap-1.5 shadow-[0_1px_3px_rgba(22,21,19,0.05)]">
+    <article className="rounded-xl bg-bg-white border border-border p-2.5 flex flex-col gap-1.5 shadow-[0_1px_3px_rgba(22,21,19,0.05)] hover:bg-bg-alt transition-colors">
       {/* Status pill — single line, right-aligned. Stage already shown in column header. */}
       <div className="flex items-center justify-end">
         <span
@@ -217,7 +217,7 @@ export function DashboardStageBoard({
   counts: DashboardData["stageCounts"];
 }) {
   return (
-    <article className="rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <article className="bento-tile rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between gap-2 flex-wrap">
         <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           Stage Snapshot · Where every collab is stuck
@@ -229,7 +229,7 @@ export function DashboardStageBoard({
       </header>
       <div className="-mx-2 px-2 overflow-x-auto scrollbar-thin">
         <div
-          className="grid grid-flow-col gap-3 snap-x snap-mandatory pb-2"
+          className="grid grid-flow-col gap-3 snap-x snap-mandatory pb-2 bento-stagger"
           style={{ gridAutoColumns: "minmax(280px, 1fr)" }}
         >
           {STAGES.map((s) => {

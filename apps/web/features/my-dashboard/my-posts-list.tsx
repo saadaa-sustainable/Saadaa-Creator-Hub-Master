@@ -109,7 +109,7 @@ export function MyPostsList({ posts }: MyPostsListProps) {
 function ListView({ posts }: { posts: MyPost[] }) {
   return (
     <div className="ob-list-wrap">
-      <div className="overflow-x-auto rounded-[var(--radius)] border border-[--border]">
+      <div className="bento-tile overflow-x-auto rounded-[var(--radius)] border border-[--border] bg-[--bg-white]">
         <table className="w-full text-[0.8rem]">
           <thead>
             <tr className="border-b border-[--border] bg-[--bg-surface]">
@@ -137,7 +137,7 @@ function ListView({ posts }: { posts: MyPost[] }) {
             {posts.map((p, i) => (
               <tr
                 key={p.post_id ?? i}
-                className="border-b border-[--border] last:border-0 hover:bg-[--bg-surface] transition-colors"
+                className="border-b border-[--border] last:border-0 hover:bg-[--bg-surface] transition-colors duration-150"
               >
                 <td className="px-3 py-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -185,8 +185,10 @@ function ListView({ posts }: { posts: MyPost[] }) {
 }
 
 function CardsView({ posts }: { posts: MyPost[] }) {
+  // Single-node rise on the grid (replays only when the view toggles, like a
+  // tab swap) — children stay animation-free so data changes never re-trigger.
   return (
-    <div className="ob-card-grid">
+    <div className="ob-card-grid dash-tab-swap">
       {posts.map((p, i) => (
         <MyPostCard key={p.post_id ?? i} post={p} />
       ))}
@@ -213,12 +215,8 @@ function MyPostCard({ post: p }: { post: MyPost }) {
           className="ob-card-avatar"
         />
         <div className="ob-card-id">
-          <div className="ob-card-name">
-            {p.inf_name ?? p.username ?? "—"}
-          </div>
-          {p.username && (
-            <div className="ob-card-handle">@{p.username}</div>
-          )}
+          <div className="ob-card-name">{p.inf_name ?? p.username ?? "—"}</div>
+          {p.username && <div className="ob-card-handle">@{p.username}</div>}
         </div>
       </div>
 
@@ -248,16 +246,16 @@ function MyPostCard({ post: p }: { post: MyPost }) {
           <span className="ob-card-meta-label">Order ID</span>
           <span
             className="ob-card-meta-val tabular"
-            style={p.order_id ? { color: "var(--color-success-text)" } : undefined}
+            style={
+              p.order_id ? { color: "var(--color-success-text)" } : undefined
+            }
           >
             {p.order_id ?? "—"}
           </span>
         </div>
         <div className="ob-card-meta">
           <span className="ob-card-meta-label">Order Status</span>
-          <span className="ob-card-meta-val">
-            {p.order_status ?? "—"}
-          </span>
+          <span className="ob-card-meta-val">{p.order_status ?? "—"}</span>
         </div>
         <div className="ob-card-meta">
           <span className="ob-card-meta-label">Reach Out</span>

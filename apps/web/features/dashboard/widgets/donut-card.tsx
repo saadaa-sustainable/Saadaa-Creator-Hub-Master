@@ -25,7 +25,7 @@ export function DashboardDonut({
   const circ = 2 * Math.PI * radius;
   let acc = 0;
   return (
-    <article className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Icon size={12} aria-hidden /> {title}
@@ -48,6 +48,7 @@ export function DashboardDonut({
                 return (
                   <circle
                     key={s.label}
+                    className="bento-donut-slice"
                     cx="50"
                     cy="50"
                     r={radius}
@@ -75,7 +76,10 @@ export function DashboardDonut({
             {slices.map((s) => {
               const pct = Math.round((s.value / sum) * 100);
               return (
-                <li key={s.label} className="flex items-center gap-2 text-[0.74rem] min-w-0">
+                <li
+                  key={s.label}
+                  className="flex items-center gap-2 text-[0.74rem] min-w-0 rounded-md -mx-1 px-1 hover:bg-bg-alt transition-colors"
+                >
                   <span
                     className="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0"
                     style={{ background: s.color }}

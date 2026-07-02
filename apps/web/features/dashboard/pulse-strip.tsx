@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, Minus, type LucideIcon } from "lucide-react";
 import { Box, Instagram, Send, UserCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { CountUpInt } from "./count-up-stats";
 import type { PulseStat } from "./types";
 
 interface PulseCardProps {
@@ -33,7 +34,7 @@ function PulseCard({ title, icon: Icon, tone, stat }: PulseCardProps) {
       ? "text-danger bg-danger-bg"
       : "text-text-tertiary bg-bg-ecru";
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-2 min-h-[112px]">
+    <div className="bento-tile relative overflow-hidden rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-2 min-h-[112px]">
       <div
         className={cn(
           "absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r",
@@ -54,7 +55,7 @@ function PulseCard({ title, icon: Icon, tone, stat }: PulseCardProps) {
         </span>
       </header>
       <div className="font-emph text-[1.6rem] leading-none font-bold tabular text-text-primary">
-        {stat.today}
+        <CountUpInt value={stat.today} />
       </div>
       <div
         className={cn(
@@ -84,7 +85,7 @@ export function DashboardPulseStrip({
   };
 }) {
   return (
-    <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 bento-stagger">
       <PulseCard title="Reach-outs Today" icon={Send} tone="info" stat={pulse.reachOut} />
       <PulseCard title="Onboarded Today" icon={UserCheck} tone="success" stat={pulse.onboarded} />
       <PulseCard title="Posts Live Today" icon={Instagram} tone="accent" stat={pulse.posted} />

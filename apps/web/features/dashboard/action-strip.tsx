@@ -37,7 +37,7 @@ const TONE_CLS: Record<ChipDef["tone"], string> = {
 
 export function DashboardActionStrip({ actions }: { actions: ActionCounts }) {
   return (
-    <section className="h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
+    <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Zap size={12} aria-hidden /> What needs the team today
@@ -52,7 +52,8 @@ export function DashboardActionStrip({ actions }: { actions: ActionCounts }) {
               key={c.key}
               href={ACTION_HREFS[c.key] as never}
               className={cn(
-                "flex items-center gap-2 px-2.5 py-2 rounded-xl border text-[0.74rem] font-semibold transition hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-10px_rgba(22,21,19,0.25)]",
+                // 44px touch floor on phones only — desktop chip height unchanged.
+                "flex items-center gap-2 px-2.5 py-2 max-sm:min-h-[44px] rounded-xl border text-[0.74rem] font-semibold transition hover:-translate-y-0.5 hover:shadow-[0_6px_14px_-10px_rgba(22,21,19,0.25)]",
                 TONE_CLS[c.tone],
                 muted && "opacity-55",
               )}

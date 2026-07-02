@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState, useTransition } from "react";
+import { FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Banknote,
@@ -159,7 +159,7 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-2.5 sm:gap-3 min-w-0">
-      <article className="rounded-2xl border border-border bg-bg-white p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 min-w-0 overflow-hidden">
+      <article className="bento-tile rounded-2xl border border-border bg-bg-white p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 min-w-0 overflow-hidden">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
@@ -176,7 +176,7 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
         </div>
         <div className="h-2.5 sm:h-3 rounded-full bg-bg-muted overflow-hidden">
           <div
-            className="h-full rounded-full bg-success transition-all"
+            className="bento-bar h-full rounded-full bg-success transition-all"
             style={{ width: `${stats.completion}%` }}
           />
         </div>
@@ -190,7 +190,7 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
           <MiniStat label="Overdue" value={stats.overdue} tone="text-danger" />
         </div>
       </article>
-      <article className="rounded-2xl border border-border bg-bg-white p-3 sm:p-4 min-w-0 overflow-hidden">
+      <article className="bento-tile rounded-2xl border border-border bg-bg-white p-3 sm:p-4 min-w-0 overflow-hidden">
         <p className="text-[0.58rem] sm:text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary mb-2.5 sm:mb-3">
           Stage mix
         </p>
@@ -212,7 +212,10 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
                 </span>
                 <span className="h-2 rounded-full bg-bg-muted overflow-hidden">
                   <span
-                    className={cn("block h-full rounded-full", stage.dot)}
+                    className={cn(
+                      "bento-bar block h-full rounded-full",
+                      stage.dot,
+                    )}
                     style={{ width: `${pct}%` }}
                   />
                 </span>
@@ -232,7 +235,7 @@ function TeamLeaderboard({ entries }: { entries: TeamLeaderboardEntry[] }) {
   if (entries.length === 0) return null;
   const bestScore = Math.max(...entries.map((entry) => entry.score), 1);
   return (
-    <article className="rounded-2xl border border-border bg-bg-white p-3 sm:p-4 min-w-0 overflow-hidden">
+    <article className="bento-tile rounded-2xl border border-border bg-bg-white p-3 sm:p-4 min-w-0 overflow-hidden">
       <header className="flex items-center justify-between gap-3 mb-3">
         <div>
           <p className="text-[0.58rem] sm:text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
@@ -246,11 +249,11 @@ function TeamLeaderboard({ entries }: { entries: TeamLeaderboardEntry[] }) {
           <Crown size={15} aria-hidden />
         </span>
       </header>
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2 bento-stagger">
         {entries.map((entry, index) => (
           <div
             key={entry.name}
-            className="rounded-xl border border-border bg-bg-muted/45 p-2.5 sm:p-3 min-w-0 overflow-hidden"
+            className="rounded-xl border border-border bg-bg-muted/45 p-2.5 sm:p-3 min-w-0 overflow-hidden transition-[transform,border-color] duration-150 hover:border-accent/45 motion-safe:hover:-translate-y-0.5"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-[0.62rem] font-extrabold text-text-tertiary tabular">
@@ -267,7 +270,7 @@ function TeamLeaderboard({ entries }: { entries: TeamLeaderboardEntry[] }) {
             </div>
             <div className="mt-2 h-2 rounded-full bg-bg-white overflow-hidden">
               <div
-                className="h-full rounded-full bg-accent"
+                className="bento-bar h-full rounded-full bg-accent"
                 style={{
                   width: `${Math.max(8, (entry.score / bestScore) * 100)}%`,
                 }}
@@ -334,7 +337,10 @@ function WorkloadCard({
       : "Submit";
   const ButtonIcon = isPayment ? Eye : CheckCircle2;
   return (
-    <article className="rounded-xl bg-bg-white border border-border p-2 sm:p-2.5 flex flex-col gap-1.5 sm:gap-2 shadow-[0_1px_3px_rgba(22,21,19,0.05)] min-w-0">
+    // Hover lift mirrors .bento-tile's feel via utilities only — the entrance
+    // animation lives on the column container (one-shot window) so cards that
+    // remount on a filter change never replay it.
+    <article className="rounded-xl bg-bg-white border border-border p-2 sm:p-2.5 flex flex-col gap-1.5 sm:gap-2 shadow-[0_1px_3px_rgba(22,21,19,0.05)] min-w-0 transition-[transform,box-shadow,border-color] duration-150 hover:border-accent/45 hover:shadow-[0_12px_32px_-16px_rgba(22,21,19,0.2)] motion-safe:hover:-translate-y-0.5">
       <div className="flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1 text-[0.55rem] font-extrabold uppercase tracking-[0.05em] rounded-full px-1.5 py-0.5 bg-bg-muted text-text-secondary whitespace-nowrap">
           <Icon size={8} aria-hidden />
@@ -554,6 +560,15 @@ export function MyDashboardWorkloadBoard({
   const [postingPost, setPostingPost] = useState<MyPost | null>(null);
   const [paymentPost, setPaymentPost] = useState<MyPost | null>(null);
 
+  // One-shot entrance window: `.bento-stagger` sits on the column lists only
+  // during the initial mount choreography (max delay 0.4s + 0.42s run), then
+  // comes off so cards remounting after a filter change never re-animate.
+  const [entranceDone, setEntranceDone] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setEntranceDone(true), 900);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const grouped = useMemo(() => {
     const map = new Map<StageKey, MyPost[]>();
     for (const stage of STAGES) map.set(stage.key, []);
@@ -579,7 +594,7 @@ export function MyDashboardWorkloadBoard({
     <>
       <MyDashboardInsights posts={posts} />
       <TeamLeaderboard entries={leaderboard} />
-      <article className="rounded-2xl bg-bg-white border border-border p-2.5 sm:p-4 flex flex-col gap-2.5 sm:gap-3 min-w-0 overflow-hidden">
+      <article className="bento-tile rounded-2xl bg-bg-white border border-border p-2.5 sm:p-4 flex flex-col gap-2.5 sm:gap-3 min-w-0 overflow-hidden">
         <header className="flex items-center justify-between gap-2 flex-wrap">
           <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
             My Kanban · submit directly from each stage
@@ -649,7 +664,12 @@ export function MyDashboardWorkloadBoard({
                       {items.length}
                     </span>
                   </header>
-                  <div className="px-2 pb-3 flex flex-col gap-2 min-h-[220px]">
+                  <div
+                    className={cn(
+                      "px-2 pb-3 flex flex-col gap-2 min-h-[220px]",
+                      !entranceDone && "bento-stagger",
+                    )}
+                  >
                     {items.length === 0 ? (
                       <div className="flex-1 grid place-items-center text-[0.7rem] text-text-tertiary py-8 italic">
                         No cards here

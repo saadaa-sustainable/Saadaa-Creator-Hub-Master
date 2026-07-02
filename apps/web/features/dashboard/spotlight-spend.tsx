@@ -1,5 +1,6 @@
 import { IndianRupee, TrendingUp } from "lucide-react";
 import { formatRupees } from "@/lib/formatters";
+import { CountUpRupeesBare } from "./count-up-stats";
 import type { SparkPoint } from "./types";
 
 function Sparkline({ data }: { data: SparkPoint[] }) {
@@ -54,7 +55,7 @@ export function DashboardSpotlight({
   const delta7 = prev7 === 0 ? (last7 > 0 ? 100 : 0) : Math.round(((last7 - prev7) / prev7) * 100);
 
   return (
-    <article className="h-full rounded-2xl border border-border p-4 flex flex-col gap-2 min-h-[200px] bg-gradient-to-br from-bg-white to-[#FAF6E6] relative overflow-hidden">
+    <article className="bento-tile h-full rounded-2xl border border-border p-4 flex flex-col gap-2 min-h-[200px] bg-gradient-to-br from-bg-white to-[#FAF6E6] relative overflow-hidden">
       <div className="absolute -top-12 -right-10 w-44 h-44 rounded-full bg-accent/15 blur-3xl pointer-events-none" />
       <header className="flex items-center justify-between relative z-10">
         <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
@@ -67,7 +68,7 @@ export function DashboardSpotlight({
       </header>
       <div className="inline-flex items-baseline gap-1 font-emph text-[1.95rem] leading-none font-bold tabular text-text-primary relative z-10">
         <IndianRupee size={20} aria-hidden className="translate-y-[3px]" />
-        <span>{formatRupees(totalSpend).replace(/^₹/, "")}</span>
+        <CountUpRupeesBare value={totalSpend} />
       </div>
       <Sparkline data={spendSpark} />
       <footer className="mt-auto flex justify-between items-center text-[0.68rem] text-text-tertiary tabular relative z-10">
