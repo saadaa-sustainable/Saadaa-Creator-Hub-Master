@@ -51,6 +51,14 @@ export default function PartnershipStatusKM() {
           <strong>Refresh statuses</strong> button runs the same sweep on
           demand.
         </p>
+        <p>
+          A <strong>daily background refresh</strong> (server cron, ~9:00 IST)
+          also re-reads every creator on the board with nobody watching: all
+          pending requests every day, plus the stalest accepted/rejected
+          creators (to catch revocations). Worst-case staleness with zero
+          clicks is therefore about a day; opening the tab is always the
+          freshest read.
+        </p>
       </KMSection>
 
       <KMSection tag="Filters">

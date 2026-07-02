@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/notifications",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/partnership-refresh",
+      "schedule": "30 3 * * *"
     }
   ]
 }
