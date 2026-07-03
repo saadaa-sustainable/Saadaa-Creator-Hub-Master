@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { LayoutDashboard } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StageSkeleton } from "@/components/ui/skeleton";
+import { DashboardInteractionLayer } from "@/features/dashboard/interaction-layer";
 import { DashboardTabs } from "@/features/dashboard/tabs";
 import {
   resolveTab,
@@ -84,7 +85,7 @@ export default async function DashboardPage({
   };
 
   return (
-    <div className="dash-stage">
+    <DashboardInteractionLayer className="dash-stage" variant="main">
       <PageHeader
         icon={LayoutDashboard}
         title="Dashboard"
@@ -114,7 +115,7 @@ export default async function DashboardPage({
           <TabBody tab={tab} sp={sp} overviewFilters={overviewFilters} />
         </Suspense>
       </div>
-    </div>
+    </DashboardInteractionLayer>
   );
 }
 

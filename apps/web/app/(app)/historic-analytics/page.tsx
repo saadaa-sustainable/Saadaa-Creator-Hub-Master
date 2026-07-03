@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { StageSkeleton } from "@/components/ui/skeleton";
 import { getActor } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
+import { DashboardInteractionLayer } from "@/features/dashboard/interaction-layer";
 import { DashboardFiltersBar } from "@/features/dashboard/filters";
 import { DashboardOverviewStrip } from "@/features/dashboard/overview-strip";
 import { DashboardBento } from "@/features/dashboard/dashboard-bento";
@@ -60,7 +61,10 @@ export default async function HistoricAnalyticsPage({
   };
 
   return (
-    <div className="onboarding-stage dash-overview-stage historic-analytics-stage">
+    <DashboardInteractionLayer
+      className="onboarding-stage dash-overview-stage historic-analytics-stage"
+      variant="historic"
+    >
       <PageHeader
         icon={History}
         title="Historic Analytics"
@@ -91,7 +95,7 @@ export default async function HistoricAnalyticsPage({
           <HistoricAnalyticsBody filters={filters} />
         </Suspense>
       )}
-    </div>
+    </DashboardInteractionLayer>
   );
 }
 

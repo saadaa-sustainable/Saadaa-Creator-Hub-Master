@@ -3,6 +3,7 @@ import { LayoutDashboard } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { getActor } from "@/lib/auth";
+import { DashboardInteractionLayer } from "@/features/dashboard/interaction-layer";
 import { fetchMyDashboardData } from "@/features/my-dashboard/queries";
 import { MyDashboardBody } from "@/features/my-dashboard/page-client";
 
@@ -13,7 +14,10 @@ export default async function MyDashboardPage() {
 
   if (!actor) {
     return (
-      <div className="onboarding-stage my-dashboard-stage">
+      <DashboardInteractionLayer
+        className="onboarding-stage my-dashboard-stage"
+        variant="personal"
+      >
         <PageHeader
           icon={LayoutDashboard}
           title="My Dashboard"
@@ -22,7 +26,7 @@ export default async function MyDashboardPage() {
         <div className="flex items-center justify-center py-20 text-sm text-[--text-secondary]">
           Sign in to view your dashboard
         </div>
-      </div>
+      </DashboardInteractionLayer>
     );
   }
 
@@ -31,7 +35,10 @@ export default async function MyDashboardPage() {
   const actorIdentifier = actor.name || actor.email;
 
   return (
-    <div className="onboarding-stage my-dashboard-stage">
+    <DashboardInteractionLayer
+      className="onboarding-stage my-dashboard-stage"
+      variant="personal"
+    >
       <PageHeader
         icon={LayoutDashboard}
         title="My Dashboard"
@@ -40,7 +47,7 @@ export default async function MyDashboardPage() {
       <Suspense fallback={<TableSkeleton rows={6} />}>
         <MyDashboardData actorIdentifier={actorIdentifier} />
       </Suspense>
-    </div>
+    </DashboardInteractionLayer>
   );
 }
 
