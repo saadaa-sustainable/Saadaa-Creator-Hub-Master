@@ -12493,16 +12493,10 @@ body:has(.km-backdrop) {
 }
 
 /* Ad creative lightbox — in-app preview popup opened from any thumbnail.
-   fb.me frame-blocks embedding, so this shows the stored creative; the real
-   Meta preview stays behind an explicit external button. */
+   Same anatomy as the Posting form's Post Preview (IG embed + stats aside);
+   fb.me frame-blocks embedding, so Meta stays behind an explicit button. */
 .ad-lightbox-panel {
-  width: min(34rem, 94vw);
-}
-.ad-lightbox-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
+  width: min(45rem, 94vw);
 }
 .ad-lightbox-img {
   width: 100%;

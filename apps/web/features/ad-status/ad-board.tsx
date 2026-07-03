@@ -31,6 +31,7 @@ import {
   formatRupees,
   workflowStatusLabel,
 } from "@/lib/formatters";
+import { extractShortcode } from "@/lib/instagram-shortcode";
 import type { AdStatusFilters, AdStatusRow, WarehouseAd } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -185,11 +186,15 @@ function AdImg({
   alt,
   size = 44,
   className,
+  postUrl,
 }: {
   ad: WarehouseAd;
   alt: string;
   size?: number;
   className?: string;
+  /** The organic Instagram post behind this ad — when present, the preview
+   *  popup renders the live IG embed instead of the low-res Meta thumb. */
+  postUrl?: string | null;
 }) {
   const [failed, setFailed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -235,6 +240,7 @@ function AdImg({
         <AdCreativeLightbox
           ad={ad}
           alt={alt}
+          postUrl={postUrl}
           onClose={() => setPreviewOpen(false)}
         />
       )}
@@ -243,17 +249,23 @@ function AdImg({
 }
 
 /**
- * In-app ad preview popup. Meta's fb.me preview page frame-blocks embedding,
- * so the popup shows the stored creative large with the ad's key numbers —
- * jumping out to Business Suite only via the explicit "Open in Meta" button.
+ * In-app ad preview popup — same anatomy as the Posting form's Post Preview.
+ * The ad IS an organic post run as an ad, so when the row carries the post
+ * link we render the NATIVE Instagram embed (videos play, carousels swipe) —
+ * not Meta's low-res expiring thumbnail. The Meta thumb is only the fallback
+ * for rows with no post link (retired IDs, some historic). Meta's fb.me
+ * preview page frame-blocks embedding, so Business Suite stays behind the
+ * explicit "Open in Meta" button.
  */
 function AdCreativeLightbox({
   ad,
   alt,
+  postUrl,
   onClose,
 }: {
   ad: WarehouseAd;
   alt: string;
+  postUrl?: string | null;
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -272,6 +284,10 @@ function AdCreativeLightbox({
   }, [onClose]);
 
   const src = ad.imageUrl || ad.thumbnailUrl || null;
+  const shortcode = extractShortcode(postUrl ?? "");
+  const igUrl =
+    postUrl?.trim() ||
+    (shortcode ? `https://www.instagram.com/p/${shortcode}/` : null);
   if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
@@ -279,60 +295,103 @@ function AdCreativeLightbox({
       className="modal-backdrop modal-backdrop--onboarding ad-lightbox-backdrop"
       role="dialog"
       aria-modal="true"
-      aria-label={`Ad creative — ${ad.adName || alt}`}
+      aria-label={`Ad preview — ${ad.adName || alt}`}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
       }}
     >
       <div
-        className="modal-panel modal-panel--onboarding ad-lightbox-panel"
+        className="modal-panel modal-panel--lg modal-panel--onboarding ad-lightbox-panel"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="modal-head">
           <div className="flex items-center gap-2 min-w-0">
-            <Megaphone size={16} aria-hidden className="shrink-0" />
-            <h2 className="font-semibold truncate" title={ad.adName}>
-              {ad.adName || "Ad creative"}
-            </h2>
+            {shortcode ? (
+              <Instagram size={16} aria-hidden className="shrink-0" />
+            ) : (
+              <Megaphone size={16} aria-hidden className="shrink-0" />
+            )}
+            <h2 className="font-semibold">Ad Preview</h2>
             {ad.category && <WhCategoryBadge category={ad.category} />}
           </div>
           <button
             type="button"
             className="icon-btn"
             onClick={onClose}
-            aria-label="Close preview"
+            aria-label="Close"
           >
-            <X size={16} aria-hidden />
+            <X size={14} aria-hidden />
           </button>
         </header>
-        <div className="ad-lightbox-body">
-          {src && !failed ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={src}
-              alt={alt}
-              referrerPolicy="no-referrer"
-              className="ad-lightbox-img"
-              onError={() => setFailed(true)}
-            />
-          ) : (
-            <div className="ad-lightbox-fallback">
-              <Megaphone size={26} aria-hidden />
-              <span>
-                Creative image unavailable — Meta&apos;s image link has
-                expired. Use &quot;Open in Meta&quot; below for the live
-                preview.
-              </span>
-            </div>
-          )}
-          <div className="ad-lightbox-metrics tabular">
-            {formatRupees(ad.amountSpent)} spent · {roasText(ad)} ·{" "}
-            {formatNumber(ad.impressions)} impr · {formatNumber(ad.ftewvCount)}{" "}
-            FTEWV · {formatNumber(ad.ncpCount)} NCP ·{" "}
-            {formatNumber(ad.shopifyOrders)} orders
+
+        <div className="modal-body flex flex-col gap-4 sm:flex-row">
+          <div className="w-full sm:w-[400px] sm:shrink-0">
+            {shortcode ? (
+              <iframe
+                src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
+                title="Instagram post preview"
+                loading="lazy"
+                allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
+                allowFullScreen
+                className="w-full h-[480px] sm:h-[560px] rounded-[var(--radius)] border border-border bg-white"
+              />
+            ) : src && !failed ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={src}
+                alt={alt}
+                referrerPolicy="no-referrer"
+                className="ad-lightbox-img"
+                onError={() => setFailed(true)}
+              />
+            ) : (
+              <div className="ad-lightbox-fallback">
+                <Megaphone size={26} aria-hidden />
+                <span>
+                  Creative image unavailable — Meta&apos;s image link has
+                  expired. Use &quot;Open in Meta&quot; below for the live
+                  preview.
+                </span>
+              </div>
+            )}
           </div>
+
+          <aside className="flex-1 min-w-0 flex flex-col gap-3">
+            <span
+              className="text-[0.82rem] font-semibold text-text-primary break-words"
+              title={ad.adName}
+            >
+              {ad.adName || "—"}
+            </span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-[0.85rem] text-text-secondary tabular">
+              <span>{formatRupees(ad.amountSpent)} spent</span>
+              <span>{roasText(ad)} ROAS</span>
+              <span>{formatNumber(ad.impressions)} impressions</span>
+              <span>{formatNumber(ad.ftewvCount)} FTEWV</span>
+              <span>{formatNumber(ad.ncpCount)} NCP</span>
+              <span>{formatNumber(ad.shopifyOrders)} orders</span>
+            </div>
+            {ad.adCreated && (
+              <span className="inline-flex items-center gap-1 text-[0.78rem] text-text-tertiary tabular">
+                <CalendarDays size={13} aria-hidden />
+                Ad created {formatDate(ad.adCreated)}
+              </span>
+            )}
+            {igUrl && (
+              <a
+                href={igUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-auto inline-flex items-center gap-1 text-[0.8rem] font-semibold text-[#3B6FD4] hover:underline"
+              >
+                <ExternalLink size={13} aria-hidden />
+                Open on Instagram
+              </a>
+            )}
+          </aside>
         </div>
+
         <footer className="modal-foot ob-overview-footer">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close
@@ -375,6 +434,7 @@ function RowThumb({ row, size = 44 }: { row: AdStatusRow; size?: number }) {
         ad={primary}
         alt={`Ad creative — ${row.username || row.postIdShort}`}
         size={size}
+        postUrl={row.linkToPost}
       />
     );
   return (
@@ -1011,6 +1071,7 @@ function AdStatusOverviewModal({
                       ad={ad}
                       alt={`Ad creative — ${ad.adName}`}
                       size={36}
+                      postUrl={row.linkToPost}
                     />
                     <div className="min-w-0 flex-1">
                       <span
@@ -1495,7 +1556,12 @@ function AdRunRowGroup({
         extras.map((ad) => (
           <tr key={ad.adId} className="ad-extra-row cursor-pointer" {...clickProps}>
             <td data-column-id="ad_thumb">
-              <AdImg ad={ad} alt={`Ad creative — ${ad.adName}`} size={36} />
+              <AdImg
+                ad={ad}
+                alt={`Ad creative — ${ad.adName}`}
+                size={36}
+                postUrl={row.linkToPost}
+              />
             </td>
             <td data-column-id="ad_name">
               <div className="min-w-0">
@@ -1650,6 +1716,7 @@ function AdRunCardsGrid({
                   alt={`Ad creative — ${r.username || r.postIdShort}`}
                   size={44}
                   className="ad-card-thumb"
+                  postUrl={r.linkToPost}
                 />
               )}
             </div>
@@ -1790,6 +1857,7 @@ function AdRunCardsGrid({
                         ad={ad}
                         alt={`Ad creative — ${ad.adName}`}
                         size={28}
+                        postUrl={r.linkToPost}
                       />
                       <div className="min-w-0 flex-1">
                         <span

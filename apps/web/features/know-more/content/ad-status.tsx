@@ -168,12 +168,14 @@ export default function AdStatusKM() {
       <KMSection tag="Thumbnails, Preview & Landing links">
         <KMList>
           <li>
-            <strong>Thumbnail</strong> · the actual ad creative. Clicking it
-            opens an in-app preview popup — the creative large with its spend
-            / ROAS / impressions line and an &quot;Open in Meta&quot; button
-            (Meta blocks embedding its preview page, so the external jump is
-            always explicit). Falls back to the creator avatar when
-            Meta&apos;s image link has expired.
+            <strong>Thumbnail</strong> · the ad creative. Clicking it opens
+            the in-app Ad Preview popup — the same anatomy as the Posting
+            form&apos;s Post Preview: the post&apos;s <em>live Instagram
+            embed</em> (videos play, carousels swipe) beside the ad&apos;s
+            spend / ROAS / impressions / FTEWV / NCP / orders, with
+            &quot;Open in Meta&quot; and &quot;Landing&quot; as explicit
+            buttons. Rows without a post link (retired IDs, some historic)
+            fall back to Meta&apos;s stored creative image.
           </li>
           <li>
             <strong>Landing</strong> · the page the ad points at (product page
