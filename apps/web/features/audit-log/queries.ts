@@ -37,32 +37,44 @@ export async function fetchAuditLogData(): Promise<AuditLogData> {
     await Promise.all([
       svc
         .from("cell_edits")
-        .select("id, table_name, row_pk, column_key, old_value, new_value, edited_by, edited_at")
+        .select(
+          "id, table_name, row_pk, column_key, old_value, new_value, edited_by, edited_at",
+        )
         .order("edited_at", { ascending: false })
         .limit(PER_SOURCE),
       svc
         .from("cell_comments")
-        .select("id, table_id, row_pk, column_key, body, author_email, resolved, resolved_by, resolved_at, created_at")
+        .select(
+          "id, table_id, row_pk, column_key, body, author_email, resolved, resolved_by, resolved_at, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(PER_SOURCE),
       svc
         .from("row_deletions")
-        .select("id, table_name, row_pk, deleted_by, deleted_at, restored_at, restored_by")
+        .select(
+          "id, table_name, row_pk, deleted_by, deleted_at, restored_at, restored_by",
+        )
         .order("deleted_at", { ascending: false })
         .limit(PER_SOURCE),
       svc
         .from("user_audit_log")
-        .select("id, actor_email, target_email, action, before_json, after_json, notes, created_at")
+        .select(
+          "id, actor_email, target_email, action, before_json, after_json, notes, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(PER_SOURCE),
       svc
         .from("system_errors")
-        .select("id, type, key, message, source, resolved, resolved_at, resolved_by, created_at")
+        .select(
+          "id, type, key, message, source, resolved, resolved_at, resolved_by, created_at",
+        )
         .order("created_at", { ascending: false })
         .limit(PER_SOURCE),
       svc
         .from("approval_logs")
-        .select("id, action_type, action, entity_id, admin_email, admin_name, notes, timestamp")
+        .select(
+          "id, action_type, action, entity_id, version_id, admin_email, admin_name, notes, timestamp",
+        )
         .order("timestamp", { ascending: false })
         .limit(PER_SOURCE),
     ]);
@@ -150,7 +162,15 @@ export async function fetchAuditLogData(): Promise<AuditLogData> {
 
   for (const r of (approvalLogs.data ?? []) as Raw[]) {
     const action = str(r.action);
-    const approved = action.toLowerCase() === "approved";
+    const lc = action.toLowerCase();
+    const tone =
+      lc.includes("reject") || lc.includes("close")
+        ? "delete"
+        : lc.includes("approv") || lc.includes("reopen")
+          ? "resolve"
+          : lc.includes("submit") || lc.includes("create")
+            ? "create"
+            : "change";
     entries.push({
       id: `ap-${str(r.id)}`,
       source: "Approval",
@@ -158,8 +178,9 @@ export async function fetchAuditLogData(): Promise<AuditLogData> {
       actor: str(r.admin_name) || str(r.admin_email) || "Admin",
       action: `${action} ${str(r.action_type) || "item"}`,
       target: str(r.entity_id) || "—",
-      detail: trim(r.notes),
-      tone: approved ? "resolve" : "delete",
+      detail:
+        trim(r.notes) || (r.version_id ? `Request #${str(r.version_id)}` : ""),
+      tone,
     });
   }
 

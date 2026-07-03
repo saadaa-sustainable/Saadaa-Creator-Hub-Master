@@ -44,6 +44,161 @@ export type CampaignEditResult =
     }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
+type ActorLike = {
+  email?: string | null;
+  name?: string | null;
+};
+
+function actorEmail(actor: ActorLike): string | null {
+  return (actor.email ?? "").trim().toLowerCase() || null;
+}
+
+function actorName(actor: ActorLike): string | null {
+  return (actor.name ?? "").trim() || actorEmail(actor);
+}
+
+async function logApprovalEvent(
+  supabase: any,
+  input: {
+    actionType: string;
+    action: string;
+    entityId: string;
+    actor?: ActorLike;
+    notes?: string | null;
+    versionId?: string | number | null;
+  },
+): Promise<void> {
+  const { error } = await supabase.from("approval_logs").insert({
+    action_type: input.actionType,
+    action: input.action,
+    entity_id: input.entityId,
+    version_id:
+      input.versionId === null || input.versionId === undefined
+        ? null
+        : String(input.versionId),
+    admin_email: input.actor ? actorEmail(input.actor) : null,
+    admin_name: input.actor ? actorName(input.actor) : null,
+    notes: (input.notes ?? "").trim() || null,
+  });
+
+  if (error) {
+    console.error(
+      "[campaigns] approval/audit log insert failed:",
+      error.message,
+    );
+    return;
+  }
+
+  revalidatePath("/audit-log");
+}
+
+function campaignEditRequestPayload(
+  input: CampaignCreateInput,
+  totalBudget: number,
+): CampaignCreateInput & { totalBudget: number } {
+  return {
+    ...input,
+    budgetRows: input.budgetRows.map((row) => ({ ...row })),
+    totalBudget,
+  };
+}
+
+async function fetchCampaignSnapshot(supabase: any, campaignId: string) {
+  const { data: campaign, error } = await supabase
+    .from("campaigns")
+    .select(
+      "campaign_id, campaign_name, key_message, start_date, end_date, brief_link, internal_brief_link, no_of_creators, total_budget, status, created_by, created_at, updated_at",
+    )
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+
+  if (error) return { error: error.message, campaign: null, budgetRows: [] };
+  if (!campaign)
+    return {
+      error: `Campaign ${campaignId} not found.`,
+      campaign: null,
+      budgetRows: [],
+    };
+
+  const { data: budgetRows, error: budgetError } = await supabase
+    .from("campaign_budget")
+    .select(
+      "id, campaign_id, month_label, tier, collab_type, campaign_name, num_influencers, avg_comp, min_garments, max_garments, est_garment_cost, total_with_garments",
+    )
+    .eq("campaign_id", campaignId)
+    .order("id", { ascending: true });
+
+  if (budgetError) {
+    return { error: budgetError.message, campaign, budgetRows: [] };
+  }
+
+  return { error: null, campaign, budgetRows: budgetRows ?? [] };
+}
+
+async function applyCampaignEdit(
+  supabase: any,
+  campaignId: string,
+  input: CampaignCreateInput,
+  totalBudget: number,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { error: updateErr } = await supabase
+    .from("campaigns")
+    .update({
+      campaign_name: input.campaignName,
+      key_message: input.keyMessage,
+      start_date: input.startDate || null,
+      end_date: input.endDate || null,
+      brief_link: input.briefLink,
+      internal_brief_link: input.internalBrief,
+      no_of_creators: input.numCreators,
+      total_budget: totalBudget,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("campaign_id", campaignId);
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  // Preserve the original month_label so monthly roll-ups stay stable across
+  // edits; fall back to the current month if no prior rows exist.
+  const { data: priorBudget } = await supabase
+    .from("campaign_budget")
+    .select("month_label")
+    .eq("campaign_id", campaignId)
+    .limit(1);
+  const now = new Date();
+  const monthLabel =
+    (Array.isArray(priorBudget) && priorBudget[0]?.month_label) ||
+    now.toLocaleString("en-IN", {
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    });
+
+  const { error: deleteErr } = await supabase
+    .from("campaign_budget")
+    .delete()
+    .eq("campaign_id", campaignId);
+  if (deleteErr) return { ok: false, error: deleteErr.message };
+
+  const budgetRows = input.budgetRows.map((r) => ({
+    campaign_id: campaignId,
+    month_label: monthLabel,
+    tier: r.tier,
+    collab_type: r.collabType,
+    campaign_name: r.campaignName,
+    num_influencers: r.numInfluencers,
+    avg_comp: r.avgComp,
+    min_garments: r.minGarments,
+    max_garments: r.maxGarments,
+  }));
+
+  const { error: insertErr } = await supabase
+    .from("campaign_budget")
+    .insert(budgetRows);
+  if (insertErr) return { ok: false, error: insertErr.message };
+
+  return { ok: true };
+}
+
 /**
  * Server action — atomic campaign create. Delegates to submit_campaign RPC.
  * Mirrors legacy submitCampaign behavior (server gens IFC{NNN}, writes
@@ -66,7 +221,7 @@ export async function submitCampaign(
   }
 
   const v = parsed.data;
-  const { allocated, totalComp, totalAll } = computeTotals(v.budgetRows);
+  const { allocated, totalAll } = computeTotals(v.budgetRows);
   if (allocated === 0) {
     return {
       ok: false,
@@ -146,6 +301,14 @@ export async function submitCampaign(
     },
   ]);
 
+  await logApprovalEvent(supabase, {
+    actionType: "Campaign",
+    action: "Submitted",
+    entityId: row.campaign_id,
+    actor,
+    notes: "New campaign submitted for approval.",
+  });
+
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 
   // ── Notifications: Campaign Created broadcast + submitter confirmation ───
@@ -159,21 +322,18 @@ export async function submitCampaign(
   const createdName = v.campaignName;
   const creatorEmail = (actor.email ?? "").trim().toLowerCase();
   const creatorName = actor.name ?? actor.email ?? "a team member";
-  const budgetForEmail = new Intl.NumberFormat("en-IN").format(row.total_budget);
+  const budgetForEmail = new Intl.NumberFormat("en-IN").format(
+    row.total_budget,
+  );
   after(async () => {
     // 1. Admin broadcast — actor excluded to avoid double-emailing them.
     const admins = await resolveGlobalAdminEmails();
     const adminRecipients = Array.from(
-      new Set(
-        admins.filter((e) => e && e.includes("@") && e !== creatorEmail),
-      ),
+      new Set(admins.filter((e) => e && e.includes("@") && e !== creatorEmail)),
     );
     if (adminRecipients.length > 0) {
       const esc = (s: string) =>
-        s
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;");
+        s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const bodyHtml = `
       <p style="margin:0 0 12px;">A new campaign was just created in CreatorHub.</p>
       <table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 14px;">
@@ -213,7 +373,10 @@ export async function submitCampaign(
         { label: "Campaign ID", value: createdById },
         { label: "Campaign Name", value: createdName },
         { label: "Key Message", value: v.keyMessage },
-        { label: "Start Date", value: v.startDate ? formatDate(v.startDate) : null },
+        {
+          label: "Start Date",
+          value: v.startDate ? formatDate(v.startDate) : null,
+        },
         { label: "End Date", value: v.endDate ? formatDate(v.endDate) : null },
         { label: "No. of Creators", value: v.numCreators || null },
         { label: "Influencers Allocated", value: allocated },
@@ -231,6 +394,7 @@ export async function submitCampaign(
 
   revalidateTag("campaigns");
   revalidatePath("/campaigns");
+  revalidatePath("/approvals");
   revalidatePath("/reach-out/outbound");
   revalidatePath("/onboarding");
 
@@ -248,10 +412,9 @@ export async function submitCampaign(
 }
 
 /**
- * Server action — edit an existing campaign. UPDATEs the `campaigns` row and
- * REPLACES its `campaign_budget` rows (delete-then-insert), then recomputes
- * total_budget = compensation + garment cost. No RPC — IDs are already minted;
- * there is no counter to serialise. Validated with the same CampaignCreateSchema.
+ * Server action — submit an existing campaign edit for admin approval. The live
+ * campaign is not changed until Approvals accepts the request; approval then
+ * replaces the `campaign_budget` rows and recomputes total_budget.
  *
  * DECISION D8 (applied, not changed): editing avg_comp / num_influencers does
  * NOT retroactively rewrite existing posts' commercial_amount; posts already
@@ -262,7 +425,7 @@ export async function editCampaign(
   campaignId: string,
   input: unknown,
 ): Promise<CampaignEditResult> {
-  await assertPermission("campaign_edit");
+  const actor = await assertPermission("campaign_edit");
 
   const id = (campaignId ?? "").trim();
   if (!id) return { ok: false, error: "Campaign ID is required." };
@@ -289,14 +452,25 @@ export async function editCampaign(
 
   const supabase = createServiceClient();
 
-  // Guard — campaign must exist before we delete/replace its budget rows.
-  const { data: existing, error: existingErr } = await (supabase as any)
-    .from("campaigns")
-    .select("campaign_id")
+  const snapshot = await fetchCampaignSnapshot(supabase, id);
+  if (snapshot.error || !snapshot.campaign) {
+    return { ok: false, error: snapshot.error ?? `Campaign ${id} not found.` };
+  }
+
+  const { data: pendingEdit, error: pendingErr } = await (supabase as any)
+    .from("campaign_approval_requests")
+    .select("id")
     .eq("campaign_id", id)
+    .eq("request_type", "edit")
+    .eq("status", "Pending Approval")
     .maybeSingle();
-  if (existingErr) return { ok: false, error: existingErr.message };
-  if (!existing) return { ok: false, error: `Campaign ${id} not found.` };
+  if (pendingErr) return { ok: false, error: pendingErr.message };
+  if (pendingEdit) {
+    return {
+      ok: false,
+      error: `${id} already has an edit awaiting approval.`,
+    };
+  }
 
   // D8 — count reach-outs already tied to this campaign (commercials unchanged).
   const { count: tiedCount } = await (supabase as any)
@@ -307,68 +481,41 @@ export async function editCampaign(
   // total_budget mirrors submit_campaign: compensation + garment cost.
   const totalBudget = totalAll;
 
-  const { error: updateErr } = await (supabase as any)
-    .from("campaigns")
-    .update({
-      campaign_name: v.campaignName,
-      key_message: v.keyMessage,
-      start_date: v.startDate || null,
-      end_date: v.endDate || null,
-      brief_link: v.briefLink,
-      internal_brief_link: v.internalBrief,
-      no_of_creators: v.numCreators,
-      total_budget: totalBudget,
-      updated_at: new Date().toISOString(),
+  const requestPayload = campaignEditRequestPayload(v, totalBudget);
+  const { data: request, error: requestErr } = await (supabase as any)
+    .from("campaign_approval_requests")
+    .insert({
+      request_type: "edit",
+      campaign_id: id,
+      status: "Pending Approval",
+      requested_by_email: actorEmail(actor),
+      requested_by_name: actorName(actor),
+      request_payload: requestPayload,
+      before_payload: {
+        campaign: snapshot.campaign,
+        budgetRows: snapshot.budgetRows,
+      },
+      notes: `Edit submitted for ${id}.`,
     })
-    .eq("campaign_id", id);
-  if (updateErr) return { ok: false, error: updateErr.message };
+    .select("id")
+    .single();
+  if (requestErr) return { ok: false, error: requestErr.message };
 
-  // Preserve the original month_label so monthly roll-ups stay stable across
-  // edits; fall back to the current month if no prior rows exist.
-  const { data: priorBudget } = await (supabase as any)
-    .from("campaign_budget")
-    .select("month_label")
-    .eq("campaign_id", id)
-    .limit(1);
-  const now = new Date();
-  const monthLabel =
-    (Array.isArray(priorBudget) && priorBudget[0]?.month_label) ||
-    now.toLocaleString("en-IN", {
-      month: "short",
-      year: "numeric",
-      timeZone: "Asia/Kolkata",
-    });
-
-  // REPLACE budget rows — delete existing, insert the new set. Only raw inputs;
-  // total_cost / est_garment_cost / total_with_garments are GENERATED columns.
-  const { error: deleteErr } = await (supabase as any)
-    .from("campaign_budget")
-    .delete()
-    .eq("campaign_id", id);
-  if (deleteErr) return { ok: false, error: deleteErr.message };
-
-  const budgetRows = v.budgetRows.map((r) => ({
-    campaign_id: id,
-    month_label: monthLabel,
-    tier: r.tier,
-    collab_type: r.collabType,
-    campaign_name: r.campaignName,
-    num_influencers: r.numInfluencers,
-    avg_comp: r.avgComp,
-    min_garments: r.minGarments,
-    max_garments: r.maxGarments,
-  }));
-
-  const { error: insertErr } = await (supabase as any)
-    .from("campaign_budget")
-    .insert(budgetRows);
-  if (insertErr) return { ok: false, error: insertErr.message };
+  await logApprovalEvent(supabase, {
+    actionType: "Campaign Edit",
+    action: "Submitted",
+    entityId: id,
+    versionId: request?.id,
+    actor,
+    notes: `Edit submitted for approval. Proposed budget: ₹${new Intl.NumberFormat("en-IN").format(totalBudget)}.`,
+  });
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 
   revalidateTag("campaigns");
   revalidatePath("/campaigns");
   revalidatePath("/campaigns/new");
+  revalidatePath("/approvals");
   revalidatePath("/reach-out/outbound");
   revalidatePath("/onboarding");
 
@@ -379,7 +526,7 @@ export async function editCampaign(
     ok: true,
     campaignId: id,
     totalBudget,
-    message: `Campaign "${id} - ${v.campaignName}" updated. ₹${formattedBudget} total budget (with garments).`,
+    message: `Campaign "${id} - ${v.campaignName}" edit sent for approval. ₹${formattedBudget} proposed budget (with garments).`,
     ...(tied > 0
       ? {
           warning: `${tied} reach-out${tied === 1 ? "" : "s"} already tied; their commercials unchanged.`,
@@ -420,11 +567,16 @@ export async function fetchCampaignForEdit(campaignId: string): Promise<{
     .eq("campaign_id", id)
     .order("id", { ascending: true });
 
-  const numericTier = (t: string | null): CampaignCreateInput["budgetRows"][number]["tier"] => {
+  const numericTier = (
+    t: string | null,
+  ): CampaignCreateInput["budgetRows"][number]["tier"] => {
     const match = (INFLUENCER_TIERS as readonly string[]).find((x) => x === t);
-    return (match ?? "Mid tier (50K to 500K)") as CampaignCreateInput["budgetRows"][number]["tier"];
+    return (match ??
+      "Mid tier (50K to 500K)") as CampaignCreateInput["budgetRows"][number]["tier"];
   };
-  const collab = (c: string | null): CampaignCreateInput["budgetRows"][number]["collabType"] =>
+  const collab = (
+    c: string | null,
+  ): CampaignCreateInput["budgetRows"][number]["collabType"] =>
     c === "Paid" ? "Paid" : "Barter";
 
   const budgetRows: CampaignCreateInput["budgetRows"] = (
@@ -467,7 +619,7 @@ export interface CampaignStatusResult {
 export async function closeCampaign(
   campaignId: string,
 ): Promise<CampaignStatusResult> {
-  await assertPermission("campaign_edit");
+  const actor = await assertPermission("campaign_edit");
   const id = (campaignId ?? "").trim();
   if (!id) return { ok: false, error: "Campaign ID is required." };
 
@@ -481,8 +633,17 @@ export async function closeCampaign(
   // Void the un-onboarded reach-out leftovers now that the campaign is closed.
   await voidUnonboardedForCampaign(id);
 
+  await logApprovalEvent(supabase, {
+    actionType: "Campaign",
+    action: "Closed",
+    entityId: id,
+    actor,
+    notes: "Campaign manually closed.",
+  });
+
   revalidatePath("/campaigns");
   revalidatePath("/reach-out");
+  revalidatePath("/approvals");
   return { ok: true };
 }
 
@@ -494,7 +655,7 @@ export async function closeCampaign(
 export async function reopenCampaign(
   campaignId: string,
 ): Promise<CampaignStatusResult> {
-  await assertPermission("campaign_edit");
+  const actor = await assertPermission("campaign_edit");
   const id = (campaignId ?? "").trim();
   if (!id) return { ok: false, error: "Campaign ID is required." };
 
@@ -506,7 +667,130 @@ export async function reopenCampaign(
     .eq("campaign_id", id);
   if (error) return { ok: false, error: error.message };
 
+  await logApprovalEvent(supabase, {
+    actionType: "Campaign",
+    action: "Reopened",
+    entityId: id,
+    actor,
+    notes: "Campaign manually reopened.",
+  });
+
   revalidatePath("/campaigns");
+  revalidatePath("/approvals");
+  return { ok: true };
+}
+
+export async function approveCampaignEditRequest(
+  requestId: number,
+): Promise<CampaignStatusResult> {
+  const actor = await assertPermission("admin");
+  const id = Number(requestId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return { ok: false, error: "Approval request ID is required." };
+  }
+
+  const supabase = createServiceClient();
+  const { data: request, error } = await (supabase as any)
+    .from("campaign_approval_requests")
+    .select("id, campaign_id, status, request_payload")
+    .eq("id", id)
+    .eq("status", "Pending Approval")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!request) return { ok: false, error: "Edit request isn't pending." };
+
+  const parsed = CampaignCreateSchema.safeParse(request.request_payload);
+  if (!parsed.success) {
+    return { ok: false, error: "Stored edit request failed validation." };
+  }
+
+  const { allocated, totalAll } = computeTotals(parsed.data.budgetRows);
+  if (allocated === 0) {
+    return {
+      ok: false,
+      error: "Stored edit request has no allocated creators.",
+    };
+  }
+
+  const applied = await applyCampaignEdit(
+    supabase,
+    request.campaign_id,
+    parsed.data,
+    totalAll,
+  );
+  if (!applied.ok) return applied;
+
+  const now = new Date().toISOString();
+  const { error: updateErr } = await (supabase as any)
+    .from("campaign_approval_requests")
+    .update({
+      status: "Approved",
+      decided_at: now,
+      decided_by_email: actorEmail(actor),
+      decided_by_name: actorName(actor),
+    })
+    .eq("id", id);
+  if (updateErr) return { ok: false, error: updateErr.message };
+
+  await logApprovalEvent(supabase, {
+    actionType: "Campaign Edit",
+    action: "Approved",
+    entityId: request.campaign_id,
+    versionId: id,
+    actor,
+    notes: "Campaign edit approved and applied.",
+  });
+
+  revalidateTag("campaigns");
+  revalidatePath("/approvals");
+  revalidatePath("/campaigns");
+  revalidatePath("/campaigns/new");
+  revalidatePath("/dashboard");
+  revalidatePath("/reach-out");
+  revalidatePath("/onboarding");
+  return { ok: true };
+}
+
+export async function rejectCampaignEditRequest(
+  requestId: number,
+  notes?: string,
+): Promise<CampaignStatusResult> {
+  const actor = await assertPermission("admin");
+  const id = Number(requestId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return { ok: false, error: "Approval request ID is required." };
+  }
+
+  const supabase = createServiceClient();
+  const now = new Date().toISOString();
+  const { data: request, error } = await (supabase as any)
+    .from("campaign_approval_requests")
+    .update({
+      status: "Rejected",
+      decided_at: now,
+      decided_by_email: actorEmail(actor),
+      decided_by_name: actorName(actor),
+      decision_notes: (notes ?? "").trim() || null,
+    })
+    .eq("id", id)
+    .eq("status", "Pending Approval")
+    .select("id, campaign_id")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!request) return { ok: false, error: "Edit request isn't pending." };
+
+  await logApprovalEvent(supabase, {
+    actionType: "Campaign Edit",
+    action: "Rejected",
+    entityId: request.campaign_id,
+    versionId: id,
+    actor,
+    notes: (notes ?? "").trim() || null,
+  });
+
+  revalidatePath("/approvals");
+  revalidatePath("/campaigns");
+  revalidatePath("/campaigns/new");
   return { ok: true };
 }
 
@@ -538,12 +822,12 @@ export async function approveCampaign(
       error: "Campaign isn't pending approval (already approved or rejected).",
     };
 
-  await (supabase as any).from("approval_logs").insert({
-    action_type: "Campaign",
+  await logApprovalEvent(supabase, {
+    actionType: "Campaign",
     action: "Approved",
-    entity_id: id,
-    admin_email: (actor as any).email ?? null,
-    admin_name: (actor as any).name ?? null,
+    entityId: id,
+    actor,
+    notes: "Campaign approved and activated.",
   });
 
   revalidatePath("/approvals");
@@ -575,15 +859,13 @@ export async function rejectCampaign(
     .select("campaign_id")
     .maybeSingle();
   if (error) return { ok: false, error: error.message };
-  if (!data)
-    return { ok: false, error: "Campaign isn't pending approval." };
+  if (!data) return { ok: false, error: "Campaign isn't pending approval." };
 
-  await (supabase as any).from("approval_logs").insert({
-    action_type: "Campaign",
+  await logApprovalEvent(supabase, {
+    actionType: "Campaign",
     action: "Rejected",
-    entity_id: id,
-    admin_email: (actor as any).email ?? null,
-    admin_name: (actor as any).name ?? null,
+    entityId: id,
+    actor,
     notes: (notes ?? "").trim() || null,
   });
 
