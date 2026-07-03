@@ -31,8 +31,7 @@
 // ── Overview (dashboard-native aggregate) ───────────────────────────────────
 import { fetchDashboardData, fetchDashboardFilterOptions } from "./queries";
 import { DashboardFiltersBar } from "./filters";
-import { DashboardOverviewStrip } from "./overview-strip";
-import { DashboardBento } from "./dashboard-bento";
+import { DashboardOverviewCommandCenter } from "./overview-command-center";
 import type { DashboardFilters } from "./types";
 
 // ── Influencer Journey ──────────────────────────────────────────────────────
@@ -118,8 +117,7 @@ export async function OverviewTabBody({ params }: { params: DashboardFilters }) 
   return (
     <div className="onboarding-stage dash-overview-stage">
       <DashboardFiltersBar initial={params} options={options} />
-      <DashboardOverviewStrip data={data} />
-      <DashboardBento data={data} />
+      <DashboardOverviewCommandCenter data={data} />
     </div>
   );
 }
