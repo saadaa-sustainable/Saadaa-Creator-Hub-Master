@@ -7635,6 +7635,69 @@
     margin-top: 0.12rem;
   }
 
+  .campaign-detail-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.1rem;
+  }
+
+  .campaign-detail-reachout-button,
+  .campaign-detail-section-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-height: 34px;
+    border: 1px solid
+      color-mix(
+        in oklab,
+        var(--campaign-accent, #b57514) 20%,
+        var(--color-border)
+      );
+    border-radius: 10px;
+    background: var(--color-bg-white);
+    color: color-mix(
+      in oklab,
+      var(--campaign-accent, #b57514) 58%,
+      var(--color-text-primary)
+    );
+    padding: 0.42rem 0.62rem;
+    font-size: 0.72rem;
+    line-height: 1;
+    font-weight: 850;
+    text-decoration: none;
+    white-space: nowrap;
+    box-shadow: 0 10px 22px -18px rgba(22, 21, 19, 0.3);
+    transition:
+      border-color 0.16s ease-out,
+      transform 0.16s ease-out,
+      background 0.16s ease-out;
+  }
+
+  .campaign-detail-reachout-button:hover,
+  .campaign-detail-section-link:hover {
+    border-color: color-mix(
+      in oklab,
+      var(--campaign-accent, #b57514) 38%,
+      var(--color-border)
+    );
+    background: color-mix(in oklab, var(--campaign-accent, #b57514) 6%, white);
+    transform: translateY(-1px);
+  }
+
+  .campaign-detail-reachout-button strong {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.35rem;
+    min-height: 1.35rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--campaign-accent, #b57514) 12%, white);
+    color: var(--color-text-primary);
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+  }
+
   .campaign-detail-stat-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -7746,6 +7809,128 @@
   .campaign-link-row span {
     color: var(--color-text-tertiary);
     font-size: 0.78rem;
+  }
+
+  .campaign-creator-section {
+    gap: 0.72rem;
+  }
+
+  .campaign-creator-roster {
+    display: grid;
+    gap: 0.5rem;
+    max-height: 320px;
+    overflow: auto;
+    padding-right: 0.16rem;
+    scrollbar-gutter: stable;
+  }
+
+  .campaign-creator-card {
+    --creator-card-index: 0;
+    display: grid;
+    grid-template-columns: 42px minmax(150px, 1fr) minmax(210px, 1.2fr) minmax(
+        112px,
+        0.62fr
+      );
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+    border: 1px solid
+      color-mix(
+        in oklab,
+        var(--campaign-accent, #b57514) 11%,
+        var(--color-border-soft)
+      );
+    border-radius: 13px;
+    background: rgba(255, 252, 248, 0.76);
+    padding: 0.58rem 0.64rem;
+    animation: slideFadeIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(var(--creator-card-index) * 24ms);
+  }
+
+  .campaign-creator-card__avatar {
+    border: 2px solid var(--color-bg-white);
+    box-shadow: 0 10px 18px -15px rgba(22, 21, 19, 0.46);
+  }
+
+  .campaign-creator-card__identity {
+    display: grid;
+    gap: 0.12rem;
+    min-width: 0;
+  }
+
+  .campaign-creator-card__identity strong,
+  .campaign-creator-card__identity span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .campaign-creator-card__identity strong {
+    color: var(--color-text-primary);
+    font-size: 0.82rem;
+    line-height: 1.15;
+    font-weight: 850;
+  }
+
+  .campaign-creator-card__identity span {
+    color: var(--color-text-tertiary);
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  .campaign-creator-card__meta {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.32rem;
+    min-width: 0;
+  }
+
+  .campaign-creator-card__meta span,
+  .campaign-creator-card__status span,
+  .campaign-creator-card__status small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .campaign-creator-card__meta span {
+    border-radius: 999px;
+    background: var(--color-bg-white);
+    padding: 0.2rem 0.42rem;
+    color: var(--color-text-secondary);
+    font-size: 0.64rem;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .campaign-creator-card__status {
+    display: grid;
+    justify-items: end;
+    gap: 0.18rem;
+    min-width: 0;
+    color: var(--color-text-tertiary);
+  }
+
+  .campaign-creator-card__status span {
+    max-width: 100%;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--campaign-accent, #b57514) 10%, white);
+    padding: 0.22rem 0.48rem;
+    color: color-mix(
+      in oklab,
+      var(--campaign-accent, #b57514) 62%,
+      var(--color-text-primary)
+    );
+    font-size: 0.62rem;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .campaign-creator-card__status small {
+    max-width: 100%;
+    font-size: 0.66rem;
+    font-weight: 750;
   }
 
   .campaign-budget-lines {
@@ -8372,8 +8557,55 @@
       padding: 0.58rem;
     }
 
+    .campaign-detail-quick-actions,
+    .campaign-detail-reachout-button,
+    .campaign-detail-section-link {
+      width: 100%;
+    }
+
     .campaign-link-row {
       grid-template-columns: 1fr;
+    }
+
+    .campaign-creator-roster {
+      max-height: 360px;
+      padding-right: 0;
+      scrollbar-gutter: auto;
+    }
+
+    .campaign-creator-card {
+      grid-template-columns: 38px minmax(0, 1fr);
+      gap: 0.5rem;
+      padding: 0.54rem;
+      border-radius: 12px;
+    }
+
+    .campaign-creator-card__avatar {
+      width: 38px !important;
+      height: 38px !important;
+      min-width: 38px !important;
+      min-height: 38px !important;
+    }
+
+    .campaign-creator-card__meta,
+    .campaign-creator-card__status {
+      grid-column: 1 / -1;
+    }
+
+    .campaign-creator-card__meta {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.28rem;
+    }
+
+    .campaign-creator-card__status {
+      justify-items: stretch;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+    }
+
+    .campaign-creator-card__status span,
+    .campaign-creator-card__status small {
+      text-align: center;
     }
 
     .campaign-budget-line {

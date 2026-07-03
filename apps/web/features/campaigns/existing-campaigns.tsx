@@ -23,18 +23,20 @@ import {
   Plus,
   RotateCcw,
   Search,
+  Send,
   SlidersHorizontal,
   Target,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Avatar } from "@/components/ui";
 import {
   ViewModeToggle,
   type ViewMode,
 } from "@/components/ui/view-mode-toggle";
 import { SearchableSelect } from "@/components/ui/searchable-select";
-import { formatDate, formatRupees } from "@/lib/formatters";
-import type { CampaignListRow } from "./queries";
+import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
+import type { CampaignCreatorListRow, CampaignListRow } from "./queries";
 import { closeCampaign, fetchCampaignForEdit, reopenCampaign } from "./actions";
 import { CampaignCreateForm } from "./create-form";
 import type { CampaignCreateInput } from "./schema";
@@ -906,6 +908,12 @@ function CampaignDetailsModal({
     0,
   );
   const creatorsUsed = campaign.creators_used ?? 0;
+  const onboardedCreators = campaign.creator_rows ?? [];
+  const reachoutCreators = campaign.reachout_creator_rows ?? [];
+  const reachoutHref = {
+    pathname: "/onboarding",
+    query: { campaign: campaign.campaign_id },
+  };
   const allocationTarget = creatorCap || target || 0;
   const progressPct =
     allocationTarget > 0
@@ -989,6 +997,16 @@ function CampaignDetailsModal({
                 >
                   <span />
                 </div>
+                <div className="campaign-detail-quick-actions">
+                  <Link
+                    href={reachoutHref}
+                    className="campaign-detail-reachout-button"
+                  >
+                    <Send size={13} />
+                    Reach-outs
+                    <strong>{reachoutCreators.length}</strong>
+                  </Link>
+                </div>
               </div>
             </div>
 
@@ -1020,6 +1038,41 @@ function CampaignDetailsModal({
                 <dd>{budgetRows.length}</dd>
               </div>
             </dl>
+          </section>
+
+          {onboardedCreators.length > 0 && (
+            <section className="campaign-detail-section campaign-creator-section">
+              <div className="campaign-detail-section-head">
+                <div>
+                  <h3>Onboarded Creators</h3>
+                  <p>Creators currently consuming campaign slots.</p>
+                </div>
+                <strong>{onboardedCreators.length}</strong>
+              </div>
+              <CampaignCreatorRoster
+                rows={onboardedCreators}
+                emptyText="No onboarded creators yet."
+              />
+            </section>
+          )}
+
+          <section className="campaign-detail-section campaign-creator-section">
+            <div className="campaign-detail-section-head">
+              <div>
+                <h3>Reach-out Creators</h3>
+                <p>Creators assigned to this campaign before onboarding.</p>
+              </div>
+              <Link
+                href={reachoutHref}
+                className="campaign-detail-section-link"
+              >
+                Open board <ExternalLink size={12} />
+              </Link>
+            </div>
+            <CampaignCreatorRoster
+              rows={reachoutCreators}
+              emptyText="No reach-out creators assigned."
+            />
           </section>
 
           <section className="campaign-detail-section">
@@ -1129,6 +1182,66 @@ function CampaignDetailsModal({
           </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CampaignCreatorRoster({
+  rows,
+  emptyText,
+}: {
+  rows: CampaignCreatorListRow[];
+  emptyText: string;
+}) {
+  if (rows.length === 0) {
+    return <p>{emptyText}</p>;
+  }
+
+  return (
+    <div className="campaign-creator-roster">
+      {rows.map((creator, index) => (
+        <article
+          key={creator.key}
+          className="campaign-creator-card"
+          style={
+            {
+              "--creator-card-index": String(index),
+            } as CSSProperties
+          }
+        >
+          <Avatar
+            src={creator.profile_pic}
+            username={creator.username}
+            name={creator.inf_name}
+            size={42}
+            className="campaign-creator-card__avatar"
+          />
+          <div className="campaign-creator-card__identity">
+            <strong>
+              {creator.inf_name ?? creator.username ?? "Unknown creator"}
+            </strong>
+            <span>
+              {creator.username
+                ? `@${creator.username}`
+                : (creator.inf_id ?? "No SIF")}
+            </span>
+          </div>
+          <div className="campaign-creator-card__meta">
+            <span>{creator.inf_id ?? "No SIF"}</span>
+            <span>{formatFollowers(creator.followers)}</span>
+            <span>{creator.category ?? "No tier"}</span>
+            <span>{creator.state ?? "No state"}</span>
+          </div>
+          <div className="campaign-creator-card__status">
+            <span>{statusLabel(creator.workflow_status)}</span>
+            <small>
+              {creator.collab_id ??
+                creator.post_id_short ??
+                formatDate(creator.reach_out_date ?? creator.onboard_date)}
+            </small>
+          </div>
+        </article>
+      ))}
     </div>
   );
 }
