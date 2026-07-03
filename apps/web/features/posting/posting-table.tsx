@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Eye, Grid3X3, Inbox, List as ListIcon, Send } from "lucide-react";
-import { Avatar, PartnershipKeyEdit } from "@/components/ui";
+import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
 import { PartnershipBadge } from "@/components/ui/status-pill";
 import {
   formatDate,
@@ -125,13 +125,12 @@ export function PostingTable({
       ) : rows.length === 0 ? (
         <PostingEmpty />
       ) : (
-        <div className="campaign-card-grid stage-campaign-card-grid">
-          {rows.map((r, index) => (
+        <div className="ob-card-grid">
+          {rows.map((r) => (
             <PostingCard
               key={r.post_id}
               r={r}
               rows={rows}
-              index={index}
               onSubmit={setSelected}
               onOverview={setOverviewRow}
             />
@@ -283,51 +282,51 @@ function PostingListRow({
 function PostingCard({
   r,
   rows,
-  index,
   onSubmit,
   onOverview,
 }: {
   r: PostingRow;
   rows: PostingRow[];
-  index: number;
   onSubmit: (row: PostingRow) => void;
   onOverview: (row: PostingRow) => void;
 }) {
   const posted = isPosted(r);
 
   return (
-    <article
-      className="campaign-card stage-campaign-card"
-      style={postingStyle(r, index)}
+    <div
+      className={cn(
+        "ob-card",
+        posted ? "ob-card-onboarded" : "ob-card-pending",
+      )}
     >
-      <div className="campaign-card__head">
-        <div className="stage-campaign-card-head">
-          <Avatar
-            src={r.creator?.profile_pic}
-            username={r.creator?.username}
-            name={r.creator?.inf_name}
-            size={46}
-          />
-          <div className="min-w-0">
-            <div className="campaign-card__id-row">
-              {r.campaign?.campaign_id && (
-                <span className="campaign-card__id">
-                  <strong>{r.campaign.campaign_id}</strong>
-                </span>
-              )}
-              <span className="campaign-status-pill">
-                {workflowStatusLabel(r.workflow_status)}
-              </span>
-            </div>
-            <h3>{r.creator?.inf_name ?? r.creator?.username ?? "—"}</h3>
-            {r.creator?.username && (
-              <p className="campaign-card__message">@{r.creator.username}</p>
-            )}
+      <div className="ob-card-head">
+        <Avatar
+          src={r.creator?.profile_pic}
+          username={r.creator?.username}
+          name={r.creator?.inf_name}
+          size={44}
+          className="ob-card-avatar"
+        />
+        <div className="ob-card-id">
+          <div className="ob-card-name">
+            {r.creator?.inf_name ?? r.creator?.username ?? "—"}
           </div>
+          {r.creator?.username && (
+            <div className="ob-card-handle">@{r.creator.username}</div>
+          )}
         </div>
       </div>
 
-      <div className="campaign-card__meta-row">
+      <div className="ob-card-pills">
+        <span className="ob-card-stage-pill">
+          <WorkflowStatusPill status={r.workflow_status} />
+        </span>
+        <span className="ob-card-stage-text">
+          {workflowStatusLabel(r.workflow_status)}
+        </span>
+        {r.campaign?.campaign_id && (
+          <span className="campaign-chip">{r.campaign.campaign_id}</span>
+        )}
         <PostIdWithCollab r={r} />
         <CollabIdBadge r={r} rows={rows} />
         {(r.nomenclature ?? r.content_type) && (
@@ -337,88 +336,91 @@ function PostingCard({
         )}
       </div>
 
-      <div className="campaign-card__progress">
-        <div>
-          <span>Posting Progress</span>
-          <strong>{postingProgress(r)}% ready</strong>
-        </div>
-        <span className="campaign-card__progress-track" aria-hidden>
-          <span />
-        </span>
-      </div>
-
-      <dl className="campaign-card__facts">
-        <div>
-          <dt>Followers</dt>
-          <dd>
+      <dl className="ob-card-meta-grid">
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Followers</span>
+          <span className="ob-card-meta-val tabular">
             {formatFollowers(r.creator?.followers)}
             {r.creator?.category && (
-              <span className="stage-fact-muted"> · {r.creator.category}</span>
+              <span className="ob-card-meta-sub"> · {r.creator.category}</span>
             )}
-          </dd>
+          </span>
         </div>
-        <div>
-          <dt>Collab</dt>
-          <dd>{r.collab_type ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Collab</span>
+          <span className="ob-card-meta-val">{r.collab_type ?? "—"}</span>
         </div>
-        <div>
-          <dt>Commercials</dt>
-          <dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Commercials</span>
+          <span className="ob-card-meta-val tabular">
             {r.commercial_amount != null
               ? formatRupees(r.commercial_amount)
               : "—"}
-          </dd>
+          </span>
         </div>
-        <div>
-          <dt>Deliverables</dt>
-          <dd>{formatDeliverables(r)}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Deliverables</span>
+          <span className="ob-card-meta-val tabular">
+            {formatDeliverables(r)}
+          </span>
         </div>
-        <div>
-          <dt>Ads Rights</dt>
-          <dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Ads Rights</span>
+          <span className="ob-card-meta-val">
             <AdsRightsCell r={r} />
-          </dd>
+          </span>
         </div>
         {(r.ads_usage_rights ?? "").trim() && (
-          <div>
-            <dt>Partnership</dt>
-            <dd className="stage-partnership-cell">
+          <div className="ob-card-meta ob-card-meta--full">
+            <span className="ob-card-meta-label">Partnership</span>
+            <span className="ob-card-meta-val flex flex-wrap items-center gap-1.5">
               <PartnershipBadge status={r.partnership_status} showEmpty compact />
               <PartnershipKeyEdit postId={r.post_id!} value={r.partnership_id} compact isPosted={posted} />
-            </dd>
+            </span>
           </div>
         )}
-        <div>
-          <dt>Onboarded</dt>
-          <dd>{formatDate(r.onboard_date) ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Onboarded</span>
+          <span className="ob-card-meta-val tabular">
+            {formatDate(r.onboard_date) ?? "—"}
+          </span>
         </div>
-        <div>
-          <dt>Post Date</dt>
-          <dd>{formatDate(r.post_date) ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Post Date</span>
+          <span className="ob-card-meta-val tabular">
+            {formatDate(r.post_date) ?? "—"}
+          </span>
         </div>
-        <div>
-          <dt>Order ID</dt>
-          <dd>{r.order_id ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Order ID</span>
+          <span
+            className="ob-card-meta-val tabular"
+            style={
+              r.order_id ? { color: "var(--color-success-text)" } : undefined
+            }
+          >
+            {r.order_id ?? "—"}
+          </span>
         </div>
-        <div>
-          <dt>Live Link</dt>
-          <dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Live Link</span>
+          <span className="ob-card-meta-val">
             <PostLinkCell url={r.post_link} />
-          </dd>
+          </span>
         </div>
-        <div>
-          <dt>Drive</dt>
-          <dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Drive</span>
+          <span className="ob-card-meta-val">
             <DriveLinkCell url={r.download_link} />
-          </dd>
+          </span>
         </div>
       </dl>
 
-      <div className="campaign-card__actions">
+      <div className="ob-card-actions">
         {posted ? (
           <button
             type="button"
-            className="campaign-list-action campaign-list-action--brief"
+            className="action-view"
             onClick={() => onOverview(r)}
           >
             <Eye size={12} aria-hidden />
@@ -427,7 +429,7 @@ function PostingCard({
         ) : (
           <button
             type="button"
-            className="campaign-list-action campaign-list-action--brief"
+            className="action-primary"
             onClick={() => onSubmit(r)}
           >
             <Send size={12} aria-hidden />
@@ -435,6 +437,6 @@ function PostingCard({
           </button>
         )}
       </div>
-    </article>
+    </div>
   );
 }

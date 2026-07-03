@@ -5382,7 +5382,10 @@
     }
     .ob-card-meta:nth-child(2),
     .ob-card-meta:nth-child(5),
-    .ob-card-meta:nth-child(6) {
+    .ob-card-meta:nth-child(6),
+    .ob-card-meta:nth-child(7),
+    .ob-card-meta:nth-child(8),
+    .ob-card-meta:nth-child(9) {
       display: none;
     }
     .ob-card-meta-label {
@@ -13674,13 +13677,13 @@ body:has(.km-backdrop) {
 }
 
 .stage-campaign-list {
-  gap: 0.78rem;
+  gap: 0.58rem;
 }
 
 .stage-campaign-row {
   cursor: default;
-  gap: 0.95rem;
-  padding: 0.92rem 1rem;
+  gap: 0.7rem;
+  padding: 0.68rem 0.78rem;
 }
 
 .stage-campaign-row .campaign-card__id-row {
@@ -13690,21 +13693,23 @@ body:has(.km-backdrop) {
 .stage-campaign-identity,
 .stage-campaign-card-head {
   display: grid;
-  grid-template-columns: 50px minmax(0, 1fr);
+  grid-template-columns: 42px minmax(0, 1fr);
   align-items: center;
-  gap: 0.82rem;
+  gap: 0.64rem;
   min-width: 0;
 }
 
 .stage-campaign-identity [data-avatar],
 .stage-campaign-card-head [data-avatar] {
   flex: 0 0 auto;
+  width: 42px !important;
+  height: 42px !important;
 }
 
 .stage-campaign-signal {
   align-self: stretch;
-  min-height: 72px;
-  padding: 0.68rem 0.76rem;
+  min-height: 58px;
+  padding: 0.5rem 0.6rem;
 }
 
 .stage-campaign-signal .campaign-list-row__reachouts {
@@ -13717,21 +13722,31 @@ body:has(.km-backdrop) {
 
 .stage-campaign-row .campaign-list-row__actions {
   min-width: max-content;
-  gap: 0.48rem;
+  gap: 0.36rem;
 }
 
 .stage-campaign-row .campaign-list-row__stats {
-  gap: 0.56rem;
+  gap: 0.42rem;
 }
 
 .stage-campaign-row .campaign-list-row__stats > div {
-  min-height: 58px;
-  padding: 0.56rem 0.62rem;
+  min-height: 48px;
+  padding: 0.44rem 0.5rem;
 }
 
 .stage-campaign-row .campaign-list-action {
-  height: 38px;
-  padding-inline: 0.68rem;
+  height: 34px;
+  padding-inline: 0.56rem;
+}
+
+.stage-campaign-row .campaign-list-row__main h3 {
+  margin-top: 0.3rem;
+  font-size: 0.86rem;
+}
+
+.stage-campaign-row .campaign-list-row__main p {
+  margin-top: 0.2rem;
+  font-size: 0.68rem;
 }
 
 .stage-campaign-card-grid {

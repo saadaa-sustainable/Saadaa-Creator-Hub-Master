@@ -221,13 +221,12 @@ export function OnboardingTable({
           description="Try clearing filters or widening the reach-out date range."
         />
       ) : (
-        <div className="campaign-card-grid stage-campaign-card-grid">
-          {parentRows.map((r, index) => (
+        <div className="ob-card-grid">
+          {parentRows.map((r) => (
             <ObCard
               key={r.post_id}
               r={r}
               rows={rows}
-              index={index}
               onOpen={setOrderRow}
               onOverview={setOverviewRow}
               onEmail={(postId) => setCollabEmail({ postId })}
@@ -409,14 +408,12 @@ function OnboardingListRow({
 function ObCard({
   r,
   rows,
-  index,
   onOpen,
   onOverview,
   onEmail,
 }: {
   r: OnboardingRow;
   rows: OnboardingRow[];
-  index: number;
   onOpen: (row: OnboardingRow) => void;
   onOverview: (row: OnboardingRow) => void;
   onEmail: (postId: string) => void;
@@ -427,44 +424,44 @@ function ObCard({
     "Estimated delivery date has passed and this post is not marked Posted yet.";
   const showMissingEmailAlert =
     onboarded && !r.collab_email_sent_at && !r.collab_email_skipped;
-  const commercial =
-    r._collabCommercialTotal ?? r.commercial_amount ?? undefined;
 
   return (
-    <article
-      className="campaign-card stage-campaign-card"
-      style={stageStyle(onboardingTone(r), onboardingProgress(r), index)}
+    <div
+      className={cn(
+        "ob-card",
+        onboarded ? "ob-card-onboarded" : "ob-card-pending",
+      )}
     >
-      <div className="campaign-card__head">
-        <div className="stage-campaign-card-head">
-          <Avatar
-            src={r.creator?.profile_pic}
-            username={r.creator?.username}
-            name={r.creator?.inf_name}
-            size={46}
-          />
-          <div className="min-w-0">
-            <div className="campaign-card__id-row">
-              {r.campaign?.campaign_id && (
-                <span className="campaign-card__id">
-                  <strong>{r.campaign.campaign_id}</strong>
-                </span>
-              )}
-              <span className="campaign-status-pill">
-                {workflowStatusLabel(r.workflow_status)}
-              </span>
-            </div>
-            <h3>{r.creator?.inf_name ?? r.creator?.username ?? "—"}</h3>
-            {r.creator?.username && (
-              <p className="campaign-card__message">@{r.creator.username}</p>
-            )}
+      <div className="ob-card-head">
+        <Avatar
+          src={r.creator?.profile_pic}
+          username={r.creator?.username}
+          name={r.creator?.inf_name}
+          size={44}
+          className="ob-card-avatar"
+        />
+        <div className="ob-card-id">
+          <div className="ob-card-name">
+            {r.creator?.inf_name ?? r.creator?.username ?? "—"}
           </div>
+          {r.creator?.username && (
+            <div className="ob-card-handle">@{r.creator.username}</div>
+          )}
         </div>
       </div>
 
-      <div className="campaign-card__meta-row">
+      <div className="ob-card-pills">
+        <span className="ob-card-stage-pill">
+          <WorkflowStatusPill status={r.workflow_status} />
+        </span>
+        <span className="ob-card-stage-text">
+          {workflowStatusLabel(r.workflow_status)}
+        </span>
         {r.reachout_direction === "inbound" && (
           <span className="pill pill--info">Inbound</span>
+        )}
+        {r.campaign?.campaign_id && (
+          <span className="campaign-chip">{r.campaign.campaign_id}</span>
         )}
         <span className="post-id tabular">{r.post_id_short ?? r.post_id}</span>
         <span
@@ -481,51 +478,58 @@ function ObCard({
         )}
       </div>
 
-      <div className="campaign-card__progress">
-        <div>
-          <span>Onboarding Progress</span>
-          <strong>{onboardingProgress(r)}% ready</strong>
-        </div>
-        <span className="campaign-card__progress-track" aria-hidden>
-          <span />
-        </span>
-      </div>
-
-      <dl className="campaign-card__facts">
-        <div>
-          <dt>Followers</dt>
-          <dd>
+      <dl className="ob-card-meta-grid">
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Followers</span>
+          <span className="ob-card-meta-val tabular">
             {formatFollowers(r.creator?.followers)}
             {r.creator?.category && (
-              <span className="stage-fact-muted"> · {r.creator.category}</span>
+              <span className="ob-card-meta-sub"> · {r.creator.category}</span>
             )}
-          </dd>
+          </span>
         </div>
-        <div>
-          <dt>Collab</dt>
-          <dd>{r.collab_type ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Collab</span>
+          <span className="ob-card-meta-val">{r.collab_type ?? "—"}</span>
         </div>
-        <div>
-          <dt>Commercials</dt>
-          <dd>{commercial != null ? formatRupees(Number(commercial)) : "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Commercials</span>
+          <span className="ob-card-meta-val tabular">
+            {(r._collabCommercialTotal ?? r.commercial_amount) != null
+              ? formatRupees(
+                  r._collabCommercialTotal ?? (r.commercial_amount as number),
+                )
+              : "—"}
+          </span>
         </div>
-        <div>
-          <dt>Deliverables</dt>
-          <dd>{collabDeliverableBreakdown(r, rows)}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Deliverables</span>
+          <span className="ob-card-meta-val tabular">
+            {collabDeliverableBreakdown(r, rows)}
+          </span>
         </div>
-        <div>
-          <dt>Barter</dt>
-          <dd>
-            {r.barter_amount != null ? formatRupees(Number(r.barter_amount)) : "—"}
-          </dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Barter</span>
+          <span className="ob-card-meta-val tabular">
+            {r.barter_amount != null
+              ? formatRupees(Number(r.barter_amount))
+              : "—"}
+          </span>
         </div>
-        <div>
-          <dt>Order ID</dt>
-          <dd>{r.order_id ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Order ID</span>
+          <span
+            className="ob-card-meta-val tabular"
+            style={
+              r.order_id ? { color: "var(--color-success-text)" } : undefined
+            }
+          >
+            {r.order_id ?? "—"}
+          </span>
         </div>
-        <div>
-          <dt>Est. Delivery</dt>
-          <dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Est. Delivery</span>
+          <span className="ob-card-meta-val ob-card-delivery-val tabular">
             {formatDate(r.est_delivery) ?? "—"}
             {overdue && (
               <button
@@ -538,36 +542,40 @@ function ObCard({
                 Overdue
               </button>
             )}
-          </dd>
+          </span>
         </div>
-        <div>
-          <dt>Tracking</dt>
-          <dd>{r.tracking_id ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Tracking</span>
+          <span className="ob-card-meta-val tabular">
+            {r.tracking_id ?? "—"}
+          </span>
         </div>
-        <div>
-          <dt>Garments</dt>
-          <dd>{r.garment_qty ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Garment Qty</span>
+          <span className="ob-card-meta-val tabular">
+            {r.garment_qty ?? "—"}
+          </span>
         </div>
-        <div>
-          <dt>Payment</dt>
-          <dd>{r.payment_status ?? "—"}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Payment</span>
+          <span className="ob-card-meta-val">{r.payment_status ?? "—"}</span>
         </div>
       </dl>
 
       {onboarded && !showMissingEmailAlert && (
-        <div className="stage-inline-status">
-          <span>Email</span>
+        <div className="ob-card-email-row">
+          <span className="ob-card-meta-label">Email</span>
           <EmailStatusCell r={r} rows={rows} onSend={onEmail} />
         </div>
       )}
 
-      <div className="campaign-card__actions">
+      <div className="ob-card-actions">
         {onboarded ? (
           <>
             {showMissingEmailAlert && (
               <button
                 type="button"
-                className="campaign-list-action campaign-list-action--danger"
+                className="action-danger"
                 onClick={(e) => {
                   e.stopPropagation();
                   // Email targets the collab representative; post_id is non-null
@@ -582,7 +590,7 @@ function ObCard({
             )}
             <button
               type="button"
-              className="campaign-list-action campaign-list-action--brief"
+              className="action-view"
               onClick={() => onOverview(r)}
             >
               <Eye size={12} aria-hidden />
@@ -592,7 +600,7 @@ function ObCard({
         ) : (
           <button
             type="button"
-            className="campaign-list-action campaign-list-action--brief"
+            className="action-primary"
             onClick={() => onOpen(r)}
           >
             <Send size={12} aria-hidden />
@@ -600,7 +608,7 @@ function ObCard({
           </button>
         )}
       </div>
-    </article>
+    </div>
   );
 }
 
