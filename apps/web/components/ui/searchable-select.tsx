@@ -21,6 +21,8 @@ interface SearchableSelectProps {
   id?: string;
   disabled?: boolean;
   className?: string;
+  contentClassName?: string;
+  optionLayout?: "inline" | "stacked";
   /** Show a clear (×) affordance when a value is set. */
   clearable?: boolean;
 }
@@ -39,6 +41,8 @@ export function SearchableSelect({
   id,
   disabled,
   className,
+  contentClassName,
+  optionLayout = "inline",
   clearable,
 }: SearchableSelectProps) {
   const [open, setOpen] = useState(false);
@@ -121,7 +125,11 @@ export function SearchableSelect({
           <span className={cn("truncate", !selected && "text-text-tertiary")}>
             {selected ? selected.label : placeholder}
           </span>
-          <ChevronsUpDown size={14} className="shrink-0 opacity-50" aria-hidden />
+          <ChevronsUpDown
+            size={14}
+            className="shrink-0 opacity-50"
+            aria-hidden
+          />
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -133,6 +141,7 @@ export function SearchableSelect({
             "z-[1200] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-xl",
             "bg-white border border-[#E7E2D2]",
             "shadow-[0_10px_30px_-8px_rgba(44,36,32,0.25)]",
+            contentClassName,
           )}
         >
           <div className="flex items-center gap-2 px-3 py-2 border-b border-[#E7E2D2]">
@@ -166,7 +175,9 @@ export function SearchableSelect({
             className="max-h-64 overflow-y-auto py-1"
           >
             {filtered.length === 0 ? (
-              <li className="px-3 py-3 text-sm text-text-tertiary">No matches</li>
+              <li className="px-3 py-3 text-sm text-text-tertiary">
+                No matches
+              </li>
             ) : (
               filtered.map((o, i) => (
                 <li
@@ -181,10 +192,33 @@ export function SearchableSelect({
                     o.value === value && "font-semibold",
                   )}
                 >
-                  <span className="flex min-w-0 items-baseline gap-2">
-                    <span className="truncate">{o.label}</span>
+                  <span
+                    className={cn(
+                      "flex min-w-0",
+                      optionLayout === "stacked"
+                        ? "flex-col items-start gap-0.5"
+                        : "items-baseline gap-2",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "min-w-0",
+                        optionLayout === "stacked"
+                          ? "whitespace-normal break-words leading-tight"
+                          : "truncate",
+                      )}
+                    >
+                      {o.label}
+                    </span>
                     {o.hint && (
-                      <span className="truncate text-xs text-text-tertiary">
+                      <span
+                        className={cn(
+                          "min-w-0 text-xs text-text-tertiary",
+                          optionLayout === "stacked"
+                            ? "w-full truncate font-normal"
+                            : "truncate",
+                        )}
+                      >
                         {o.hint}
                       </span>
                     )}

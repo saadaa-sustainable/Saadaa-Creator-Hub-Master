@@ -399,6 +399,8 @@ export function ExistingCampaigns({
               placeholder="All campaign IDs"
               searchPlaceholder="Search campaign ID..."
               className="campaign-filter-combobox"
+              contentClassName="campaign-id-filter-popover"
+              optionLayout="stacked"
             />
           </div>
 
@@ -571,7 +573,7 @@ export function ExistingCampaigns({
                   <footer className="campaign-list-row__actions">
                     <button
                       type="button"
-                      className="btn btn-secondary btn-xs"
+                      className="campaign-list-action"
                       onClick={(event) => {
                         event.stopPropagation();
                         setSelected(campaign);
@@ -585,7 +587,7 @@ export function ExistingCampaigns({
                         href={campaign.brief_link}
                         target="_blank"
                         rel="noopener"
-                        className="campaign-brief-link"
+                        className="campaign-list-action campaign-list-action--brief"
                         onClick={(event) => event.stopPropagation()}
                       >
                         Brief <ExternalLink size={11} />
@@ -595,7 +597,7 @@ export function ExistingCampaigns({
                       <>
                         <button
                           type="button"
-                          className="btn btn-secondary btn-xs"
+                          className="campaign-list-action"
                           disabled={loadingEditId === campaign.campaign_id}
                           onClick={(event) => {
                             event.stopPropagation();
@@ -611,7 +613,7 @@ export function ExistingCampaigns({
                         </button>
                         <button
                           type="button"
-                          className="btn btn-secondary btn-xs"
+                          className="campaign-list-action campaign-list-action--status"
                           disabled={statusBusyId === campaign.campaign_id}
                           onClick={(event) => {
                             event.stopPropagation();
