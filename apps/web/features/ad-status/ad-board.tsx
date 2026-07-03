@@ -187,6 +187,7 @@ function AdImg({
   size = 44,
   className,
   postUrl,
+  igUsername,
 }: {
   ad: WarehouseAd;
   alt: string;
@@ -195,6 +196,9 @@ function AdImg({
   /** The organic Instagram post behind this ad — when present, the preview
    *  popup renders the live IG embed instead of the low-res Meta thumb. */
   postUrl?: string | null;
+  /** Creator handle — lets the popup resolve the post's real video file via
+   *  Meta and autoplay it natively (the IG embed can't play Reels inline). */
+  igUsername?: string | null;
 }) {
   const [failed, setFailed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -241,11 +245,19 @@ function AdImg({
           ad={ad}
           alt={alt}
           postUrl={postUrl}
+          igUsername={igUsername}
           onClose={() => setPreviewOpen(false)}
         />
       )}
     </>
   );
+}
+
+/** Resolved IG media for the popup: null = nothing usable, keep fallbacks. */
+interface IgMediaHit {
+  mediaType: string | null;
+  mediaUrl: string | null;
+  posterUrl: string | null;
 }
 
 /**
@@ -261,15 +273,21 @@ function AdCreativeLightbox({
   ad,
   alt,
   postUrl,
+  igUsername,
   onClose,
 }: {
   ad: WarehouseAd;
   alt: string;
   postUrl?: string | null;
+  igUsername?: string | null;
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   const [failed, setFailed] = useState(false);
+  // undefined = still resolving, null = nothing usable (fall back to embed)
+  const [igMedia, setIgMedia] = useState<IgMediaHit | null | undefined>(
+    undefined,
+  );
   useEffect(() => setMounted(true), []);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -288,6 +306,38 @@ function AdCreativeLightbox({
   const igUrl =
     postUrl?.trim() ||
     (shortcode ? `https://www.instagram.com/p/${shortcode}/` : null);
+
+  // Ask Meta for the post's real media file — a native <video> can autoplay,
+  // the IG embed can't (Reels in the embed only link out to Instagram).
+  useEffect(() => {
+    if (!shortcode || !igUsername) {
+      setIgMedia(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(
+      `/api/ads/ig-video?username=${encodeURIComponent(igUsername)}&shortcode=${encodeURIComponent(shortcode)}`,
+    )
+      .then((r) => (r.ok ? r.json() : { media: null }))
+      .then((j: { media: IgMediaHit | null }) => {
+        if (!cancelled) setIgMedia(j.media ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setIgMedia(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shortcode, igUsername]);
+
+  const videoUrl =
+    igMedia?.mediaType === "VIDEO" && igMedia.mediaUrl ? igMedia.mediaUrl : null;
+  const highResImage =
+    igMedia && igMedia.mediaType !== "VIDEO" && igMedia.mediaUrl
+      ? igMedia.mediaUrl
+      : null;
+  const resolving = Boolean(shortcode && igUsername) && igMedia === undefined;
+
   if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
@@ -327,7 +377,34 @@ function AdCreativeLightbox({
 
         <div className="modal-body ad-lightbox-grid">
           <div className="ad-lightbox-media">
-            {shortcode ? (
+            {resolving ? (
+              <div className="ad-lightbox-loading" aria-label="Loading preview">
+                <span className="ad-lightbox-spinner" aria-hidden />
+                Fetching post from Instagram…
+              </div>
+            ) : videoUrl ? (
+              // Native playback: the post's real video file from Meta —
+              // autoplays muted (browser policy), controls for sound.
+              // eslint-disable-next-line jsx-a11y/media-has-caption
+              <video
+                src={videoUrl}
+                poster={igMedia?.posterUrl ?? src ?? undefined}
+                autoPlay
+                muted
+                loop
+                controls
+                playsInline
+                className="ad-lightbox-video"
+              />
+            ) : highResImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={highResImage}
+                alt={alt}
+                referrerPolicy="no-referrer"
+                className="ad-lightbox-img"
+              />
+            ) : shortcode ? (
               <iframe
                 src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
                 title="Instagram post preview"
@@ -458,6 +535,7 @@ function RowThumb({ row, size = 44 }: { row: AdStatusRow; size?: number }) {
         alt={`Ad creative — ${row.username || row.postIdShort}`}
         size={size}
         postUrl={row.linkToPost}
+        igUsername={row.username}
       />
     );
   return (
@@ -1095,6 +1173,7 @@ function AdStatusOverviewModal({
                       alt={`Ad creative — ${ad.adName}`}
                       size={36}
                       postUrl={row.linkToPost}
+                      igUsername={row.username}
                     />
                     <div className="min-w-0 flex-1">
                       <span
@@ -1584,6 +1663,7 @@ function AdRunRowGroup({
                 alt={`Ad creative — ${ad.adName}`}
                 size={36}
                 postUrl={row.linkToPost}
+                igUsername={row.username}
               />
             </td>
             <td data-column-id="ad_name">
@@ -1740,6 +1820,7 @@ function AdRunCardsGrid({
                   size={44}
                   className="ad-card-thumb"
                   postUrl={r.linkToPost}
+                  igUsername={r.username}
                 />
               )}
             </div>
@@ -1881,6 +1962,7 @@ function AdRunCardsGrid({
                         alt={`Ad creative — ${ad.adName}`}
                         size={28}
                         postUrl={r.linkToPost}
+                        igUsername={r.username}
                       />
                       <div className="min-w-0 flex-1">
                         <span

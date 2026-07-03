@@ -393,6 +393,82 @@ export async function fetchPostByShortcode(
 }
 
 /**
+ * Deep variant of fetchPostByShortcode — pages BACKWARD through the creator's
+ * media with business_discovery cursor pagination (`media.after(...)`) until
+ * the shortcode matches. Historic ads reference posts months old; active
+ * creators push them well past the recent-90 window (verified live: a Dec-2025
+ * reel sat on page 3 of ritika_hans's media WITH media_url). Costs one Graph
+ * call per page — cap pages at the call site and cache the result. Bails
+ * early when X-App-Usage crosses 90%.
+ */
+export async function fetchPostByShortcodeDeep(
+  handle: string,
+  shortcode: string,
+  maxPages = 10,
+): Promise<MetaPostResult> {
+  const c = creds();
+  if (!c) return { status: "error", error: "Meta Graph not configured" };
+  const clean = cleanHandle(handle);
+  const sc = shortcode.trim();
+  if (!clean || !sc) return { status: "error", error: "missing handle/shortcode" };
+
+  let after = "";
+  let accountResolved = false;
+  let usagePct = 0;
+
+  try {
+    for (let page = 0; page < maxPages; page++) {
+      const mediaMod =
+        `media.limit(${POST_PROBE_MEDIA_LIMIT})` + (after ? `.after(${after})` : "");
+      const field =
+        `business_discovery.username(${clean})` +
+        `{${mediaMod}{permalink,timestamp,caption,like_count,comments_count,media_type,thumbnail_url,media_url}}`;
+      const url =
+        `https://graph.facebook.com/${GRAPH_VERSION}/${c.ownId}?` +
+        `fields=${encodeURIComponent(field)}&access_token=${encodeURIComponent(c.token)}`;
+
+      const res = await fetch(url, { cache: "no-store" });
+      const text = await res.text();
+      usagePct = Math.max(usagePct, usageMaxPct(res.headers.get("x-app-usage")));
+
+      if (!res.ok) {
+        if (isNotFound(text)) return { status: "notfound", usagePct };
+        return { status: "error", error: text.slice(0, 200), usagePct };
+      }
+      const json = JSON.parse(text) as {
+        business_discovery?: {
+          media?: { data?: RawMedia[]; paging?: { cursors?: { after?: string } } };
+        };
+        error?: { message?: string; code?: number };
+      };
+      if (json.error) {
+        const msg = json.error.message ?? "unknown";
+        if (isNotFound(msg)) return { status: "notfound", usagePct };
+        return { status: "error", error: msg.slice(0, 200), usagePct };
+      }
+
+      accountResolved = accountResolved || !!json.business_discovery;
+      const media = json.business_discovery?.media;
+      const data = media?.data ?? [];
+      const hit = data.find((m) => extractShortcode(m.permalink) === sc);
+      if (hit)
+        return { status: "ok", node: buildPostNode(hit), accountResolved, usagePct };
+
+      const next = media?.paging?.cursors?.after;
+      if (!next || !data.length || usagePct > 90) break;
+      after = next;
+    }
+    return { status: "notfound", accountResolved, usagePct };
+  } catch (e) {
+    return {
+      status: "error",
+      error: e instanceof Error ? e.message.slice(0, 200) : "fetch failed",
+      usagePct,
+    };
+  }
+}
+
+/**
  * Batch business_discovery — ONE Meta Batch POST with up to 50 sub-requests.
  * Returns results PARALLEL to `handles` plus the max X-App-Usage % observed.
  * Mirrors ig_fetching.py fetch_meta_batch. Caller must pass ≤ META_BATCH_SIZE.
