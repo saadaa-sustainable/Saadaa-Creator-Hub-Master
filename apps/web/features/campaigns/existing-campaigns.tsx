@@ -1,6 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type CSSProperties,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -22,6 +28,11 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  ViewModeToggle,
+  type ViewMode,
+} from "@/components/ui/view-mode-toggle";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import type { CampaignListRow } from "./queries";
 import { closeCampaign, fetchCampaignForEdit, reopenCampaign } from "./actions";
@@ -29,6 +40,8 @@ import { CampaignCreateForm } from "./create-form";
 import type { CampaignCreateInput } from "./schema";
 
 const CAMPAIGN_CARD_ACCENTS = ["#B57514", "#3B6FD4", "#4F7C4D", "#7B4FBF"];
+const CAMPAIGN_VIEW_STORAGE_KEY = "creatorhub:existing-campaigns:view";
+const CAMPAIGN_VIEW_OPTIONS: ViewMode[] = ["cards", "list"];
 
 type CampaignStatusFilter =
   | "all"
@@ -43,6 +56,27 @@ type CampaignSort =
   | "budget-desc"
   | "budget-asc"
   | "target-desc";
+
+type CampaignViewMode = Extract<ViewMode, "cards" | "list">;
+
+const STATUS_FILTER_OPTIONS: Array<{
+  value: CampaignStatusFilter;
+  label: string;
+}> = [
+  { value: "all", label: "All campaigns" },
+  { value: "active", label: "Active" },
+  { value: "closed", label: "Closed" },
+  { value: "with-brief", label: "With brief" },
+  { value: "missing-brief", label: "Missing brief" },
+];
+
+const SORT_OPTIONS: Array<{ value: CampaignSort; label: string }> = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "budget-desc", label: "Budget high to low" },
+  { value: "budget-asc", label: "Budget low to high" },
+  { value: "target-desc", label: "Target high to low" },
+];
 
 interface ExistingCampaignsProps {
   campaigns: CampaignListRow[];
@@ -133,8 +167,20 @@ export function ExistingCampaigns({
   const [campaignIdFilter, setCampaignIdFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<CampaignStatusFilter>("all");
   const [sortBy, setSortBy] = useState<CampaignSort>("newest");
+  const [viewMode, setViewMode] = useState<CampaignViewMode>("cards");
   const [, startLoadEdit] = useTransition();
   const [, startStatus] = useTransition();
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(CAMPAIGN_VIEW_STORAGE_KEY);
+      if (stored === "cards" || stored === "list") {
+        setViewMode(stored);
+      }
+    } catch {
+      // localStorage unavailable
+    }
+  }, []);
 
   const changeStatus = (campaignId: string, action: "close" | "reopen") => {
     setStatusBusyId(campaignId);
@@ -186,6 +232,25 @@ export function ExistingCampaigns({
           return bNum - aNum || b.localeCompare(a);
         }),
     [campaigns],
+  );
+
+  const campaignIdOptions = useMemo(
+    () => [
+      {
+        value: "all",
+        label: "All campaign IDs",
+        hint: `${campaigns.length} campaigns`,
+      },
+      ...campaignIds.map((campaignId) => {
+        const campaign = campaigns.find((c) => c.campaign_id === campaignId);
+        return {
+          value: campaignId,
+          label: campaignId,
+          hint: campaign?.campaign_name ?? undefined,
+        };
+      }),
+    ],
+    [campaignIds, campaigns],
   );
 
   const filteredCampaigns = useMemo(() => {
@@ -315,61 +380,55 @@ export function ExistingCampaigns({
         </label>
 
         <div className="campaign-filter-controls">
-          <label className="campaign-filter-select campaign-filter-select--id">
+          <div className="campaign-filter-select campaign-filter-select--id campaign-filter-select--combo">
             <Hash size={14} aria-hidden="true" />
-            <select
+            <SearchableSelect
               value={campaignIdFilter}
-              onChange={(event) => setCampaignIdFilter(event.target.value)}
-              aria-label="Filter by campaign ID"
-            >
-              <option value="all">All campaign IDs</option>
-              {campaignIds.map((campaignId) => (
-                <option key={campaignId} value={campaignId}>
-                  {campaignId}
-                </option>
-              ))}
-            </select>
-          </label>
+              onChange={setCampaignIdFilter}
+              options={campaignIdOptions}
+              placeholder="All campaign IDs"
+              searchPlaceholder="Search campaign ID..."
+              className="campaign-filter-combobox"
+            />
+          </div>
 
-          <label className="campaign-filter-select">
+          <div className="campaign-filter-select campaign-filter-select--combo">
             <SlidersHorizontal size={14} aria-hidden="true" />
-            <select
+            <SearchableSelect
               value={statusFilter}
-              onChange={(event) =>
-                setStatusFilter(event.target.value as CampaignStatusFilter)
+              onChange={(value) =>
+                setStatusFilter(value as CampaignStatusFilter)
               }
-              aria-label="Filter campaigns"
-            >
-              <option value="all">All campaigns</option>
-              <option value="active">Active</option>
-              <option value="closed">Closed</option>
-              <option value="with-brief">With brief</option>
-              <option value="missing-brief">Missing brief</option>
-            </select>
-          </label>
+              options={STATUS_FILTER_OPTIONS}
+              placeholder="All campaigns"
+              searchPlaceholder="Search filters..."
+              className="campaign-filter-combobox"
+            />
+          </div>
 
-          <label className="campaign-filter-select">
+          <div className="campaign-filter-select campaign-filter-select--combo">
             <ArrowDownUp size={14} aria-hidden="true" />
-            <select
+            <SearchableSelect
               value={sortBy}
-              onChange={(event) =>
-                setSortBy(event.target.value as CampaignSort)
-              }
-              aria-label="Sort campaigns"
-            >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
-              <option value="budget-desc">Budget high to low</option>
-              <option value="budget-asc">Budget low to high</option>
-              <option value="target-desc">Target high to low</option>
-            </select>
-          </label>
+              onChange={(value) => setSortBy(value as CampaignSort)}
+              options={SORT_OPTIONS}
+              placeholder="Newest first"
+              searchPlaceholder="Search sort..."
+              className="campaign-filter-combobox"
+            />
+          </div>
         </div>
 
         <div className="campaign-list-toolbar__meta">
           <span>
             Showing {filteredCampaigns.length} of {campaigns.length}
           </span>
+          <ViewModeToggle
+            storageKey={CAMPAIGN_VIEW_STORAGE_KEY}
+            options={CAMPAIGN_VIEW_OPTIONS}
+            defaultMode={viewMode}
+            onChange={(mode) => setViewMode(mode as CampaignViewMode)}
+          />
           {hasFilters && (
             <button type="button" onClick={clearFilters}>
               Reset
@@ -392,7 +451,11 @@ export function ExistingCampaigns({
           </button>
         </div>
       ) : (
-        <div className="campaign-card-grid">
+        <div
+          className={
+            viewMode === "list" ? "campaign-list-view" : "campaign-card-grid"
+          }
+        >
           {filteredCampaigns.map((campaign, index) => {
             const target = normalizeNumber(campaign.no_of_creators);
             const isClosed = isClosedStatus(campaign.status);
@@ -417,6 +480,148 @@ export function ExistingCampaigns({
                   )
                 : 0;
             const accent = campaignAccent(campaign, index);
+
+            if (viewMode === "list") {
+              return (
+                <article
+                  key={campaign.campaign_id}
+                  className="campaign-list-row"
+                  data-status={isClosed ? "closed" : "active"}
+                  style={
+                    {
+                      "--campaign-accent": accent,
+                      "--campaign-progress": `${progressPct}%`,
+                      "--campaign-card-index": String(index),
+                    } as CSSProperties
+                  }
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View details for ${campaign.campaign_id}`}
+                  onClick={() => setSelected(campaign)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelected(campaign);
+                    }
+                  }}
+                >
+                  <div className="campaign-list-row__main">
+                    <div className="campaign-card__id-row">
+                      <strong className="campaign-card__id">
+                        {campaign.campaign_id}
+                      </strong>
+                      <span className="campaign-status-pill">
+                        {statusLabel(campaign.status)}
+                      </span>
+                    </div>
+                    <h3>{campaign.campaign_name ?? "Untitled campaign"}</h3>
+                    {campaign.key_message && <p>{campaign.key_message}</p>}
+                  </div>
+
+                  <div className="campaign-list-row__allocation">
+                    <div>
+                      <span>Allocation</span>
+                      <strong>
+                        {allocationTarget > 0
+                          ? `${creatorsUsed} / ${allocationTarget}`
+                          : "No cap"}
+                      </strong>
+                    </div>
+                    <div
+                      className="campaign-card__progress-track"
+                      aria-hidden="true"
+                    >
+                      <span />
+                    </div>
+                  </div>
+
+                  <dl className="campaign-list-row__stats">
+                    <div>
+                      <dt>Budget</dt>
+                      <dd>{formatRupees(campaign.total_budget)}</dd>
+                    </div>
+                    <div>
+                      <dt>Created</dt>
+                      <dd>{formatDate(campaign.created_at)}</dd>
+                    </div>
+                    <div>
+                      <dt>Window</dt>
+                      <dd>{campaignWindowLabel(campaign)}</dd>
+                    </div>
+                    <div>
+                      <dt>Lines</dt>
+                      <dd>{budgetRows.length}</dd>
+                    </div>
+                  </dl>
+
+                  <footer className="campaign-list-row__actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelected(campaign);
+                      }}
+                    >
+                      <Eye size={12} />
+                      View
+                    </button>
+                    {campaign.brief_link && (
+                      <a
+                        href={campaign.brief_link}
+                        target="_blank"
+                        rel="noopener"
+                        className="campaign-brief-link"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        Brief <ExternalLink size={11} />
+                      </a>
+                    )}
+                    {canManage && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-xs"
+                          disabled={loadingEditId === campaign.campaign_id}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openEdit(campaign.campaign_id);
+                          }}
+                        >
+                          {loadingEditId === campaign.campaign_id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Pencil size={12} />
+                          )}
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-xs"
+                          disabled={statusBusyId === campaign.campaign_id}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            changeStatus(
+                              campaign.campaign_id,
+                              isClosed ? "reopen" : "close",
+                            );
+                          }}
+                        >
+                          {statusBusyId === campaign.campaign_id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : isClosed ? (
+                            <RotateCcw size={12} />
+                          ) : (
+                            <Lock size={12} />
+                          )}
+                          {isClosed ? "Reopen" : "Close"}
+                        </button>
+                      </>
+                    )}
+                  </footer>
+                </article>
+              );
+            }
 
             return (
               <article
