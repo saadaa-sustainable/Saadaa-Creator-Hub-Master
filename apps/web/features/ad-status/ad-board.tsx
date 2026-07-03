@@ -161,6 +161,19 @@ function HistoricChip() {
   );
 }
 
+/** The ad name carries a pre-renumbering SIF; the row is attached to the
+ * creator via the raw legacy archive, not to a specific post. */
+function RetiredIdChip() {
+  return (
+    <span
+      className="pill pill--muted text-[0.62rem] font-bold uppercase tracking-[0.05em] shrink-0"
+      title="Ad name uses a retired (pre-renumbering) post ID — attached to the creator via the legacy archive; no specific post exists for it"
+    >
+      Retired ID
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Ad creative thumbnail — plain <img> (Meta CDN blocks proxying), lazy, no
 // referrer. Clicking opens the Meta ad preview (fb.me) — the real ad.
@@ -209,13 +222,14 @@ function AdImg({
       className="ad-thumb-link shrink-0"
       title="Open Meta ad preview"
       aria-label={`Open Meta ad preview — ${alt}`}
+      onClick={(e) => e.stopPropagation()}
     >
       {body}
     </a>
   );
 }
 
-/** Row thumbnail: primary ad creative when available, else creator avatar. */
+/** Row thumbnail: first-occurrence ad creative when available, else avatar. */
 function RowThumb({ row, size = 44 }: { row: AdStatusRow; size?: number }) {
   const primary = row.primaryAd;
   if (primary && (primary.imageUrl || primary.thumbnailUrl))
@@ -258,6 +272,7 @@ function AdLinkChips({ ad }: { ad: WarehouseAd | null }) {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-[0.74rem] px-[10px] py-[3px] rounded-full bg-[rgba(59,111,212,0.1)] text-[#3B6FD4] font-semibold no-underline"
           title={ad.adLink}
+          onClick={(e) => e.stopPropagation()}
         >
           <ExternalLink size={11} aria-hidden />
           Landing
@@ -270,6 +285,7 @@ function AdLinkChips({ ad }: { ad: WarehouseAd | null }) {
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-[0.74rem] px-[10px] py-[3px] rounded-full bg-[rgba(123,79,191,0.1)] text-[#7B4FBF] font-semibold no-underline"
           title="Open Meta ad preview"
+          onClick={(e) => e.stopPropagation()}
         >
           <Eye size={11} aria-hidden />
           Preview
@@ -283,6 +299,36 @@ function AdLinkChips({ ad }: { ad: WarehouseAd | null }) {
 function roasText(ad: WarehouseAd | null): string {
   if (!ad) return "—";
   return `${ad.roasMa.toFixed(2)}x`;
+}
+
+/** Meta delivery enum → label: ACTIVE → "Active", CAMPAIGN_PAUSED → "Campaign paused". */
+function prettyAdDeliveryStatus(status: string | null | undefined): string {
+  const raw = String(status ?? "").trim();
+  if (!raw) return "—";
+  const words = raw.replace(/_/g, " ").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** True when the first-occurrence ad's category is winner-class. */
+function isWinnerCategory(category: string | null | undefined): boolean {
+  return category === "Winner" || category === "Incremental Winner";
+}
+
+/**
+ * Clickable-row props — whole list row opens the Ad Overview modal (founder
+ * ask: rows must be an Overview affordance, not just the button). Inner
+ * links/buttons stopPropagation so they keep their own behavior.
+ *
+ * Deliberately NO role="button"/tabIndex on the <tr>: rows contain links,
+ * buttons and an editable field, and role=button makes those children
+ * presentational to assistive tech (axe nested-interactive). The row click is
+ * a mouse convenience; the inner controls remain the accessible path.
+ */
+function rowClickProps(open: () => void, label: string) {
+  return {
+    title: label,
+    onClick: open,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -300,6 +346,7 @@ function LinkChips({ post, drive }: { post?: string; drive?: string }) {
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-[0.74rem] px-[10px] py-[3px] rounded-full bg-[rgba(225,48,108,0.1)] text-[#E1306C] font-semibold no-underline"
+          onClick={(e) => e.stopPropagation()}
         >
           <Instagram size={11} aria-hidden />
           Post
@@ -311,6 +358,7 @@ function LinkChips({ post, drive }: { post?: string; drive?: string }) {
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-[0.74rem] px-[10px] py-[3px] rounded-full bg-[rgba(79,124,77,0.1)] text-[var(--success-text)] font-semibold no-underline"
+          onClick={(e) => e.stopPropagation()}
         >
           <Download size={11} aria-hidden />
           Drive
@@ -630,6 +678,11 @@ function AdStatusOverviewModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
+  // Warehouse-matched → live first-occurrence ad drives status/classification;
+  // posts.ads_status / ads_results are legacy fields, stale for matched rows.
+  const matched = row.ads.length > 0;
+  const firstAd = row.primaryAd;
+
   if (!mounted || typeof document === "undefined") return null;
 
   return createPortal(
@@ -682,18 +735,32 @@ function AdStatusOverviewModal({
               </div>
               {row.warehouseCategory ? (
                 <WhCategoryBadge category={row.warehouseCategory} />
-              ) : (
+              ) : row.ads.length ? null : (
+                // Legacy badge only for rows the warehouse doesn't know —
+                // a matched-but-uncategorized ad must not show a stale
+                // legacy "Winner" beside a "—" classification field.
                 <AsClassBadge value={row.adsResults} />
               )}
             </div>
             <div className="ob-overview-pills">
               {row.source === "historic" && <HistoricChip />}
+              {row.retiredId && <RetiredIdChip />}
               {row.campaign && (
                 <span className="campaign-chip">{row.campaign}</span>
               )}
-              <span className="pill pill--muted capitalize">
-                {row.adsStatus || "Pending"}
-              </span>
+              {/* Matched rows: legacy "Pending" chip contradicts the warehouse
+                  badge — show the first ad's Meta delivery status instead. */}
+              {matched ? (
+                firstAd?.adStatus ? (
+                  <span className="pill pill--muted">
+                    {prettyAdDeliveryStatus(firstAd.adStatus)}
+                  </span>
+                ) : null
+              ) : (
+                <span className="pill pill--muted capitalize">
+                  {row.adsStatus || "Pending"}
+                </span>
+              )}
               {row.adsUsageRights && (
                 <span className="pill pill--info">
                   <ShieldCheck size={10} aria-hidden />
@@ -754,11 +821,19 @@ function AdStatusOverviewModal({
             />
             <OverviewItem
               label="Ads Status"
-              value={row.adsStatus || "Pending"}
+              value={
+                matched
+                  ? prettyAdDeliveryStatus(firstAd?.adStatus)
+                  : row.adsStatus || "Pending"
+              }
             />
             <OverviewItem
               label="Classification"
-              value={row.adsResults || "Untested"}
+              value={
+                matched
+                  ? row.warehouseCategory || "—"
+                  : row.adsResults || "Untested"
+              }
             />
           </section>
 
@@ -791,7 +866,9 @@ function AdStatusOverviewModal({
                 </strong>
               </div>
               <ul className="ad-overview-ad-list">
-                {row.ads.map((ad) => (
+                {/* `ads` is first-occurrence order (earliest created first) —
+                    entry 0 IS the first-occurrence ad. */}
+                {row.ads.map((ad, i) => (
                   <li key={ad.adId}>
                     <AdImg
                       ad={ad}
@@ -813,6 +890,21 @@ function AdStatusOverviewModal({
                         {formatNumber(ad.shopifyOrders)} orders
                       </span>
                     </div>
+                    {i === 0 && (
+                      <span
+                        className={cn(
+                          "pill text-[0.62rem] font-bold uppercase tracking-[0.05em] shrink-0 whitespace-nowrap",
+                          isWinnerCategory(ad.category)
+                            ? "bg-[#ECF1E9] text-[#4F7C4D]"
+                            : "pill--muted",
+                        )}
+                        title="Earliest ad created from this post — drives the row's status"
+                      >
+                        {isWinnerCategory(ad.category)
+                          ? "First Occurrence Winner Ad"
+                          : "First occurrence"}
+                      </span>
+                    )}
                     <WhCategoryBadge category={ad.category || "—"} />
                     <AdLinkChips ad={ad} />
                   </li>
@@ -864,6 +956,55 @@ function AdStatusOverviewModal({
       </div>
     </div>,
     document.body,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Render pagination — 60 rows/page per section (Untested + Ad Run, list AND
+// cards). Mounting all ~670 Ad Run row groups (thumbnails + expanders) froze
+// the main thread; only the DOM is windowed — search/filters/KPIs/donut keep
+// operating on the FULL set. Pager strip mirrors the sheets grid pager.
+// ---------------------------------------------------------------------------
+
+const RENDER_PAGE_SIZE = 60;
+
+function SectionPager({
+  page,
+  total,
+  onPage,
+}: {
+  page: number;
+  total: number;
+  onPage: (page: number) => void;
+}) {
+  if (total <= RENDER_PAGE_SIZE) return null;
+  const pageCount = Math.max(1, Math.ceil(total / RENDER_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const first = safePage * RENDER_PAGE_SIZE + 1;
+  const last = Math.min((safePage + 1) * RENDER_PAGE_SIZE, total);
+  return (
+    <div className="flex items-center justify-between gap-2 mt-2 rounded-xl border border-border bg-bg-surface/50 px-3 py-2 sm:px-4">
+      <button
+        type="button"
+        onClick={() => onPage(Math.max(0, safePage - 1))}
+        disabled={safePage === 0}
+        className="inline-flex min-h-[2.2rem] items-center gap-1 rounded-[9px] border border-border bg-bg-white px-3 text-[0.72rem] font-bold text-text-secondary transition-colors hover:bg-bg-alt disabled:opacity-40"
+      >
+        ← Prev
+      </button>
+      <span className="text-[0.68rem] tabular text-text-secondary">
+        Rows {first.toLocaleString("en-IN")}–{last.toLocaleString("en-IN")} of{" "}
+        {total.toLocaleString("en-IN")} · page {safePage + 1}/{pageCount}
+      </span>
+      <button
+        type="button"
+        onClick={() => onPage(Math.min(pageCount - 1, safePage + 1))}
+        disabled={safePage >= pageCount - 1}
+        className="inline-flex min-h-[2.2rem] items-center gap-1 rounded-[9px] border border-border bg-bg-white px-3 text-[0.72rem] font-bold text-text-secondary transition-colors hover:bg-bg-alt disabled:opacity-40"
+      >
+        Next →
+      </button>
+    </div>
   );
 }
 
@@ -928,7 +1069,14 @@ function UntestedListTable({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.postId}>
+              <tr
+                key={r.postId}
+                className="cursor-pointer"
+                {...rowClickProps(
+                  () => onOverview(r),
+                  `Open ad overview — ${r.name || r.username || r.postIdShort || r.postId}`,
+                )}
+              >
                 {hasThumbs && (
                   <td data-column-id="ad_thumb">
                     <RowThumb row={r} />
@@ -962,6 +1110,7 @@ function UntestedListTable({
                     postId={r.postId}
                     value={r.partnershipId}
                     compact
+                    stopPropagation
                   />
                 </td>
                 <td data-column-id="actions">
@@ -969,7 +1118,10 @@ function UntestedListTable({
                     <button
                       type="button"
                       className="action-btn action-btn--view"
-                      onClick={() => onOverview(r)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOverview(r);
+                      }}
                     >
                       <Eye size={11} aria-hidden />
                       Overview
@@ -1118,8 +1270,9 @@ function AdMetricCells({ ad }: { ad: WarehouseAd | null }) {
 }
 
 /**
- * One Ad Run row group — primary ad inline; "+N more ads" expands the
- * remaining warehouse ads as sibling rows with the same columns.
+ * One Ad Run row group — FIRST-occurrence ad inline; "+N more ads" expands
+ * the remaining warehouse ads (occurrence order) as sibling rows with the
+ * same columns. The whole row opens the Ad Overview modal.
  */
 function AdRunRowGroup({
   row,
@@ -1131,10 +1284,14 @@ function AdRunRowGroup({
   const [open, setOpen] = useState(false);
   const primary = row.primaryAd;
   const extras = row.ads.filter((ad) => ad !== primary);
+  const clickProps = rowClickProps(
+    () => onOverview(row),
+    `Open ad overview — ${row.name || row.username || row.postIdShort || row.postId}`,
+  );
 
   return (
     <>
-      <tr>
+      <tr className="cursor-pointer" {...clickProps}>
         <td data-column-id="ad_thumb">
           <RowThumb row={row} />
         </td>
@@ -1148,6 +1305,7 @@ function AdRunRowGroup({
                 {primary?.adName || row.name || row.postIdShort || "—"}
               </span>
               {row.source === "historic" && <HistoricChip />}
+              {row.retiredId && <RetiredIdChip />}
             </div>
             <div className="flex items-center gap-2 text-[0.72rem] text-text-tertiary min-w-0">
               <span className="truncate">
@@ -1158,7 +1316,10 @@ function AdRunRowGroup({
                   type="button"
                   className="ad-more-toggle"
                   aria-expanded={open}
-                  onClick={() => setOpen((v) => !v)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen((v) => !v);
+                  }}
                 >
                   {open ? "Hide ads" : `+${extras.length} more ad${extras.length > 1 ? "s" : ""}`}
                 </button>
@@ -1182,7 +1343,10 @@ function AdRunRowGroup({
             <button
               type="button"
               className="action-btn action-btn--view"
-              onClick={() => onOverview(row)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOverview(row);
+              }}
             >
               <Eye size={11} aria-hidden />
               Overview
@@ -1192,7 +1356,7 @@ function AdRunRowGroup({
       </tr>
       {open &&
         extras.map((ad) => (
-          <tr key={ad.adId} className="ad-extra-row">
+          <tr key={ad.adId} className="ad-extra-row cursor-pointer" {...clickProps}>
             <td data-column-id="ad_thumb">
               <AdImg ad={ad} alt={`Ad creative — ${ad.adName}`} size={36} />
             </td>
@@ -1356,6 +1520,7 @@ function AdRunCardsGrid({
             <div className="ob-card-pills">
               <RowStatusBadge row={r} />
               {r.source === "historic" && <HistoricChip />}
+              {r.retiredId && <RetiredIdChip />}
               <span className="post-id tabular">
                 {r.postIdShort || r.postId}
               </span>
@@ -1367,7 +1532,12 @@ function AdRunCardsGrid({
               {r.campaign && (
                 <span className="campaign-chip">{r.campaign}</span>
               )}
-              {r.adsStatus && <AdRunStatusPill value={r.adsStatus} />}
+              {/* Legacy ads_status pill only when the warehouse doesn't know
+                  the post — a matched card already shows the live delivery
+                  status; the stale local value would contradict it. */}
+              {r.adsStatus && !r.ads.length && (
+                <AdRunStatusPill value={r.adsStatus} />
+              )}
               {r.adsUsageRights && (
                 <span className="pill pill--info">
                   <ShieldCheck size={10} aria-hidden />
@@ -1585,7 +1755,43 @@ export function AdStatusBoard({
 
   const total = filteredUntested.length + filteredAdRun.length;
 
-  // Analytics bento — warehouse category breakdown (best category per post)
+  // ── Render pagination — one page state per section, shared by the mobile
+  // and desktop wrappers (only one is visible at a time). Filters/search/
+  // view changes land back on page 1; safe-clamping covers shrinking sets.
+  const [untestedPage, setUntestedPage] = useState(0);
+  const [adRunPage, setAdRunPage] = useState(0);
+  useEffect(() => {
+    setUntestedPage(0);
+    setAdRunPage(0);
+  }, [q, classification, adStatus, filters.campaign, view]);
+
+  const safeUntestedPage = Math.min(
+    untestedPage,
+    Math.max(0, Math.ceil(filteredUntested.length / RENDER_PAGE_SIZE) - 1),
+  );
+  const safeAdRunPage = Math.min(
+    adRunPage,
+    Math.max(0, Math.ceil(filteredAdRun.length / RENDER_PAGE_SIZE) - 1),
+  );
+  const pagedUntested = useMemo(
+    () =>
+      filteredUntested.slice(
+        safeUntestedPage * RENDER_PAGE_SIZE,
+        (safeUntestedPage + 1) * RENDER_PAGE_SIZE,
+      ),
+    [filteredUntested, safeUntestedPage],
+  );
+  const pagedAdRun = useMemo(
+    () =>
+      filteredAdRun.slice(
+        safeAdRunPage * RENDER_PAGE_SIZE,
+        (safeAdRunPage + 1) * RENDER_PAGE_SIZE,
+      ),
+    [filteredAdRun, safeAdRunPage],
+  );
+
+  // Analytics bento — warehouse category breakdown (first-occurrence ad's
+  // category per post)
   const catCount = (c: string) =>
     adRun.filter((r) => r.warehouseCategory === c).length;
   const classSlices: DonutSeg[] = [
@@ -1664,25 +1870,27 @@ export function AdStatusBoard({
         />
         {/* Mobile: always cards */}
         <div className="md:hidden">
-          <UntestedCardsGrid
-            rows={filteredUntested}
-            onOverview={setOverviewRow}
-          />
+          <UntestedCardsGrid rows={pagedUntested} onOverview={setOverviewRow} />
         </div>
         {/* Desktop: respect toggle */}
         <div className="hidden md:block">
           {view === "list" ? (
             <UntestedListTable
-              rows={filteredUntested}
+              rows={pagedUntested}
               onOverview={setOverviewRow}
             />
           ) : (
             <UntestedCardsGrid
-              rows={filteredUntested}
+              rows={pagedUntested}
               onOverview={setOverviewRow}
             />
           )}
         </div>
+        <SectionPager
+          page={safeUntestedPage}
+          total={filteredUntested.length}
+          onPage={setUntestedPage}
+        />
 
         {/* Section 2 — Ad Run Status */}
         <SectionHead
@@ -1692,16 +1900,21 @@ export function AdStatusBoard({
         />
         {/* Mobile: always cards */}
         <div className="md:hidden">
-          <AdRunCardsGrid rows={filteredAdRun} onOverview={setOverviewRow} />
+          <AdRunCardsGrid rows={pagedAdRun} onOverview={setOverviewRow} />
         </div>
         {/* Desktop: respect toggle */}
         <div className="hidden md:block">
           {view === "list" ? (
-            <AdRunListTable rows={filteredAdRun} onOverview={setOverviewRow} />
+            <AdRunListTable rows={pagedAdRun} onOverview={setOverviewRow} />
           ) : (
-            <AdRunCardsGrid rows={filteredAdRun} onOverview={setOverviewRow} />
+            <AdRunCardsGrid rows={pagedAdRun} onOverview={setOverviewRow} />
           )}
         </div>
+        <SectionPager
+          page={safeAdRunPage}
+          total={filteredAdRun.length}
+          onPage={setAdRunPage}
+        />
 
         {overviewRow && (
           <AdStatusOverviewModal

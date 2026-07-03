@@ -1,11 +1,12 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
-  bestCategory,
+  compareAdOccurrence,
   fetchAdThumbnailsFor,
   fetchMetaAdsCoveredPostIds,
   fetchWarehouseAdRows,
   isMetaAdsWarehouseConfigured,
+  pickFirstAd,
   pickPrimaryAd,
   type WarehouseAd,
 } from "@/lib/supabase/meta-ads";
@@ -140,6 +141,47 @@ async function fetchHistoricWarehouseMatches(
   }
 }
 
+/**
+ * Old-SIF alias resolution for warehouse tokens that match NO post anywhere.
+ * The token's SIF prefix is looked up in the RAW legacy archive
+ * (historic_creator_data), whose sif_id column keeps the pre-dedup numbering;
+ * the username found there identifies the creator the ad belongs to today.
+ * Returns Map<token, archiveUsername>. Fails soft to an empty Map.
+ */
+async function resolveRetiredAliases(
+  supabase: ReturnType<typeof createServiceClient>,
+  tokens: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!tokens.length) return out;
+  try {
+    const prefixOf = (t: string) => t.match(/^([A-Z]+-\d+)/)?.[1] ?? "";
+    const prefixes = [...new Set(tokens.map(prefixOf).filter(Boolean))];
+    const CHUNK = 200;
+    const byPrefix = new Map<string, string>();
+    for (let i = 0; i < prefixes.length; i += CHUNK) {
+      const { data, error } = await (supabase as any)
+        .from("historic_creator_data")
+        .select("sif_id, username")
+        .in("sif_id", prefixes.slice(i, i + CHUNK));
+      if (error || !data) continue;
+      for (const r of data as Array<{ sif_id: string; username: string | null }>) {
+        const sif = String(r.sif_id ?? "").toUpperCase();
+        const u = String(r.username ?? "").trim();
+        if (sif && u && !byPrefix.has(sif)) byPrefix.set(sif, u);
+      }
+    }
+    for (const t of tokens) {
+      const u = byPrefix.get(prefixOf(t));
+      if (u) out.set(t, u);
+    }
+    return out;
+  } catch (err) {
+    console.warn("[ad-status] retired-alias resolution failed:", err);
+    return out;
+  }
+}
+
 export async function fetchAdStatusData(
   filters: AdStatusFilters,
 ): Promise<{
@@ -260,7 +302,7 @@ export async function fetchAdStatusData(
     },
   };
 
-  // One matched row = one tick in its best category's bucket.
+  // One matched row = one tick in its FIRST-occurrence ad's category bucket.
   const countCategory = (category: string | null) => {
     if (category === "Incremental Winner") kpi.categories.incrementalWinners++;
     else if (category === "Winner") kpi.categories.winners++;
@@ -307,8 +349,13 @@ export async function fetchAdStatusData(
       (p.collab_id as string | null) ||
       (infId ? `${infId}-C${Number(p.collab_number ?? 1)}` : null);
 
-    const ads = warehouseAds.get(postIdShort.toUpperCase()) ?? [];
-    const warehouseCategory = bestCategory(ads);
+    // First-occurrence order — earliest ad first (modal + expander order);
+    // the FIRST ad is the inline creative and drives the row's status chip.
+    const ads = [...(warehouseAds.get(postIdShort.toUpperCase()) ?? [])].sort(
+      compareAdOccurrence,
+    );
+    const firstAd = pickFirstAd(ads);
+    const warehouseCategory = (firstAd?.category ?? "").trim() || null;
     countCategory(warehouseCategory);
 
     const row: AdStatusRow = {
@@ -339,7 +386,7 @@ export async function fetchAdStatusData(
       collabType: String(p.collab_type ?? "").trim(),
       source: "live",
       ads,
-      primaryAd: pickPrimaryAd(ads),
+      primaryAd: firstAd,
       warehouseCategory,
     };
 
@@ -376,7 +423,7 @@ export async function fetchAdStatusData(
       .trim()
       .toUpperCase();
     if (!token || seenHistoric.has(token)) continue;
-    const ads = warehouseAds.get(token) ?? [];
+    const ads = [...(warehouseAds.get(token) ?? [])].sort(compareAdOccurrence);
     if (!ads.length) continue;
     seenHistoric.add(token);
 
@@ -394,7 +441,8 @@ export async function fetchAdStatusData(
         )
       : null;
 
-    const warehouseCategory = bestCategory(ads);
+    const firstAd = pickFirstAd(ads);
+    const warehouseCategory = (firstAd?.category ?? "").trim() || null;
     countCategory(warehouseCategory);
 
     adRun.push({
@@ -430,14 +478,69 @@ export async function fetchAdStatusData(
       collabType: String(h.collab_type ?? "").trim(),
       source: "historic",
       ads,
-      primaryAd: pickPrimaryAd(ads),
+      primaryAd: firstAd,
       warehouseCategory,
     });
   }
 
-  // Ad Run mirrors the Creative Testing Dashboard: spend desc, warehouse
-  // matches first; unmatched (covered/classified-only) rows fall back to
-  // post_date desc at the tail.
+  // ── Retired-ID alias matches ──────────────────────────────────────────────
+  // Tokens STILL unmatched mostly reference pre-dedup SIFs: the creator was
+  // renumbered during the archive cleanup, so the ad name carries a retired
+  // ID. The raw archive (historic_creator_data) maps old SIF → username →
+  // today's canonical creator. These attach at CREATOR level (founder call —
+  // the old P-numbers don't survive renumbering) and land in Ad Run with a
+  // "Retired ID" marker. Campaign filter hides them (they carry no campaign).
+  if (!filters.campaign) {
+    const aliasTokens = historicTokens.filter((t) => !seenHistoric.has(t));
+    const aliasMap = await resolveRetiredAliases(supabase, aliasTokens);
+    for (const [token, archiveUsername] of aliasMap) {
+      const ads = [...(warehouseAds.get(token) ?? [])].sort(compareAdOccurrence);
+      if (!ads.length) continue;
+      const uname = archiveUsername.replace(/^@/, "").trim();
+      const cRow =
+        creatorMap.get(uname.toLowerCase()) ?? ({} as Record<string, unknown>);
+      const firstAd = pickFirstAd(ads);
+      const warehouseCategory = (firstAd?.category ?? "").trim() || null;
+      countCategory(warehouseCategory);
+
+      adRun.push({
+        postId: token,
+        postIdShort: token,
+        infId: (cRow.inf_id as string | null) ?? null,
+        collabId: null,
+        name: String(cRow.inf_name ?? uname),
+        username: String(cRow.username ?? uname),
+        profilePicUrl:
+          String(cRow.profile_pic ?? "") ||
+          igCacheMap.get(uname.toLowerCase()) ||
+          null,
+        campaign: "",
+        category: (cRow.category as string | null) ?? null,
+        followers: Number(cRow.followers ?? 0) || null,
+        workflowStatus: "",
+        postDate: null,
+        daysSince: null,
+        linkToPost: "",
+        downloadLink: "",
+        adsUsageRights: "",
+        adsResults: "",
+        adsStatus: "",
+        isClassified: false,
+        isInMetaAds: true,
+        partnershipId: "",
+        collabType: "",
+        source: "historic",
+        retiredId: true,
+        ads,
+        primaryAd: firstAd,
+        warehouseCategory,
+      });
+    }
+  }
+
+  // Ad Run: spend desc over the spend that's actually DISPLAYED — the
+  // first-occurrence ad's (sorting by the hidden top spender made the Spend
+  // column look unsorted). Unmatched rows fall back to post_date desc.
   adRun.sort((a, b) => {
     const sa = a.primaryAd?.amountSpent ?? -1;
     const sb = b.primaryAd?.amountSpent ?? -1;
@@ -462,11 +565,12 @@ export async function fetchAdStatusData(
 
   const enrichRow = (row: AdStatusRow): AdStatusRow => {
     if (!row.ads.length) return row;
+    // .map preserves the first-occurrence order established above.
     const ads = row.ads.map((ad) => {
       const t = thumbs.get(ad.adId);
       return t ? { ...ad, thumbnailUrl: t.thumb, imageUrl: t.image } : ad;
     });
-    return { ...row, ads, primaryAd: pickPrimaryAd(ads) };
+    return { ...row, ads, primaryAd: pickFirstAd(ads) };
   };
 
   const warehouseConnected = isMetaAdsWarehouseConfigured();

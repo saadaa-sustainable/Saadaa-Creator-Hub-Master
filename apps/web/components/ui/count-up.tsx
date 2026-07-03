@@ -58,7 +58,10 @@ export function CountUp({
         };
         raf = requestAnimationFrame(tick);
       },
-      { threshold: 0.4 },
+      // Generous rootMargin: tiles start counting ~600px BEFORE they enter the
+      // viewport, so scrolling never catches numbers mid-spin — that read as
+      // "the page keeps reloading" on long dashboards.
+      { threshold: 0.01, rootMargin: "600px 0px" },
     );
     io.observe(el);
     return () => {

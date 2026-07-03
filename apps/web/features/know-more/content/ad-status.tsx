@@ -34,8 +34,10 @@ export default function AdStatusKM() {
             <strong>6. Ad Run Status</strong> — one row per post that ran as an
             ad: creative thumbnail, ad name, created date, Spend, ROAS, FTEWV,
             NCP, Shopify orders, category chip, Landing + Preview links. Posts
-            with several ads show the top spender inline plus a
-            &quot;+N more ads&quot; expander.
+            with several ads show the <strong>first-occurrence</strong> ad
+            (earliest created) inline plus a &quot;+N more ads&quot; expander.
+            Clicking anywhere on a row opens its full overview popup; both
+            sections paginate at 60 rows per page.
           </li>
         </KMList>
       </KMSection>
@@ -54,6 +56,14 @@ export default function AdStatusKM() {
             <strong>Historic</strong> chip and always sit in Ad Run — by
             definition they ran as ads. Partnership editing is disabled on
             them.
+          </li>
+          <li>
+            <strong>Retired IDs</strong> · some older ad names carry a post ID
+            that was retired during the creator-data cleanup (the creator was
+            renumbered). These ads are resolved through the legacy archive to
+            the creator&apos;s current profile and shown with a{" "}
+            <strong>Retired ID</strong> chip — the spend and category are real,
+            but no specific post exists behind the row.
           </li>
           <li>
             <strong>Eligibility</strong> · a post is tracked here when its ads
@@ -121,9 +131,11 @@ export default function AdStatusKM() {
           </li>
         </KMList>
         <p>
-          A post with several ads wears its <strong>best</strong> category, and
-          the same rule feeds the KPI tiles and the donut. Each ad in the
-          expander keeps its own chip.
+          A post with several ads wears its <strong>first-occurrence</strong>{" "}
+          ad&apos;s category — the earliest-created ad is the one we judge the
+          creative by — and the same rule feeds the KPI tiles and the donut.
+          The overview popup labels that ad (e.g. &quot;First Occurrence Winner
+          Ad&quot;), and each ad in the expander keeps its own chip.
         </p>
       </KMSection>
 
@@ -184,7 +196,7 @@ export default function AdStatusKM() {
           </li>
           <li>
             <strong>Category tiles</strong> · matched posts (live + historic)
-            counted once each under their best category.
+            counted once each under their first-occurrence ad&apos;s category.
           </li>
           <li>
             <strong>Win Rate</strong> · Incremental Winners + Winners ÷ all

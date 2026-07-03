@@ -165,13 +165,40 @@ export function rankCategory(category: string | null | undefined): number {
   return CATEGORY_RANK[String(category ?? "").trim()] ?? 6;
 }
 
-/** The ad with the highest spend — the "primary" creative shown inline. */
+/** The ad with the highest spend — used for spend-desc board ordering. */
 export function pickPrimaryAd(ads: WarehouseAd[]): WarehouseAd | null {
   let best: WarehouseAd | null = null;
   for (const ad of ads) {
     if (!best || ad.amountSpent > best.amountSpent) best = ad;
   }
   return best;
+}
+
+/**
+ * Occurrence order — earliest `adCreated` first; ads with no created date
+ * sort last; `adId` asc tiebreak so the order is deterministic.
+ */
+export function compareAdOccurrence(a: WarehouseAd, b: WarehouseAd): number {
+  const ta = a.adCreated ? Date.parse(a.adCreated) : NaN;
+  const tb = b.adCreated ? Date.parse(b.adCreated) : NaN;
+  const aOk = Number.isFinite(ta);
+  const bOk = Number.isFinite(tb);
+  if (aOk && bOk && ta !== tb) return ta - tb;
+  if (aOk !== bOk) return aOk ? -1 : 1;
+  return a.adId.localeCompare(b.adId);
+}
+
+/**
+ * The FIRST-OCCURRENCE ad — earliest `adCreated` (null last, adId asc
+ * tiebreak). Business rule (2026-07): the first ad run on a post is the
+ * creative shown inline AND the ad whose category drives the row's status.
+ */
+export function pickFirstAd(ads: WarehouseAd[]): WarehouseAd | null {
+  let first: WarehouseAd | null = null;
+  for (const ad of ads) {
+    if (!first || compareAdOccurrence(ad, first) < 0) first = ad;
+  }
+  return first;
 }
 
 /** Best (lowest-rank) category across a post's ads, or null when unknown. */

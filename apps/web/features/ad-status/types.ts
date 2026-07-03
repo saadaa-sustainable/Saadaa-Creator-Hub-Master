@@ -31,15 +31,20 @@ export interface AdStatusRow {
   collabType: string;
   /** live = posts table; historic = historic_posts archive (always Ad Run). */
   source: "live" | "historic";
-  /** Warehouse ads whose ad_name carries this post's SIF token, spend desc. */
+  /** True when the ad name carries a PRE-DEDUP (renumbered-away) SIF — the
+   *  row is attached at CREATOR level via the raw-archive alias; there is no
+   *  specific post behind it. */
+  retiredId?: boolean;
+  /** Warehouse ads whose ad_name carries this post's SIF token, in
+   *  first-occurrence order (earliest ad_created first, null last). */
   ads: WarehouseAd[];
-  /** Highest-spend ad — the creative shown inline. */
+  /** FIRST-occurrence ad (earliest ad_created) — the creative shown inline. */
   primaryAd: WarehouseAd | null;
-  /** Best-rank warehouse category across `ads` (Incremental Winner > … > Discarded). */
+  /** The first-occurrence ad's warehouse category — drives the row status chip. */
   warehouseCategory: string | null;
 }
 
-/** Per-warehouse-category row counts (best category per matched post). */
+/** Per-warehouse-category row counts (first-occurrence ad's category per matched post). */
 export interface AdStatusCategoryCounts {
   incrementalWinners: number;
   winners: number;
