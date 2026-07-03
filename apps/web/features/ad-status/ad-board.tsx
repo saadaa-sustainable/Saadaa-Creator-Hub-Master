@@ -17,6 +17,7 @@ import {
   ShoppingBag,
   Trophy,
   TrendingUp,
+  UserRound,
   X,
   XCircle,
 } from "lucide-react";
@@ -849,7 +850,7 @@ function LinkRow({
   label: string;
   url?: string | null;
 }) {
-  const hasUrl = !!url && /^https?:\/\//i.test(url);
+  const hasUrl = isHttpUrl(url);
   return (
     <div className="pt-overview-link-row ad-detail-link-row">
       <div className="pt-overview-link-label">
@@ -878,6 +879,10 @@ function LinkRow({
       )}
     </div>
   );
+}
+
+function isHttpUrl(url?: string | null) {
+  return !!url && /^https?:\/\//i.test(url);
 }
 
 function AdDetailMetric({
@@ -928,6 +933,27 @@ function AdStatusOverviewModal({
   const adSpend = row.ads.reduce((sum, ad) => sum + ad.amountSpent, 0);
   const adOrders = row.ads.reduce((sum, ad) => sum + ad.shopifyOrders, 0);
   const adImpressions = row.ads.reduce((sum, ad) => sum + ad.impressions, 0);
+  const profileSlug = row.username?.replace(/^@+/, "").trim();
+  const profileUrl = profileSlug
+    ? `https://www.instagram.com/${profileSlug}/`
+    : null;
+  const detailLinks = [
+    {
+      icon: <Download size={12} aria-hidden />,
+      label: "Drive Download Link",
+      url: row.downloadLink,
+    },
+    {
+      icon: <ExternalLink size={12} aria-hidden />,
+      label: "Ad Landing Page",
+      url: row.primaryAd?.adLink,
+    },
+    {
+      icon: <Eye size={12} aria-hidden />,
+      label: "Meta Ad Preview",
+      url: row.primaryAd?.previewLink,
+    },
+  ].filter((link) => isHttpUrl(link.url));
 
   if (!mounted || typeof document === "undefined") return null;
 
@@ -966,6 +992,17 @@ function AdStatusOverviewModal({
             </p>
           </div>
           <div className="modal-head__actions">
+            {profileUrl && (
+              <a
+                href={profileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-ghost campaign-detail-edit-btn"
+              >
+                <UserRound size={14} aria-hidden />
+                Profile
+              </a>
+            )}
             {row.linkToPost && (
               <a
                 href={row.linkToPost}
@@ -1172,34 +1209,26 @@ function AdStatusOverviewModal({
             </section>
           )}
 
-          <section className="campaign-detail-section ad-detail-links">
-            <div className="campaign-detail-section-head">
-              <div>
-                <h3>Links</h3>
-                <p>Open the live post, creative assets, or warehouse preview.</p>
+          {detailLinks.length > 0 && (
+            <section className="campaign-detail-section ad-detail-links">
+              <div className="campaign-detail-section-head">
+                <div>
+                  <h3>Links</h3>
+                  <p>
+                    Open creative assets, landing pages, or warehouse previews.
+                  </p>
+                </div>
               </div>
-            </div>
-            <LinkRow
-              icon={<Instagram size={12} aria-hidden />}
-              label="Live Post URL"
-              url={row.linkToPost}
-            />
-            <LinkRow
-              icon={<Download size={12} aria-hidden />}
-              label="Drive Download Link"
-              url={row.downloadLink}
-            />
-            <LinkRow
-              icon={<ExternalLink size={12} aria-hidden />}
-              label="Ad Landing Page"
-              url={row.primaryAd?.adLink}
-            />
-            <LinkRow
-              icon={<Eye size={12} aria-hidden />}
-              label="Meta Ad Preview"
-              url={row.primaryAd?.previewLink}
-            />
-          </section>
+              {detailLinks.map((link) => (
+                <LinkRow
+                  key={link.label}
+                  icon={link.icon}
+                  label={link.label}
+                  url={link.url}
+                />
+              ))}
+            </section>
+          )}
         </div>
 
         <footer className="modal-foot ob-overview-footer">

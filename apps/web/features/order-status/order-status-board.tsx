@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   CalendarDays,
-  ExternalLink,
   Eye,
   Grid3X3,
   IndianRupee,
@@ -154,104 +159,130 @@ function OrderListTable({
   onOverview: (row: OrderStatusRow) => void;
 }) {
   return (
-    <div className="ob-list-wrap">
-      <table className="ob-list-table">
-        <thead>
-          <tr>
-            <th>Creator</th>
-            <th>Post ID</th>
-            <th>Collab ID</th>
-            <th>INF ID</th>
-            <th>Campaign</th>
-            <th>Order ID</th>
-            <th>Status</th>
-            <th>Tracking</th>
-            <th>Est Delivery</th>
-            <th className="text-right">Total</th>
-            <th>Placed</th>
-            <th>Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.postId}>
-              <td>
-                <div className="flex items-center gap-2 min-w-0">
-                  <Avatar
-                    src={r.profilePicUrl}
-                    username={r.username}
-                    name={r.name}
-                    size={32}
-                  />
-                  <div className="flex flex-col min-w-0">
-                    <strong className="truncate text-[0.84rem] text-text-primary">
-                      {r.name || r.username || "—"}
-                    </strong>
-                    {r.username && (
-                      <span className="truncate text-[0.7rem] text-text-tertiary">
-                        @{r.username}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </td>
-              <td className="tabular whitespace-nowrap">
-                <span className="post-id tabular">{r.postId || "—"}</span>
-              </td>
-              <td className="tabular whitespace-nowrap">
-                {r.collabId ? (
-                  <span
-                    className="campaign-chip tabular"
-                    title="Groups all deliverables of this collaboration"
-                  >
-                    {r.collabId}
-                  </span>
-                ) : (
-                  <span className="text-text-tertiary">—</span>
-                )}
-              </td>
-              <td className="tabular whitespace-nowrap">{r.infId || "—"}</td>
-              <td>
-                <span className="campaign-chip">{r.campaign || "—"}</span>
-              </td>
-              <td className="tabular whitespace-nowrap">
-                <span>
-                  {r.orderId}
-                  {r.isOverdue && (
-                    <>
-                      {" "}
-                      <OverduePill />
-                    </>
-                  )}
-                </span>
-              </td>
-              <td>
-                <ShippingStatusPill
-                  shipping={r.shippingStatus}
-                  manual={r.orderStatus}
-                  bucket={r.bucket}
-                />
-              </td>
-              <td className="tabular">{r.trackingId || "—"}</td>
-              <td className="tabular">{formatDate(r.estDelivery)}</td>
-              <td className="text-right tabular">
-                {r.totalPrice > 0 ? formatRupees(r.totalPrice) : "—"}
-              </td>
-              <td className="tabular">{formatDate(r.orderPlaced)}</td>
-              <td>
-                <button
-                  type="button"
-                  className="order-status-pill-button"
-                  onClick={() => onOverview(r)}
-                >
-                  Overview <ExternalLink size={11} aria-hidden />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="campaign-list-view stage-campaign-list">
+      {rows.map((r, index) => (
+        <OrderStatusListRow
+          key={`${r.postId}-${r.orderId}`}
+          row={r}
+          index={index}
+          onOverview={onOverview}
+        />
+      ))}
     </div>
+  );
+}
+
+function orderStatusTone(r: OrderStatusRow) {
+  if (r.bucket === "delivered") return "var(--color-success-text)";
+  if (r.bucket === "rto" || r.isOverdue) return "var(--color-danger-text, #cf3f33)";
+  if (r.bucket === "transit") return "#3b6fd4";
+  return "var(--color-warning-text, #b57514)";
+}
+
+function orderStatusProgress(r: OrderStatusRow) {
+  if (r.bucket === "delivered") return 100;
+  if (r.bucket === "transit") return 64;
+  if (r.bucket === "rto") return 18;
+  if (r.trackingId) return 48;
+  return 24;
+}
+
+function orderStatusStyle(row: OrderStatusRow, index: number) {
+  return {
+    "--campaign-accent": orderStatusTone(row),
+    "--campaign-progress": `${orderStatusProgress(row)}%`,
+    "--campaign-card-index": index,
+  } as CSSProperties;
+}
+
+function OrderStatusListRow({
+  row,
+  index,
+  onOverview,
+}: {
+  row: OrderStatusRow;
+  index: number;
+  onOverview: (row: OrderStatusRow) => void;
+}) {
+  return (
+    <article
+      className="campaign-list-row stage-campaign-row"
+      style={orderStatusStyle(row, index)}
+    >
+      <div className="stage-campaign-identity">
+        <Avatar
+          src={row.profilePicUrl}
+          username={row.username}
+          name={row.name}
+          size={46}
+        />
+        <div className="campaign-list-row__main">
+          <div className="campaign-card__id-row">
+            <span className="campaign-card__id">
+              <strong>{row.postId || row.orderId}</strong>
+            </span>
+            <ShippingStatusPill
+              shipping={row.shippingStatus}
+              manual={row.orderStatus}
+              bucket={row.bucket}
+            />
+            {row.isOverdue && <OverduePill />}
+          </div>
+          <h3>{row.name || row.username || "—"}</h3>
+          <p>
+            @{row.username || "—"} · {row.campaign || "—"} ·{" "}
+            {row.collabId || row.infId || "—"}
+          </p>
+        </div>
+      </div>
+
+      <div className="campaign-list-row__allocation stage-campaign-signal">
+        <div>
+          <span>Fulfillment</span>
+          <strong>{orderStatusProgress(row)}%</strong>
+        </div>
+        <span className="campaign-card__progress-track" aria-hidden>
+          <span />
+        </span>
+        <div className="campaign-list-row__reachouts">
+          <span>
+            <Truck size={12} aria-hidden />
+            {row.trackingId || "No tracking"}
+          </span>
+          <strong>{row.customerOrderCount || 0}</strong>
+        </div>
+      </div>
+
+      <dl className="campaign-list-row__stats">
+        <div>
+          <dt>Order ID</dt>
+          <dd>{row.orderId || "—"}</dd>
+        </div>
+        <div>
+          <dt>Total</dt>
+          <dd>{row.totalPrice > 0 ? formatRupees(row.totalPrice) : "—"}</dd>
+        </div>
+        <div>
+          <dt>Delivery</dt>
+          <dd>{formatDate(row.estDelivery)}</dd>
+        </div>
+        <div>
+          <dt>Placed</dt>
+          <dd>{formatDate(row.orderPlaced)}</dd>
+        </div>
+      </dl>
+
+      <div className="campaign-list-row__actions">
+        <button
+          type="button"
+          className="campaign-list-action campaign-list-action--brief"
+          onClick={() => onOverview(row)}
+        >
+          <Eye size={13} aria-hidden />
+          Overview
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -263,44 +294,41 @@ function OrderCardsGrid({
   onOverview: (row: OrderStatusRow) => void;
 }) {
   return (
-    <div className="ob-card-grid">
-      {rows.map((r) => (
+    <div className="campaign-card-grid stage-campaign-card-grid">
+      {rows.map((r, index) => (
         <article
           key={r.postId}
-          className={cn(
-            "ob-card",
-            r.bucket === "delivered"
-              ? "ob-card-onboarded"
-              : r.bucket === "rto" || r.isOverdue
-                ? "ob-card-pending"
-                : "",
-          )}
+          className="campaign-card stage-campaign-card"
+          style={orderStatusStyle(r, index)}
         >
-          <div className="ob-card-head">
-            <Avatar
-              src={r.profilePicUrl}
-              username={r.username}
-              name={r.name}
-              size={44}
-              className="ob-card-avatar"
-            />
-            <div className="ob-card-id min-w-0">
-              <div className="ob-card-name">{r.name || r.username || "—"}</div>
-              {r.username && (
-                <div className="ob-card-handle">@{r.username}</div>
-              )}
+          <div className="campaign-card__head">
+            <div className="stage-campaign-card-head">
+              <Avatar
+                src={r.profilePicUrl}
+                username={r.username}
+                name={r.name}
+                size={46}
+              />
+              <div className="min-w-0">
+                <div className="campaign-card__id-row">
+                  <span className="campaign-card__id">
+                    <strong>{r.postId || r.orderId}</strong>
+                  </span>
+                  <ShippingStatusPill
+                    shipping={r.shippingStatus}
+                    manual={r.orderStatus}
+                    bucket={r.bucket}
+                  />
+                </div>
+                <h3>{r.name || r.username || "—"}</h3>
+                {r.username && (
+                  <p className="campaign-card__message">@{r.username}</p>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="ob-card-pills">
-            <ShippingStatusPill
-              shipping={r.shippingStatus}
-              manual={r.orderStatus}
-              bucket={r.bucket}
-            />
-            {r.postId && (
-              <span className="campaign-chip tabular">{r.postId}</span>
-            )}
+          <div className="campaign-card__meta-row">
             {r.collabId && (
               <span className="campaign-chip tabular">{r.collabId}</span>
             )}
@@ -314,45 +342,42 @@ function OrderCardsGrid({
             {r.isOverdue && <OverduePill />}
           </div>
 
-          <dl className="ob-card-meta-grid order-status-card-meta">
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Order ID</span>
-              <span className="ob-card-meta-val tabular">{r.orderId}</span>
+          <div className="campaign-card__progress">
+            <div>
+              <span>Fulfillment</span>
+              <strong>{orderStatusProgress(r)}% ready</strong>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Tracking</span>
-              <span className="ob-card-meta-val tabular">
-                {r.trackingId || "—"}
-              </span>
+            <span className="campaign-card__progress-track" aria-hidden>
+              <span />
+            </span>
+          </div>
+
+          <dl className="campaign-card__facts">
+            <div>
+              <dt>Order ID</dt>
+              <dd>{r.orderId}</dd>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Est. Delivery</span>
-              <span className="ob-card-meta-val tabular">
-                {formatDate(r.estDelivery)}
-              </span>
+            <div>
+              <dt>Tracking</dt>
+              <dd>{r.trackingId || "—"}</dd>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Delivered</span>
-              <span className="ob-card-meta-val tabular">
-                {formatDate(r.deliveryDate)}
-              </span>
+            <div>
+              <dt>Est. Delivery</dt>
+              <dd>{formatDate(r.estDelivery)}</dd>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Total</span>
-              <span className="ob-card-meta-val tabular">
-                {r.totalPrice > 0 ? formatRupees(r.totalPrice) : "—"}
-              </span>
+            <div>
+              <dt>Delivered</dt>
+              <dd>{formatDate(r.deliveryDate)}</dd>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Refund</span>
-              <span
-                className={cn(
-                  "ob-card-meta-val tabular",
-                  r.refundAmount > 0 && "text-danger",
-                )}
-              >
+            <div>
+              <dt>Total</dt>
+              <dd>{r.totalPrice > 0 ? formatRupees(r.totalPrice) : "—"}</dd>
+            </div>
+            <div>
+              <dt>Refund</dt>
+              <dd className={cn(r.refundAmount > 0 && "text-danger")}>
                 {r.refundAmount > 0 ? formatRupees(r.refundAmount) : "—"}
-              </span>
+              </dd>
             </div>
           </dl>
 
@@ -371,10 +396,10 @@ function OrderCardsGrid({
             </div>
           </div>
 
-          <footer className="order-status-card-actions">
+          <footer className="campaign-card__actions">
             <button
               type="button"
-              className="action-btn action-btn--view order-status-card-action-btn"
+              className="campaign-list-action campaign-list-action--brief"
               onClick={() => onOverview(r)}
               aria-label="View order overview"
             >

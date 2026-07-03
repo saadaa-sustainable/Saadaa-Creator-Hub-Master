@@ -1,5 +1,10 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -138,9 +143,14 @@ export function CreatorAnalyticsView({
       ) : view === "list" ? (
         <CreatorListTable rows={rows} onOpen={setDetailRow} />
       ) : (
-        <div className="ob-card-grid">
-          {rows.map((r) => (
-            <CreatorCard key={r.inf_id} r={r} onOpen={() => setDetailRow(r)} />
+        <div className="campaign-card-grid stage-campaign-card-grid">
+          {rows.map((r, index) => (
+            <CreatorCard
+              key={r.inf_id}
+              r={r}
+              index={index}
+              onOpen={() => setDetailRow(r)}
+            />
           ))}
         </div>
       )}
@@ -159,111 +169,15 @@ function CreatorListTable({
   onOpen: (r: CreatorAnalyticsRow) => void;
 }) {
   return (
-    <div className="ob-list-wrap">
-      {/* Mobile: stacked cards (the table is too wide for phones). */}
-      <div className="grid gap-2 md:hidden">
-        {rows.map((r) => (
-          <CreatorCard key={r.inf_id} r={r} onOpen={() => onOpen(r)} />
-        ))}
-      </div>
-
-      {/* Desktop: dense roster table. */}
-      <div className="hidden md:block overflow-auto rounded-[var(--radius)] border border-border bg-bg-white shadow-sm">
-        <table className="w-full min-w-[820px] border-collapse text-[0.82rem]">
-          <thead className="sticky top-0 z-[1] bg-bg-ecru">
-            <tr>
-              {[
-                "Creator",
-                "INF ID",
-                "Type",
-                "Current Stage",
-                "Tier",
-                "Followers",
-                "Collabs",
-                "History",
-              ].map((h) => (
-                <th
-                  key={h}
-                  scope="col"
-                  className={cn(
-                    "border-b border-border px-2.5 py-2.5 text-left text-[0.7rem] font-bold uppercase tracking-[0.04em] text-text-secondary",
-                    // Freeze the History action column to the right edge so it
-                    // stays reachable while the wide roster scrolls sideways.
-                    h === "History" &&
-                      "sticky right-0 z-[2] bg-bg-ecru shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]",
-                  )}
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, idx) => (
-              <tr
-                key={r.inf_id}
-                className={cn(
-                  "border-b border-border-soft last:border-0",
-                  idx % 2 === 1 && "bg-bg-alt/50",
-                  "transition-colors hover:bg-bg-alt",
-                )}
-              >
-                <td className="px-2.5 py-1.5 align-middle">
-                  <CreatorCell r={r} />
-                </td>
-                <td className="px-2.5 py-1.5 align-middle">
-                  <span className="tabular text-[0.78rem]">{r.inf_id}</span>
-                </td>
-                <td className="px-2.5 py-1.5 align-middle">
-                  <CreatorTypeChip type={r.creator_type} />
-                </td>
-                <td className="px-2.5 py-1.5 align-middle">
-                  <div className="flex flex-wrap items-center gap-1">
-                    <StageCell stage={r.current_stage} />
-                    <PartnershipBadge status={r.partnership_status} compact />
-                  </div>
-                </td>
-                <td className="px-2.5 py-1.5 align-middle">
-                  {r.category ? (
-                    <span className="campaign-chip">{r.category}</span>
-                  ) : (
-                    <span className="text-text-tertiary">—</span>
-                  )}
-                </td>
-                <td className="px-2.5 py-1.5 align-middle">
-                  <span className="tabular">{formatFollowers(r.followers)}</span>
-                </td>
-                <td className="px-2.5 py-1.5 align-middle">
-                  <span className="tabular whitespace-nowrap text-[0.78rem]">
-                    {collabSummary(r)}
-                  </span>
-                </td>
-                <td
-                  className={cn(
-                    "px-2.5 py-1.5 align-middle sticky right-0 shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]",
-                    // Opaque bg so scrolled cells don't bleed under the frozen
-                    // column; matches the row's zebra stripe as closely as alpha
-                    // allows.
-                    idx % 2 === 1 ? "bg-bg-alt" : "bg-bg-white",
-                  )}
-                >
-                  <button
-                    type="button"
-                    className="action-btn action-btn--view"
-                    onClick={() => onOpen(r)}
-                    aria-label={`View collab history for ${
-                      r.inf_name ?? r.username
-                    }`}
-                  >
-                    <History size={11} aria-hidden />
-                    History
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="campaign-list-view stage-campaign-list">
+      {rows.map((r, index) => (
+        <CreatorListRow
+          key={r.inf_id}
+          r={r}
+          index={index}
+          onOpen={() => onOpen(r)}
+        />
+      ))}
     </div>
   );
 }
@@ -360,101 +274,202 @@ function CreatorPager({
   );
 }
 
-function CreatorCell({ r }: { r: CreatorAnalyticsRow }) {
+function creatorTone(r: CreatorAnalyticsRow) {
+  if (r.is_active === false) return "var(--color-danger-text, #cf3f33)";
+  if (r.creator_type === "new_creator") return "#3b6fd4";
+  return "var(--color-success-text)";
+}
+
+function creatorProgress(r: CreatorAnalyticsRow) {
+  if (r.total_collab_count <= 0) return 12;
+  return Math.min(100, Math.max(18, Math.round(r.live_collab_count * 100 / r.total_collab_count)));
+}
+
+function creatorStyle(r: CreatorAnalyticsRow, index: number) {
+  return {
+    "--campaign-accent": creatorTone(r),
+    "--campaign-progress": `${creatorProgress(r)}%`,
+    "--campaign-card-index": index,
+  } as CSSProperties;
+}
+
+function CreatorListRow({
+  r,
+  index,
+  onOpen,
+}: {
+  r: CreatorAnalyticsRow;
+  index: number;
+  onOpen: () => void;
+}) {
   return (
-    <div className="ob-creator-cell">
-      <Avatar
-        src={r.profile_pic}
-        username={r.username}
-        name={r.inf_name}
-        size={46}
-        className="ob-creator-avatar"
-      />
-      <div className="min-w-0">
-        <div className="creator-name">{r.inf_name ?? (r.username || "—")}</div>
-        <div className="creator-handle">@{r.username || "—"}</div>
-        {r.is_active === false && (
-          <DeactivatedBadge isActive={r.is_active} className="mt-1" />
-        )}
+    <article
+      className="campaign-list-row stage-campaign-row"
+      style={creatorStyle(r, index)}
+    >
+      <div className="stage-campaign-identity">
+        <Avatar
+          src={r.profile_pic}
+          username={r.username}
+          name={r.inf_name}
+          size={46}
+        />
+        <div className="campaign-list-row__main">
+          <div className="campaign-card__id-row">
+            <span className="campaign-card__id">
+              <strong>{r.inf_id}</strong>
+            </span>
+            <CreatorTypeChip type={r.creator_type} />
+            <DeactivatedBadge isActive={r.is_active} />
+          </div>
+          <h3>{r.inf_name ?? (r.username || "—")}</h3>
+          <p>
+            @{r.username || "—"} · {r.category ?? "No tier"} ·{" "}
+            {formatFollowers(r.followers)}
+          </p>
+        </div>
       </div>
-    </div>
+
+      <div className="campaign-list-row__allocation stage-campaign-signal">
+        <div>
+          <span>Live Collabs</span>
+          <strong>{creatorProgress(r)}%</strong>
+        </div>
+        <span className="campaign-card__progress-track" aria-hidden>
+          <span />
+        </span>
+        <div className="campaign-list-row__reachouts">
+          <span>{r.current_stage ? <StageCell stage={r.current_stage} /> : "No stage"}</span>
+          <strong>{r.live_collab_count}</strong>
+        </div>
+      </div>
+
+      <dl className="campaign-list-row__stats">
+        <div>
+          <dt>Followers</dt>
+          <dd>{formatFollowers(r.followers)}</dd>
+        </div>
+        <div>
+          <dt>Collabs</dt>
+          <dd>{collabSummary(r)}</dd>
+        </div>
+        <div>
+          <dt>Deliverables</dt>
+          <dd>{r.deliverable_count}</dd>
+        </div>
+        <div>
+          <dt>Last Post</dt>
+          <dd>{formatDate(r.last_post_date)}</dd>
+        </div>
+      </dl>
+
+      <div className="campaign-list-row__actions">
+        <button
+          type="button"
+          className="campaign-list-action campaign-list-action--brief"
+          onClick={onOpen}
+          aria-label={`View collab history for ${r.inf_name ?? r.username}`}
+        >
+          <History size={13} aria-hidden />
+          History
+        </button>
+      </div>
+    </article>
   );
 }
 
 function CreatorCard({
   r,
+  index,
   onOpen,
 }: {
   r: CreatorAnalyticsRow;
+  index: number;
   onOpen: () => void;
 }) {
   return (
-    <div className="ob-card">
-      <div className="ob-card-head">
-        <Avatar
-          src={r.profile_pic}
-          username={r.username}
-          name={r.inf_name}
-          size={44}
-          className="ob-card-avatar"
-        />
-        <div className="ob-card-id">
-          <div className="ob-card-name">{r.inf_name ?? (r.username || "—")}</div>
-          {r.username && <div className="ob-card-handle">@{r.username}</div>}
+    <article
+      className="campaign-card stage-campaign-card"
+      style={creatorStyle(r, index)}
+    >
+      <div className="campaign-card__head">
+        <div className="stage-campaign-card-head">
+          <Avatar
+            src={r.profile_pic}
+            username={r.username}
+            name={r.inf_name}
+            size={46}
+          />
+          <div className="min-w-0">
+            <div className="campaign-card__id-row">
+              <span className="campaign-card__id">
+                <strong>{r.inf_id}</strong>
+              </span>
+              <CreatorTypeChip type={r.creator_type} />
+            </div>
+            <h3>{r.inf_name ?? (r.username || "—")}</h3>
+            {r.username && (
+              <p className="campaign-card__message">@{r.username}</p>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="ob-card-pills">
+      <div className="campaign-card__meta-row">
         <DeactivatedBadge isActive={r.is_active} />
-        <CreatorTypeChip type={r.creator_type} />
         {r.current_stage && <StageCell stage={r.current_stage} />}
         <PartnershipBadge status={r.partnership_status} compact />
-        <span className="post-id tabular">{r.inf_id}</span>
         {r.category && <span className="campaign-chip">{r.category}</span>}
       </div>
 
-      <dl className="ob-card-meta-grid">
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Followers</span>
-          <span className="ob-card-meta-val tabular">
-            {formatFollowers(r.followers)}
-          </span>
+      <div className="campaign-card__progress">
+        <div>
+          <span>Live Collaboration Share</span>
+          <strong>{creatorProgress(r)}%</strong>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Collabs</span>
-          <span className="ob-card-meta-val tabular">{collabSummary(r)}</span>
+        <span className="campaign-card__progress-track" aria-hidden>
+          <span />
+        </span>
+      </div>
+
+      <dl className="campaign-card__facts">
+        <div>
+          <dt>Followers</dt>
+          <dd>{formatFollowers(r.followers)}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Deliverables</span>
-          <span className="ob-card-meta-val tabular">
-            {r.deliverable_count}
-          </span>
+        <div>
+          <dt>Collabs</dt>
+          <dd>{collabSummary(r)}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Last Post</span>
-          <span className="ob-card-meta-val tabular">
-            {formatDate(r.last_post_date)}
-          </span>
+        <div>
+          <dt>Deliverables</dt>
+          <dd>{r.deliverable_count}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Region</span>
-          <span className="ob-card-meta-val">{r.state ?? "—"}</span>
+        <div>
+          <dt>Last Post</dt>
+          <dd>{formatDate(r.last_post_date)}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Reach Out</span>
-          <span className="ob-card-meta-val tabular">
-            {formatDate(r.reach_out_from)}
-          </span>
+        <div>
+          <dt>Region</dt>
+          <dd>{r.state ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>Reach Out</dt>
+          <dd>{formatDate(r.reach_out_from)}</dd>
         </div>
       </dl>
 
-      <div className="ob-card-actions">
-        <button type="button" className="action-view" onClick={onOpen}>
+      <div className="campaign-card__actions">
+        <button
+          type="button"
+          className="campaign-list-action campaign-list-action--brief"
+          onClick={onOpen}
+        >
           <History size={12} aria-hidden />
           History
         </button>
       </div>
-    </div>
+    </article>
   );
 }
 

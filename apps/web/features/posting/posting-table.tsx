@@ -1,8 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Eye, Grid3X3, Inbox, List as ListIcon, Send } from "lucide-react";
-import { DataTable } from "@/components/data-table/data-table";
-import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
+import { Avatar, PartnershipKeyEdit } from "@/components/ui";
 import { PartnershipBadge } from "@/components/ui/status-pill";
 import {
   formatDate,
@@ -20,7 +19,6 @@ import {
   collabIdLabel,
   formatDeliverables,
   isPosted,
-  postingColumns,
 } from "./columns";
 import { PostingModal } from "./posting-form";
 import { PostingOverviewModal } from "./posting-overview-modal";
@@ -50,45 +48,6 @@ export function PostingTable({
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
-
-  const columnsWithActions = useMemo(
-    () => [
-      ...postingColumns,
-      {
-        id: "actions",
-        header: "Action",
-        cell: ({ row }: { row: { original: PostingRow } }) => {
-          const r = row.original;
-          if (isPosted(r)) {
-            return (
-              <span className="ob-row-action">
-                <button
-                  type="button"
-                  className="action-btn action-btn--view"
-                  onClick={() => setOverviewRow(r)}
-                  aria-label="View posting overview"
-                >
-                  <Eye size={11} aria-hidden />
-                  Overview
-                </button>
-              </span>
-            );
-          }
-          return (
-            <button
-              type="button"
-              className="action-btn"
-              onClick={() => setSelected(r)}
-            >
-              <Send size={11} aria-hidden />
-              Submit
-            </button>
-          );
-        },
-      },
-    ],
-    [],
-  );
 
   return (
     <>
@@ -148,39 +107,31 @@ export function PostingTable({
       </div>
 
       {view === "list" ? (
-        <div className="ob-list-wrap">
-          <DataTable<PostingRow>
-            data={rows}
-            columns={columnsWithActions}
-            emptyTitle="No posting rows match these filters"
-            emptyDescription="Try clearing filters or widening the onboarded date range."
-            mobileCard={(r) => (
-              <PostingCard
+        rows.length === 0 ? (
+          <PostingEmpty />
+        ) : (
+          <div className="campaign-list-view stage-campaign-list">
+            {rows.map((r, index) => (
+              <PostingListRow
+                key={r.post_id}
                 r={r}
-                rows={rows}
+                index={index}
                 onSubmit={setSelected}
                 onOverview={setOverviewRow}
               />
-            )}
-          />
-        </div>
+            ))}
+          </div>
+        )
       ) : rows.length === 0 ? (
-        <div className="glass-card text-center py-10 text-text-tertiary">
-          <Inbox size={28} className="mx-auto mb-2" />
-          <p className="font-medium text-text-primary">
-            No posting rows match these filters
-          </p>
-          <p className="text-sm">
-            Try clearing filters or widening the onboarded date range.
-          </p>
-        </div>
+        <PostingEmpty />
       ) : (
-        <div className="ob-card-grid">
-          {rows.map((r) => (
+        <div className="campaign-card-grid stage-campaign-card-grid">
+          {rows.map((r, index) => (
             <PostingCard
               key={r.post_id}
               r={r}
               rows={rows}
+              index={index}
               onSubmit={setSelected}
               onOverview={setOverviewRow}
             />
@@ -191,55 +142,192 @@ export function PostingTable({
   );
 }
 
-/** Posting card — mirrors `ObCard` shell exactly. */
-function PostingCard({
+function postingTone(r: PostingRow) {
+  return isPosted(r)
+    ? "var(--color-success-text)"
+    : "var(--color-warning-text, #b57514)";
+}
+
+function postingProgress(r: PostingRow) {
+  if (isPosted(r)) return 100;
+  if (r.partnership_id || r.post_link || r.download_link) return 68;
+  if (r.ads_usage_rights) return 42;
+  return 18;
+}
+
+function postingStyle(r: PostingRow, index: number) {
+  return {
+    "--campaign-accent": postingTone(r),
+    "--campaign-progress": `${postingProgress(r)}%`,
+    "--campaign-card-index": index,
+  } as CSSProperties;
+}
+
+function PostingEmpty() {
+  return (
+    <div className="campaign-filter-empty">
+      <Inbox size={28} aria-hidden />
+      <strong>No posting rows match these filters</strong>
+      <span>Try clearing filters or widening the onboarded date range.</span>
+    </div>
+  );
+}
+
+function PostingListRow({
   r,
-  rows,
+  index,
   onSubmit,
   onOverview,
 }: {
   r: PostingRow;
-  rows: PostingRow[];
+  index: number;
   onSubmit: (row: PostingRow) => void;
   onOverview: (row: PostingRow) => void;
 }) {
   const posted = isPosted(r);
 
   return (
-    <div
-      className={cn(
-        "ob-card",
-        posted ? "ob-card-onboarded" : "ob-card-pending",
-      )}
+    <article
+      className="campaign-list-row stage-campaign-row"
+      style={postingStyle(r, index)}
     >
-      <div className="ob-card-head">
+      <div className="stage-campaign-identity">
         <Avatar
           src={r.creator?.profile_pic}
           username={r.creator?.username}
           name={r.creator?.inf_name}
-          size={44}
-          className="ob-card-avatar"
+          size={46}
         />
-        <div className="ob-card-id">
-          <div className="ob-card-name">
-            {r.creator?.inf_name ?? r.creator?.username ?? "—"}
+        <div className="campaign-list-row__main">
+          <div className="campaign-card__id-row">
+            {r.campaign?.campaign_id && (
+              <span className="campaign-card__id">
+                <strong>{r.campaign.campaign_id}</strong>
+              </span>
+            )}
+            <span className="campaign-status-pill">
+              {workflowStatusLabel(r.workflow_status)}
+            </span>
           </div>
-          {r.creator?.username && (
-            <div className="ob-card-handle">@{r.creator.username}</div>
-          )}
+          <h3>{r.creator?.inf_name ?? r.creator?.username ?? "—"}</h3>
+          <p>
+            @{r.creator?.username ?? "—"} · {r.post_id_short ?? r.post_id} ·{" "}
+            {collabIdLabel(r)}
+          </p>
         </div>
       </div>
 
-      <div className="ob-card-pills">
-        <span className="ob-card-stage-pill">
-          <WorkflowStatusPill status={r.workflow_status} />
+      <div className="campaign-list-row__allocation stage-campaign-signal">
+        <div>
+          <span>Posting Progress</span>
+          <strong>{postingProgress(r)}%</strong>
+        </div>
+        <span className="campaign-card__progress-track" aria-hidden>
+          <span />
         </span>
-        <span className="ob-card-stage-text">
-          {workflowStatusLabel(r.workflow_status)}
-        </span>
-        {r.campaign?.campaign_id && (
-          <span className="campaign-chip">{r.campaign.campaign_id}</span>
+        <div className="campaign-list-row__reachouts">
+          <span>{formatDeliverables(r)}</span>
+          <strong>{posted ? 1 : 0}</strong>
+        </div>
+      </div>
+
+      <dl className="campaign-list-row__stats">
+        <div>
+          <dt>Followers</dt>
+          <dd>{formatFollowers(r.creator?.followers)}</dd>
+        </div>
+        <div>
+          <dt>Commercials</dt>
+          <dd>
+            {r.commercial_amount != null
+              ? formatRupees(r.commercial_amount)
+              : "—"}
+          </dd>
+        </div>
+        <div>
+          <dt>Rights</dt>
+          <dd>{r.ads_usage_rights || "—"}</dd>
+        </div>
+        <div>
+          <dt>Post Date</dt>
+          <dd>{formatDate(r.post_date) ?? "—"}</dd>
+        </div>
+      </dl>
+
+      <div className="campaign-list-row__actions">
+        {posted ? (
+          <button
+            type="button"
+            className="campaign-list-action campaign-list-action--brief"
+            onClick={() => onOverview(r)}
+            aria-label="View posting overview"
+          >
+            <Eye size={13} aria-hidden />
+            Overview
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="campaign-list-action campaign-list-action--brief"
+            onClick={() => onSubmit(r)}
+          >
+            <Send size={13} aria-hidden />
+            Submit
+          </button>
         )}
+      </div>
+    </article>
+  );
+}
+
+function PostingCard({
+  r,
+  rows,
+  index,
+  onSubmit,
+  onOverview,
+}: {
+  r: PostingRow;
+  rows: PostingRow[];
+  index: number;
+  onSubmit: (row: PostingRow) => void;
+  onOverview: (row: PostingRow) => void;
+}) {
+  const posted = isPosted(r);
+
+  return (
+    <article
+      className="campaign-card stage-campaign-card"
+      style={postingStyle(r, index)}
+    >
+      <div className="campaign-card__head">
+        <div className="stage-campaign-card-head">
+          <Avatar
+            src={r.creator?.profile_pic}
+            username={r.creator?.username}
+            name={r.creator?.inf_name}
+            size={46}
+          />
+          <div className="min-w-0">
+            <div className="campaign-card__id-row">
+              {r.campaign?.campaign_id && (
+                <span className="campaign-card__id">
+                  <strong>{r.campaign.campaign_id}</strong>
+                </span>
+              )}
+              <span className="campaign-status-pill">
+                {workflowStatusLabel(r.workflow_status)}
+              </span>
+            </div>
+            <h3>{r.creator?.inf_name ?? r.creator?.username ?? "—"}</h3>
+            {r.creator?.username && (
+              <p className="campaign-card__message">@{r.creator.username}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="campaign-card__meta-row">
         <PostIdWithCollab r={r} />
         <CollabIdBadge r={r} rows={rows} />
         {(r.nomenclature ?? r.content_type) && (
@@ -249,91 +337,88 @@ function PostingCard({
         )}
       </div>
 
-      <dl className="ob-card-meta-grid">
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Followers</span>
-          <span className="ob-card-meta-val tabular">
+      <div className="campaign-card__progress">
+        <div>
+          <span>Posting Progress</span>
+          <strong>{postingProgress(r)}% ready</strong>
+        </div>
+        <span className="campaign-card__progress-track" aria-hidden>
+          <span />
+        </span>
+      </div>
+
+      <dl className="campaign-card__facts">
+        <div>
+          <dt>Followers</dt>
+          <dd>
             {formatFollowers(r.creator?.followers)}
             {r.creator?.category && (
-              <span className="ob-card-meta-sub"> · {r.creator.category}</span>
+              <span className="stage-fact-muted"> · {r.creator.category}</span>
             )}
-          </span>
+          </dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Collab</span>
-          <span className="ob-card-meta-val">{r.collab_type ?? "—"}</span>
+        <div>
+          <dt>Collab</dt>
+          <dd>{r.collab_type ?? "—"}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Commercials</span>
-          <span className="ob-card-meta-val tabular">
+        <div>
+          <dt>Commercials</dt>
+          <dd>
             {r.commercial_amount != null
               ? formatRupees(r.commercial_amount)
               : "—"}
-          </span>
+          </dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Deliverables</span>
-          <span className="ob-card-meta-val tabular">
-            {formatDeliverables(r)}
-          </span>
+        <div>
+          <dt>Deliverables</dt>
+          <dd>{formatDeliverables(r)}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Ads Rights</span>
-          <span className="ob-card-meta-val">
+        <div>
+          <dt>Ads Rights</dt>
+          <dd>
             <AdsRightsCell r={r} />
-          </span>
+          </dd>
         </div>
         {(r.ads_usage_rights ?? "").trim() && (
-          <div className="ob-card-meta ob-card-meta--full">
-            <span className="ob-card-meta-label">Partnership</span>
-            <span className="ob-card-meta-val flex flex-wrap items-center gap-1.5">
+          <div>
+            <dt>Partnership</dt>
+            <dd className="stage-partnership-cell">
               <PartnershipBadge status={r.partnership_status} showEmpty compact />
               <PartnershipKeyEdit postId={r.post_id!} value={r.partnership_id} compact isPosted={posted} />
-            </span>
+            </dd>
           </div>
         )}
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Onboarded</span>
-          <span className="ob-card-meta-val tabular">
-            {formatDate(r.onboard_date) ?? "—"}
-          </span>
+        <div>
+          <dt>Onboarded</dt>
+          <dd>{formatDate(r.onboard_date) ?? "—"}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Post Date</span>
-          <span className="ob-card-meta-val tabular">
-            {formatDate(r.post_date) ?? "—"}
-          </span>
+        <div>
+          <dt>Post Date</dt>
+          <dd>{formatDate(r.post_date) ?? "—"}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Order ID</span>
-          <span
-            className="ob-card-meta-val tabular"
-            style={
-              r.order_id ? { color: "var(--color-success-text)" } : undefined
-            }
-          >
-            {r.order_id ?? "—"}
-          </span>
+        <div>
+          <dt>Order ID</dt>
+          <dd>{r.order_id ?? "—"}</dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Live Link</span>
-          <span className="ob-card-meta-val">
+        <div>
+          <dt>Live Link</dt>
+          <dd>
             <PostLinkCell url={r.post_link} />
-          </span>
+          </dd>
         </div>
-        <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Drive</span>
-          <span className="ob-card-meta-val">
+        <div>
+          <dt>Drive</dt>
+          <dd>
             <DriveLinkCell url={r.download_link} />
-          </span>
+          </dd>
         </div>
       </dl>
 
-      <div className="ob-card-actions">
+      <div className="campaign-card__actions">
         {posted ? (
           <button
             type="button"
-            className="action-view"
+            className="campaign-list-action campaign-list-action--brief"
             onClick={() => onOverview(r)}
           >
             <Eye size={12} aria-hidden />
@@ -342,7 +427,7 @@ function PostingCard({
         ) : (
           <button
             type="button"
-            className="action-primary"
+            className="campaign-list-action campaign-list-action--brief"
             onClick={() => onSubmit(r)}
           >
             <Send size={12} aria-hidden />
@@ -350,6 +435,6 @@ function PostingCard({
           </button>
         )}
       </div>
-    </div>
+    </article>
   );
 }

@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { Eye, Grid3X3, List as ListIcon, UserMinus, X } from "lucide-react";
 import { Avatar } from "@/components/ui";
@@ -148,94 +154,134 @@ function OffboardingListTable({
   onOpen: (row: OffboardingRow) => void;
 }) {
   return (
-    <div className="ob-list-wrap">
-      <table className="ob-list-table">
-        <thead>
-          <tr>
-            <th>Creator</th>
-            <th>Post ID</th>
-            <th>Collab ID</th>
-            <th>INF ID</th>
-            <th>Campaign</th>
-            <th>Deliverables</th>
-            <th>Order ID</th>
-            <th>Collab</th>
-            <th>Payment</th>
-            <th className="text-right">Commercials</th>
-            <th>Reached Out</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr
-              key={r.postId}
-              role="button"
-              tabIndex={0}
-              className="cursor-pointer"
-              onClick={() => onOpen(r)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onOpen(r);
-                }
-              }}
-            >
-              <td>
-                <div className="flex items-center gap-2 min-w-0">
-                  <Avatar
-                    src={r.profilePicUrl}
-                    username={r.username}
-                    name={r.name}
-                    size={32}
-                  />
-                  <div className="flex flex-col min-w-0">
-                    <strong className="truncate text-[0.84rem] text-text-primary">
-                      {r.name || r.username || "—"}
-                    </strong>
-                    {r.username && (
-                      <span className="truncate text-[0.7rem] text-text-tertiary">
-                        @{r.username}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </td>
-              <td className="tabular whitespace-nowrap">
-                <span className="post-id tabular">{r.postId || "—"}</span>
-              </td>
-              <td className="tabular whitespace-nowrap">
-                {collabIdOf(r) ? (
-                  <span
-                    className="campaign-chip tabular"
-                    title="Groups all deliverables of this collaboration"
-                  >
-                    {collabIdOf(r)}
-                  </span>
-                ) : (
-                  <span className="text-text-tertiary">—</span>
-                )}
-              </td>
-              <td className="tabular whitespace-nowrap">{r.infId || "—"}</td>
-              <td>
-                <span className="campaign-chip">{r.campaign || "—"}</span>
-              </td>
-              <td className="tabular whitespace-nowrap text-text-secondary">
-                {deliverablesLabel(r)}
-              </td>
-              <td className="tabular whitespace-nowrap">{r.orderId || "—"}</td>
-              <td>{r.collabType || "—"}</td>
-              <td>
-                <PaymentPill status={r.paymentStatus} />
-              </td>
-              <td className="text-right tabular">
-                {r.commercials > 0 ? formatRupees(r.commercials) : "—"}
-              </td>
-              <td className="tabular">{formatDate(r.reachoutDate)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="campaign-list-view stage-campaign-list">
+      {rows.map((r, index) => (
+        <OffboardingListRow
+          key={r.postId}
+          row={r}
+          index={index}
+          onOpen={onOpen}
+        />
+      ))}
     </div>
+  );
+}
+
+function offboardingTone(r: OffboardingRow) {
+  return r.paymentStatus.toLowerCase() === "done"
+    ? "var(--color-success-text)"
+    : "var(--color-warning-text, #b57514)";
+}
+
+function offboardingProgress(r: OffboardingRow) {
+  return r.paymentStatus.toLowerCase() === "done" ? 100 : 72;
+}
+
+function offboardingDeliverableCount(r: OffboardingRow) {
+  return r.staticPosts + r.reels + r.stories;
+}
+
+function offboardingStyle(row: OffboardingRow, index: number) {
+  return {
+    "--campaign-accent": offboardingTone(row),
+    "--campaign-progress": `${offboardingProgress(row)}%`,
+    "--campaign-card-index": index,
+  } as CSSProperties;
+}
+
+function OffboardingListRow({
+  row,
+  index,
+  onOpen,
+}: {
+  row: OffboardingRow;
+  index: number;
+  onOpen: (row: OffboardingRow) => void;
+}) {
+  const collabId = collabIdOf(row);
+  return (
+    <article
+      className="campaign-list-row stage-campaign-row"
+      style={offboardingStyle(row, index)}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(row)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(row);
+        }
+      }}
+    >
+      <div className="stage-campaign-identity">
+        <Avatar
+          src={row.profilePicUrl}
+          username={row.username}
+          name={row.name}
+          size={46}
+        />
+        <div className="campaign-list-row__main">
+          <div className="campaign-card__id-row">
+            <span className="campaign-card__id">
+              <strong>{row.postId || collabId || "—"}</strong>
+            </span>
+            <PaymentPill status={row.paymentStatus} />
+          </div>
+          <h3>{row.name || row.username || "—"}</h3>
+          <p>
+            @{row.username || "—"} · {row.campaign || "—"} ·{" "}
+            {collabId || row.infId || "—"}
+          </p>
+        </div>
+      </div>
+
+      <div className="campaign-list-row__allocation stage-campaign-signal">
+        <div>
+          <span>Offboarding</span>
+          <strong>{offboardingProgress(row)}%</strong>
+        </div>
+        <span className="campaign-card__progress-track" aria-hidden>
+          <span />
+        </span>
+        <div className="campaign-list-row__reachouts">
+          <span>{deliverablesLabel(row)}</span>
+          <strong>{offboardingDeliverableCount(row)}</strong>
+        </div>
+      </div>
+
+      <dl className="campaign-list-row__stats">
+        <div>
+          <dt>Order ID</dt>
+          <dd>{row.orderId || "—"}</dd>
+        </div>
+        <div>
+          <dt>Collab</dt>
+          <dd>{row.collabType || "—"}</dd>
+        </div>
+        <div>
+          <dt>Commercials</dt>
+          <dd>{row.commercials > 0 ? formatRupees(row.commercials) : "—"}</dd>
+        </div>
+        <div>
+          <dt>Reached Out</dt>
+          <dd>{formatDate(row.reachoutDate)}</dd>
+        </div>
+      </dl>
+
+      <div className="campaign-list-row__actions">
+        <button
+          type="button"
+          className="campaign-list-action campaign-list-action--brief"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(row);
+          }}
+        >
+          <Eye size={13} aria-hidden />
+          Overview
+        </button>
+      </div>
+    </article>
   );
 }
 
@@ -247,11 +293,12 @@ function OffboardingCardsGrid({
   onOpen: (row: OffboardingRow) => void;
 }) {
   return (
-    <div className="ob-card-grid">
-      {rows.map((r) => (
+    <div className="campaign-card-grid stage-campaign-card-grid">
+      {rows.map((r, index) => (
         <article
           key={r.postId}
-          className="ob-card cursor-pointer"
+          className="campaign-card stage-campaign-card"
+          style={offboardingStyle(r, index)}
           role="button"
           tabIndex={0}
           aria-label={`View details for ${r.postId}`}
@@ -263,22 +310,30 @@ function OffboardingCardsGrid({
             }
           }}
         >
-          <div className="ob-card-head">
-            <Avatar
-              src={r.profilePicUrl}
-              username={r.username}
-              name={r.name}
-              size={44}
-              className="ob-card-avatar"
-            />
-            <div className="ob-card-id min-w-0">
-              <div className="ob-card-name">{r.name || r.username || "—"}</div>
-              {r.username && <div className="ob-card-handle">@{r.username}</div>}
+          <div className="campaign-card__head">
+            <div className="stage-campaign-card-head">
+              <Avatar
+                src={r.profilePicUrl}
+                username={r.username}
+                name={r.name}
+                size={46}
+              />
+              <div className="min-w-0">
+                <div className="campaign-card__id-row">
+                  <span className="campaign-card__id">
+                    <strong>{r.postId || collabIdOf(r) || "—"}</strong>
+                  </span>
+                  <PaymentPill status={r.paymentStatus} />
+                </div>
+                <h3>{r.name || r.username || "—"}</h3>
+                {r.username && (
+                  <p className="campaign-card__message">@{r.username}</p>
+                )}
+              </div>
             </div>
           </div>
 
-          <div className="ob-card-pills">
-            {r.postId && <span className="post-id tabular">{r.postId}</span>}
+          <div className="campaign-card__meta-row">
             {collabIdOf(r) && (
               <span
                 className="campaign-chip tabular"
@@ -295,38 +350,52 @@ function OffboardingCardsGrid({
             )}
           </div>
 
-          <dl className="ob-card-meta-grid">
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Deliverables</span>
-              <span className="ob-card-meta-val tabular">
-                {deliverablesLabel(r)}
-              </span>
+          <div className="campaign-card__progress">
+            <div>
+              <span>Offboarding</span>
+              <strong>{offboardingProgress(r)}% ready</strong>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Order ID</span>
-              <span className="ob-card-meta-val tabular">
-                {r.orderId || "—"}
-              </span>
+            <span className="campaign-card__progress-track" aria-hidden>
+              <span />
+            </span>
+          </div>
+
+          <dl className="campaign-card__facts">
+            <div>
+              <dt>Deliverables</dt>
+              <dd>{deliverablesLabel(r)}</dd>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Commercials</span>
-              <span className="ob-card-meta-val tabular">
-                {r.commercials > 0 ? formatRupees(r.commercials) : "—"}
-              </span>
+            <div>
+              <dt>Order ID</dt>
+              <dd>{r.orderId || "—"}</dd>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Reached Out</span>
-              <span className="ob-card-meta-val tabular">
-                {formatDate(r.reachoutDate)}
-              </span>
+            <div>
+              <dt>Commercials</dt>
+              <dd>{r.commercials > 0 ? formatRupees(r.commercials) : "—"}</dd>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Followers</span>
-              <span className="ob-card-meta-val tabular">
-                {r.followers ? r.followers.toLocaleString("en-IN") : "—"}
-              </span>
+            <div>
+              <dt>Reached Out</dt>
+              <dd>{formatDate(r.reachoutDate)}</dd>
+            </div>
+            <div>
+              <dt>Followers</dt>
+              <dd>{r.followers ? r.followers.toLocaleString("en-IN") : "—"}</dd>
             </div>
           </dl>
+
+          <div className="campaign-card__actions">
+            <button
+              type="button"
+              className="campaign-list-action campaign-list-action--brief"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpen(r);
+              }}
+            >
+              <Eye size={12} aria-hidden />
+              Overview
+            </button>
+          </div>
         </article>
       ))}
     </div>
