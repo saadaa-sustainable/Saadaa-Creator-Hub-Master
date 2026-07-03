@@ -13,23 +13,88 @@ import type { ReactNode } from "react";
 import { HeroKpi } from "./bento-kit";
 import type { DashboardData } from "./types";
 
+interface RailSegment {
+  label: string;
+  value: number;
+  color: string;
+}
+
 function fmt(n: number): string {
   return n.toLocaleString("en-IN");
+}
+
+function MiniRail({
+  label,
+  segments,
+}: {
+  label: string;
+  segments: RailSegment[];
+}) {
+  const visibleSegments = segments.filter((segment) => segment.value > 0);
+  const total = visibleSegments.reduce((sum, segment) => sum + segment.value, 0);
+  if (total <= 0) return null;
+  const ariaLabel = `${label}: ${visibleSegments
+    .map((segment) => `${segment.label} ${fmt(segment.value)}`)
+    .join(", ")}`;
+
+  return (
+    <div
+      className="dashboard-overview-rail"
+      role="img"
+      aria-label={ariaLabel}
+      data-depth="3"
+    >
+      <div className="dashboard-overview-rail__track" aria-hidden="true">
+        {visibleSegments.map((segment) => (
+          <span
+            key={segment.label}
+            className="dashboard-overview-rail__fill"
+            style={{
+              width: `${Math.max(1, Math.round((segment.value / total) * 100))}%`,
+              background: segment.color,
+            }}
+          />
+        ))}
+      </div>
+      <div className="dashboard-overview-rail__legend">
+        {visibleSegments.map((segment) => (
+          <span key={segment.label}>
+            <span
+              className="dashboard-overview-rail__dot"
+              style={{ background: segment.color }}
+              aria-hidden="true"
+            />
+            {segment.label}
+            <strong>{fmt(segment.value)}</strong>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function OverviewBand({
   icon,
   title,
   summary,
+  railLabel,
+  railSegments,
   children,
 }: {
   icon: ReactNode;
   title: string;
   summary: string;
+  railLabel: string;
+  railSegments: RailSegment[];
   children: ReactNode;
 }) {
   return (
-    <div className="dashboard-overview-band">
+    <div className="dashboard-overview-band" data-depth="4">
+      <div className="dashboard-overview-band__depth" aria-hidden="true">
+        <span data-depth="0" />
+        <span data-depth="1" />
+        <span data-depth="5" />
+      </div>
       <div className="acc-kpi-group dashboard-overview-band__head">
         <span className="dashboard-overview-band__label">
           {icon}
@@ -37,6 +102,7 @@ function OverviewBand({
         </span>
         <span className="dashboard-overview-band__meta">{summary}</span>
       </div>
+      <MiniRail label={railLabel} segments={railSegments} />
       {children}
     </div>
   );
@@ -82,6 +148,21 @@ export function DashboardOverviewStrip({
         icon={<Megaphone size={13} aria-hidden />}
         title="Campaigns & creators"
         summary={`${fmt(campaign.activeCampaigns)} campaigns / ${fmt(campaign.totalCreators)} creators`}
+        railLabel="Campaign overview split"
+        railSegments={[
+          {
+            label: "Creators",
+            value: campaign.totalCreators,
+            color: "#3B6FD4",
+          },
+          { label: "Collabs", value: totalPipeline, color: "#4F7C4D" },
+          {
+            label: "Campaigns",
+            value: campaign.activeCampaigns,
+            color: "#B57514",
+          },
+          { label: "Paid", value: campaign.paidCount, color: "#161513" },
+        ]}
       >
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
           <HeroKpi
@@ -122,6 +203,13 @@ export function DashboardOverviewStrip({
         icon={<UserRoundCheck size={13} aria-hidden />}
         title="Per-stage pipeline"
         summary={`${pipeline.conversionPct}% conversion / ${pipeline.postRatePct}% post rate`}
+        railLabel="Per-stage pipeline split"
+        railSegments={[
+          { label: "Reach Out", value: pipeline.reachOut, color: "#3B6FD4" },
+          { label: "Onboarded", value: pipeline.onboarded, color: "#7B4FBF" },
+          { label: "Posted", value: pipeline.posted, color: "#4F7C4D" },
+          { label: "Ad Winners", value: pipeline.adWinners, color: "#B57514" },
+        ]}
       >
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
           <HeroKpi
@@ -159,6 +247,29 @@ export function DashboardOverviewStrip({
         icon={<Hourglass size={13} aria-hidden />}
         title="Needs attention"
         summary={`${fmt(attentionTotal)} action checks / ${fmt(pipeline.paymentPending)} payment pending`}
+        railLabel="Attention queue split"
+        railSegments={[
+          {
+            label: "Email",
+            value: data.actions.needsEmail,
+            color: "#B57514",
+          },
+          {
+            label: "Orders",
+            value: data.actions.needsOrder,
+            color: "#3B6FD4",
+          },
+          {
+            label: "Payments",
+            value: pipeline.paymentPending,
+            color: "#C0392B",
+          },
+          {
+            label: "Overdue",
+            value: data.actions.overdue,
+            color: "#161513",
+          },
+        ]}
       >
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
           <HeroKpi

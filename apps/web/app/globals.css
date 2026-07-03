@@ -8264,6 +8264,9 @@ body:has(.km-backdrop) {
   gap: 0.9rem;
 }
 .dash-overview-stage .dashboard-overview-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   border: 1px solid color-mix(in oklab, var(--color-border) 76%, white);
   border-radius: 18px;
   background:
@@ -8271,6 +8274,50 @@ body:has(.km-backdrop) {
     var(--color-bg-white);
   padding: 0.82rem;
   box-shadow: 0 12px 28px -24px rgba(22, 21, 19, 0.2);
+}
+.dash-overview-stage .dashboard-overview-band__depth {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.dash-overview-stage .dashboard-overview-band__depth span {
+  position: absolute;
+  display: block;
+}
+.dash-overview-stage .dashboard-overview-band__depth span[data-depth="0"] {
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(201, 194, 174, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 194, 174, 0.1) 1px, transparent 1px);
+  background-size: 30px 30px;
+  opacity: 0.42;
+}
+.dash-overview-stage .dashboard-overview-band__depth span[data-depth="1"] {
+  width: 118%;
+  height: 7rem;
+  right: -9%;
+  top: -4.4rem;
+  background: linear-gradient(
+    100deg,
+    transparent 8%,
+    rgba(240, 198, 30, 0.18) 48%,
+    transparent 86%
+  );
+  filter: blur(8px);
+  animation: dashboardOverviewGlow 10s ease-in-out infinite;
+}
+.dash-overview-stage .dashboard-overview-band__depth span[data-depth="5"] {
+  inset: 0;
+  background: linear-gradient(
+    112deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.42) 42%,
+    transparent 62%
+  );
+  opacity: 0.65;
+  transform: translateX(-120%);
+  animation: dashboardOverviewSheen 7s cubic-bezier(0.22, 1, 0.36, 1) infinite;
 }
 .dash-overview-stage .dashboard-overview-band__head {
   display: flex;
@@ -8295,6 +8342,136 @@ body:has(.km-backdrop) {
   text-align: right;
   font-weight: 800;
   letter-spacing: 0.04em;
+}
+.dash-overview-stage .dashboard-overview-rail {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0.42rem;
+  margin: -0.2rem 0 0.78rem;
+}
+.dash-overview-stage .dashboard-overview-rail__track {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-bg-muted, #f0ede6);
+}
+.dash-overview-stage .dashboard-overview-rail__fill {
+  min-width: 1px;
+  transform-origin: left center;
+  animation: dashboardOverviewRailIn 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.dash-overview-stage .dashboard-overview-rail__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.72rem;
+  color: var(--color-text-tertiary, #9a9384);
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+.dash-overview-stage .dashboard-overview-rail__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+.dash-overview-stage .dashboard-overview-rail__legend strong {
+  color: var(--color-text-secondary, #6e695e);
+  font-weight: 900;
+}
+.dash-overview-stage .dashboard-overview-rail__dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+}
+.dashboard-monthly-trend {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.dashboard-monthly-trend::before {
+  content: "";
+  position: absolute;
+  inset: 2.8rem 1rem 2.1rem;
+  z-index: -1;
+  border-radius: 18px;
+  background:
+    linear-gradient(rgba(201, 194, 174, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 194, 174, 0.12) 1px, transparent 1px),
+    linear-gradient(112deg, rgba(59, 111, 212, 0.06), transparent 42%);
+  background-size: 34px 34px, 34px 34px, 100% 100%;
+  opacity: 0.76;
+}
+.dashboard-monthly-trend header {
+  position: relative;
+  z-index: 1;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+.dashboard-monthly-trend [data-depth="3"] {
+  position: relative;
+  border-radius: 14px;
+}
+.dashboard-monthly-trend__grid {
+  stroke: rgba(201, 194, 174, 0.58);
+  stroke-width: 0.8;
+  stroke-dasharray: 4 5;
+}
+.dashboard-monthly-trend__area {
+  opacity: 0.96;
+}
+.dashboard-monthly-trend__line {
+  filter: drop-shadow(0 3px 5px rgba(22, 21, 19, 0.08));
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: dashboardMonthlyDraw 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.dashboard-monthly-trend__dot {
+  opacity: 0;
+  transform: scale(0.64);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dashboardMonthlyDot 0.42s cubic-bezier(0.22, 1, 0.36, 1) 0.36s forwards;
+}
+@keyframes dashboardOverviewRailIn {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes dashboardOverviewGlow {
+  0%,
+  100% {
+    opacity: 0.58;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    opacity: 0.88;
+    transform: translate3d(-1.25rem, 0.8rem, 0) scale(1.08);
+  }
+}
+@keyframes dashboardOverviewSheen {
+  0%,
+  46% {
+    transform: translateX(-120%);
+  }
+  78%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+@keyframes dashboardMonthlyDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes dashboardMonthlyDot {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .acc-kpi--skeleton {
   height: 84px;
@@ -8562,6 +8739,22 @@ body:has(.km-backdrop) {
   }
   .dash-overview-stage .dashboard-overview-band__meta {
     display: none;
+  }
+  .dash-overview-stage .dashboard-overview-rail {
+    gap: 0.32rem;
+    margin: -0.1rem 0 0.58rem;
+  }
+  .dash-overview-stage .dashboard-overview-rail__track {
+    height: 6px;
+  }
+  .dash-overview-stage .dashboard-overview-rail__legend {
+    gap: 0.25rem 0.52rem;
+    font-size: 0.56rem;
+    line-height: 1.15;
+  }
+  .dash-overview-stage .dashboard-overview-rail__dot {
+    width: 0.34rem;
+    height: 0.34rem;
   }
   .my-dashboard-stage .acc-kpi-grid,
   .journey-stage .acc-kpi-grid,
@@ -11705,12 +11898,25 @@ input[type="date"]::-webkit-clear-button {
   .bento-tile,
   .bento-stagger > *,
   .dash-tab-swap,
-  .bento-bar {
+  .bento-bar,
+  .dashboard-overview-rail__fill,
+  .dashboard-overview-band__depth span,
+  .dashboard-monthly-trend__line,
+  .dashboard-monthly-trend__dot {
     animation: none !important;
   }
   .bento-tile,
-  .bento-tile:hover {
+  .bento-tile:hover,
+  .dashboard-overview-band__depth span,
+  .dashboard-monthly-trend__line,
+  .dashboard-monthly-trend__dot {
     transition: none;
     transform: none;
+  }
+  .dashboard-monthly-trend__line {
+    stroke-dashoffset: 0;
+  }
+  .dashboard-monthly-trend__dot {
+    opacity: 1;
   }
 }
