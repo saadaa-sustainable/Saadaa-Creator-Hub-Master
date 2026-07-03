@@ -9,6 +9,7 @@ import {
   ExternalLink,
   Eye,
   FileText,
+  Hash,
   IndianRupee,
   Loader2,
   Lock,
@@ -129,6 +130,7 @@ export function ExistingCampaigns({
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [campaignIdFilter, setCampaignIdFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<CampaignStatusFilter>("all");
   const [sortBy, setSortBy] = useState<CampaignSort>("newest");
   const [, startLoadEdit] = useTransition();
@@ -167,11 +169,32 @@ export function ExistingCampaigns({
       setEditTarget(res);
     });
   };
+
+  const campaignIds = useMemo(
+    () =>
+      Array.from(new Set(campaigns.map((campaign) => campaign.campaign_id)))
+        .filter(Boolean)
+        .sort((a, b) => {
+          const aNum =
+            normalizeNumber(
+              campaigns.find((c) => c.campaign_id === a)?.campaign_num,
+            ) ?? 0;
+          const bNum =
+            normalizeNumber(
+              campaigns.find((c) => c.campaign_id === b)?.campaign_num,
+            ) ?? 0;
+          return bNum - aNum || b.localeCompare(a);
+        }),
+    [campaigns],
+  );
+
   const filteredCampaigns = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const next = campaigns.filter((campaign) => {
       const isClosed = isClosedStatus(campaign.status);
       const hasBrief = Boolean(campaign.brief_link);
+      const idMatch =
+        campaignIdFilter === "all" || campaign.campaign_id === campaignIdFilter;
       const statusMatch =
         statusFilter === "all" ||
         (statusFilter === "active" && !isClosed) ||
@@ -179,6 +202,7 @@ export function ExistingCampaigns({
         (statusFilter === "with-brief" && hasBrief) ||
         (statusFilter === "missing-brief" && !hasBrief);
 
+      if (!idMatch) return false;
       if (!statusMatch) return false;
       if (!normalizedQuery) return true;
       return campaignSearchText(campaign).includes(normalizedQuery);
@@ -216,10 +240,11 @@ export function ExistingCampaigns({
           );
       }
     });
-  }, [campaigns, query, sortBy, statusFilter]);
+  }, [campaignIdFilter, campaigns, query, sortBy, statusFilter]);
 
   const clearFilters = () => {
     setQuery("");
+    setCampaignIdFilter("all");
     setStatusFilter("all");
     setSortBy("newest");
   };
@@ -237,7 +262,10 @@ export function ExistingCampaigns({
   }, [filteredCampaigns]);
   const { totalBudget, totalTarget } = stats;
   const hasFilters =
-    query.trim().length > 0 || statusFilter !== "all" || sortBy !== "newest";
+    query.trim().length > 0 ||
+    campaignIdFilter !== "all" ||
+    statusFilter !== "all" ||
+    sortBy !== "newest";
 
   if (campaigns.length === 0) {
     return (
@@ -281,12 +309,28 @@ export function ExistingCampaigns({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search ID, name, message"
+            placeholder="Search name, message, brief"
             aria-label="Search existing campaigns"
           />
         </label>
 
         <div className="campaign-filter-controls">
+          <label className="campaign-filter-select campaign-filter-select--id">
+            <Hash size={14} aria-hidden="true" />
+            <select
+              value={campaignIdFilter}
+              onChange={(event) => setCampaignIdFilter(event.target.value)}
+              aria-label="Filter by campaign ID"
+            >
+              <option value="all">All campaign IDs</option>
+              {campaignIds.map((campaignId) => (
+                <option key={campaignId} value={campaignId}>
+                  {campaignId}
+                </option>
+              ))}
+            </select>
+          </label>
+
           <label className="campaign-filter-select">
             <SlidersHorizontal size={14} aria-hidden="true" />
             <select
@@ -678,7 +722,7 @@ function CampaignDetailsModal({
             {canManage && (
               <button
                 type="button"
-                className="btn btn-secondary btn-xs"
+                className="btn btn-secondary btn-xs campaign-detail-edit-btn"
                 onClick={onEdit}
                 disabled={editLoading}
               >
@@ -692,7 +736,7 @@ function CampaignDetailsModal({
             )}
             <button
               type="button"
-              className="icon-btn"
+              className="icon-btn campaign-detail-close-btn"
               onClick={onClose}
               aria-label="Close campaign details"
             >
