@@ -8023,9 +8023,13 @@
       min-width: 0;
     }
 
+    .campaign-list-toolbar__meta [role="radiogroup"] {
+      display: none;
+    }
+
     .campaign-card-grid {
-      grid-template-columns: 1fr;
-      gap: 0.72rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.5rem;
     }
 
     .campaign-list-view {
@@ -8068,78 +8072,152 @@
     }
 
     .campaign-card {
-      padding: 0.82rem;
-      border-radius: 13px;
-      gap: 0.68rem;
+      padding: 0.56rem;
+      border-radius: 12px;
+      gap: 0.44rem;
     }
 
     .campaign-card__head {
       grid-template-columns: minmax(0, 1fr);
-      gap: 0.65rem;
-    }
-
-    .campaign-card__id-row {
-      gap: 0.35rem;
-      flex-wrap: wrap;
-    }
-
-    .campaign-card h3 {
-      font-size: 0.98rem;
-      margin-top: 0.38rem;
-    }
-
-    .campaign-card__budget {
-      min-width: 68px;
-      text-align: left;
-    }
-
-    .campaign-card__message {
-      font-size: 0.76rem;
-      min-height: 0;
-    }
-
-    .campaign-card__progress {
-      padding: 0.5rem 0.56rem;
-    }
-
-    .campaign-card__progress > div:first-child {
-      font-size: 0.56rem;
-    }
-
-    .campaign-card__meta-row {
-      font-size: 0.6rem;
-    }
-
-    .campaign-card__facts {
       gap: 0.42rem;
     }
 
+    .campaign-card__id-row {
+      gap: 0.24rem;
+      flex-wrap: wrap;
+    }
+
+    .campaign-card__id {
+      min-height: 1.18rem;
+      padding: 0.16rem 0.36rem;
+    }
+
+    .campaign-card__id-row strong {
+      font-size: 0.64rem;
+    }
+
+    .campaign-status-pill {
+      min-height: 1.05rem;
+      padding: 0.1rem 0.32rem;
+      font-size: 0.48rem;
+    }
+
+    .campaign-card h3 {
+      display: -webkit-box;
+      margin-top: 0.28rem;
+      overflow: hidden;
+      font-size: 0.74rem;
+      line-height: 1.16;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .campaign-card__budget {
+      min-width: 0;
+      text-align: left;
+      border-radius: 9px;
+      padding: 0.38rem 0.42rem;
+    }
+
+    .campaign-card__budget span {
+      font-size: 0.5rem;
+    }
+
+    .campaign-card__budget strong {
+      font-size: 0.68rem;
+    }
+
+    .campaign-card__message {
+      display: none;
+    }
+
+    .campaign-card__progress {
+      gap: 0.32rem;
+      padding: 0.4rem 0.44rem;
+      border-radius: 9px;
+    }
+
+    .campaign-card__progress > div:first-child {
+      font-size: 0.48rem;
+      gap: 0.35rem;
+    }
+
+    .campaign-card__progress > div:first-child span {
+      display: none;
+    }
+
+    .campaign-card__progress strong {
+      font-size: 0.52rem;
+    }
+
+    .campaign-card__progress-track {
+      height: 5px;
+    }
+
+    .campaign-card__meta-row {
+      gap: 0.28rem;
+      font-size: 0.52rem;
+    }
+
+    .campaign-card__meta-row span {
+      min-height: 1.18rem;
+      padding: 0.14rem 0.34rem;
+    }
+
+    .campaign-card__facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.34rem;
+    }
+
     .campaign-card__facts > div {
-      min-height: 50px;
-      padding: 0.45rem 0.5rem;
+      min-height: 42px;
+      border-radius: 8px;
+      padding: 0.36rem 0.4rem;
+    }
+
+    .campaign-card__facts > div:nth-child(3) {
+      display: none;
     }
 
     .campaign-card__facts dt svg {
       display: none;
     }
 
+    .campaign-card__facts dt {
+      font-size: 0.48rem;
+    }
+
+    .campaign-card__facts dd {
+      margin-top: 0.24rem;
+      font-size: 0.62rem;
+    }
+
     .campaign-card__actions {
-      padding-top: 0.55rem;
-      gap: 0.55rem;
+      padding-top: 0.42rem;
+      gap: 0.34rem;
       align-items: stretch;
     }
 
     .campaign-card__primary-actions,
     .campaign-card__secondary-actions {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(50px, 1fr));
+      gap: 0.3rem;
       width: 100%;
     }
 
-    .campaign-card__actions .btn {
-      min-height: 36px;
-    }
-
-    .campaign-card__primary-actions .btn {
-      flex: 1 1 auto;
+    .campaign-card__actions .btn,
+    .campaign-card__actions .campaign-brief-link {
+      width: 100%;
+      min-height: 28px;
+      justify-content: center;
+      border-radius: 8px;
+      padding: 0.28rem 0.18rem;
+      font-size: 0.54rem;
+      gap: 0.22rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .campaign-detail-modal {

@@ -168,6 +168,7 @@ export function ExistingCampaigns({
   const [statusFilter, setStatusFilter] = useState<CampaignStatusFilter>("all");
   const [sortBy, setSortBy] = useState<CampaignSort>("newest");
   const [viewMode, setViewMode] = useState<CampaignViewMode>("cards");
+  const [isMobileView, setIsMobileView] = useState(false);
   const [, startLoadEdit] = useTransition();
   const [, startStatus] = useTransition();
 
@@ -180,6 +181,14 @@ export function ExistingCampaigns({
     } catch {
       // localStorage unavailable
     }
+  }, []);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const sync = () => setIsMobileView(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
   }, []);
 
   const changeStatus = (campaignId: string, action: "close" | "reopen") => {
@@ -331,6 +340,7 @@ export function ExistingCampaigns({
     campaignIdFilter !== "all" ||
     statusFilter !== "all" ||
     sortBy !== "newest";
+  const effectiveViewMode: CampaignViewMode = isMobileView ? "cards" : viewMode;
 
   if (campaigns.length === 0) {
     return (
@@ -423,12 +433,14 @@ export function ExistingCampaigns({
           <span>
             Showing {filteredCampaigns.length} of {campaigns.length}
           </span>
-          <ViewModeToggle
-            storageKey={CAMPAIGN_VIEW_STORAGE_KEY}
-            options={CAMPAIGN_VIEW_OPTIONS}
-            defaultMode={viewMode}
-            onChange={(mode) => setViewMode(mode as CampaignViewMode)}
-          />
+          {!isMobileView && (
+            <ViewModeToggle
+              storageKey={CAMPAIGN_VIEW_STORAGE_KEY}
+              options={CAMPAIGN_VIEW_OPTIONS}
+              defaultMode={viewMode}
+              onChange={(mode) => setViewMode(mode as CampaignViewMode)}
+            />
+          )}
           {hasFilters && (
             <button type="button" onClick={clearFilters}>
               Reset
@@ -453,7 +465,9 @@ export function ExistingCampaigns({
       ) : (
         <div
           className={
-            viewMode === "list" ? "campaign-list-view" : "campaign-card-grid"
+            effectiveViewMode === "list"
+              ? "campaign-list-view"
+              : "campaign-card-grid"
           }
         >
           {filteredCampaigns.map((campaign, index) => {
@@ -481,7 +495,7 @@ export function ExistingCampaigns({
                 : 0;
             const accent = campaignAccent(campaign, index);
 
-            if (viewMode === "list") {
+            if (effectiveViewMode === "list") {
               return (
                 <article
                   key={campaign.campaign_id}
