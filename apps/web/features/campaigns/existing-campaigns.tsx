@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ArrowDownUp,
   CalendarDays,
   ExternalLink,
   Eye,
@@ -14,6 +15,8 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Search,
+  SlidersHorizontal,
   Target,
   X,
 } from "lucide-react";
@@ -25,6 +28,20 @@ import { CampaignCreateForm } from "./create-form";
 import type { CampaignCreateInput } from "./schema";
 
 const CAMPAIGN_CARD_ACCENTS = ["#B57514", "#3B6FD4", "#4F7C4D", "#7B4FBF"];
+
+type CampaignStatusFilter =
+  | "all"
+  | "active"
+  | "closed"
+  | "with-brief"
+  | "missing-brief";
+
+type CampaignSort =
+  | "newest"
+  | "oldest"
+  | "budget-desc"
+  | "budget-asc"
+  | "target-desc";
 
 interface ExistingCampaignsProps {
   campaigns: CampaignListRow[];
@@ -54,6 +71,53 @@ function statusLabel(status: string | null | undefined): string {
   return status ? status.replace(/_/g, " ") : "active";
 }
 
+function campaignWindowLabel(campaign: CampaignListRow): string {
+  if (campaign.start_date && campaign.end_date) {
+    return `${formatDate(campaign.start_date)} - ${formatDate(
+      campaign.end_date,
+    )}`;
+  }
+  if (campaign.start_date) return `From ${formatDate(campaign.start_date)}`;
+  if (campaign.end_date) return `Until ${formatDate(campaign.end_date)}`;
+  return "No campaign window";
+}
+
+function campaignAccent(campaign: CampaignListRow, index = 0): string {
+  if (isClosedStatus(campaign.status)) return "#6E695E";
+  const seed = normalizeNumber(campaign.campaign_num) ?? index;
+  return CAMPAIGN_CARD_ACCENTS[Math.abs(seed) % CAMPAIGN_CARD_ACCENTS.length];
+}
+
+function dateTime(value: string | null | undefined): number {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function campaignSearchText(campaign: CampaignListRow): string {
+  const budgetText = (campaign.budget_rows ?? [])
+    .flatMap((row) => [
+      row.tier,
+      row.collab_type,
+      row.campaign_name,
+      row.month_label,
+    ])
+    .filter(Boolean)
+    .join(" ");
+
+  return [
+    campaign.campaign_id,
+    campaign.campaign_name,
+    campaign.key_message,
+    statusLabel(campaign.status),
+    campaignWindowLabel(campaign),
+    budgetText,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
 export function ExistingCampaigns({
   campaigns,
   showCreateAction = false,
@@ -64,6 +128,9 @@ export function ExistingCampaigns({
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<CampaignStatusFilter>("all");
+  const [sortBy, setSortBy] = useState<CampaignSort>("newest");
   const [, startLoadEdit] = useTransition();
   const [, startStatus] = useTransition();
 
@@ -100,18 +167,77 @@ export function ExistingCampaigns({
       setEditTarget(res);
     });
   };
+  const filteredCampaigns = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const next = campaigns.filter((campaign) => {
+      const isClosed = isClosedStatus(campaign.status);
+      const hasBrief = Boolean(campaign.brief_link);
+      const statusMatch =
+        statusFilter === "all" ||
+        (statusFilter === "active" && !isClosed) ||
+        (statusFilter === "closed" && isClosed) ||
+        (statusFilter === "with-brief" && hasBrief) ||
+        (statusFilter === "missing-brief" && !hasBrief);
+
+      if (!statusMatch) return false;
+      if (!normalizedQuery) return true;
+      return campaignSearchText(campaign).includes(normalizedQuery);
+    });
+
+    return next.sort((a, b) => {
+      switch (sortBy) {
+        case "oldest":
+          return (
+            dateTime(a.created_at) - dateTime(b.created_at) ||
+            (normalizeNumber(a.campaign_num) ?? 0) -
+              (normalizeNumber(b.campaign_num) ?? 0)
+          );
+        case "budget-desc":
+          return (
+            (normalizeNumber(b.total_budget) ?? 0) -
+            (normalizeNumber(a.total_budget) ?? 0)
+          );
+        case "budget-asc":
+          return (
+            (normalizeNumber(a.total_budget) ?? 0) -
+            (normalizeNumber(b.total_budget) ?? 0)
+          );
+        case "target-desc":
+          return (
+            (normalizeNumber(b.no_of_creators) ?? 0) -
+            (normalizeNumber(a.no_of_creators) ?? 0)
+          );
+        case "newest":
+        default:
+          return (
+            (normalizeNumber(b.campaign_num) ?? 0) -
+              (normalizeNumber(a.campaign_num) ?? 0) ||
+            dateTime(b.created_at) - dateTime(a.created_at)
+          );
+      }
+    });
+  }, [campaigns, query, sortBy, statusFilter]);
+
+  const clearFilters = () => {
+    setQuery("");
+    setStatusFilter("all");
+    setSortBy("newest");
+  };
+
   const stats = useMemo(() => {
-    const totalBudget = campaigns.reduce(
+    const totalBudget = filteredCampaigns.reduce(
       (sum, c) => sum + (normalizeNumber(c.total_budget) ?? 0),
       0,
     );
-    const totalTarget = campaigns.reduce(
+    const totalTarget = filteredCampaigns.reduce(
       (sum, c) => sum + (normalizeNumber(c.no_of_creators) ?? 0),
       0,
     );
     return { totalBudget, totalTarget };
-  }, [campaigns]);
+  }, [filteredCampaigns]);
   const { totalBudget, totalTarget } = stats;
+  const hasFilters =
+    query.trim().length > 0 || statusFilter !== "all" || sortBy !== "newest";
 
   if (campaigns.length === 0) {
     return (
@@ -136,7 +262,7 @@ export function ExistingCampaigns({
       <div className="campaign-list-metrics" aria-label="Campaign summary">
         <div>
           <span>Campaigns</span>
-          <strong>{campaigns.length}</strong>
+          <strong>{filteredCampaigns.length}</strong>
         </div>
         <div>
           <span>Target</span>
@@ -148,209 +274,285 @@ export function ExistingCampaigns({
         </div>
       </div>
 
-      <div className="campaign-card-grid">
-        {campaigns.map((campaign, index) => {
-          const target = normalizeNumber(campaign.no_of_creators);
-          const isClosed = isClosedStatus(campaign.status);
-          const budgetRows = campaign.budget_rows ?? [];
-          const totalWithGarments = budgetRows.reduce(
-            (sum, row) => sum + (normalizeNumber(row.total_with_garments) ?? 0),
-            0,
-          );
-          // Creator cap = Σ budget num_influencers; used = distinct active creators.
-          const creatorCap = budgetRows.reduce(
-            (sum, row) => sum + (normalizeNumber(row.num_influencers) ?? 0),
-            0,
-          );
-          const creatorsUsed = campaign.creators_used ?? 0;
-          const allocationTarget = creatorCap || target || 0;
-          const progressPct =
-            allocationTarget > 0
-              ? Math.min(100, Math.round((creatorsUsed / allocationTarget) * 100))
-              : 0;
-          const accent = isClosed
-            ? "#6E695E"
-            : CAMPAIGN_CARD_ACCENTS[index % CAMPAIGN_CARD_ACCENTS.length];
+      <div className="campaign-list-toolbar">
+        <label className="campaign-search-field">
+          <Search size={15} aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search ID, name, message"
+            aria-label="Search existing campaigns"
+          />
+        </label>
 
-          return (
-            <article
-              key={campaign.campaign_id}
-              className="campaign-card"
-              data-status={isClosed ? "closed" : "active"}
-              style={
-                {
-                  "--campaign-accent": accent,
-                  "--campaign-progress": `${progressPct}%`,
-                } as CSSProperties
+        <div className="campaign-filter-controls">
+          <label className="campaign-filter-select">
+            <SlidersHorizontal size={14} aria-hidden="true" />
+            <select
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(event.target.value as CampaignStatusFilter)
               }
-              role="button"
-              tabIndex={0}
-              aria-label={`View details for ${campaign.campaign_id}`}
-              onClick={() => setSelected(campaign)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setSelected(campaign);
-                }
-              }}
+              aria-label="Filter campaigns"
             >
-              <header className="campaign-card__head">
-                <div className="min-w-0">
-                  <div className="campaign-card__id-row">
-                    <strong className="campaign-card__id">
-                      {campaign.campaign_id}
-                    </strong>
-                    <span className="campaign-status-pill">
-                      {statusLabel(campaign.status)}
-                    </span>
-                  </div>
-                  <h3>{campaign.campaign_name ?? "Untitled campaign"}</h3>
-                </div>
-                <div className="campaign-card__budget">
-                  <span>Budget</span>
-                  <strong>{formatRupees(campaign.total_budget)}</strong>
-                </div>
-              </header>
+              <option value="all">All campaigns</option>
+              <option value="active">Active</option>
+              <option value="closed">Closed</option>
+              <option value="with-brief">With brief</option>
+              <option value="missing-brief">Missing brief</option>
+            </select>
+          </label>
 
-              {campaign.key_message && (
-                <p className="campaign-card__message">{campaign.key_message}</p>
-              )}
+          <label className="campaign-filter-select">
+            <ArrowDownUp size={14} aria-hidden="true" />
+            <select
+              value={sortBy}
+              onChange={(event) =>
+                setSortBy(event.target.value as CampaignSort)
+              }
+              aria-label="Sort campaigns"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="budget-desc">Budget high to low</option>
+              <option value="budget-asc">Budget low to high</option>
+              <option value="target-desc">Target high to low</option>
+            </select>
+          </label>
+        </div>
 
-              <div className="campaign-card__progress">
-                <div>
-                  <span>Creator allocation</span>
-                  <strong>
-                    {allocationTarget > 0
-                      ? `${progressPct}% filled`
-                      : "No cap set"}
-                  </strong>
-                </div>
-                <div
-                  className="campaign-card__progress-track"
-                  aria-hidden="true"
-                >
-                  <span />
-                </div>
-              </div>
-
-              <dl className="campaign-card__facts">
-                <div>
-                  <dt>
-                    <Target size={12} />
-                    Creators
-                  </dt>
-                  <dd
-                    title={
-                      creatorCap > 0
-                        ? `${creatorsUsed} of ${creatorCap} creator slots used`
-                        : undefined
-                    }
-                  >
-                    {creatorCap > 0
-                      ? `${creatorsUsed} / ${creatorCap}`
-                      : (target ?? "—")}
-                  </dd>
-                </div>
-                <div>
-                  <dt>
-                    <CalendarDays size={12} />
-                    Created
-                  </dt>
-                  <dd>{formatDate(campaign.created_at)}</dd>
-                </div>
-                <div>
-                  <dt>
-                    <IndianRupee size={12} />
-                    With garments
-                  </dt>
-                  <dd>
-                    {totalWithGarments ? formatRupees(totalWithGarments) : "—"}
-                  </dd>
-                </div>
-              </dl>
-
-              <div className="campaign-card__meta-row">
-                <span>{budgetRows.length} budget lines</span>
-                <span>
-                  {campaign.start_date || campaign.end_date
-                    ? `${formatDate(campaign.start_date)} - ${formatDate(
-                        campaign.end_date,
-                      )}`
-                    : "No campaign window"}
-                </span>
-              </div>
-
-              <footer className="campaign-card__actions">
-                <div className="campaign-card__primary-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-xs"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setSelected(campaign);
-                    }}
-                  >
-                    <Eye size={12} />
-                    View Details
-                  </button>
-                  {campaign.brief_link && (
-                    <a
-                      href={campaign.brief_link}
-                      target="_blank"
-                      rel="noopener"
-                      className="campaign-brief-link"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      Brief <ExternalLink size={11} />
-                    </a>
-                  )}
-                </div>
-                {canManage && (
-                  <div className="campaign-card__secondary-actions">
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-xs"
-                      disabled={loadingEditId === campaign.campaign_id}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openEdit(campaign.campaign_id);
-                      }}
-                    >
-                      {loadingEditId === campaign.campaign_id ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        <Pencil size={12} />
-                      )}
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-xs"
-                      disabled={statusBusyId === campaign.campaign_id}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        changeStatus(
-                          campaign.campaign_id,
-                          isClosed ? "reopen" : "close",
-                        );
-                      }}
-                    >
-                      {statusBusyId === campaign.campaign_id ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : isClosed ? (
-                        <RotateCcw size={12} />
-                      ) : (
-                        <Lock size={12} />
-                      )}
-                      {isClosed ? "Reopen" : "Close"}
-                    </button>
-                  </div>
-                )}
-              </footer>
-            </article>
-          );
-        })}
+        <div className="campaign-list-toolbar__meta">
+          <span>
+            Showing {filteredCampaigns.length} of {campaigns.length}
+          </span>
+          {hasFilters && (
+            <button type="button" onClick={clearFilters}>
+              Reset
+            </button>
+          )}
+        </div>
       </div>
+
+      {filteredCampaigns.length === 0 ? (
+        <div className="campaign-filter-empty">
+          <Search size={24} />
+          <strong>No campaigns match</strong>
+          <span>Try another search term or filter.</span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={clearFilters}
+          >
+            Reset filters
+          </button>
+        </div>
+      ) : (
+        <div className="campaign-card-grid">
+          {filteredCampaigns.map((campaign, index) => {
+            const target = normalizeNumber(campaign.no_of_creators);
+            const isClosed = isClosedStatus(campaign.status);
+            const budgetRows = campaign.budget_rows ?? [];
+            const totalWithGarments = budgetRows.reduce(
+              (sum, row) =>
+                sum + (normalizeNumber(row.total_with_garments) ?? 0),
+              0,
+            );
+            // Creator cap = Σ budget num_influencers; used = distinct active creators.
+            const creatorCap = budgetRows.reduce(
+              (sum, row) => sum + (normalizeNumber(row.num_influencers) ?? 0),
+              0,
+            );
+            const creatorsUsed = campaign.creators_used ?? 0;
+            const allocationTarget = creatorCap || target || 0;
+            const progressPct =
+              allocationTarget > 0
+                ? Math.min(
+                    100,
+                    Math.round((creatorsUsed / allocationTarget) * 100),
+                  )
+                : 0;
+            const accent = campaignAccent(campaign, index);
+
+            return (
+              <article
+                key={campaign.campaign_id}
+                className="campaign-card"
+                data-status={isClosed ? "closed" : "active"}
+                style={
+                  {
+                    "--campaign-accent": accent,
+                    "--campaign-progress": `${progressPct}%`,
+                    "--campaign-card-index": String(index),
+                  } as CSSProperties
+                }
+                role="button"
+                tabIndex={0}
+                aria-label={`View details for ${campaign.campaign_id}`}
+                onClick={() => setSelected(campaign)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelected(campaign);
+                  }
+                }}
+              >
+                <header className="campaign-card__head">
+                  <div className="min-w-0">
+                    <div className="campaign-card__id-row">
+                      <strong className="campaign-card__id">
+                        {campaign.campaign_id}
+                      </strong>
+                      <span className="campaign-status-pill">
+                        {statusLabel(campaign.status)}
+                      </span>
+                    </div>
+                    <h3>{campaign.campaign_name ?? "Untitled campaign"}</h3>
+                  </div>
+                  <div className="campaign-card__budget">
+                    <span>Budget</span>
+                    <strong>{formatRupees(campaign.total_budget)}</strong>
+                  </div>
+                </header>
+
+                {campaign.key_message && (
+                  <p className="campaign-card__message">
+                    {campaign.key_message}
+                  </p>
+                )}
+
+                <div className="campaign-card__progress">
+                  <div>
+                    <span>Creator allocation</span>
+                    <strong>
+                      {allocationTarget > 0
+                        ? `${progressPct}% filled`
+                        : "No cap set"}
+                    </strong>
+                  </div>
+                  <div
+                    className="campaign-card__progress-track"
+                    aria-hidden="true"
+                  >
+                    <span />
+                  </div>
+                </div>
+
+                <dl className="campaign-card__facts">
+                  <div>
+                    <dt>
+                      <Target size={12} />
+                      Creators
+                    </dt>
+                    <dd
+                      title={
+                        creatorCap > 0
+                          ? `${creatorsUsed} of ${creatorCap} creator slots used`
+                          : undefined
+                      }
+                    >
+                      {creatorCap > 0
+                        ? `${creatorsUsed} / ${creatorCap}`
+                        : (target ?? "—")}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>
+                      <CalendarDays size={12} />
+                      Created
+                    </dt>
+                    <dd>{formatDate(campaign.created_at)}</dd>
+                  </div>
+                  <div>
+                    <dt>
+                      <IndianRupee size={12} />
+                      With garments
+                    </dt>
+                    <dd>
+                      {totalWithGarments
+                        ? formatRupees(totalWithGarments)
+                        : "—"}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div className="campaign-card__meta-row">
+                  <span>{budgetRows.length} budget lines</span>
+                  <span>{campaignWindowLabel(campaign)}</span>
+                </div>
+
+                <footer className="campaign-card__actions">
+                  <div className="campaign-card__primary-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelected(campaign);
+                      }}
+                    >
+                      <Eye size={12} />
+                      View Details
+                    </button>
+                    {campaign.brief_link && (
+                      <a
+                        href={campaign.brief_link}
+                        target="_blank"
+                        rel="noopener"
+                        className="campaign-brief-link"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        Brief <ExternalLink size={11} />
+                      </a>
+                    )}
+                  </div>
+                  {canManage && (
+                    <div className="campaign-card__secondary-actions">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-xs"
+                        disabled={loadingEditId === campaign.campaign_id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openEdit(campaign.campaign_id);
+                        }}
+                      >
+                        {loadingEditId === campaign.campaign_id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Pencil size={12} />
+                        )}
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-xs"
+                        disabled={statusBusyId === campaign.campaign_id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          changeStatus(
+                            campaign.campaign_id,
+                            isClosed ? "reopen" : "close",
+                          );
+                        }}
+                      >
+                        {statusBusyId === campaign.campaign_id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : isClosed ? (
+                          <RotateCcw size={12} />
+                        ) : (
+                          <Lock size={12} />
+                        )}
+                        {isClosed ? "Reopen" : "Close"}
+                      </button>
+                    </div>
+                  )}
+                </footer>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
       {selected && (
         <CampaignDetailsModal
@@ -429,6 +631,7 @@ function CampaignDetailsModal({
 }) {
   const target = normalizeNumber(campaign.no_of_creators);
   const budgetRows = campaign.budget_rows ?? [];
+  const accent = campaignAccent(campaign);
   const totalWithGarments = budgetRows.reduce(
     (sum, row) => sum + (normalizeNumber(row.total_with_garments) ?? 0),
     0,
@@ -438,22 +641,38 @@ function CampaignDetailsModal({
     0,
   );
   const creatorsUsed = campaign.creators_used ?? 0;
+  const allocationTarget = creatorCap || target || 0;
+  const progressPct =
+    allocationTarget > 0
+      ? Math.min(100, Math.round((creatorsUsed / allocationTarget) * 100))
+      : 0;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-panel campaign-detail-modal"
+        style={
+          {
+            "--campaign-accent": accent,
+            "--campaign-progress": `${progressPct}%`,
+          } as CSSProperties
+        }
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="modal-head">
+        <header className="modal-head campaign-detail-head">
           <div className="min-w-0">
             <div className="campaign-card__id-row">
-              <strong>{campaign.campaign_id}</strong>
+              <strong className="campaign-card__id">
+                {campaign.campaign_id}
+              </strong>
               <span className="campaign-status-pill">
                 {statusLabel(campaign.status)}
               </span>
             </div>
             <h2>{campaign.campaign_name ?? "Untitled campaign"}</h2>
+            {campaign.key_message && (
+              <p className="campaign-detail-subtitle">{campaign.key_message}</p>
+            )}
           </div>
           <div className="modal-head__actions">
             {canManage && (
@@ -483,51 +702,68 @@ function CampaignDetailsModal({
         </header>
 
         <div className="modal-body campaign-detail-body">
-          <dl className="campaign-detail-grid">
-            <div>
-              <dt>Campaign ID</dt>
-              <dd>{campaign.campaign_id}</dd>
+          <section className="campaign-detail-overview">
+            <div className="campaign-detail-allocation-card">
+              <div
+                className="campaign-detail-ring"
+                aria-label={`Creator allocation ${progressPct}% filled`}
+              >
+                <strong>{progressPct}%</strong>
+                <span>filled</span>
+              </div>
+              <div className="campaign-detail-allocation-copy">
+                <span>Creator allocation</span>
+                <strong>
+                  {allocationTarget > 0
+                    ? `${creatorsUsed} / ${allocationTarget}`
+                    : "No cap set"}
+                </strong>
+                <div
+                  className="campaign-card__progress-track campaign-detail-progress-track"
+                  aria-hidden="true"
+                >
+                  <span />
+                </div>
+              </div>
             </div>
-            <div>
-              <dt>Creators (used / cap)</dt>
-              <dd>
-                {creatorCap > 0
-                  ? `${creatorsUsed} / ${creatorCap}`
-                  : (target ?? "—")}
-              </dd>
-            </div>
-            <div>
-              <dt>Comp budget</dt>
-              <dd>{formatRupees(campaign.total_budget)}</dd>
-            </div>
-            <div>
-              <dt>With garments</dt>
-              <dd>
-                {totalWithGarments ? formatRupees(totalWithGarments) : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt>Created</dt>
-              <dd>{formatDate(campaign.created_at)}</dd>
-            </div>
-            <div>
-              <dt>Window</dt>
-              <dd>
-                {formatDate(campaign.start_date)} to{" "}
-                {formatDate(campaign.end_date)}
-              </dd>
-            </div>
-          </dl>
 
-          {campaign.key_message && (
-            <section className="campaign-detail-section">
-              <h3>Key Message</h3>
-              <p>{campaign.key_message}</p>
-            </section>
-          )}
+            <dl className="campaign-detail-stat-grid">
+              <div>
+                <dt>Campaign ID</dt>
+                <dd>{campaign.campaign_id}</dd>
+              </div>
+              <div>
+                <dt>Comp budget</dt>
+                <dd>{formatRupees(campaign.total_budget)}</dd>
+              </div>
+              <div>
+                <dt>With garments</dt>
+                <dd>
+                  {totalWithGarments ? formatRupees(totalWithGarments) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatDate(campaign.created_at)}</dd>
+              </div>
+              <div>
+                <dt>Window</dt>
+                <dd>{campaignWindowLabel(campaign)}</dd>
+              </div>
+              <div>
+                <dt>Budget lines</dt>
+                <dd>{budgetRows.length}</dd>
+              </div>
+            </dl>
+          </section>
 
           <section className="campaign-detail-section">
-            <h3>Links</h3>
+            <div className="campaign-detail-section-head">
+              <div>
+                <h3>Links</h3>
+                <p>Briefs attached to this campaign.</p>
+              </div>
+            </div>
             <div className="campaign-link-row">
               {campaign.brief_link ? (
                 <a href={campaign.brief_link} target="_blank" rel="noopener">
@@ -551,24 +787,47 @@ function CampaignDetailsModal({
           </section>
 
           <section className="campaign-detail-section">
-            <h3>Budget Lines</h3>
+            <div className="campaign-detail-section-head">
+              <div>
+                <h3>Budget Lines</h3>
+                <p>
+                  {budgetRows.length} rows /{" "}
+                  {allocationTarget > 0
+                    ? `${allocationTarget} creator slots`
+                    : "No creator cap"}
+                </p>
+              </div>
+              <strong>
+                {totalWithGarments ? formatRupees(totalWithGarments) : "—"}
+              </strong>
+            </div>
             {budgetRows.length === 0 ? (
               <p>No budget lines found.</p>
             ) : (
               <div className="campaign-budget-lines">
-                {budgetRows.map((row) => (
-                  <div key={row.id} className="campaign-budget-line">
-                    <div>
-                      <strong>{row.tier ?? "Tier"}</strong>
-                      <span>
-                        {row.collab_type ?? "Collab"} /{" "}
-                        {row.campaign_name ??
-                          campaign.campaign_name ??
-                          "Segment"}
-                      </span>
+                {budgetRows.map((row, index) => (
+                  <div
+                    key={row.id}
+                    className="campaign-budget-line"
+                    style={
+                      {
+                        "--budget-line-index": String(index),
+                      } as CSSProperties
+                    }
+                  >
+                    <div className="campaign-budget-line__main">
+                      <div>
+                        <strong>{row.tier ?? "Tier"}</strong>
+                        <span>
+                          {row.collab_type ?? "Collab"} /{" "}
+                          {row.campaign_name ??
+                            campaign.campaign_name ??
+                            "Segment"}
+                        </span>
+                      </div>
                       <em>{row.month_label ?? "No month label"}</em>
                     </div>
-                    <dl>
+                    <dl className="campaign-budget-line__stats">
                       <div>
                         <dt>No.</dt>
                         <dd>{row.num_influencers ?? 0}</dd>
@@ -593,7 +852,7 @@ function CampaignDetailsModal({
                         <dt>Est garment</dt>
                         <dd>{formatRupees(row.est_garment_cost)}</dd>
                       </div>
-                      <div>
+                      <div className="campaign-budget-line__stat--total">
                         <dt>Total</dt>
                         <dd>{formatRupees(row.total_with_garments)}</dd>
                       </div>
