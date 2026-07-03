@@ -99,7 +99,11 @@ export function AdStatusFiltersBar({
             onChange={(v) => setParam("classification", v || undefined)}
             options={[
               { value: "", label: "All Results" },
+              { value: "Incremental Winner", label: "Incremental Winner" },
               { value: "Winner", label: "Winner" },
+              { value: "P0 analysis", label: "P0 Analysis" },
+              { value: "P1 analysis", label: "P1 Analysis" },
+              { value: "P2 analysis", label: "P2 Analysis" },
               { value: "ITE", label: "ITE" },
               { value: "Discarded but analyse", label: "Discarded (Analyse)" },
               { value: "Discarded", label: "Discarded" },

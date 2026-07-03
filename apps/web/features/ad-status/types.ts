@@ -1,3 +1,7 @@
+import type { WarehouseAd } from "@/lib/supabase/meta-ads";
+
+export type { WarehouseAd };
+
 export interface AdStatusRow {
   postId: string;
   postIdShort: string;
@@ -25,6 +29,24 @@ export interface AdStatusRow {
   isInMetaAds: boolean;
   partnershipId: string;
   collabType: string;
+  /** live = posts table; historic = historic_posts archive (always Ad Run). */
+  source: "live" | "historic";
+  /** Warehouse ads whose ad_name carries this post's SIF token, spend desc. */
+  ads: WarehouseAd[];
+  /** Highest-spend ad — the creative shown inline. */
+  primaryAd: WarehouseAd | null;
+  /** Best-rank warehouse category across `ads` (Incremental Winner > … > Discarded). */
+  warehouseCategory: string | null;
+}
+
+/** Per-warehouse-category row counts (best category per matched post). */
+export interface AdStatusCategoryCounts {
+  incrementalWinners: number;
+  winners: number;
+  p0: number;
+  p1: number;
+  p2: number;
+  discarded: number;
 }
 
 export interface AdStatusKpi {
@@ -34,11 +56,14 @@ export interface AdStatusKpi {
   pendingClassification: number;
   winners: number;
   discarded: number;
+  /** Counts by warehouse category across all matched rows (live + historic). */
+  categories: AdStatusCategoryCounts;
 }
 
 export interface AdStatusFilters {
   campaign?: string;
-  /** Winner | ITE | Discarded | Discarded but analyse | __untested */
+  /** Legacy result (Winner | ITE | Discarded | Discarded but analyse), a
+   * warehouse category (Incremental Winner | P0 analysis | …), or __untested */
   classification?: string;
   /** Substring match on adsStatus — e.g. "run" matches "running" */
   adStatus?: string;

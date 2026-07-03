@@ -25,8 +25,13 @@ import { PartnershipKeyEdit } from "@/components/ui/partnership-key-edit";
 import { TileHead } from "@/features/dashboard/bento-kit";
 import { DonutTile, type DonutSeg } from "@/features/dashboard/bento-charts";
 import { cn } from "@/lib/cn";
-import { formatDate, workflowStatusLabel } from "@/lib/formatters";
-import type { AdStatusFilters, AdStatusRow } from "./types";
+import {
+  formatDate,
+  formatNumber,
+  formatRupees,
+  workflowStatusLabel,
+} from "@/lib/formatters";
+import type { AdStatusFilters, AdStatusRow, WarehouseAd } from "./types";
 
 // ---------------------------------------------------------------------------
 // Classification badge — exact legacy colors
@@ -72,6 +77,215 @@ function AsClassBadge({ value }: { value: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Warehouse category badge — Creative Testing Dashboard semantics in our
+// tokens. Incremental Winner gets the filled/stronger green variant.
+// ---------------------------------------------------------------------------
+
+const BADGE_BASE =
+  "pill inline-flex items-center gap-1 px-[10px] py-[3px] rounded-full text-[0.7rem] font-extrabold tracking-[0.04em] uppercase leading-tight whitespace-nowrap";
+
+function WhCategoryBadge({ category }: { category: string }) {
+  if (category === "Incremental Winner")
+    return (
+      <span
+        className={cn(BADGE_BASE, "bg-[#4F7C4D] text-white")}
+        title="Incremental Winner"
+      >
+        <Trophy size={9} aria-hidden />
+        Incr. Winner
+      </span>
+    );
+  if (category === "Winner")
+    return (
+      <span className={cn(BADGE_BASE, "bg-[#ECF1E9] text-[#4F7C4D]")}>
+        <Trophy size={9} aria-hidden />
+        Winner
+      </span>
+    );
+  if (category === "P0 analysis")
+    return (
+      <span className={cn(BADGE_BASE, "bg-[#E6EDF8] text-[#3B6FD4]")}>
+        <Search size={9} aria-hidden />
+        P0 Analysis
+      </span>
+    );
+  if (category === "P1 analysis")
+    return (
+      <span className={cn(BADGE_BASE, "bg-[#FAF1DC] text-[#B57514]")}>
+        <TrendingUp size={9} aria-hidden />
+        P1 Analysis
+      </span>
+    );
+  if (category === "P2 analysis")
+    return (
+      <span className={cn(BADGE_BASE, "bg-[#FAF1DC] text-[#B57514]")}>
+        <TrendingUp size={9} aria-hidden />
+        P2 Analysis
+      </span>
+    );
+  if (category === "Discarded")
+    return (
+      <span className={cn(BADGE_BASE, "bg-[#FDECEA] text-[#C0392B]")}>
+        <XCircle size={9} aria-hidden />
+        Discarded
+      </span>
+    );
+  return (
+    <span className="pill pill--muted font-bold uppercase">{category}</span>
+  );
+}
+
+/**
+ * Status chip for an Ad Run row: warehouse category when matched, otherwise
+ * neutral (legacy classification text or plain "In Meta Ads").
+ */
+function RowStatusBadge({ row }: { row: AdStatusRow }) {
+  if (row.warehouseCategory)
+    return <WhCategoryBadge category={row.warehouseCategory} />;
+  return (
+    <span className="pill pill--muted font-bold uppercase">
+      <Megaphone size={9} aria-hidden />
+      {row.adsResults || "In Meta Ads"}
+    </span>
+  );
+}
+
+function HistoricChip() {
+  return (
+    <span
+      className="pill pill--muted text-[0.62rem] font-bold uppercase tracking-[0.05em] shrink-0"
+      title="From the historic archive — pre-platform post matched to a warehouse ad"
+    >
+      Historic
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ad creative thumbnail — plain <img> (Meta CDN blocks proxying), lazy, no
+// referrer. Clicking opens the Meta ad preview (fb.me) — the real ad.
+// ---------------------------------------------------------------------------
+
+function AdImg({
+  ad,
+  alt,
+  size = 44,
+  className,
+}: {
+  ad: WarehouseAd;
+  alt: string;
+  size?: number;
+  className?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const src = ad.imageUrl || ad.thumbnailUrl || null;
+  const body =
+    src && !failed ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        className={cn("ad-thumb", className)}
+        style={{ width: size, height: size }}
+        onError={() => setFailed(true)}
+      />
+    ) : (
+      <span
+        className={cn("ad-thumb ad-thumb--empty", className)}
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <Megaphone size={Math.round(size * 0.36)} aria-hidden />
+      </span>
+    );
+  if (!ad.previewLink) return body;
+  return (
+    <a
+      href={ad.previewLink}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="ad-thumb-link shrink-0"
+      title="Open Meta ad preview"
+      aria-label={`Open Meta ad preview — ${alt}`}
+    >
+      {body}
+    </a>
+  );
+}
+
+/** Row thumbnail: primary ad creative when available, else creator avatar. */
+function RowThumb({ row, size = 44 }: { row: AdStatusRow; size?: number }) {
+  const primary = row.primaryAd;
+  if (primary && (primary.imageUrl || primary.thumbnailUrl))
+    return (
+      <AdImg
+        ad={primary}
+        alt={`Ad creative — ${row.username || row.postIdShort}`}
+        size={size}
+      />
+    );
+  return (
+    <Avatar
+      src={row.profilePicUrl}
+      username={row.username}
+      name={row.name}
+      size={size}
+    />
+  );
+}
+
+function rowHasThumb(row: AdStatusRow): boolean {
+  return Boolean(
+    row.primaryAd && (row.primaryAd.imageUrl || row.primaryAd.thumbnailUrl),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Warehouse link chips — Landing (ad_link) + Preview (fb.me real ad preview)
+// ---------------------------------------------------------------------------
+
+function AdLinkChips({ ad }: { ad: WarehouseAd | null }) {
+  if (!ad || (!ad.adLink && !ad.previewLink))
+    return <span className="text-text-tertiary text-[0.78rem]">—</span>;
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {ad.adLink && (
+        <a
+          href={ad.adLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[0.74rem] px-[10px] py-[3px] rounded-full bg-[rgba(59,111,212,0.1)] text-[#3B6FD4] font-semibold no-underline"
+          title={ad.adLink}
+        >
+          <ExternalLink size={11} aria-hidden />
+          Landing
+        </a>
+      )}
+      {ad.previewLink && (
+        <a
+          href={ad.previewLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[0.74rem] px-[10px] py-[3px] rounded-full bg-[rgba(123,79,191,0.1)] text-[#7B4FBF] font-semibold no-underline"
+          title="Open Meta ad preview"
+        >
+          <Eye size={11} aria-hidden />
+          Preview
+        </a>
+      )}
+    </div>
+  );
+}
+
+/** ROAS as "2.35x" — 2dp, en-IN irrelevant for a ratio. */
+function roasText(ad: WarehouseAd | null): string {
+  if (!ad) return "—";
+  return `${ad.roasMa.toFixed(2)}x`;
+}
+
+// ---------------------------------------------------------------------------
 // Link chips — Instagram (pink) + Drive (green), exact legacy colors
 // ---------------------------------------------------------------------------
 
@@ -106,8 +320,18 @@ function LinkChips({ post, drive }: { post?: string; drive?: string }) {
   );
 }
 
-function CardLinkActions({ post, drive }: { post?: string; drive?: string }) {
-  if (!post && !drive) return null;
+function CardLinkActions({
+  post,
+  drive,
+  landing,
+  preview,
+}: {
+  post?: string;
+  drive?: string;
+  landing?: string | null;
+  preview?: string | null;
+}) {
+  if (!post && !drive && !landing && !preview) return null;
   return (
     <div className="ob-card-actions ad-status-card-link-actions">
       {post && (
@@ -130,6 +354,30 @@ function CardLinkActions({ post, drive }: { post?: string; drive?: string }) {
         >
           <Download size={12} aria-hidden />
           Drive
+        </a>
+      )}
+      {landing && (
+        <a
+          href={landing}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="action-view ad-status-link-action ad-status-link-action--landing"
+          title={landing}
+        >
+          <ExternalLink size={12} aria-hidden />
+          Landing
+        </a>
+      )}
+      {preview && (
+        <a
+          href={preview}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="action-view ad-status-link-action ad-status-link-action--preview"
+          title="Open Meta ad preview"
+        >
+          <Eye size={12} aria-hidden />
+          Preview
         </a>
       )}
     </div>
@@ -253,8 +501,16 @@ function AdPerformanceStats({
   adRun: AdStatusRow[];
 }) {
   const total = untested.length + adRun.length;
-  const classified = adRun.filter((r) => r.isClassified).length;
-  const winners = adRun.filter((r) => r.adsResults === "Winner").length;
+  // Classified = warehouse-categorised OR legacy-classified.
+  const classified = adRun.filter(
+    (r) => r.warehouseCategory != null || r.isClassified,
+  ).length;
+  const winners = adRun.filter(
+    (r) =>
+      r.warehouseCategory === "Incremental Winner" ||
+      r.warehouseCategory === "Winner" ||
+      r.adsResults === "Winner",
+  ).length;
   const winRate =
     classified > 0 ? ((winners / classified) * 100).toFixed(1) : "0";
   const classRate = total > 0 ? ((classified / total) * 100).toFixed(1) : "0";
@@ -270,7 +526,7 @@ function AdPerformanceStats({
     <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-2">
       <TileHead
         icon={<BarChart3 size={12} aria-hidden />}
-        info="Win Rate = Winners ÷ classified ads. Class. Rate = classified ÷ all eligible posts. In Meta Ads = posts found on the Meta platform."
+        info="Win Rate = Winner-class posts (Incremental Winner + Winner) ÷ classified posts. Class. Rate = classified ÷ all eligible posts. In Meta Ads = posts found on the Meta platform."
       >
         Performance Stats
       </TileHead>
@@ -424,9 +680,14 @@ function AdStatusOverviewModal({
                 <strong>{row.name || row.username || "—"}</strong>
                 <span>@{row.username || "—"}</span>
               </div>
-              <AsClassBadge value={row.adsResults} />
+              {row.warehouseCategory ? (
+                <WhCategoryBadge category={row.warehouseCategory} />
+              ) : (
+                <AsClassBadge value={row.adsResults} />
+              )}
             </div>
             <div className="ob-overview-pills">
+              {row.source === "historic" && <HistoricChip />}
               {row.campaign && (
                 <span className="campaign-chip">{row.campaign}</span>
               )}
@@ -520,6 +781,46 @@ function AdStatusOverviewModal({
             />
           </section>
 
+          {row.ads.length > 0 && (
+            <section className="ob-overview-card ad-overview-ads">
+              <div className="flex items-center gap-2 mb-2">
+                <Megaphone size={13} aria-hidden />
+                <strong className="text-[0.8rem]">
+                  Meta Ads Performance ({row.ads.length} ad
+                  {row.ads.length > 1 ? "s" : ""})
+                </strong>
+              </div>
+              <ul className="ad-overview-ad-list">
+                {row.ads.map((ad) => (
+                  <li key={ad.adId}>
+                    <AdImg
+                      ad={ad}
+                      alt={`Ad creative — ${ad.adName}`}
+                      size={36}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <span
+                        className="block truncate text-[0.76rem] font-semibold text-text-primary"
+                        title={ad.adName}
+                      >
+                        {ad.adName}
+                      </span>
+                      <span className="block text-[0.7rem] text-text-tertiary tabular">
+                        {formatRupees(ad.amountSpent)} · {roasText(ad)} ·{" "}
+                        {formatNumber(ad.impressions)} impr ·{" "}
+                        {formatNumber(ad.ftewvCount)} FTEWV ·{" "}
+                        {formatNumber(ad.ncpCount)} NCP ·{" "}
+                        {formatNumber(ad.shopifyOrders)} orders
+                      </span>
+                    </div>
+                    <WhCategoryBadge category={ad.category || "—"} />
+                    <AdLinkChips ad={ad} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="pt-overview-links">
             <LinkRow
               icon={<Instagram size={12} aria-hidden />}
@@ -530,6 +831,16 @@ function AdStatusOverviewModal({
               icon={<Download size={12} aria-hidden />}
               label="Drive Download Link"
               url={row.downloadLink}
+            />
+            <LinkRow
+              icon={<ExternalLink size={12} aria-hidden />}
+              label="Ad Landing Page"
+              url={row.primaryAd?.adLink}
+            />
+            <LinkRow
+              icon={<Eye size={12} aria-hidden />}
+              label="Meta Ad Preview"
+              url={row.primaryAd?.previewLink}
             />
           </section>
         </div>
@@ -567,6 +878,9 @@ function UntestedListTable({
   rows: AdStatusRow[];
   onOverview: (row: AdStatusRow) => void;
 }) {
+  // Thumbnails only exist for warehouse-matched rows — in practice a matched
+  // row is never Untested, but keep the column self-healing if that changes.
+  const hasThumbs = rows.some(rowHasThumb);
   if (!rows.length)
     return (
       <div className="bento-tile ob-list-wrap ad-status-list-wrap">
@@ -574,7 +888,7 @@ function UntestedListTable({
           <tbody>
             <tr>
               <td
-                colSpan={7}
+                colSpan={8}
                 className="text-center py-8 text-text-tertiary text-sm"
               >
                 No untested ads — warehouse classified everything.
@@ -589,6 +903,7 @@ function UntestedListTable({
       <div>
         <table className="ob-list-table">
           <colgroup>
+            {hasThumbs && <col className="ad-col-thumb" />}
             <col className="ad-col-creator" />
             <col className="ad-col-post-id" />
             <col className="ad-col-campaign" />
@@ -600,6 +915,7 @@ function UntestedListTable({
           </colgroup>
           <thead>
             <tr>
+              {hasThumbs && <th data-column-id="ad_thumb">Ad</th>}
               <th data-column-id="creator">Creator</th>
               <th data-column-id="post_id">Post ID</th>
               <th data-column-id="campaign">Campaign</th>
@@ -613,6 +929,11 @@ function UntestedListTable({
           <tbody>
             {rows.map((r) => (
               <tr key={r.postId}>
+                {hasThumbs && (
+                  <td data-column-id="ad_thumb">
+                    <RowThumb row={r} />
+                  </td>
+                )}
                 <td data-column-id="creator">
                   <CreatorCell row={r} />
                 </td>
@@ -780,6 +1101,125 @@ function UntestedCardsGrid({
 // Ad Run section — list table
 // ---------------------------------------------------------------------------
 
+/** Metric cells shared by the primary row and each expanded sibling ad. */
+function AdMetricCells({ ad }: { ad: WarehouseAd | null }) {
+  return (
+    <>
+      <td className="tabular">{ad ? formatDate(ad.adCreated) : "—"}</td>
+      <td className="tabular font-semibold">
+        {ad ? formatRupees(ad.amountSpent) : "—"}
+      </td>
+      <td className="tabular">{roasText(ad)}</td>
+      <td className="tabular">{ad ? formatNumber(ad.ftewvCount) : "—"}</td>
+      <td className="tabular">{ad ? formatNumber(ad.ncpCount) : "—"}</td>
+      <td className="tabular">{ad ? formatNumber(ad.shopifyOrders) : "—"}</td>
+    </>
+  );
+}
+
+/**
+ * One Ad Run row group — primary ad inline; "+N more ads" expands the
+ * remaining warehouse ads as sibling rows with the same columns.
+ */
+function AdRunRowGroup({
+  row,
+  onOverview,
+}: {
+  row: AdStatusRow;
+  onOverview: (row: AdStatusRow) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const primary = row.primaryAd;
+  const extras = row.ads.filter((ad) => ad !== primary);
+
+  return (
+    <>
+      <tr>
+        <td data-column-id="ad_thumb">
+          <RowThumb row={row} />
+        </td>
+        <td data-column-id="ad_name">
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span
+                className="truncate font-bold text-text-primary text-[0.8rem]"
+                title={primary?.adName || row.name || undefined}
+              >
+                {primary?.adName || row.name || row.postIdShort || "—"}
+              </span>
+              {row.source === "historic" && <HistoricChip />}
+            </div>
+            <div className="flex items-center gap-2 text-[0.72rem] text-text-tertiary min-w-0">
+              <span className="truncate">
+                @{row.username || "—"} · {row.postIdShort || row.postId}
+              </span>
+              {extras.length > 0 && (
+                <button
+                  type="button"
+                  className="ad-more-toggle"
+                  aria-expanded={open}
+                  onClick={() => setOpen((v) => !v)}
+                >
+                  {open ? "Hide ads" : `+${extras.length} more ad${extras.length > 1 ? "s" : ""}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </td>
+        <AdMetricCells ad={primary} />
+        <td>
+          <RowStatusBadge row={row} />
+        </td>
+        <td className="ad-links-cell">
+          {primary ? (
+            <AdLinkChips ad={primary} />
+          ) : (
+            <LinkChips post={row.linkToPost} />
+          )}
+        </td>
+        <td data-column-id="actions">
+          <span className="ob-row-action">
+            <button
+              type="button"
+              className="action-btn action-btn--view"
+              onClick={() => onOverview(row)}
+            >
+              <Eye size={11} aria-hidden />
+              Overview
+            </button>
+          </span>
+        </td>
+      </tr>
+      {open &&
+        extras.map((ad) => (
+          <tr key={ad.adId} className="ad-extra-row">
+            <td data-column-id="ad_thumb">
+              <AdImg ad={ad} alt={`Ad creative — ${ad.adName}`} size={36} />
+            </td>
+            <td data-column-id="ad_name">
+              <div className="min-w-0">
+                <span
+                  className="block truncate text-[0.76rem] text-text-secondary"
+                  title={ad.adName}
+                >
+                  {ad.adName}
+                </span>
+              </div>
+            </td>
+            <AdMetricCells ad={ad} />
+            <td>
+              <WhCategoryBadge category={ad.category || "—"} />
+            </td>
+            <td className="ad-links-cell">
+              <AdLinkChips ad={ad} />
+            </td>
+            <td data-column-id="actions" />
+          </tr>
+        ))}
+    </>
+  );
+}
+
 function AdRunListTable({
   rows,
   onOverview,
@@ -794,7 +1234,7 @@ function AdRunListTable({
           <tbody>
             <tr>
               <td
-                colSpan={7}
+                colSpan={11}
                 className="text-center py-8 text-text-tertiary text-sm"
               >
                 No ads match filters.
@@ -807,83 +1247,38 @@ function AdRunListTable({
   return (
     <div className="bento-tile ob-list-wrap ad-status-list-wrap">
       <div>
-        <table className="ob-list-table">
+        <table className="ob-list-table ad-run-table">
           <colgroup>
-            <col className="ad-col-creator" />
-            <col className="ad-col-post-id" />
-            <col className="ad-col-campaign" />
-            <col className="ad-col-status" />
+            <col className="ad-col-thumb" />
+            <col className="ad-col-ad-name" />
+            <col className="ad-col-created" />
+            <col className="ad-col-spend" />
+            <col className="ad-col-metric" />
+            <col className="ad-col-metric" />
+            <col className="ad-col-metric" />
+            <col className="ad-col-metric" />
             <col className="ad-col-classification" />
-            <col className="ad-col-partnership" />
             <col className="ad-col-links" />
             <col className="ad-col-actions" />
           </colgroup>
           <thead>
             <tr>
-              <th data-column-id="creator">Creator</th>
-              <th data-column-id="post_id">Post ID</th>
-              <th data-column-id="campaign">Campaign</th>
-              <th style={{ width: "6.5rem" }}>Run Status</th>
-              <th style={{ width: "8.5rem" }}>Classification</th>
-              <th style={{ width: "10rem" }}>Partnership ID</th>
-              <th style={{ width: "7rem" }}>Post</th>
+              <th data-column-id="ad_thumb">Ad</th>
+              <th data-column-id="ad_name">Ad Name / Creator</th>
+              <th>Created</th>
+              <th>Spend</th>
+              <th>ROAS</th>
+              <th>FTEWV</th>
+              <th>NCP</th>
+              <th>Shop. Orders</th>
+              <th>Status</th>
+              <th>Links</th>
               <th data-column-id="actions">Action</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.postId}>
-                <td data-column-id="creator">
-                  <CreatorCell row={r} />
-                </td>
-                <td data-column-id="post_id">
-                  <PostIdCode
-                    value={r.postIdShort || r.postId}
-                    collabId={r.collabId}
-                  />
-                </td>
-                <td data-column-id="campaign">
-                  {r.campaign ? (
-                    <span className="campaign-chip">{r.campaign}</span>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>
-                  {r.adsStatus ? (
-                    <span className="inline-flex items-center px-[10px] py-[3px] rounded-full bg-bg-surface text-text-secondary text-[0.72rem] font-bold capitalize border border-border">
-                      {r.adsStatus}
-                    </span>
-                  ) : (
-                    <span className="text-text-tertiary">—</span>
-                  )}
-                </td>
-                <td>
-                  <AsClassBadge value={r.adsResults} />
-                </td>
-                <td>
-                  <PartnershipKeyEdit
-                    postId={r.postId}
-                    value={r.partnershipId}
-                    compact
-                  />
-                </td>
-                <td>
-                  <LinkChips post={r.linkToPost} />
-                </td>
-                <td data-column-id="actions">
-                  <span className="ob-row-action">
-                    <button
-                      type="button"
-                      className="action-btn action-btn--view"
-                      onClick={() => onOverview(r)}
-                    >
-                      <Eye size={11} aria-hidden />
-                      Overview
-                    </button>
-                  </span>
-                </td>
-              </tr>
+              <AdRunRowGroup key={r.postId} row={r} onOverview={onOverview} />
             ))}
           </tbody>
         </table>
@@ -912,112 +1307,220 @@ function AdRunCardsGrid({
     );
   return (
     <div className="ob-card-grid">
-      {rows.map((r) => (
-        <article
-          key={r.postId}
-          className={cn(
-            "ob-card ad-status-card",
-            r.adsResults === "Winner" && "ob-card-onboarded",
-            (r.adsResults === "Discarded" ||
-              r.adsResults === "Discarded but analyse") &&
-              "ob-card-pending",
-          )}
-        >
-          <div className="ob-card-head">
-            <Avatar
-              src={r.profilePicUrl}
-              username={r.username}
-              name={r.name}
-              size={44}
-              className="ob-card-avatar"
-            />
-            <div className="ob-card-id min-w-0">
-              <div className="ob-card-name">{r.name || r.username || "—"}</div>
-              {r.username && (
-                <div className="ob-card-handle">@{r.username}</div>
+      {rows.map((r) => {
+        const primary = r.primaryAd;
+        const extras = r.ads.filter((ad) => ad !== primary);
+        const wonClass =
+          r.warehouseCategory === "Incremental Winner" ||
+          r.warehouseCategory === "Winner" ||
+          r.adsResults === "Winner";
+        const lostClass =
+          r.warehouseCategory === "Discarded" ||
+          r.adsResults === "Discarded" ||
+          r.adsResults === "Discarded but analyse";
+        return (
+          <article
+            key={r.postId}
+            className={cn(
+              "ob-card ad-status-card",
+              wonClass && "ob-card-onboarded",
+              lostClass && "ob-card-pending",
+            )}
+          >
+            <div className="ob-card-head">
+              <Avatar
+                src={r.profilePicUrl}
+                username={r.username}
+                name={r.name}
+                size={44}
+                className="ob-card-avatar"
+              />
+              <div className="ob-card-id min-w-0">
+                <div className="ob-card-name">
+                  {r.name || r.username || "—"}
+                </div>
+                {r.username && (
+                  <div className="ob-card-handle">@{r.username}</div>
+                )}
+              </div>
+              {rowHasThumb(r) && primary && (
+                <AdImg
+                  ad={primary}
+                  alt={`Ad creative — ${r.username || r.postIdShort}`}
+                  size={44}
+                  className="ad-card-thumb"
+                />
               )}
             </div>
-          </div>
 
-          <div className="ob-card-pills">
-            <AsClassBadge value={r.adsResults} />
-            <span className="post-id tabular">{r.postIdShort || r.postId}</span>
-            {r.collabId && (
-              <span className="campaign-chip tabular" title="Collab ID">
-                {r.collabId}
+            <div className="ob-card-pills">
+              <RowStatusBadge row={r} />
+              {r.source === "historic" && <HistoricChip />}
+              <span className="post-id tabular">
+                {r.postIdShort || r.postId}
               </span>
+              {r.collabId && (
+                <span className="campaign-chip tabular" title="Collab ID">
+                  {r.collabId}
+                </span>
+              )}
+              {r.campaign && (
+                <span className="campaign-chip">{r.campaign}</span>
+              )}
+              {r.adsStatus && <AdRunStatusPill value={r.adsStatus} />}
+              {r.adsUsageRights && (
+                <span className="pill pill--info">
+                  <ShieldCheck size={10} aria-hidden />
+                  Ads: {r.adsUsageRights}
+                </span>
+              )}
+            </div>
+
+            <dl className="ob-card-meta-grid ad-status-card-meta">
+              {primary ? (
+                <>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">Spend</span>
+                    <span className="ob-card-meta-val tabular">
+                      {formatRupees(primary.amountSpent)}
+                    </span>
+                  </div>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">ROAS</span>
+                    <span className="ob-card-meta-val tabular">
+                      {roasText(primary)}
+                    </span>
+                  </div>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">FTEWV</span>
+                    <span className="ob-card-meta-val tabular">
+                      {formatNumber(primary.ftewvCount)}
+                    </span>
+                  </div>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">NCP</span>
+                    <span className="ob-card-meta-val tabular">
+                      {formatNumber(primary.ncpCount)}
+                    </span>
+                  </div>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">Shop. Orders</span>
+                    <span className="ob-card-meta-val tabular">
+                      {formatNumber(primary.shopifyOrders)}
+                    </span>
+                  </div>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">Ad Created</span>
+                    <span className="ob-card-meta-val tabular">
+                      {formatDate(primary.adCreated) || "—"}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">In Meta Ads</span>
+                    <span
+                      className={cn(
+                        "ob-card-meta-val",
+                        r.isInMetaAds ? "text-success" : "text-text-secondary",
+                      )}
+                    >
+                      {r.isInMetaAds ? "Yes" : "No"}
+                    </span>
+                  </div>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">Post Date</span>
+                    <span className="ob-card-meta-val tabular">
+                      {formatDate(r.postDate) || "—"}
+                    </span>
+                  </div>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">Days Since</span>
+                    <span className="ob-card-meta-val">
+                      <DaysSince days={r.daysSince} ago />
+                    </span>
+                  </div>
+                  <div className="ob-card-meta">
+                    <span className="ob-card-meta-label">Collab</span>
+                    <span
+                      className={cn(
+                        "ob-card-meta-val",
+                        !r.collabType && "text-text-tertiary font-normal",
+                      )}
+                    >
+                      {r.collabType || "—"}
+                    </span>
+                  </div>
+                </>
+              )}
+              <div className="ob-card-meta ad-status-card-partnership">
+                <span className="ob-card-meta-label">Partnership</span>
+                <span className="ob-card-meta-val tabular">
+                  {r.source === "historic" ? (
+                    <span className="text-text-tertiary font-normal">—</span>
+                  ) : (
+                    <PartnershipKeyEdit
+                      postId={r.postId}
+                      value={r.partnershipId}
+                      compact
+                      stopPropagation
+                    />
+                  )}
+                </span>
+              </div>
+            </dl>
+
+            {extras.length > 0 && (
+              <details className="ad-card-more">
+                <summary>
+                  +{extras.length} more ad{extras.length > 1 ? "s" : ""}
+                </summary>
+                <ul>
+                  {extras.map((ad) => (
+                    <li key={ad.adId}>
+                      <AdImg
+                        ad={ad}
+                        alt={`Ad creative — ${ad.adName}`}
+                        size={28}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <span
+                          className="block truncate text-[0.74rem] font-semibold text-text-secondary"
+                          title={ad.adName}
+                        >
+                          {ad.adName}
+                        </span>
+                        <span className="block text-[0.7rem] text-text-tertiary tabular">
+                          {formatRupees(ad.amountSpent)} · {roasText(ad)}
+                        </span>
+                      </div>
+                      <WhCategoryBadge category={ad.category || "—"} />
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
-            {r.campaign && <span className="campaign-chip">{r.campaign}</span>}
-            <AdRunStatusPill value={r.adsStatus} />
-            {r.adsUsageRights && (
-              <span className="pill pill--info">
-                <ShieldCheck size={10} aria-hidden />
-                Ads: {r.adsUsageRights}
-              </span>
-            )}
-          </div>
 
-          <dl className="ob-card-meta-grid ad-status-card-meta">
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">In Meta Ads</span>
-              <span
-                className={cn(
-                  "ob-card-meta-val",
-                  r.isInMetaAds ? "text-success" : "text-text-secondary",
-                )}
+            <CardLinkActions
+              post={r.linkToPost}
+              drive={r.downloadLink}
+              landing={primary?.adLink}
+              preview={primary?.previewLink}
+            />
+
+            <div className="ob-card-actions">
+              <button
+                type="button"
+                className="action-view"
+                onClick={() => onOverview(r)}
               >
-                {r.isInMetaAds ? "Yes" : "No"}
-              </span>
+                <Eye size={12} aria-hidden /> Overview
+              </button>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Post Date</span>
-              <span className="ob-card-meta-val tabular">
-                {formatDate(r.postDate) || "—"}
-              </span>
-            </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Days Since</span>
-              <span className="ob-card-meta-val">
-                <DaysSince days={r.daysSince} ago />
-              </span>
-            </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Collab</span>
-              <span
-                className={cn(
-                  "ob-card-meta-val",
-                  !r.collabType && "text-text-tertiary font-normal",
-                )}
-              >
-                {r.collabType || "—"}
-              </span>
-            </div>
-            <div className="ob-card-meta ad-status-card-partnership">
-              <span className="ob-card-meta-label">Partnership</span>
-              <span className="ob-card-meta-val tabular">
-                <PartnershipKeyEdit
-                  postId={r.postId}
-                  value={r.partnershipId}
-                  compact
-                  stopPropagation
-                />
-              </span>
-            </div>
-          </dl>
-
-          <CardLinkActions post={r.linkToPost} drive={r.downloadLink} />
-
-          <div className="ob-card-actions">
-            <button
-              type="button"
-              className="action-view"
-              onClick={() => onOverview(r)}
-            >
-              <Eye size={12} aria-hidden /> Overview
-            </button>
-          </div>
-        </article>
-      ))}
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -1045,7 +1548,7 @@ export function AdStatusBoard({
   const matchesBase = (r: AdStatusRow) => {
     if (q) {
       const hay =
-        `${r.name} ${r.username} ${r.postId} ${r.postIdShort}`.toLowerCase();
+        `${r.name} ${r.username} ${r.postId} ${r.postIdShort} ${r.primaryAd?.adName ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     // adStatus filter on adsStatus field (substring match, same as legacy)
@@ -1067,7 +1570,14 @@ export function AdStatusBoard({
     if (classification === "__untested") return [];
     return adRun.filter((r) => {
       if (!matchesBase(r)) return false;
-      if (classification && r.adsResults !== classification) return false;
+      // Classification matches either vocabulary: legacy result (Winner/ITE/…)
+      // or warehouse category (Incremental Winner / P0 analysis / …).
+      if (
+        classification &&
+        r.adsResults !== classification &&
+        r.warehouseCategory !== classification
+      )
+        return false;
       return true;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1075,29 +1585,25 @@ export function AdStatusBoard({
 
   const total = filteredUntested.length + filteredAdRun.length;
 
-  // Analytics bento — classification breakdown
+  // Analytics bento — warehouse category breakdown (best category per post)
+  const catCount = (c: string) =>
+    adRun.filter((r) => r.warehouseCategory === c).length;
   const classSlices: DonutSeg[] = [
     { name: "Untested", value: untested.length, color: "#9A9384" },
     {
-      name: "Winner",
-      value: adRun.filter((r) => r.adsResults === "Winner").length,
-      color: "#4F7C4D",
+      name: "Incr. Winner",
+      value: catCount("Incremental Winner"),
+      color: "#3D6B3B",
     },
+    { name: "Winner", value: catCount("Winner"), color: "#4F7C4D" },
+    { name: "P0", value: catCount("P0 analysis"), color: "#3B6FD4" },
+    { name: "P1", value: catCount("P1 analysis"), color: "#B57514" },
+    { name: "P2", value: catCount("P2 analysis"), color: "#D19E3F" },
+    { name: "Discarded", value: catCount("Discarded"), color: "#C0392B" },
     {
-      name: "ITE",
-      value: adRun.filter((r) => r.adsResults === "ITE").length,
-      color: "#B57514",
-    },
-    {
-      name: "Analyse",
-      value: adRun.filter((r) => r.adsResults === "Discarded but analyse")
-        .length,
-      color: "#3B6FD4",
-    },
-    {
-      name: "Discarded",
-      value: adRun.filter((r) => r.adsResults === "Discarded").length,
-      color: "#C0392B",
+      name: "Uncategorised",
+      value: adRun.filter((r) => r.warehouseCategory == null).length,
+      color: "#7B4FBF",
     },
   ].filter((s) => s.value > 0);
 

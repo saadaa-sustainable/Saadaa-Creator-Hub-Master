@@ -1,8 +1,13 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
+  bestCategory,
+  fetchAdThumbnailsFor,
   fetchMetaAdsCoveredPostIds,
+  fetchWarehouseAdRows,
   isMetaAdsWarehouseConfigured,
+  pickPrimaryAd,
+  type WarehouseAd,
 } from "@/lib/supabase/meta-ads";
 import type {
   AdStatusFilterOptions,
@@ -63,6 +68,78 @@ function isEligible(
   return hasRights || coveredSet.has(postIdShort.toUpperCase());
 }
 
+/**
+ * historic_posts columns we want (verified live 2026-07-03). Intersected
+ * against a limit-1 probe so a missing column never 42703s the read — the
+ * archive schema is hand-migrated and may drift.
+ */
+const HISTORIC_COLS_PREFERRED = [
+  "post_id",
+  "post_id_short",
+  "inf_id",
+  "username",
+  "campaign_id",
+  "nomenclature",
+  "collab_id",
+  "workflow_status",
+  "collab_type",
+  "post_date",
+  "post_link",
+  "download_link",
+  "profile_pic",
+  "followers",
+  "influencer_category",
+];
+
+/**
+ * Historic archive rows whose SIF token (post_id / post_id_short, e.g.
+ * "SIF-1007-P1") appears in the warehouse map. Tokens are already
+ * uppercase-normalized; historic ids are stored uppercase (verified live).
+ * Chunked `.in()` of 200, fired in parallel. Fails soft to [].
+ */
+async function fetchHistoricWarehouseMatches(
+  supabase: ReturnType<typeof createServiceClient>,
+  tokens: string[],
+): Promise<Array<Record<string, unknown>>> {
+  if (!tokens.length) return [];
+  try {
+    // limit-1 probe → real column set (getLiveColumnKeys pattern).
+    const probe = await (supabase as any)
+      .from("historic_posts")
+      .select("*")
+      .limit(1);
+    if (probe.error || !probe.data?.length) return [];
+    const live = new Set(Object.keys(probe.data[0] as Record<string, unknown>));
+    const cols = HISTORIC_COLS_PREFERRED.filter((c) => live.has(c));
+    // The token lives verbatim in post_id_short (mirrors post_id) — match on
+    // whichever the live schema carries.
+    const keyCol = live.has("post_id_short") ? "post_id_short" : "post_id";
+    if (!cols.includes(keyCol)) return [];
+
+    const CHUNK = 200;
+    const chunks: string[][] = [];
+    for (let i = 0; i < tokens.length; i += CHUNK) {
+      chunks.push(tokens.slice(i, i + CHUNK));
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) =>
+        (supabase as any)
+          .from("historic_posts")
+          .select(cols.join(","))
+          .in(keyCol, chunk),
+      ),
+    );
+    const rows: Array<Record<string, unknown>> = [];
+    for (const res of results) {
+      if (!res.error && res.data) rows.push(...res.data);
+    }
+    return rows;
+  } catch (err) {
+    console.warn("[ad-status] historic_posts warehouse match failed:", err);
+    return [];
+  }
+}
+
 export async function fetchAdStatusData(
   filters: AdStatusFilters,
 ): Promise<{
@@ -112,15 +189,36 @@ export async function fetchAdStatusData(
     ),
   ]);
 
-  const [postsRes, creatorsRes, igCacheRes, coveredSet] = await Promise.all([
-    fetchPosts(),
-    (supabase as any).from("creators").select(CREATOR_COLS).limit(5000),
-    (supabase as any)
-      .from("instagram_cache")
-      .select("username, profile_pic")
-      .limit(5000),
-    warehouseWithTimeout,
+  // Per-ad warehouse rows (ae_table_view, keyed by SIF token). Has its own
+  // internal 6s guard; this outer race mirrors the covered-set guard so a
+  // hung connection can never block render either way.
+  const warehouseAdsWithTimeout = Promise.race([
+    fetchWarehouseAdRows(),
+    new Promise<Map<string, WarehouseAd[]>>((resolve) =>
+      setTimeout(() => {
+        console.warn("[ad-status] Meta Ads ae_table_view timeout — falling back to empty map");
+        resolve(new Map());
+      }, 6000),
+    ),
   ]);
+
+  const [postsRes, creatorsRes, igCacheRes, coveredSetRaw, warehouseAds] =
+    await Promise.all([
+      fetchPosts(),
+      (supabase as any).from("creators").select(CREATOR_COLS).limit(5000),
+      (supabase as any)
+        .from("instagram_cache")
+        .select("username, profile_pic")
+        .limit(5000),
+      warehouseWithTimeout,
+      warehouseAdsWithTimeout,
+    ]);
+
+  // Coverage = primary_table IFAD names ∪ ae_table_view tokens — a post
+  // counts as "in Meta Ads" if either warehouse source knows it. (Keeps the
+  // legacy primary_table coverage intact for posts missing from the view.)
+  const coveredSet = new Set<string>(coveredSetRaw);
+  for (const token of warehouseAds.keys()) coveredSet.add(token);
 
   if (postsRes.error) {
     console.error("[ad-status] posts query failed:", postsRes.error);
@@ -152,6 +250,24 @@ export async function fetchAdStatusData(
     pendingClassification: 0,
     winners: 0,
     discarded: 0,
+    categories: {
+      incrementalWinners: 0,
+      winners: 0,
+      p0: 0,
+      p1: 0,
+      p2: 0,
+      discarded: 0,
+    },
+  };
+
+  // One matched row = one tick in its best category's bucket.
+  const countCategory = (category: string | null) => {
+    if (category === "Incremental Winner") kpi.categories.incrementalWinners++;
+    else if (category === "Winner") kpi.categories.winners++;
+    else if (category === "P0 analysis") kpi.categories.p0++;
+    else if (category === "P1 analysis") kpi.categories.p1++;
+    else if (category === "P2 analysis") kpi.categories.p2++;
+    else if (category === "Discarded") kpi.categories.discarded++;
   };
 
   const now = Date.now();
@@ -191,6 +307,10 @@ export async function fetchAdStatusData(
       (p.collab_id as string | null) ||
       (infId ? `${infId}-C${Number(p.collab_number ?? 1)}` : null);
 
+    const ads = warehouseAds.get(postIdShort.toUpperCase()) ?? [];
+    const warehouseCategory = bestCategory(ads);
+    countCategory(warehouseCategory);
+
     const row: AdStatusRow = {
       postId: String(p.post_id ?? ""),
       postIdShort,
@@ -217,6 +337,10 @@ export async function fetchAdStatusData(
       isInMetaAds,
       partnershipId: String(p.partnership_id ?? "").trim(),
       collabType: String(p.collab_type ?? "").trim(),
+      source: "live",
+      ads,
+      primaryAd: pickPrimaryAd(ads),
+      warehouseCategory,
     };
 
     // Untested = no classification result AND not yet in Meta Ads warehouse.
@@ -228,8 +352,124 @@ export async function fetchAdStatusData(
     }
   }
 
+  // ── Historic archive matches ──────────────────────────────────────────────
+  // Warehouse tokens with no live post are looked up in historic_posts —
+  // by definition these ran as ads, so they land in Ad Run only. Live rows
+  // always win a token; existing KPI fields stay live-only (semantics
+  // unchanged) while the per-category counts cover both sources.
+  const livePostIds = new Set(
+    posts
+      .map((p) => String(p.post_id_short ?? "").trim().toUpperCase())
+      .filter(Boolean),
+  );
+  const historicTokens = [...warehouseAds.keys()].filter(
+    (t) => !livePostIds.has(t),
+  );
+  const historicRows = await fetchHistoricWarehouseMatches(
+    supabase,
+    historicTokens,
+  );
+
+  const seenHistoric = new Set<string>();
+  for (const h of historicRows) {
+    const token = String(h.post_id_short ?? h.post_id ?? "")
+      .trim()
+      .toUpperCase();
+    if (!token || seenHistoric.has(token)) continue;
+    const ads = warehouseAds.get(token) ?? [];
+    if (!ads.length) continue;
+    seenHistoric.add(token);
+
+    const camp = String(h.campaign_id ?? "").trim();
+    if (filters.campaign && camp !== filters.campaign) continue;
+
+    const username = String(h.username ?? "").trim();
+    const cRow =
+      creatorMap.get(username.toLowerCase()) ?? ({} as Record<string, unknown>);
+
+    const postDateStr = h.post_date ? String(h.post_date).slice(0, 10) : null;
+    const daysSince = postDateStr
+      ? Math.floor(
+          (now - new Date(postDateStr + "T00:00:00Z").getTime()) / 86400000,
+        )
+      : null;
+
+    const warehouseCategory = bestCategory(ads);
+    countCategory(warehouseCategory);
+
+    adRun.push({
+      postId: String(h.post_id ?? token),
+      postIdShort: String(h.post_id_short ?? h.post_id ?? token),
+      infId: (h.inf_id as string | null) ?? null,
+      collabId: (h.collab_id as string | null) ?? null,
+      name: String(cRow.inf_name ?? username ?? ""),
+      username,
+      profilePicUrl:
+        String(cRow.profile_pic ?? "") ||
+        String(h.profile_pic ?? "") ||
+        igCacheMap.get(username.toLowerCase()) ||
+        null,
+      campaign: camp,
+      category:
+        (cRow.category as string | null) ??
+        (h.influencer_category as string | null) ??
+        null,
+      followers:
+        Number(cRow.followers ?? 0) || Number(h.followers ?? 0) || null,
+      workflowStatus: String(h.workflow_status ?? "Posted"),
+      postDate: postDateStr,
+      daysSince,
+      linkToPost: String(h.post_link ?? "").trim(),
+      downloadLink: String(h.download_link ?? "").trim(),
+      adsUsageRights: "",
+      adsResults: "",
+      adsStatus: "",
+      isClassified: false,
+      isInMetaAds: true,
+      partnershipId: "",
+      collabType: String(h.collab_type ?? "").trim(),
+      source: "historic",
+      ads,
+      primaryAd: pickPrimaryAd(ads),
+      warehouseCategory,
+    });
+  }
+
+  // Ad Run mirrors the Creative Testing Dashboard: spend desc, warehouse
+  // matches first; unmatched (covered/classified-only) rows fall back to
+  // post_date desc at the tail.
+  adRun.sort((a, b) => {
+    const sa = a.primaryAd?.amountSpent ?? -1;
+    const sb = b.primaryAd?.amountSpent ?? -1;
+    if (sa !== sb) return sb - sa;
+    return (b.postDate ?? "").localeCompare(a.postDate ?? "");
+  });
+
+  // ── Thumbnails ────────────────────────────────────────────────────────────
+  // Only for ads attached to a matched row (chunked .in(), fail-soft). Merged
+  // as new copies — rows/ads are never mutated in place.
+  const matchedAdIds: string[] = [];
+  for (const row of adRun) {
+    for (const ad of row.ads) matchedAdIds.push(ad.adId);
+  }
+  const thumbs = await fetchAdThumbnailsFor(matchedAdIds);
+
+  const enrichRow = (row: AdStatusRow): AdStatusRow => {
+    if (!row.ads.length) return row;
+    const ads = row.ads.map((ad) => {
+      const t = thumbs.get(ad.adId);
+      return t ? { ...ad, thumbnailUrl: t.thumb, imageUrl: t.image } : ad;
+    });
+    return { ...row, ads, primaryAd: pickPrimaryAd(ads) };
+  };
+
   const warehouseConnected = isMetaAdsWarehouseConfigured();
-  return { untested, adRun, kpi, warehouseConnected };
+  return {
+    untested: untested.map(enrichRow),
+    adRun: adRun.map(enrichRow),
+    kpi,
+    warehouseConnected,
+  };
 }
 
 export const fetchAdStatusFilterOptions = unstable_cache(

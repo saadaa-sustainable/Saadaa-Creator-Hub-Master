@@ -12414,6 +12414,126 @@ body:has(.km-backdrop) {
 .ad-status-stage .ad-status-list-wrap col.ad-col-actions {
   width: 8.2rem;
 }
+/* Creative Testing Dashboard columns (Ad Run table + optional Untested thumb).
+   table-layout:fixed — every new column NEEDS an explicit width here. */
+.ad-status-stage .ad-status-list-wrap table.ad-run-table {
+  min-width: 78rem;
+}
+.ad-status-stage .ad-status-list-wrap col.ad-col-thumb {
+  width: 3.9rem;
+}
+.ad-status-stage .ad-status-list-wrap col.ad-col-ad-name {
+  width: 15rem;
+}
+.ad-status-stage .ad-status-list-wrap col.ad-col-created {
+  width: 6.8rem;
+}
+.ad-status-stage .ad-status-list-wrap col.ad-col-spend {
+  width: 6.6rem;
+}
+.ad-status-stage .ad-status-list-wrap col.ad-col-metric {
+  width: 4.9rem;
+}
+.ad-status-stage .ad-status-list-wrap [data-column-id="ad_thumb"] {
+  text-align: center;
+}
+.ad-status-stage .ad-status-list-wrap td[data-column-id="ad_thumb"] > * {
+  margin-inline: auto;
+}
+.ad-status-stage .ad-status-list-wrap td.ad-links-cell > .flex {
+  flex-wrap: nowrap;
+}
+.ad-status-stage .ad-status-list-wrap td.ad-links-cell a {
+  padding: 3px 9px;
+  font-size: 0.7rem;
+}
+/* Expanded sibling-ad rows — visually subordinate to their primary row */
+.ad-status-stage .ad-extra-row td {
+  background: color-mix(in oklab, var(--color-bg-surface) 55%, #fff);
+  border-top-style: dashed;
+}
+.ad-more-toggle {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-info-text, #3b6fd4);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ad-more-toggle:hover {
+  text-decoration: underline;
+}
+/* Ad creative thumbnail — 44px rounded; empty variant when CDN URL expired */
+.ad-thumb {
+  display: block;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+}
+.ad-thumb--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+}
+.ad-thumb-link {
+  display: inline-block;
+  line-height: 0;
+  cursor: pointer;
+}
+.ad-thumb-link:hover .ad-thumb {
+  border-color: var(--color-accent);
+}
+/* Card variant — creative sits at the head's right edge */
+.ad-status-card .ad-card-thumb,
+.ad-status-card .ob-card-head .ad-thumb-link {
+  margin-left: auto;
+}
+/* "+N more ads" expander inside cards */
+.ad-card-more summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-info-text, #3b6fd4);
+  list-style: none;
+}
+.ad-card-more summary::-webkit-details-marker {
+  display: none;
+}
+.ad-card-more ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ad-card-more li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+/* Overview modal — per-ad performance list */
+.ad-overview-ads .ad-overview-ad-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ad-overview-ads .ad-overview-ad-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
 .ad-status-stage .ad-status-list-wrap [data-column-id="actions"] {
   position: static;
   width: auto;
@@ -12426,14 +12546,8 @@ body:has(.km-backdrop) {
 .ad-status-stage .ad-status-list-wrap th {
   padding-inline: 10px !important;
 }
-.ad-status-stage .ad-status-list-wrap td:nth-child(6) > .flex {
-  justify-content: center;
-  flex-wrap: nowrap;
-}
-.ad-status-stage .ad-status-list-wrap td:nth-child(6) a {
-  padding: 3px 9px;
-  font-size: 0.7rem;
-}
+/* (old td:nth-child(6) link rules removed 2026-07-03 — the links column moved
+   in the CTD layout; .ad-links-cell rules above are the replacement.) */
 .ad-overview-modal .ob-overview-card {
   background: color-mix(in oklab, var(--color-bg-ecru) 50%, #fff);
 }
@@ -12455,6 +12569,17 @@ body:has(.km-backdrop) {
   }
   .ad-status-stage .ad-status-card-partnership .pk-edit__trigger {
     right: -14px;
+  }
+  /* Thumbs stay small on phones; expander rows keep 44px touch targets */
+  .ad-status-card .ad-card-thumb {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  .ad-card-more summary,
+  .ad-more-toggle {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
   }
   .ad-overview-modal {
     width: min(94vw, 560px);
