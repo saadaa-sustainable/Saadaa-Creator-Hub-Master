@@ -188,6 +188,7 @@ function AdImg({
   className,
   postUrl,
   igUsername,
+  postDate,
 }: {
   ad: WarehouseAd;
   alt: string;
@@ -199,6 +200,8 @@ function AdImg({
   /** Creator handle — lets the popup resolve the post's real video file via
    *  Meta and autoplay it natively (the IG embed can't play Reels inline). */
   igUsername?: string | null;
+  /** Post date — early-exits the Meta media pagination. */
+  postDate?: string | null;
 }) {
   const [failed, setFailed] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -246,6 +249,7 @@ function AdImg({
           alt={alt}
           postUrl={postUrl}
           igUsername={igUsername}
+          postDate={postDate}
           onClose={() => setPreviewOpen(false)}
         />
       )}
@@ -274,12 +278,15 @@ function AdCreativeLightbox({
   alt,
   postUrl,
   igUsername,
+  postDate,
   onClose,
 }: {
   ad: WarehouseAd;
   alt: string;
   postUrl?: string | null;
   igUsername?: string | null;
+  /** Known post date — lets the Meta lookup stop paginating early. */
+  postDate?: string | null;
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
@@ -309,15 +316,17 @@ function AdCreativeLightbox({
 
   // Ask Meta for the post's real media file — a native <video> can autoplay,
   // the IG embed can't (Reels in the embed only link out to Instagram).
+  // NON-BLOCKING: the embed shows immediately, the video swaps in when (if)
+  // it resolves. Repeat opens hit the ig_media_cache table — one DB read.
   useEffect(() => {
     if (!shortcode || !igUsername) {
       setIgMedia(null);
       return;
     }
     let cancelled = false;
-    fetch(
-      `/api/ads/ig-video?username=${encodeURIComponent(igUsername)}&shortcode=${encodeURIComponent(shortcode)}`,
-    )
+    const qs = new URLSearchParams({ username: igUsername, shortcode });
+    if (postDate) qs.set("postDate", postDate);
+    fetch(`/api/ads/ig-video?${qs.toString()}`)
       .then((r) => (r.ok ? r.json() : { media: null }))
       .then((j: { media: IgMediaHit | null }) => {
         if (!cancelled) setIgMedia(j.media ?? null);
@@ -328,12 +337,16 @@ function AdCreativeLightbox({
     return () => {
       cancelled = true;
     };
-  }, [shortcode, igUsername]);
+  }, [shortcode, igUsername, postDate]);
 
+  // videoFailed: expired signed URL etc. → drop to the embed, not a black box
+  const [videoFailed, setVideoFailed] = useState(false);
   const videoUrl =
-    igMedia?.mediaType === "VIDEO" && igMedia.mediaUrl ? igMedia.mediaUrl : null;
+    !videoFailed && igMedia?.mediaType === "VIDEO" && igMedia.mediaUrl
+      ? igMedia.mediaUrl
+      : null;
   const highResImage =
-    igMedia && igMedia.mediaType !== "VIDEO" && igMedia.mediaUrl
+    !videoFailed && igMedia && igMedia.mediaType !== "VIDEO" && igMedia.mediaUrl
       ? igMedia.mediaUrl
       : null;
   const resolving = Boolean(shortcode && igUsername) && igMedia === undefined;
@@ -377,12 +390,7 @@ function AdCreativeLightbox({
 
         <div className="modal-body ad-lightbox-grid">
           <div className="ad-lightbox-media">
-            {resolving ? (
-              <div className="ad-lightbox-loading" aria-label="Loading preview">
-                <span className="ad-lightbox-spinner" aria-hidden />
-                Fetching post from Instagram…
-              </div>
-            ) : videoUrl ? (
+            {videoUrl ? (
               // Native playback: the post's real video file from Meta —
               // autoplays muted (browser policy), controls for sound.
               // eslint-disable-next-line jsx-a11y/media-has-caption
@@ -395,6 +403,7 @@ function AdCreativeLightbox({
                 controls
                 playsInline
                 className="ad-lightbox-video"
+                onError={() => setVideoFailed(true)}
               />
             ) : highResImage ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -405,14 +414,24 @@ function AdCreativeLightbox({
                 className="ad-lightbox-img"
               />
             ) : shortcode ? (
-              <iframe
-                src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
-                title="Instagram post preview"
-                loading="lazy"
-                allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
-                allowFullScreen
-                className="ad-lightbox-embed"
-              />
+              // Embed shows IMMEDIATELY — never a dead pane while Meta
+              // resolves; the pill signals a possible upgrade to autoplay.
+              <div className="ad-lightbox-embed-wrap">
+                <iframe
+                  src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
+                  title="Instagram post preview"
+                  loading="lazy"
+                  allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
+                  allowFullScreen
+                  className="ad-lightbox-embed"
+                />
+                {resolving && (
+                  <span className="ad-lightbox-resolving" role="status">
+                    <span className="ad-lightbox-spinner" aria-hidden />
+                    Finding video…
+                  </span>
+                )}
+              </div>
             ) : src && !failed ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -536,6 +555,7 @@ function RowThumb({ row, size = 44 }: { row: AdStatusRow; size?: number }) {
         size={size}
         postUrl={row.linkToPost}
         igUsername={row.username}
+        postDate={row.postDate}
       />
     );
   return (
@@ -1174,6 +1194,7 @@ function AdStatusOverviewModal({
                       size={36}
                       postUrl={row.linkToPost}
                       igUsername={row.username}
+                      postDate={row.postDate}
                     />
                     <div className="min-w-0 flex-1">
                       <span
@@ -1664,6 +1685,7 @@ function AdRunRowGroup({
                 size={36}
                 postUrl={row.linkToPost}
                 igUsername={row.username}
+                postDate={row.postDate}
               />
             </td>
             <td data-column-id="ad_name">
@@ -1821,6 +1843,7 @@ function AdRunCardsGrid({
                   className="ad-card-thumb"
                   postUrl={r.linkToPost}
                   igUsername={r.username}
+                  postDate={r.postDate}
                 />
               )}
             </div>
@@ -1963,6 +1986,7 @@ function AdRunCardsGrid({
                         size={28}
                         postUrl={r.linkToPost}
                         igUsername={r.username}
+                        postDate={r.postDate}
                       />
                       <div className="min-w-0 flex-1">
                         <span

@@ -297,6 +297,8 @@ export interface MetaPostResult {
   accountResolved?: boolean;
   error?: string;
   usagePct?: number;
+  /** Graph calls actually made (deep variant) — feed this to recordMetaUsage. */
+  callsMade?: number;
 }
 
 function postProbeField(handle: string): string {
@@ -405,6 +407,10 @@ export async function fetchPostByShortcodeDeep(
   handle: string,
   shortcode: string,
   maxPages = 10,
+  /** ISO date of the post when known — media is newest→oldest, so once a
+   *  page's oldest item predates this (3-day buffer) the target would
+   *  already have appeared; stop instead of burning the remaining pages. */
+  stopBeforeIso?: string | null,
 ): Promise<MetaPostResult> {
   const c = creds();
   if (!c) return { status: "error", error: "Meta Graph not configured" };
@@ -413,6 +419,7 @@ export async function fetchPostByShortcodeDeep(
   if (!clean || !sc) return { status: "error", error: "missing handle/shortcode" };
 
   let after = "";
+  let calls = 0;
   let accountResolved = false;
   let usagePct = 0;
 
@@ -428,12 +435,13 @@ export async function fetchPostByShortcodeDeep(
         `fields=${encodeURIComponent(field)}&access_token=${encodeURIComponent(c.token)}`;
 
       const res = await fetch(url, { cache: "no-store" });
+      calls++;
       const text = await res.text();
       usagePct = Math.max(usagePct, usageMaxPct(res.headers.get("x-app-usage")));
 
       if (!res.ok) {
-        if (isNotFound(text)) return { status: "notfound", usagePct };
-        return { status: "error", error: text.slice(0, 200), usagePct };
+        if (isNotFound(text)) return { status: "notfound", usagePct, callsMade: calls };
+        return { status: "error", error: text.slice(0, 200), usagePct, callsMade: calls };
       }
       const json = JSON.parse(text) as {
         business_discovery?: {
@@ -443,8 +451,8 @@ export async function fetchPostByShortcodeDeep(
       };
       if (json.error) {
         const msg = json.error.message ?? "unknown";
-        if (isNotFound(msg)) return { status: "notfound", usagePct };
-        return { status: "error", error: msg.slice(0, 200), usagePct };
+        if (isNotFound(msg)) return { status: "notfound", usagePct, callsMade: calls };
+        return { status: "error", error: msg.slice(0, 200), usagePct, callsMade: calls };
       }
 
       accountResolved = accountResolved || !!json.business_discovery;
@@ -452,18 +460,27 @@ export async function fetchPostByShortcodeDeep(
       const data = media?.data ?? [];
       const hit = data.find((m) => extractShortcode(m.permalink) === sc);
       if (hit)
-        return { status: "ok", node: buildPostNode(hit), accountResolved, usagePct };
+        return { status: "ok", node: buildPostNode(hit), accountResolved, usagePct, callsMade: calls };
 
+      if (stopBeforeIso && data.length) {
+        const oldest = data[data.length - 1]?.timestamp;
+        if (oldest) {
+          const cutoff =
+            new Date(stopBeforeIso + "T00:00:00Z").getTime() - 3 * 86400000;
+          if (new Date(oldest).getTime() < cutoff) break;
+        }
+      }
       const next = media?.paging?.cursors?.after;
       if (!next || !data.length || usagePct > 90) break;
       after = next;
     }
-    return { status: "notfound", accountResolved, usagePct };
+    return { status: "notfound", accountResolved, usagePct, callsMade: calls };
   } catch (e) {
     return {
       status: "error",
       error: e instanceof Error ? e.message.slice(0, 200) : "fetch failed",
       usagePct,
+      callsMade: calls,
     };
   }
 }
