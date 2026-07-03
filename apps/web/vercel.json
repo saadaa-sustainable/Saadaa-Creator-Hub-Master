@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/partnership-refresh",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/warehouse-sync",
+      "schedule": "0 5 * * *"
     }
   ]
 }

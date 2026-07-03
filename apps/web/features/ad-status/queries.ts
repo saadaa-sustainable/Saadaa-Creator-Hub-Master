@@ -446,13 +446,19 @@ export async function fetchAdStatusData(
   });
 
   // ── Thumbnails ────────────────────────────────────────────────────────────
-  // Only for ads attached to a matched row (chunked .in(), fail-soft). Merged
-  // as new copies — rows/ads are never mutated in place.
+  // The meta_ads_cache mirror already embeds thumbnails on each ad; only ads
+  // MISSING one warrant a live cross-project fetch (which times out on Vercel
+  // anyway — this is effectively a local-dev fallback). Merged as new copies —
+  // rows/ads are never mutated in place.
   const matchedAdIds: string[] = [];
   for (const row of adRun) {
-    for (const ad of row.ads) matchedAdIds.push(ad.adId);
+    for (const ad of row.ads) {
+      if (!ad.thumbnailUrl && !ad.imageUrl) matchedAdIds.push(ad.adId);
+    }
   }
-  const thumbs = await fetchAdThumbnailsFor(matchedAdIds);
+  const thumbs = matchedAdIds.length
+    ? await fetchAdThumbnailsFor(matchedAdIds)
+    : new Map<string, { thumb: string | null; image: string | null }>();
 
   const enrichRow = (row: AdStatusRow): AdStatusRow => {
     if (!row.ads.length) return row;

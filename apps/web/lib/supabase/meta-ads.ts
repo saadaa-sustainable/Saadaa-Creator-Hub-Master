@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
+import { createServiceClient } from "./server";
 
 function createMetaAdsClient() {
   const url = process.env.META_ADS_SUPABASE_URL?.trim();
@@ -9,14 +10,35 @@ function createMetaAdsClient() {
 }
 
 /**
- * Returns the Set of post_id_short values (e.g. "SIF-1-P1") that appear in
- * any IFAD-tagged ad_name in the Meta Ads warehouse `primary_table`.
- * Returns empty Set if the warehouse is not configured (env vars missing)
- * or if the query fails.
+ * Returns the Set of post_id_short values (e.g. "SIF-1-P1") covered by ads in
+ * the Meta Ads warehouse.
  *
- * Mirrors the legacy `mbSelectAll_` paginated pattern from Code.js.
+ * PROD REALITY (2026-07-03, Vercel runtime logs): cross-project scans of the
+ * warehouse time out on EVERY request from Vercel — this fn silently returned
+ * an empty set in production since launch. It now reads the local
+ * `meta_ads_cache` mirror first (our own DB, one fast query; kept fresh by
+ * /api/cron/warehouse-sync + the local seeder script), and only falls back to
+ * the legacy live primary_table scan when the mirror is empty (e.g. fresh
+ * environment before the first sync).
  */
 export async function fetchMetaAdsCoveredPostIds(): Promise<Set<string>> {
+  // 1. Local mirror — same region, single query.
+  try {
+    const svc = createServiceClient();
+    const { data, error } = await (svc as any)
+      .from("meta_ads_cache")
+      .select("token")
+      .limit(20000);
+    if (!error && data?.length) {
+      return new Set(
+        (data as Array<{ token: string }>).map((r) => r.token.toUpperCase()),
+      );
+    }
+  } catch {
+    // fall through to the live scan
+  }
+
+  // 2. Legacy live scan fallback (primary_table, IFAD-tagged names).
   const client = createMetaAdsClient();
   if (!client) return new Set();
   try {
@@ -205,11 +227,45 @@ const fetchWarehouseAdEntriesCached = unstable_cache(
 export async function fetchWarehouseAdRows(): Promise<
   Map<string, WarehouseAd[]>
 > {
+  // 1. Local mirror (meta_ads_cache in OUR project) — cross-project scans
+  //    time out on every Vercel request (verified in prod runtime logs), so
+  //    the mirror is the primary source; /api/cron/warehouse-sync +
+  //    scripts/sync-warehouse-cache.mjs keep it fresh.
+  try {
+    const svc = createServiceClient();
+    const { data, error } = await (svc as any)
+      .from("meta_ads_cache")
+      .select("token, ads")
+      .limit(20000);
+    if (!error && data?.length) {
+      const map = new Map<string, WarehouseAd[]>();
+      for (const row of data as Array<{ token: string; ads: unknown }>) {
+        const ads = (Array.isArray(row.ads) ? row.ads : []) as Array<
+          Record<string, unknown>
+        >;
+        map.set(
+          row.token.toUpperCase(),
+          ads.map((a) => ({
+            ...(a as unknown as WarehouseAd),
+            // Seeder/cron may store either key spelling — normalise here.
+            thumbnailUrl:
+              (a.thumbnailUrl as string | null | undefined) ??
+              (a.thumbUrl as string | null | undefined) ??
+              null,
+            imageUrl: (a.imageUrl as string | null | undefined) ?? null,
+          })),
+        );
+      }
+      return map;
+    }
+  } catch {
+    // fall through to the live scan
+  }
+
+  // 2. Fallback: live cross-project scan (only useful where the warehouse is
+  //    reachable quickly, e.g. local dev before the first sync).
   const client = createMetaAdsClient();
   if (!client) return new Map();
-  // The 6s race wraps the CACHED call: on a cold cache + slow warehouse the
-  // page renders without warehouse data, while the fill keeps running so the
-  // next render hits the cache.
   try {
     const work = fetchWarehouseAdEntriesCached().then(
       (entries) => new Map(entries),
@@ -218,6 +274,61 @@ export async function fetchWarehouseAdRows(): Promise<
   } catch {
     return new Map();
   }
+}
+
+/**
+ * Full warehouse → `meta_ads_cache` sync (scan ae_table_view, merge
+ * thumbnails, upsert per-token rollups, prune vanished tokens). Called by
+ * /api/cron/warehouse-sync (daily) and mirrored by the local seeder script.
+ * Returns a summary for the cron response.
+ */
+export async function syncWarehouseCacheToDb(): Promise<{
+  ok: boolean;
+  tokens: number;
+  ads: number;
+  thumbnails: number;
+  error?: string;
+}> {
+  const map = await readWarehouseAdMap();
+  if (map.size === 0) {
+    return { ok: false, tokens: 0, ads: 0, thumbnails: 0, error: "warehouse scan empty" };
+  }
+  const allAds = [...map.values()].flat();
+  const thumbs = await readAdThumbnails(allAds.map((a) => a.adId));
+  for (const ads of map.values()) {
+    for (const ad of ads) {
+      const t = thumbs.get(ad.adId);
+      if (t) {
+        ad.thumbnailUrl = t.thumb;
+        ad.imageUrl = t.image;
+      }
+    }
+  }
+
+  const svc = createServiceClient();
+  const nowIso = new Date().toISOString();
+  const rows = [...map.entries()].map(([token, ads]) => ({
+    token,
+    ads,
+    refreshed_at: nowIso,
+  }));
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error } = await (svc as any)
+      .from("meta_ads_cache")
+      .upsert(rows.slice(i, i + 200), { onConflict: "token" });
+    if (error) {
+      return { ok: false, tokens: map.size, ads: allAds.length, thumbnails: thumbs.size, error: error.message };
+    }
+  }
+  // Prune tokens no longer present in the warehouse.
+  const { error: delErr } = await (svc as any)
+    .from("meta_ads_cache")
+    .delete()
+    .lt("refreshed_at", nowIso);
+  if (delErr) {
+    return { ok: false, tokens: map.size, ads: allAds.length, thumbnails: thumbs.size, error: delErr.message };
+  }
+  return { ok: true, tokens: map.size, ads: allAds.length, thumbnails: thumbs.size };
 }
 
 async function readWarehouseAdMap(): Promise<Map<string, WarehouseAd[]>> {
@@ -297,11 +408,23 @@ async function readWarehouseAdMap(): Promise<Map<string, WarehouseAd[]>> {
 export async function fetchAdThumbnailsFor(
   adIds: string[],
 ): Promise<Map<string, { thumb: string | null; image: string | null }>> {
+  const empty = new Map<string, { thumb: string | null; image: string | null }>();
+  try {
+    return await raceEmpty(readAdThumbnails(adIds), empty, 5000);
+  } catch {
+    return empty;
+  }
+}
+
+/** Unraced inner read — the cron sync must NOT truncate thumbnails at 5s. */
+async function readAdThumbnails(
+  adIds: string[],
+): Promise<Map<string, { thumb: string | null; image: string | null }>> {
   const client = createMetaAdsClient();
   const empty = new Map<string, { thumb: string | null; image: string | null }>();
   if (!client || !adIds.length) return empty;
 
-  const work = (async () => {
+  {
     const map = new Map<string, { thumb: string | null; image: string | null }>();
     const CHUNK = 150;
     const chunks: string[][] = [];
@@ -333,11 +456,5 @@ export async function fetchAdThumbnailsFor(
       }
     }
     return map;
-  })();
-
-  try {
-    return await raceEmpty(work, empty, 5000);
-  } catch {
-    return empty;
   }
 }
