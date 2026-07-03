@@ -138,7 +138,7 @@ export function SearchableSelect({
           sideOffset={5}
           onOpenAutoFocus={(e) => e.preventDefault()}
           className={cn(
-            "z-[1200] w-[var(--radix-popover-trigger-width)] overflow-hidden rounded-xl",
+            "z-[1200] w-[var(--radix-popover-trigger-width)] min-w-[min(20rem,calc(100vw_-_2rem))] max-w-[calc(100vw_-_2rem)] overflow-hidden rounded-xl",
             "bg-white border border-[#E7E2D2]",
             "shadow-[0_10px_30px_-8px_rgba(44,36,32,0.25)]",
             contentClassName,

@@ -212,28 +212,38 @@ export function OnboardingTable({
         </button>
       </div>
 
-      {/* View toggle (legacy `.ob-viewtoggle`) */}
-      <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "list"}
-          className={cn(view === "list" && "active")}
-          onClick={() => setView("list")}
-        >
-          <ListIcon size={12} aria-hidden />
-          List
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "cards"}
-          className={cn(view === "cards" && "active")}
-          onClick={() => setView("cards")}
-        >
-          <Grid3X3 size={12} aria-hidden />
-          Cards
-        </button>
+      <div className="stage-board-toolbar">
+        <div className="stage-board-toolbar__copy">
+          <span>
+            {parentRows.length} row{parentRows.length === 1 ? "" : "s"}
+          </span>
+          <strong>
+            {view === "list" ? "List view" : "Card view"} · creator onboarding
+          </strong>
+        </div>
+        {/* View toggle (legacy `.ob-viewtoggle`) */}
+        <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "list"}
+            className={cn(view === "list" && "active")}
+            onClick={() => setView("list")}
+          >
+            <ListIcon size={12} aria-hidden />
+            List
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "cards"}
+            className={cn(view === "cards" && "active")}
+            onClick={() => setView("cards")}
+          >
+            <Grid3X3 size={12} aria-hidden />
+            Cards
+          </button>
+        </div>
       </div>
 
       {view === "list" ? (

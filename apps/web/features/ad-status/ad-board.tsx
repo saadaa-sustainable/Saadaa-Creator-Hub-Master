@@ -399,22 +399,31 @@ function AdCreativeLightbox({
       }}
     >
       <div
-        className="modal-panel modal-panel--lg modal-panel--onboarding ad-lightbox-panel"
+        className="modal-panel modal-panel--lg modal-panel--onboarding campaign-detail-modal ad-lightbox-panel ad-preview-modal"
         onClick={(e) => e.stopPropagation()}
+        style={{ "--campaign-accent": AD_STATUS_ACCENTS.meta } as CSSProperties}
       >
-        <header className="modal-head ad-lightbox-head">
-          <div className="flex items-center gap-2 min-w-0">
-            {shortcode ? (
-              <Instagram size={16} aria-hidden className="shrink-0" />
-            ) : (
-              <Megaphone size={16} aria-hidden className="shrink-0" />
-            )}
-            <h2 className="font-semibold">Ad Preview</h2>
-            {ad.category && <WhCategoryBadge category={ad.category} />}
+        <header className="modal-head campaign-detail-head ad-lightbox-head ad-preview-head">
+          <div className="min-w-0">
+            <div className="campaign-card__id-row">
+              <span className="campaign-card__id">
+                {shortcode ? (
+                  <Instagram size={12} aria-hidden />
+                ) : (
+                  <Megaphone size={12} aria-hidden />
+                )}
+                {shortcode ? "Instagram Creative" : "Meta Creative"}
+              </span>
+              {ad.category && <WhCategoryBadge category={ad.category} />}
+            </div>
+            <h2>Ad Preview</h2>
+            <p className="campaign-detail-subtitle" title={ad.adName}>
+              {ad.adName || "Creative details from the Meta warehouse"}
+            </p>
           </div>
           <button
             type="button"
-            className="icon-btn"
+            className="icon-btn campaign-detail-close-btn"
             onClick={onClose}
             aria-label="Close"
           >
@@ -515,7 +524,7 @@ function AdCreativeLightbox({
           </aside>
         </div>
 
-        <footer className="modal-foot ob-overview-footer">
+        <footer className="modal-foot ob-overview-footer ad-preview-footer">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close
           </button>
@@ -723,7 +732,7 @@ function AdPerformanceStats({
       sub: `${winners} winner-class`,
     },
     {
-      label: "Class. Rate",
+      label: "Review Coverage",
       value: `${classRate}%`,
       color: AD_STATUS_ACCENTS.p0,
       sub: `${classified}/${total || 0} reviewed`,
@@ -763,7 +772,7 @@ function AdPerformanceStats({
     <article className="bento-tile ad-performance-card">
       <TileHead
         icon={<BarChart3 size={12} aria-hidden />}
-        info="Win Rate = Winner-class posts (Incremental Winner + Winner) ÷ classified posts. Class. Rate = classified ÷ all eligible posts. In Meta Ads = posts found on the Meta platform."
+        info="Win Rate = Winner-class posts (Incremental Winner + Winner) ÷ reviewed posts. Review Coverage = posts with a warehouse category or legacy ads result ÷ all eligible posts. In Meta Ads = posts found on the Meta platform."
       >
         Performance Stats
       </TileHead>
@@ -831,23 +840,6 @@ function AdPerformanceStats({
 // Overview modal — same shell as posting overview
 // ---------------------------------------------------------------------------
 
-function OverviewItem({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
-  return (
-    <div className="ob-overview-item">
-      <span>{label}</span>
-      <strong className={cn(mono && "tabular")}>{value || "—"}</strong>
-    </div>
-  );
-}
-
 function LinkRow({
   icon,
   label,
@@ -859,7 +851,7 @@ function LinkRow({
 }) {
   const hasUrl = !!url && /^https?:\/\//i.test(url);
   return (
-    <div className="pt-overview-link-row">
+    <div className="pt-overview-link-row ad-detail-link-row">
       <div className="pt-overview-link-label">
         {icon}
         <span>{label}</span>
@@ -888,6 +880,23 @@ function LinkRow({
   );
 }
 
+function AdDetailMetric({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd className={cn(mono && "tabular")}>{value || "—"}</dd>
+    </div>
+  );
+}
+
 function AdStatusOverviewModal({
   row,
   onClose,
@@ -909,6 +918,16 @@ function AdStatusOverviewModal({
   // posts.ads_status / ads_results are legacy fields, stale for matched rows.
   const matched = row.ads.length > 0;
   const firstAd = row.primaryAd;
+  const accent = rowAccent(row);
+  const deliveryLabel = matched
+    ? prettyAdDeliveryStatus(firstAd?.adStatus)
+    : row.adsStatus || "Pending";
+  const classificationLabel = matched
+    ? row.warehouseCategory || "Needs review"
+    : row.adsResults || "Untested";
+  const adSpend = row.ads.reduce((sum, ad) => sum + ad.amountSpent, 0);
+  const adOrders = row.ads.reduce((sum, ad) => sum + ad.shopifyOrders, 0);
+  const adImpressions = row.ads.reduce((sum, ad) => sum + ad.impressions, 0);
 
   if (!mounted || typeof document === "undefined") return null;
 
@@ -921,227 +940,245 @@ function AdStatusOverviewModal({
       onClick={onClose}
     >
       <div
-        className="modal-panel modal-panel--lg modal-panel--onboarding ob-overview-modal ad-overview-modal"
+        className="modal-panel modal-panel--lg modal-panel--onboarding campaign-detail-modal ob-overview-modal ad-overview-modal ad-detail-modal"
         onClick={(e) => e.stopPropagation()}
+        style={{ "--campaign-accent": accent } as CSSProperties}
       >
-        <header className="modal-head">
-          <div className="flex items-center gap-2 min-w-0">
-            <Eye size={16} aria-hidden />
-            <h2 className="font-semibold">Ad Overview</h2>
-            <span className="chip text-[10px] tabular">
-              {row.postIdShort || row.postId}
-            </span>
-            {row.collabId && (
-              <span className="text-text-tertiary text-[0.7rem] tabular">
-                · {row.collabId}
+        <header className="modal-head campaign-detail-head ad-detail-head">
+          <div className="min-w-0">
+            <div className="campaign-card__id-row">
+              <span className="campaign-card__id tabular">
+                {row.postIdShort || row.postId}
               </span>
-            )}
-          </div>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={16} aria-hidden />
-          </button>
-        </header>
-
-        <div className="modal-body ob-overview-body">
-          <section className="ob-overview-card">
-            <div className="ob-overview-head">
-              <Avatar
-                src={row.profilePicUrl}
-                username={row.username}
-                name={row.name}
-                size={48}
-              />
-              <div className="ob-overview-identity">
-                <strong>{row.name || row.username || "—"}</strong>
-                <span>@{row.username || "—"}</span>
-              </div>
-              {row.warehouseCategory ? (
-                <WhCategoryBadge category={row.warehouseCategory} />
-              ) : row.ads.length ? null : (
-                // Legacy badge only for rows the warehouse doesn't know —
-                // a matched-but-uncategorized ad must not show a stale
-                // legacy "Winner" beside a "—" classification field.
-                <AsClassBadge value={row.adsResults} />
+              {row.collabId && (
+                <span className="campaign-card__status tabular">
+                  {row.collabId}
+                </span>
               )}
-            </div>
-            <div className="ob-overview-pills">
+              <RowStatusBadge row={row} />
               {row.source === "historic" && <HistoricChip />}
               {row.retiredId && <RetiredIdChip />}
-              {row.campaign && (
-                <span className="campaign-chip">{row.campaign}</span>
-              )}
-              {/* Matched rows: legacy "Pending" chip contradicts the warehouse
-                  badge — show the first ad's Meta delivery status instead. */}
-              {matched ? (
-                firstAd?.adStatus ? (
-                  <span className="pill pill--muted">
-                    {prettyAdDeliveryStatus(firstAd.adStatus)}
-                  </span>
-                ) : null
-              ) : (
-                <span className="pill pill--muted capitalize">
-                  {row.adsStatus || "Pending"}
-                </span>
-              )}
-              {row.adsUsageRights && (
-                <span className="pill pill--info">
-                  <ShieldCheck size={10} aria-hidden />
-                  Ads: {row.adsUsageRights}
-                </span>
-              )}
-              <span
-                className={cn(
-                  "pill",
-                  row.isInMetaAds ? "pill--parent" : "pill--muted",
-                )}
-              >
-                <Megaphone size={10} aria-hidden />
-                {row.isInMetaAds ? "In Meta Ads" : "Not in Meta Ads"}
-              </span>
             </div>
-          </section>
+            <h2>{row.name || row.username || row.postIdShort}</h2>
+            <p className="campaign-detail-subtitle">
+              {row.username ? `@${row.username}` : "Creator profile"} ·{" "}
+              {row.campaign || "No campaign"} · {classificationLabel}
+            </p>
+          </div>
+          <div className="modal-head__actions">
+            {row.linkToPost && (
+              <a
+                href={row.linkToPost}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-ghost campaign-detail-edit-btn"
+              >
+                <Instagram size={14} aria-hidden />
+                Post
+              </a>
+            )}
+            <button
+              type="button"
+              className="icon-btn campaign-detail-close-btn"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X size={16} aria-hidden />
+            </button>
+          </div>
+        </header>
 
-          <section className="ob-overview-grid">
-            <OverviewItem
-              label="Post ID"
-              value={
-                row.collabId ? `${row.postId} · ${row.collabId}` : row.postId
-              }
-              mono
-            />
-            <OverviewItem
-              label="Post Date"
-              value={
-                <span className="inline-flex items-center gap-1">
-                  <CalendarDays size={10} aria-hidden />
-                  {formatDate(row.postDate) || "—"}
+        <div className="modal-body campaign-detail-body ad-detail-body">
+          <section className="campaign-detail-overview ad-detail-overview">
+            <div className="campaign-detail-allocation-card ad-detail-profile-card">
+              <div className="ad-detail-avatar-frame">
+                <RowThumb row={row} size={74} />
+              </div>
+              <div className="campaign-detail-allocation-copy">
+                <span>Creator / Creative</span>
+                <strong>{row.name || row.username || "—"}</strong>
+                <p className="ad-detail-profile-sub">
+                  @{row.username || "—"} · {row.category || "No tier"}
+                </p>
+                <span className="campaign-detail-progress-track ad-detail-progress-track">
+                  <span
+                    style={
+                      {
+                        "--ad-width": row.isInMetaAds ? "100%" : "8%",
+                        "--ad-accent": accent,
+                      } as CSSProperties
+                    }
+                  />
                 </span>
-              }
-              mono
-            />
-            <OverviewItem label="Campaign" value={row.campaign || "—"} />
-            <OverviewItem
-              label="Partnership ID"
-              value={row.partnershipId || "—"}
-              mono
-            />
-            <OverviewItem
-              label="Days Since Posted"
-              value={
-                row.daysSince != null
-                  ? row.daysSince === 0
-                    ? "Today"
-                    : `${row.daysSince}d ago`
-                  : "—"
-              }
-              mono
-            />
-            <OverviewItem label="Collab Type" value={row.collabType || "—"} />
-            <OverviewItem
-              label="Ads Usage Rights"
-              value={row.adsUsageRights || "—"}
-            />
-            <OverviewItem
-              label="Ads Status"
-              value={
-                matched
-                  ? prettyAdDeliveryStatus(firstAd?.adStatus)
-                  : row.adsStatus || "Pending"
-              }
-            />
-            <OverviewItem
-              label="Classification"
-              value={
-                matched
-                  ? row.warehouseCategory || "—"
-                  : row.adsResults || "Untested"
-              }
-            />
+                <div className="campaign-detail-quick-actions">
+                  <span className="campaign-detail-reachout-button">
+                    <Megaphone size={13} aria-hidden />
+                    {row.isInMetaAds ? "In Meta Ads" : "Not in Meta Ads"}
+                  </span>
+                  <span className="campaign-detail-reachout-button">
+                    <Eye size={13} aria-hidden />
+                    {classificationLabel}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <dl className="campaign-detail-stat-grid ad-detail-stat-grid">
+              <AdDetailMetric
+                label="Campaign"
+                value={row.campaign || "—"}
+              />
+              <AdDetailMetric
+                label="Post Date"
+                value={formatDate(row.postDate) || "—"}
+                mono
+              />
+              <AdDetailMetric label="Delivery" value={deliveryLabel} />
+              <AdDetailMetric
+                label="Followers"
+                value={
+                  row.followers != null ? row.followers.toLocaleString() : "—"
+                }
+                mono
+              />
+              <AdDetailMetric
+                label="Meta Ads"
+                value={row.isInMetaAds ? "Matched" : "Not matched"}
+              />
+              <AdDetailMetric label="Ads" value={row.ads.length} mono />
+            </dl>
           </section>
 
-          <section className="ob-overview-grid">
-            <OverviewItem label="Category" value={row.category || "—"} />
-            <OverviewItem
-              label="Followers"
-              value={
-                row.followers != null ? row.followers.toLocaleString() : "—"
-              }
-              mono
-            />
-            <OverviewItem
-              label="In Meta Ads"
-              value={row.isInMetaAds ? "Yes" : "No"}
-            />
-            <OverviewItem
-              label="Workflow"
-              value={workflowStatusLabel(row.workflowStatus)}
-            />
+          <section className="campaign-detail-section ad-detail-section">
+            <div className="campaign-detail-section-head">
+              <div>
+                <h3>Post Context</h3>
+                <p>
+                  Warehouse status and creator-level fields used to classify
+                  this post for Ads Status.
+                </p>
+              </div>
+              <strong>{classificationLabel}</strong>
+            </div>
+            <dl className="campaign-detail-stat-grid ad-detail-context-grid">
+              <AdDetailMetric
+                label="Post ID"
+                value={
+                  row.collabId ? `${row.postId} · ${row.collabId}` : row.postId
+                }
+                mono
+              />
+              <AdDetailMetric
+                label="Partnership ID"
+                value={row.partnershipId || "—"}
+                mono
+              />
+              <AdDetailMetric
+                label="Days Since Posted"
+                value={
+                  row.daysSince != null
+                    ? row.daysSince === 0
+                      ? "Today"
+                      : `${row.daysSince}d ago`
+                    : "—"
+                }
+                mono
+              />
+              <AdDetailMetric
+                label="Collab Type"
+                value={row.collabType || "—"}
+              />
+              <AdDetailMetric
+                label="Ads Usage Rights"
+                value={row.adsUsageRights || "—"}
+              />
+              <AdDetailMetric
+                label="Workflow"
+                value={workflowStatusLabel(row.workflowStatus)}
+              />
+            </dl>
           </section>
 
           {row.ads.length > 0 && (
-            <section className="ob-overview-card ad-overview-ads">
-              <div className="flex items-center gap-2 mb-2">
-                <Megaphone size={13} aria-hidden />
-                <strong className="text-[0.8rem]">
-                  Meta Ads Performance ({row.ads.length} ad
-                  {row.ads.length > 1 ? "s" : ""})
-                </strong>
+            <section className="campaign-detail-section ad-detail-ad-section">
+              <div className="campaign-detail-section-head">
+                <div>
+                  <h3>Meta Ads Performance</h3>
+                  <p>
+                    {formatNumber(row.ads.length)} creative
+                    {row.ads.length > 1 ? "s" : ""} ·{" "}
+                    {formatNumber(adImpressions)} impressions ·{" "}
+                    {formatNumber(adOrders)} orders
+                  </p>
+                </div>
+                <strong>{formatRupees(adSpend)}</strong>
               </div>
-              <ul className="ad-overview-ad-list">
+              <ul className="ad-detail-ad-list">
                 {/* `ads` is first-occurrence order (earliest created first) —
                     entry 0 IS the first-occurrence ad. */}
                 {row.ads.map((ad, i) => (
-                  <li key={ad.adId}>
+                  <li key={ad.adId} className="ad-detail-ad-card">
                     <AdImg
                       ad={ad}
                       alt={`Ad creative — ${ad.adName}`}
-                      size={36}
+                      size={44}
                       postUrl={row.linkToPost}
                     />
-                    <div className="min-w-0 flex-1">
-                      <span
-                        className="block truncate text-[0.76rem] font-semibold text-text-primary"
-                        title={ad.adName}
-                      >
+                    <div className="ad-detail-ad-main">
+                      <span className="ad-detail-ad-name" title={ad.adName}>
                         {ad.adName}
                       </span>
-                      <span className="block text-[0.7rem] text-text-tertiary tabular">
-                        {formatRupees(ad.amountSpent)} · {roasText(ad)} ·{" "}
-                        {formatNumber(ad.impressions)} impr ·{" "}
-                        {formatNumber(ad.ftewvCount)} FTEWV ·{" "}
-                        {formatNumber(ad.ncpCount)} NCP ·{" "}
-                        {formatNumber(ad.shopifyOrders)} orders
-                      </span>
+                      <dl className="ad-detail-ad-metrics">
+                        <div>
+                          <dt>Spend</dt>
+                          <dd>{formatRupees(ad.amountSpent)}</dd>
+                        </div>
+                        <div>
+                          <dt>ROAS</dt>
+                          <dd>{roasText(ad)}</dd>
+                        </div>
+                        <div>
+                          <dt>Impr.</dt>
+                          <dd>{formatNumber(ad.impressions)}</dd>
+                        </div>
+                        <div>
+                          <dt>Orders</dt>
+                          <dd>{formatNumber(ad.shopifyOrders)}</dd>
+                        </div>
+                      </dl>
                     </div>
-                    {i === 0 && (
-                      <span
-                        className={cn(
-                          "pill text-[0.62rem] font-bold uppercase tracking-[0.05em] shrink-0 whitespace-nowrap",
-                          isWinnerCategory(ad.category)
-                            ? "bg-[#ECF1E9] text-[#4F7C4D]"
-                            : "pill--muted",
-                        )}
-                        title="Earliest ad created from this post — drives the row's status"
-                      >
-                        {isWinnerCategory(ad.category)
-                          ? "First Occurrence Winner Ad"
-                          : "First occurrence"}
-                      </span>
-                    )}
-                    <WhCategoryBadge category={ad.category || "—"} />
-                    <AdLinkChips ad={ad} />
+                    <div className="ad-detail-ad-actions">
+                      {i === 0 && (
+                        <span
+                          className={cn(
+                            "pill text-[0.62rem] font-bold uppercase tracking-[0.05em] shrink-0 whitespace-nowrap",
+                            isWinnerCategory(ad.category)
+                              ? "bg-[#ECF1E9] text-[#4F7C4D]"
+                              : "pill--muted",
+                          )}
+                          title="Earliest ad created from this post — drives the row's status"
+                        >
+                          {isWinnerCategory(ad.category)
+                            ? "First winner"
+                            : "First occurrence"}
+                        </span>
+                      )}
+                      <WhCategoryBadge category={ad.category || "—"} />
+                      <AdLinkChips ad={ad} />
+                    </div>
                   </li>
                 ))}
               </ul>
             </section>
           )}
 
-          <section className="pt-overview-links">
+          <section className="campaign-detail-section ad-detail-links">
+            <div className="campaign-detail-section-head">
+              <div>
+                <h3>Links</h3>
+                <p>Open the live post, creative assets, or warehouse preview.</p>
+              </div>
+            </div>
             <LinkRow
               icon={<Instagram size={12} aria-hidden />}
               label="Live Post URL"

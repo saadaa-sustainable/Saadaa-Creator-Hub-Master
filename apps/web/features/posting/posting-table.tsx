@@ -113,28 +113,38 @@ export function PostingTable({
         />
       )}
 
-      {/* View toggle — legacy `.ob-viewtoggle` (shared with onboarding). */}
-      <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "list"}
-          className={cn(view === "list" && "active")}
-          onClick={() => setView("list")}
-        >
-          <ListIcon size={12} aria-hidden />
-          List
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "cards"}
-          className={cn(view === "cards" && "active")}
-          onClick={() => setView("cards")}
-        >
-          <Grid3X3 size={12} aria-hidden />
-          Cards
-        </button>
+      <div className="stage-board-toolbar">
+        <div className="stage-board-toolbar__copy">
+          <span>
+            {rows.length} row{rows.length === 1 ? "" : "s"}
+          </span>
+          <strong>
+            {view === "list" ? "List view" : "Card view"} · posting data
+          </strong>
+        </div>
+        {/* View toggle — legacy `.ob-viewtoggle` (shared with onboarding). */}
+        <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "list"}
+            className={cn(view === "list" && "active")}
+            onClick={() => setView("list")}
+          >
+            <ListIcon size={12} aria-hidden />
+            List
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "cards"}
+            className={cn(view === "cards" && "active")}
+            onClick={() => setView("cards")}
+          >
+            <Grid3X3 size={12} aria-hidden />
+            Cards
+          </button>
+        </div>
       </div>
 
       {view === "list" ? (

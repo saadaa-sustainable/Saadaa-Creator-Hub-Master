@@ -13425,6 +13425,635 @@ body:has(.km-backdrop) {
   }
 }
 
+/* Shared stage refresh — aligns Onboarding, Posting, dashboard embeds, My
+   Dashboard and Historic Analytics with the campaign / Ads Status surface. */
+.onboarding-stage
+  :is(.onboarding-filter-card, .ob-list-wrap, .ob-card, .ob-empty),
+.dashboard-interactive-shell
+  :is(.onboarding-filter-card, .ob-list-wrap, .ob-card, .ob-empty) {
+  border-color: color-mix(
+    in oklab,
+    var(--stage-accent, var(--color-accent)) 12%,
+    var(--color-border)
+  );
+  background: var(--color-bg-white);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 18px 44px -38px rgba(22, 21, 19, 0.34);
+}
+
+.onboarding-stage .onboarding-filter-card,
+.dashboard-interactive-shell .onboarding-filter-card {
+  padding: 0.72rem;
+  border-radius: 16px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 252, 248, 0.95),
+      rgba(255, 255, 255, 0.9)
+    ),
+    var(--color-bg-white);
+}
+
+.onboarding-stage .onboarding-filter-grid,
+.dashboard-interactive-shell .onboarding-filter-grid {
+  gap: 0.62rem;
+}
+
+.onboarding-stage :is(.onboarding-filter-field > span, .onboarding-filter-grid label),
+.dashboard-interactive-shell
+  :is(.onboarding-filter-field > span, .onboarding-filter-grid label) {
+  color: var(--color-text-tertiary);
+  font-size: 0.64rem;
+  letter-spacing: 0.07em;
+}
+
+.onboarding-stage :is(.onboarding-filter-select, .onboarding-filter-grid input),
+.dashboard-interactive-shell
+  :is(.onboarding-filter-select, .onboarding-filter-grid input),
+.onboarding-stage [data-searchable-select],
+.dashboard-interactive-shell [data-searchable-select] {
+  min-height: 2.45rem;
+  border-radius: 11px;
+  background: var(--color-bg-white);
+  font-size: 0.84rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 8px 18px -18px rgba(22, 21, 19, 0.22);
+}
+
+.onboarding-stage .ob-viewtoggle,
+.dashboard-interactive-shell .ob-viewtoggle {
+  justify-self: end;
+  margin: 0 0 0.15rem;
+  border-radius: 12px;
+  background: var(--color-bg-white);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 12px 28px -24px rgba(22, 21, 19, 0.36);
+}
+
+.onboarding-stage .ob-viewtoggle button,
+.dashboard-interactive-shell .ob-viewtoggle button {
+  min-height: 30px;
+  border-radius: 9px;
+  padding: 0.34rem 0.72rem;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.onboarding-stage .ob-viewtoggle button.active,
+.dashboard-interactive-shell .ob-viewtoggle button.active {
+  background: var(--color-text-primary);
+  color: var(--color-bg-white);
+  box-shadow: 0 8px 18px -14px rgba(22, 21, 19, 0.42);
+}
+
+.stage-board-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid
+    color-mix(
+      in oklab,
+      var(--stage-accent, var(--color-accent)) 10%,
+      var(--color-border)
+    );
+  border-radius: 15px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 252, 248, 0.94),
+      rgba(255, 255, 255, 0.9)
+    ),
+    var(--color-bg-white);
+  padding: 0.56rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 16px 36px -34px rgba(22, 21, 19, 0.32);
+}
+
+.stage-board-toolbar__copy {
+  display: grid;
+  gap: 0.14rem;
+  min-width: 0;
+}
+
+.stage-board-toolbar__copy span {
+  width: fit-content;
+  border-radius: 999px;
+  background: color-mix(
+    in oklab,
+    var(--stage-accent, var(--color-accent)) 10%,
+    white
+  );
+  padding: 0.22rem 0.58rem;
+  color: var(--color-text-secondary);
+  font-size: 0.66rem;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-board-toolbar__copy strong {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.onboarding-stage .ob-list-wrap,
+.dashboard-interactive-shell .ob-list-wrap {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.onboarding-stage .ob-list-wrap > div:not([role="status"]),
+.dashboard-interactive-shell .ob-list-wrap > div:not([role="status"]) {
+  border: 0;
+  background: transparent;
+}
+
+.onboarding-stage .ob-list-wrap table,
+.dashboard-interactive-shell .ob-list-wrap table {
+  border-collapse: separate;
+  border-spacing: 0 0.58rem;
+  background: transparent;
+}
+
+.onboarding-stage .ob-list-wrap thead,
+.dashboard-interactive-shell .ob-list-wrap thead {
+  background: transparent;
+}
+
+.onboarding-stage .ob-list-wrap th,
+.dashboard-interactive-shell .ob-list-wrap th {
+  height: 2.25rem;
+  background: transparent !important;
+  color: var(--color-text-tertiary) !important;
+  padding-block: 0.35rem !important;
+}
+
+.onboarding-stage .ob-list-wrap tbody tr,
+.dashboard-interactive-shell .ob-list-wrap tbody tr {
+  background: var(--color-bg-white);
+  box-shadow:
+    0 16px 34px -32px rgba(22, 21, 19, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.onboarding-stage .ob-list-wrap tbody td,
+.dashboard-interactive-shell .ob-list-wrap tbody td {
+  height: 4rem;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-white);
+}
+
+.onboarding-stage .ob-list-wrap tbody td:first-child,
+.dashboard-interactive-shell .ob-list-wrap tbody td:first-child {
+  border-left: 3px solid var(--stage-accent, var(--color-accent));
+  border-radius: 14px 0 0 14px;
+}
+
+.onboarding-stage .ob-list-wrap tbody td:last-child,
+.dashboard-interactive-shell .ob-list-wrap tbody td:last-child {
+  border-right: 1px solid var(--color-border);
+  border-radius: 0 14px 14px 0;
+}
+
+.onboarding-stage .ob-list-wrap [data-column-id="actions"],
+.dashboard-interactive-shell .ob-list-wrap [data-column-id="actions"] {
+  background: var(--color-bg-white);
+  box-shadow: -14px 0 24px -24px rgba(22, 21, 19, 0.44);
+}
+
+.onboarding-stage .ob-card,
+.dashboard-interactive-shell .ob-card {
+  --stage-accent: var(--color-accent);
+  position: relative;
+  border-radius: 16px;
+  padding: 0.86rem;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--stage-accent) 4%, white),
+      rgba(255, 255, 255, 0.92) 38%
+    ),
+    var(--color-bg-white);
+}
+
+.onboarding-stage .ob-card::before,
+.dashboard-interactive-shell .ob-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px -1px auto -1px;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(
+    90deg,
+    var(--stage-accent),
+    color-mix(in oklab, var(--stage-accent) 45%, white)
+  );
+}
+
+.onboarding-stage .ob-card-onboarded,
+.dashboard-interactive-shell .ob-card-onboarded {
+  --stage-accent: var(--color-success-text);
+}
+
+.onboarding-stage .ob-card-pending,
+.dashboard-interactive-shell .ob-card-pending {
+  --stage-accent: var(--color-warning-text);
+}
+
+.onboarding-stage .ob-card-head,
+.dashboard-interactive-shell .ob-card-head {
+  min-width: 0;
+}
+
+.onboarding-stage .ob-card-meta-grid,
+.dashboard-interactive-shell .ob-card-meta-grid {
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 252, 248, 0.72),
+      rgba(250, 248, 245, 0.42)
+    ),
+    var(--color-bg-white);
+}
+
+.onboarding-stage .action-btn,
+.dashboard-interactive-shell .action-btn,
+.onboarding-stage .ob-card-actions button,
+.onboarding-stage .ob-card-actions a.action-view,
+.dashboard-interactive-shell .ob-card-actions button,
+.dashboard-interactive-shell .ob-card-actions a.action-view {
+  border-radius: 10px;
+  font-weight: 850;
+  box-shadow: 0 10px 22px -20px rgba(22, 21, 19, 0.3);
+}
+
+.onboarding-stage .action-btn--view,
+.onboarding-stage .ob-card-actions button.action-view,
+.onboarding-stage .ob-card-actions a.action-view,
+.dashboard-interactive-shell .action-btn--view,
+.dashboard-interactive-shell .ob-card-actions button.action-view,
+.dashboard-interactive-shell .ob-card-actions a.action-view {
+  border-color: color-mix(in oklab, #3b6fd4 24%, var(--color-border));
+  background: color-mix(in oklab, #3b6fd4 8%, white);
+  color: #2b5bb5;
+}
+
+.onboarding-stage .action-btn--view:hover,
+.onboarding-stage .ob-card-actions button.action-view:hover,
+.onboarding-stage .ob-card-actions a.action-view:hover,
+.dashboard-interactive-shell .action-btn--view:hover,
+.dashboard-interactive-shell .ob-card-actions button.action-view:hover,
+.dashboard-interactive-shell .ob-card-actions a.action-view:hover {
+  border-color: #2b5bb5;
+  background: #2b5bb5;
+  color: #fff;
+}
+
+.onboarding-stage .ob-card-actions button.action-primary,
+.dashboard-interactive-shell .ob-card-actions button.action-primary {
+  border-color: color-mix(in oklab, var(--color-accent) 58%, #b57514);
+  background: linear-gradient(
+    180deg,
+    var(--color-accent),
+    color-mix(in oklab, var(--color-accent) 70%, #b57514)
+  );
+}
+
+.ad-detail-modal {
+  width: min(820px, 94vw);
+  max-height: min(90dvh, 920px);
+}
+
+.ad-detail-head .campaign-card__id-row,
+.ad-preview-head .campaign-card__id-row {
+  align-items: center;
+}
+
+.ad-detail-body {
+  overflow-y: auto;
+  max-height: calc(min(90dvh, 920px) - 132px);
+}
+
+.ad-detail-overview {
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+}
+
+.ad-detail-profile-card {
+  grid-template-columns: 84px minmax(0, 1fr);
+}
+
+.ad-detail-avatar-frame,
+.ad-detail-avatar-frame .ad-thumb-link,
+.ad-detail-avatar-frame .ad-thumb,
+.ad-detail-avatar-frame [data-avatar] {
+  width: 74px !important;
+  height: 74px !important;
+  border-radius: 18px;
+}
+
+.ad-detail-avatar-frame .ad-thumb-link {
+  box-shadow:
+    0 18px 36px -30px rgba(22, 21, 19, 0.62),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.ad-detail-profile-sub {
+  margin: -0.14rem 0 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ad-detail-progress-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-bg-ecru);
+}
+
+.ad-detail-progress-track > span {
+  --ad-width: 0%;
+  --ad-accent: var(--campaign-accent, #7b4fbf);
+  display: block;
+  width: var(--ad-width);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    var(--ad-accent),
+    color-mix(in oklab, var(--ad-accent) 58%, white)
+  );
+  animation: campaignProgressIn 0.58s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ad-detail-stat-grid,
+.ad-detail-context-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ad-detail-context-grid {
+  margin-top: 0.1rem;
+}
+
+.ad-detail-ad-list {
+  display: grid;
+  gap: 0.56rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ad-detail-ad-card {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) minmax(180px, auto);
+  align-items: center;
+  gap: 0.68rem;
+  min-width: 0;
+  border: 1px solid
+    color-mix(
+      in oklab,
+      var(--campaign-accent, #7b4fbf) 12%,
+      var(--color-border)
+    );
+  border-radius: 14px;
+  background: var(--color-bg-white);
+  padding: 0.58rem;
+  box-shadow: 0 14px 30px -28px rgba(22, 21, 19, 0.34);
+}
+
+.ad-detail-ad-card .ad-thumb-link,
+.ad-detail-ad-card .ad-thumb {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px;
+}
+
+.ad-detail-ad-main {
+  display: grid;
+  gap: 0.34rem;
+  min-width: 0;
+}
+
+.ad-detail-ad-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.8rem;
+  font-weight: 850;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ad-detail-ad-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.36rem;
+  margin: 0;
+}
+
+.ad-detail-ad-metrics > div {
+  min-width: 0;
+  border-radius: 9px;
+  background: color-mix(in oklab, var(--color-bg-ecru) 42%, white);
+  padding: 0.32rem 0.42rem;
+}
+
+.ad-detail-ad-metrics dt {
+  color: var(--color-text-tertiary);
+  font-size: 0.54rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.ad-detail-ad-metrics dd {
+  margin: 0.18rem 0 0;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.68rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ad-detail-ad-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.36rem;
+  min-width: 0;
+}
+
+.ad-detail-links {
+  gap: 0;
+  overflow: hidden;
+}
+
+.ad-detail-links .campaign-detail-section-head {
+  margin-bottom: 0.18rem;
+}
+
+.ad-detail-link-row {
+  border: 0;
+  border-top: 1px solid var(--color-border-soft);
+  border-radius: 0;
+  background: transparent;
+  padding: 0.72rem 0;
+}
+
+.ad-detail-link-row:first-of-type {
+  border-top: 0;
+}
+
+.ad-preview-modal {
+  width: min(72rem, 94vw);
+  max-height: min(90dvh, 880px);
+}
+
+.ad-preview-modal .ad-lightbox-grid {
+  overflow: hidden;
+  border-top: 1px solid var(--color-border);
+}
+
+.ad-preview-modal .ad-lightbox-aside {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 252, 248, 0.92),
+      rgba(250, 248, 245, 0.66)
+    ),
+    var(--color-bg-white);
+}
+
+.ad-preview-modal .ad-lightbox-stats {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+}
+
+.ad-preview-footer .btn,
+.ad-preview-footer .btn-primary-cta {
+  min-height: 38px;
+  border-radius: 11px;
+}
+
+@media (max-width: 900px) {
+  .ad-detail-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .ad-detail-ad-card {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .ad-detail-ad-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 767px) {
+  .onboarding-stage .onboarding-filter-card,
+  .dashboard-interactive-shell .onboarding-filter-card {
+    padding: 0.55rem;
+    border-radius: 13px;
+  }
+
+  .onboarding-stage .onboarding-filter-grid,
+  .dashboard-interactive-shell .onboarding-filter-grid {
+    gap: 0.42rem;
+  }
+
+  .onboarding-stage :is(.onboarding-filter-select, .onboarding-filter-grid input),
+  .dashboard-interactive-shell
+    :is(.onboarding-filter-select, .onboarding-filter-grid input),
+  .onboarding-stage [data-searchable-select],
+  .dashboard-interactive-shell [data-searchable-select] {
+    min-height: 2rem;
+    border-radius: 9px;
+    font-size: 0.7rem;
+  }
+
+  .onboarding-stage .ob-card,
+  .dashboard-interactive-shell .ob-card {
+    border-radius: 12px;
+    padding: 0.64rem;
+  }
+
+  .stage-board-toolbar {
+    grid-template-columns: 1fr;
+    gap: 0.42rem;
+    padding: 0.48rem;
+    border-radius: 12px;
+  }
+
+  .ad-detail-modal,
+  .ad-preview-modal {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .ad-detail-body {
+    max-height: calc(100dvh - 9.4rem);
+    padding: 0.72rem;
+  }
+
+  .ad-detail-profile-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: 0.62rem;
+  }
+
+  .ad-detail-avatar-frame,
+  .ad-detail-avatar-frame .ad-thumb-link,
+  .ad-detail-avatar-frame .ad-thumb,
+  .ad-detail-avatar-frame [data-avatar] {
+    width: 58px !important;
+    height: 58px !important;
+    border-radius: 14px;
+  }
+
+  .ad-detail-stat-grid,
+  .ad-detail-context-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ad-detail-ad-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ad-preview-modal .ad-lightbox-grid {
+    max-height: calc(100dvh - 9.2rem);
+    overflow-y: auto;
+  }
+
+  .ad-preview-footer {
+    flex-wrap: wrap;
+  }
+
+  .ad-preview-footer > * {
+    flex: 1 1 auto;
+  }
+}
+
 /* Accounts Hub — payment panel SSR skeleton (placeholder before hydration). */
 .acc-entry-skeleton {
   height: 132px;
