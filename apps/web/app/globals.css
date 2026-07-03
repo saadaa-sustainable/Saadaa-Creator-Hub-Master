@@ -8259,6 +8259,43 @@ body:has(.km-backdrop) {
   text-transform: uppercase;
   color: var(--color-text-secondary, #6e695e);
 }
+
+.dash-overview-stage .dashboard-overview-strip {
+  gap: 0.9rem;
+}
+.dash-overview-stage .dashboard-overview-band {
+  border: 1px solid color-mix(in oklab, var(--color-border) 76%, white);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(250, 248, 245, 0.7)),
+    var(--color-bg-white);
+  padding: 0.82rem;
+  box-shadow: 0 12px 28px -24px rgba(22, 21, 19, 0.2);
+}
+.dash-overview-stage .dashboard-overview-band__head {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 0.72rem;
+}
+.dash-overview-stage .dashboard-overview-band__label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.4rem;
+}
+.dash-overview-stage .dashboard-overview-band__meta {
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-tertiary, #9a9384);
+  text-align: right;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
 .acc-kpi--skeleton {
   height: 84px;
   background: linear-gradient(
@@ -8512,6 +8549,19 @@ body:has(.km-backdrop) {
   .my-dashboard-stage .onboarding-filter-select.pl-7,
   .dash-overview-stage .onboarding-filter-select.pl-7 {
     padding-left: 1.65rem;
+  }
+  .dash-overview-stage .dashboard-overview-strip {
+    gap: 0.62rem;
+  }
+  .dash-overview-stage .dashboard-overview-band {
+    border-radius: 12px;
+    padding: 0.58rem;
+  }
+  .dash-overview-stage .dashboard-overview-band__head {
+    margin-bottom: 0.5rem;
+  }
+  .dash-overview-stage .dashboard-overview-band__meta {
+    display: none;
   }
   .my-dashboard-stage .acc-kpi-grid,
   .journey-stage .acc-kpi-grid,

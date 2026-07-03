@@ -9,8 +9,38 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { HeroKpi } from "./bento-kit";
 import type { DashboardData } from "./types";
+
+function fmt(n: number): string {
+  return n.toLocaleString("en-IN");
+}
+
+function OverviewBand({
+  icon,
+  title,
+  summary,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  summary: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="dashboard-overview-band">
+      <div className="acc-kpi-group dashboard-overview-band__head">
+        <span className="dashboard-overview-band__label">
+          {icon}
+          {title}
+        </span>
+        <span className="dashboard-overview-band__meta">{summary}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 /**
  * Overview tab — cross-system headline KPIs. Pulls every number from the
@@ -38,13 +68,21 @@ export function DashboardOverviewStrip({
   const { pipeline, campaign } = data;
   const totalPipeline =
     pipeline.reachOut + pipeline.onboarded + pipeline.posted;
+  const attentionTotal =
+    data.actions.needsEmail +
+    data.actions.needsOrder +
+    data.actions.awaitingPost +
+    data.actions.noTracking +
+    data.actions.noPartnership +
+    data.actions.overdue;
 
   return (
-    <section className="flex flex-col gap-4">
-      <div>
-        <div className="acc-kpi-group">
-          <Megaphone size={13} aria-hidden /> Campaigns &amp; creators
-        </div>
+    <section className="dashboard-overview-strip flex flex-col gap-4">
+      <OverviewBand
+        icon={<Megaphone size={13} aria-hidden />}
+        title="Campaigns & creators"
+        summary={`${fmt(campaign.activeCampaigns)} campaigns / ${fmt(campaign.totalCreators)} creators`}
+      >
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
           <HeroKpi
             color="#B57514"
@@ -78,12 +116,13 @@ export function DashboardOverviewStrip({
             />
           )}
         </div>
-      </div>
+      </OverviewBand>
 
-      <div>
-        <div className="acc-kpi-group">
-          <UserRoundCheck size={13} aria-hidden /> Per-stage pipeline
-        </div>
+      <OverviewBand
+        icon={<UserRoundCheck size={13} aria-hidden />}
+        title="Per-stage pipeline"
+        summary={`${pipeline.conversionPct}% conversion / ${pipeline.postRatePct}% post rate`}
+      >
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
           <HeroKpi
             color="#3B6FD4"
@@ -114,17 +153,18 @@ export function DashboardOverviewStrip({
             sub="Top-performing creatives"
           />
         </div>
-      </div>
+      </OverviewBand>
 
-      <div>
-        <div className="acc-kpi-group">
-          <Hourglass size={13} aria-hidden /> Needs attention
-        </div>
+      <OverviewBand
+        icon={<Hourglass size={13} aria-hidden />}
+        title="Needs attention"
+        summary={`${fmt(attentionTotal)} action checks / ${fmt(pipeline.paymentPending)} payment pending`}
+      >
         <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
           <HeroKpi
             color="#B57514"
             icon={<Hourglass size={16} aria-hidden />}
-            label="Pending Onboardings"
+            label="Awaiting Posts"
             value={data.actions.awaitingPost}
             sub="In Posting, awaiting post"
           />
@@ -133,7 +173,7 @@ export function DashboardOverviewStrip({
           <HeroKpi
             color="#B57514"
             icon={<Send size={16} aria-hidden />}
-            label="Pending Posts"
+            label="Pending Content"
             value={pipeline.pendingContent}
             sub="Onboarded, not yet posted"
           />
@@ -152,7 +192,7 @@ export function DashboardOverviewStrip({
             sub="Settled payments"
           />
         </div>
-      </div>
+      </OverviewBand>
     </section>
   );
 }
