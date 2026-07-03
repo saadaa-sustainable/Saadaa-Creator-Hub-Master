@@ -13,6 +13,9 @@ import type { ReactNode } from "react";
 import { HeroKpi } from "./bento-kit";
 import type { DashboardData } from "./types";
 
+const OVERVIEW_GRID_FOUR =
+  "acc-kpi-grid dashboard-overview-kpi-grid dashboard-overview-kpi-grid--four bento-stagger max-[480px]:grid-cols-2!";
+
 interface RailSegment {
   label: string;
   value: number;
@@ -164,7 +167,13 @@ export function DashboardOverviewStrip({
           { label: "Paid", value: campaign.paidCount, color: "#161513" },
         ]}
       >
-        <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
+        <div
+          className={`acc-kpi-grid dashboard-overview-kpi-grid ${
+            archival
+              ? "dashboard-overview-kpi-grid--three"
+              : "dashboard-overview-kpi-grid--four"
+          } bento-stagger max-[480px]:grid-cols-2!`}
+        >
           <HeroKpi
             color="#B57514"
             icon={<Megaphone size={16} aria-hidden />}
@@ -211,7 +220,7 @@ export function DashboardOverviewStrip({
           { label: "Ad Winners", value: pipeline.adWinners, color: "#B57514" },
         ]}
       >
-        <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
+        <div className={OVERVIEW_GRID_FOUR}>
           <HeroKpi
             color="#3B6FD4"
             icon={<Send size={16} aria-hidden />}
@@ -271,7 +280,7 @@ export function DashboardOverviewStrip({
           },
         ]}
       >
-        <div className="acc-kpi-grid bento-stagger max-[480px]:grid-cols-2!">
+        <div className={OVERVIEW_GRID_FOUR}>
           <HeroKpi
             color="#B57514"
             icon={<Hourglass size={16} aria-hidden />}

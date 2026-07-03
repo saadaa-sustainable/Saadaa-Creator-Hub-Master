@@ -99,34 +99,45 @@ export function DashboardBento({
           />
         </div>
       )}
-      {/* Archival copy differs (nothing is "live" on the archive) and the tile
-          centres itself in the row since the trend tile isn't beside it. */}
-      <div className={archival ? "lg:col-span-4 lg:col-start-5" : "lg:col-span-4"}>
-        <DonutTile
-          title="Pipeline Stages"
-          icon={<Layers size={13} aria-hidden />}
-          info={
-            archival
-              ? "Where every archived collab ended up, one count per deliverable stage."
-              : "Where every live collab sits right now, one count per deliverable stage."
+      {/* Archival copy differs (nothing is "live" on the archive). The wrapper
+          consumes the full row, while the tile stays left-aligned at 4-col width
+          so the following cards do not pack beside it. */}
+      <div className={archival ? "lg:col-span-12" : "lg:col-span-4"}>
+        <div
+          className={
+            archival ? "dashboard-bento__archival-donut h-full" : "h-full"
           }
-          centreLabel={archival ? "collabs" : "live collabs"}
-          segs={[
-            {
-              name: "Reach Out",
-              value: data.stageCounts.reachOut,
-              color: "#3B6FD4",
-            },
-            {
-              name: "On Board",
-              value: data.stageCounts.onBoard,
-              color: "#7B4FBF",
-            },
-            { name: "Posted", value: data.stageCounts.posted, color: "#4F7C4D" },
-            { name: "Paid", value: data.stageCounts.paid, color: "#B57514" },
-          ]}
-          emptyHint={archival ? "No collabs in scope" : "No live collabs in scope"}
-        />
+        >
+          <DonutTile
+            title="Pipeline Stages"
+            icon={<Layers size={13} aria-hidden />}
+            info={
+              archival
+                ? "Where every archived collab ended up, one count per deliverable stage."
+                : "Where every live collab sits right now, one count per deliverable stage."
+            }
+            centreLabel={archival ? "collabs" : "live collabs"}
+            segs={[
+              {
+                name: "Reach Out",
+                value: data.stageCounts.reachOut,
+                color: "#3B6FD4",
+              },
+              {
+                name: "On Board",
+                value: data.stageCounts.onBoard,
+                color: "#7B4FBF",
+              },
+              {
+                name: "Posted",
+                value: data.stageCounts.posted,
+                color: "#4F7C4D",
+              },
+              { name: "Paid", value: data.stageCounts.paid, color: "#B57514" },
+            ]}
+            emptyHint={archival ? "No collabs in scope" : "No live collabs in scope"}
+          />
+        </div>
       </div>
 
       {/* Row C — Stage Snapshot (managerial mini-kanban). Live-only: "where every

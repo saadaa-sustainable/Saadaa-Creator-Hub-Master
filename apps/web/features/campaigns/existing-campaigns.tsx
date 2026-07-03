@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type CSSProperties } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,6 +23,8 @@ import type { CampaignListRow } from "./queries";
 import { closeCampaign, fetchCampaignForEdit, reopenCampaign } from "./actions";
 import { CampaignCreateForm } from "./create-form";
 import type { CampaignCreateInput } from "./schema";
+
+const CAMPAIGN_CARD_ACCENTS = ["#B57514", "#3B6FD4", "#4F7C4D", "#7B4FBF"];
 
 interface ExistingCampaignsProps {
   campaigns: CampaignListRow[];
@@ -147,7 +149,7 @@ export function ExistingCampaigns({
       </div>
 
       <div className="campaign-card-grid">
-        {campaigns.map((campaign) => {
+        {campaigns.map((campaign, index) => {
           const target = normalizeNumber(campaign.no_of_creators);
           const isClosed = isClosedStatus(campaign.status);
           const budgetRows = campaign.budget_rows ?? [];
@@ -161,11 +163,26 @@ export function ExistingCampaigns({
             0,
           );
           const creatorsUsed = campaign.creators_used ?? 0;
+          const allocationTarget = creatorCap || target || 0;
+          const progressPct =
+            allocationTarget > 0
+              ? Math.min(100, Math.round((creatorsUsed / allocationTarget) * 100))
+              : 0;
+          const accent = isClosed
+            ? "#6E695E"
+            : CAMPAIGN_CARD_ACCENTS[index % CAMPAIGN_CARD_ACCENTS.length];
 
           return (
             <article
               key={campaign.campaign_id}
               className="campaign-card"
+              data-status={isClosed ? "closed" : "active"}
+              style={
+                {
+                  "--campaign-accent": accent,
+                  "--campaign-progress": `${progressPct}%`,
+                } as CSSProperties
+              }
               role="button"
               tabIndex={0}
               aria-label={`View details for ${campaign.campaign_id}`}
@@ -180,7 +197,9 @@ export function ExistingCampaigns({
               <header className="campaign-card__head">
                 <div className="min-w-0">
                   <div className="campaign-card__id-row">
-                    <strong>{campaign.campaign_id}</strong>
+                    <strong className="campaign-card__id">
+                      {campaign.campaign_id}
+                    </strong>
                     <span className="campaign-status-pill">
                       {statusLabel(campaign.status)}
                     </span>
@@ -196,6 +215,23 @@ export function ExistingCampaigns({
               {campaign.key_message && (
                 <p className="campaign-card__message">{campaign.key_message}</p>
               )}
+
+              <div className="campaign-card__progress">
+                <div>
+                  <span>Creator allocation</span>
+                  <strong>
+                    {allocationTarget > 0
+                      ? `${progressPct}% filled`
+                      : "No cap set"}
+                  </strong>
+                </div>
+                <div
+                  className="campaign-card__progress-track"
+                  aria-hidden="true"
+                >
+                  <span />
+                </div>
+              </div>
 
               <dl className="campaign-card__facts">
                 <div>
@@ -233,20 +269,44 @@ export function ExistingCampaigns({
                 </div>
               </dl>
 
+              <div className="campaign-card__meta-row">
+                <span>{budgetRows.length} budget lines</span>
+                <span>
+                  {campaign.start_date || campaign.end_date
+                    ? `${formatDate(campaign.start_date)} - ${formatDate(
+                        campaign.end_date,
+                      )}`
+                    : "No campaign window"}
+                </span>
+              </div>
+
               <footer className="campaign-card__actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-xs"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setSelected(campaign);
-                  }}
-                >
-                  <Eye size={12} />
-                  View Details
-                </button>
+                <div className="campaign-card__primary-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-xs"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setSelected(campaign);
+                    }}
+                  >
+                    <Eye size={12} />
+                    View Details
+                  </button>
+                  {campaign.brief_link && (
+                    <a
+                      href={campaign.brief_link}
+                      target="_blank"
+                      rel="noopener"
+                      className="campaign-brief-link"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      Brief <ExternalLink size={11} />
+                    </a>
+                  )}
+                </div>
                 {canManage && (
-                  <>
+                  <div className="campaign-card__secondary-actions">
                     <button
                       type="button"
                       className="btn btn-secondary btn-xs"
@@ -284,18 +344,7 @@ export function ExistingCampaigns({
                       )}
                       {isClosed ? "Reopen" : "Close"}
                     </button>
-                  </>
-                )}
-                {campaign.brief_link && (
-                  <a
-                    href={campaign.brief_link}
-                    target="_blank"
-                    rel="noopener"
-                    className="campaign-brief-link"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    Brief <ExternalLink size={11} />
-                  </a>
+                  </div>
                 )}
               </footer>
             </article>
