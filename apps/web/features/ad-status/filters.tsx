@@ -121,8 +121,14 @@ export function AdStatusFiltersBar({
             onChange={(v) => setParam("adStatus", v || undefined)}
             options={[
               { value: "", label: "All" },
-              { value: "run", label: "Run" },
-              { value: "running", label: "Running" },
+              // Meta delivery statuses as they exist in the warehouse mirror;
+              // matched exactly against the row's first-occurrence ad.
+              { value: "active", label: "Active" },
+              { value: "paused", label: "Paused" },
+              { value: "campaign_paused", label: "Campaign Paused" },
+              { value: "adset_paused", label: "Adset Paused" },
+              { value: "with_issues", label: "With Issues" },
+              { value: "archived", label: "Archived" },
             ]}
             placeholder="All"
             searchPlaceholder="Search…"

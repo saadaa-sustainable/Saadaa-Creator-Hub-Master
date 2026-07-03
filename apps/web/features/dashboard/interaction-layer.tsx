@@ -43,10 +43,17 @@ export function DashboardInteractionLayer({
     const revealObserver = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          entry.target.toggleAttribute("data-inview", entry.isIntersecting);
+          if (!entry.isIntersecting) continue;
+          // One-shot: reveal once, then leave the card alone. Toggling the
+          // attribute off on exit replayed the rise on every re-entry, which
+          // read as the page endlessly refreshing while scrolling.
+          entry.target.setAttribute("data-inview", "");
+          revealObserver.unobserve(entry.target);
         }
       },
-      { rootMargin: "0px 0px -8% 0px", threshold: 0.12 },
+      // Positive bottom margin arms cards ~200px BELOW the fold, so the rise
+      // finishes before the card is actually seen — never caught mid-flight.
+      { rootMargin: "0px 0px 200px 0px", threshold: 0 },
     );
 
     const scanTargets = () => {

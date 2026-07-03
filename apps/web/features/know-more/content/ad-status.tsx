@@ -16,7 +16,10 @@ export default function AdStatusKM() {
           </li>
           <li>
             <strong>2. Filter strip</strong> — search, campaign, classification
-            (warehouse categories + legacy results), ad status. URL-driven.
+            (warehouse categories + legacy results), and Ad Status (Meta
+            delivery status of the first-occurrence ad: Active / Paused /
+            Campaign Paused / Adset Paused / With Issues / Archived).
+            URL-driven.
           </li>
           <li>
             <strong>3. KPI strip</strong> — Eligible · Untested · In Meta Ads,
@@ -166,9 +169,11 @@ export default function AdStatusKM() {
         <KMList>
           <li>
             <strong>Thumbnail</strong> · the actual ad creative. Clicking it
-            (or <strong>Preview</strong>) opens Meta&apos;s real ad preview in
-            a new tab. Falls back to the creator avatar when Meta&apos;s image
-            link has expired.
+            opens an in-app preview popup — the creative large with its spend
+            / ROAS / impressions line and an &quot;Open in Meta&quot; button
+            (Meta blocks embedding its preview page, so the external jump is
+            always explicit). Falls back to the creator avatar when
+            Meta&apos;s image link has expired.
           </li>
           <li>
             <strong>Landing</strong> · the page the ad points at (product page

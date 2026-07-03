@@ -12484,9 +12484,56 @@ body:has(.km-backdrop) {
   display: inline-block;
   line-height: 0;
   cursor: pointer;
+  padding: 0;
+  border: 0;
+  background: none;
 }
 .ad-thumb-link:hover .ad-thumb {
   border-color: var(--color-accent);
+}
+
+/* Ad creative lightbox — in-app preview popup opened from any thumbnail.
+   fb.me frame-blocks embedding, so this shows the stored creative; the real
+   Meta preview stays behind an explicit external button. */
+.ad-lightbox-panel {
+  width: min(34rem, 94vw);
+}
+.ad-lightbox-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+.ad-lightbox-img {
+  width: 100%;
+  max-height: 62vh;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-surface);
+}
+.ad-lightbox-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2.2rem 1rem;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  font-size: 0.8rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+}
+.ad-lightbox-metrics {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+/* The big list wraps are work surfaces, not cards — the bento hover lift
+   moved a huge table under the cursor on every enter/leave and read as
+   jitter. Keep border/shadow feedback, drop the movement. */
+.ad-status-list-wrap.bento-tile:hover {
+  transform: none;
 }
 /* Card variant — creative sits at the head's right edge */
 .ad-status-card .ad-card-thumb,

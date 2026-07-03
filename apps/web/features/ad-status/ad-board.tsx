@@ -176,7 +176,8 @@ function RetiredIdChip() {
 
 // ---------------------------------------------------------------------------
 // Ad creative thumbnail — plain <img> (Meta CDN blocks proxying), lazy, no
-// referrer. Clicking opens the Meta ad preview (fb.me) — the real ad.
+// referrer. Clicking opens the in-app creative lightbox (NOT fb.me — that
+// redirects into Business Suite; external jump lives on its explicit button).
 // ---------------------------------------------------------------------------
 
 function AdImg({
@@ -191,6 +192,7 @@ function AdImg({
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const src = ad.imageUrl || ad.thumbnailUrl || null;
   const body =
     src && !failed ? (
@@ -213,19 +215,154 @@ function AdImg({
         <Megaphone size={Math.round(size * 0.36)} aria-hidden />
       </span>
     );
-  if (!ad.previewLink) return body;
+  if (!src && !ad.previewLink) return body;
   return (
-    <a
-      href={ad.previewLink}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="ad-thumb-link shrink-0"
-      title="Open Meta ad preview"
-      aria-label={`Open Meta ad preview — ${alt}`}
-      onClick={(e) => e.stopPropagation()}
+    <>
+      <button
+        type="button"
+        className="ad-thumb-link shrink-0"
+        title="Preview ad creative"
+        aria-label={`Preview ad creative — ${alt}`}
+        aria-haspopup="dialog"
+        onClick={(e) => {
+          e.stopPropagation();
+          setPreviewOpen(true);
+        }}
+      >
+        {body}
+      </button>
+      {previewOpen && (
+        <AdCreativeLightbox
+          ad={ad}
+          alt={alt}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * In-app ad preview popup. Meta's fb.me preview page frame-blocks embedding,
+ * so the popup shows the stored creative large with the ad's key numbers —
+ * jumping out to Business Suite only via the explicit "Open in Meta" button.
+ */
+function AdCreativeLightbox({
+  ad,
+  alt,
+  onClose,
+}: {
+  ad: WarehouseAd;
+  alt: string;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      // Capture phase + stopPropagation: Escape closes ONLY the lightbox,
+      // not the Ad Overview modal it may be stacked on.
+      e.stopPropagation();
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [onClose]);
+
+  const src = ad.imageUrl || ad.thumbnailUrl || null;
+  if (!mounted || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="modal-backdrop modal-backdrop--onboarding ad-lightbox-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Ad creative — ${ad.adName || alt}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClose();
+      }}
     >
-      {body}
-    </a>
+      <div
+        className="modal-panel modal-panel--onboarding ad-lightbox-panel"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-head">
+          <div className="flex items-center gap-2 min-w-0">
+            <Megaphone size={16} aria-hidden className="shrink-0" />
+            <h2 className="font-semibold truncate" title={ad.adName}>
+              {ad.adName || "Ad creative"}
+            </h2>
+            {ad.category && <WhCategoryBadge category={ad.category} />}
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close preview"
+          >
+            <X size={16} aria-hidden />
+          </button>
+        </header>
+        <div className="ad-lightbox-body">
+          {src && !failed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={src}
+              alt={alt}
+              referrerPolicy="no-referrer"
+              className="ad-lightbox-img"
+              onError={() => setFailed(true)}
+            />
+          ) : (
+            <div className="ad-lightbox-fallback">
+              <Megaphone size={26} aria-hidden />
+              <span>
+                Creative image unavailable — Meta&apos;s image link has
+                expired. Use &quot;Open in Meta&quot; below for the live
+                preview.
+              </span>
+            </div>
+          )}
+          <div className="ad-lightbox-metrics tabular">
+            {formatRupees(ad.amountSpent)} spent · {roasText(ad)} ·{" "}
+            {formatNumber(ad.impressions)} impr · {formatNumber(ad.ftewvCount)}{" "}
+            FTEWV · {formatNumber(ad.ncpCount)} NCP ·{" "}
+            {formatNumber(ad.shopifyOrders)} orders
+          </div>
+        </div>
+        <footer className="modal-foot ob-overview-footer">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Close
+          </button>
+          {ad.adLink && (
+            <a
+              href={ad.adLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost"
+            >
+              <ExternalLink size={14} aria-hidden />
+              Landing
+            </a>
+          )}
+          {ad.previewLink && (
+            <a
+              href={ad.previewLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary-cta"
+            >
+              <Eye size={14} aria-hidden />
+              Open in Meta
+            </a>
+          )}
+        </footer>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -1721,16 +1858,23 @@ export function AdStatusBoard({
         `${r.name} ${r.username} ${r.postId} ${r.postIdShort} ${r.primaryAd?.adName ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
-    // adStatus filter on adsStatus field (substring match, same as legacy)
-    if (adStatus && !r.adsStatus.toLowerCase().includes(adStatus)) return false;
+    // Ad Status = the row's DISPLAYED delivery status: the first-occurrence
+    // ad's Meta status (ACTIVE/PAUSED/…) when matched, else the legacy field.
+    // Exact match — "paused" must not also swallow "campaign_paused".
+    if (adStatus) {
+      const effective = (r.primaryAd?.adStatus || r.adsStatus || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "_");
+      if (effective !== adStatus) return false;
+    }
     return true;
   };
 
   const filteredUntested = useMemo(() => {
-    // When adStatus filter is active, untested posts have no adsStatus → hide all
-    if (adStatus) return [];
     // When classification is "untested only", show untested; otherwise always show untested
-    // (classification filter targets adRun section)
+    // (classification filter targets adRun section). matchesBase drops them
+    // under an adStatus filter (no warehouse ad → no delivery status).
     return untested.filter(matchesBase);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [untested, q, adStatus]);
