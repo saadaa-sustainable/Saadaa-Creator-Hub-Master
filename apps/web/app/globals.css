@@ -13043,18 +13043,27 @@ body:has(.km-backdrop) {
 }
 
 .ad-status-stage .ad-status-list-row {
+  grid-template-areas:
+    "main main main actions"
+    "signal signal stats stats";
   grid-template-columns:
-    minmax(340px, 1.22fr) minmax(220px, 0.72fr)
-    minmax(410px, 1fr) minmax(190px, max-content);
-  gap: 1rem;
-  padding: 0.96rem 1.06rem;
+    minmax(420px, 1fr) minmax(260px, 0.54fr)
+    minmax(420px, 1fr) minmax(210px, max-content);
+  align-items: stretch;
+  gap: 0.86rem 1rem;
+  padding: 1rem 1.08rem;
+}
+
+.ad-status-list-row__main {
+  grid-area: main;
+  align-self: center;
 }
 
 .ad-status-list-row__identity {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 54px minmax(0, 1fr);
   align-items: center;
-  gap: 0.86rem;
+  gap: 0.92rem;
   min-width: 0;
 }
 
@@ -13069,18 +13078,46 @@ body:has(.km-backdrop) {
 .ad-status-list-row__identity .ad-thumb,
 .ad-status-list-row__identity .ad-thumb-link,
 .ad-status-list-row__identity [data-avatar] {
-  width: 50px !important;
-  height: 50px !important;
+  width: 52px !important;
+  height: 52px !important;
+}
+
+.ad-status-list-row__chipline {
+  max-width: 100%;
+  row-gap: 0.34rem;
 }
 
 .ad-status-list-row__identity .campaign-card__id {
+  flex: 0 0 auto;
   white-space: nowrap;
+}
+
+.ad-status-list-row__identity .campaign-card__id strong {
+  white-space: nowrap;
+}
+
+.ad-status-list-row__support-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.34rem;
+  margin-top: 0.38rem;
+}
+
+.ad-status-list-row__support-chips .pill {
+  min-height: 1.2rem;
+  padding-block: 0.16rem;
+  font-size: 0.58rem;
 }
 
 .ad-status-list-row__main h3 {
   margin-top: 0.44rem;
-  font-size: 0.94rem;
-  line-height: 1.2;
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.96rem;
+  line-height: 1.18;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .ad-status-list-row__main p {
@@ -13088,9 +13125,14 @@ body:has(.km-backdrop) {
 }
 
 .ad-status-list-row__signal {
+  grid-area: signal;
   align-self: stretch;
-  min-height: 74px;
+  min-height: 68px;
   padding: 0.68rem 0.76rem;
+}
+
+.ad-status-list-row__signal > div:first-child {
+  align-items: flex-start;
 }
 
 .ad-status-list-row__signal .campaign-list-row__reachouts {
@@ -13098,13 +13140,14 @@ body:has(.km-backdrop) {
 }
 
 .ad-status-list-row__stats {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.58rem;
+  grid-area: stats;
+  grid-template-columns: repeat(4, minmax(104px, 1fr));
+  gap: 0.52rem;
 }
 
 .ad-status-list-row__stats > div {
-  min-height: 58px;
-  padding: 0.56rem 0.62rem;
+  min-height: 64px;
+  padding: 0.58rem 0.64rem;
 }
 
 .ad-status-list-row__stats dd {
@@ -13120,7 +13163,11 @@ body:has(.km-backdrop) {
 }
 
 .ad-status-list-row__actions {
-  min-width: 190px;
+  grid-area: actions;
+  align-self: start;
+  min-width: 0;
+  max-width: 238px;
+  flex-wrap: wrap;
   gap: 0.48rem;
 }
 
@@ -13270,6 +13317,20 @@ body:has(.km-backdrop) {
   min-width: 0;
 }
 
+@media (max-width: 1600px) {
+  .ad-status-stage .ad-status-list-row {
+    grid-template-areas:
+      "main actions"
+      "signal signal"
+      "stats stats";
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+
+  .ad-status-list-row__actions {
+    justify-content: flex-end;
+  }
+}
+
 @media (max-width: 1180px) {
   .ad-status-stage .ad-status-filter-toolbar {
     grid-template-columns: 1fr;
@@ -13289,17 +13350,37 @@ body:has(.km-backdrop) {
   }
 
   .ad-status-stage .ad-status-list-row {
-    grid-template-columns: minmax(300px, 1fr) minmax(190px, 0.54fr) minmax(
-        280px,
-        0.9fr
-      );
+    grid-template-areas:
+      "main actions"
+      "signal signal"
+      "stats stats";
+    grid-template-columns: minmax(0, 1fr) max-content;
     gap: 0.82rem;
   }
 
   .ad-status-list-row__actions {
-    grid-column: 1 / -1;
     justify-content: flex-end;
     min-width: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .ad-status-stage .ad-status-list-row {
+    grid-template-areas:
+      "main"
+      "signal"
+      "stats"
+      "actions";
+    grid-template-columns: 1fr;
+  }
+
+  .ad-status-list-row__actions {
+    max-width: none;
+    justify-content: flex-start;
+  }
+
+  .ad-status-list-row__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

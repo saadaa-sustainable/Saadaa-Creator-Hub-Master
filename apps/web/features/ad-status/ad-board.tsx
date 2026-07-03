@@ -1346,7 +1346,7 @@ function UntestedListTable({
               <div className="ad-status-list-row__identity">
                 <RowThumb row={r} />
                 <div className="min-w-0">
-                  <div className="campaign-card__id-row">
+                  <div className="campaign-card__id-row ad-status-list-row__chipline">
                     <span className="campaign-card__id">
                       <strong>{r.postIdShort || r.postId}</strong>
                     </span>
@@ -1636,14 +1636,18 @@ function AdRunListTable({
               <div className="ad-status-list-row__identity">
                 <RowThumb row={r} />
                 <div className="min-w-0">
-                  <div className="campaign-card__id-row">
+                  <div className="campaign-card__id-row ad-status-list-row__chipline">
                     <span className="campaign-card__id">
                       <strong>{r.postIdShort || r.postId}</strong>
                     </span>
                     <RowStatusBadge row={r} />
-                    {r.source === "historic" && <HistoricChip />}
-                    {r.retiredId && <RetiredIdChip />}
                   </div>
+                  {(r.source === "historic" || r.retiredId) && (
+                    <div className="ad-status-list-row__support-chips">
+                      {r.source === "historic" && <HistoricChip />}
+                      {r.retiredId && <RetiredIdChip />}
+                    </div>
+                  )}
                   <h3 title={rowPrimaryName(r)}>{rowPrimaryName(r)}</h3>
                   <p>{rowSubline(r)}</p>
                 </div>
