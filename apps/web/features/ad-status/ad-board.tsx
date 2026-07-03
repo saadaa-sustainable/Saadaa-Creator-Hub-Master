@@ -325,8 +325,8 @@ function AdCreativeLightbox({
           </button>
         </header>
 
-        <div className="modal-body flex flex-col gap-4 sm:flex-row">
-          <div className="w-full sm:w-[400px] sm:shrink-0">
+        <div className="modal-body ad-lightbox-grid">
+          <div className="ad-lightbox-media">
             {shortcode ? (
               <iframe
                 src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
@@ -334,7 +334,7 @@ function AdCreativeLightbox({
                 loading="lazy"
                 allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
                 allowFullScreen
-                className="w-full h-[480px] sm:h-[560px] rounded-[var(--radius)] border border-border bg-white"
+                className="ad-lightbox-embed"
               />
             ) : src && !failed ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -357,36 +357,59 @@ function AdCreativeLightbox({
             )}
           </div>
 
-          <aside className="flex-1 min-w-0 flex flex-col gap-3">
-            <span
-              className="text-[0.82rem] font-semibold text-text-primary break-words"
-              title={ad.adName}
-            >
-              {ad.adName || "—"}
+          <aside className="ad-lightbox-aside">
+            <span className="ad-lightbox-eyebrow">
+              <Megaphone size={11} aria-hidden />
+              Meta ad creative
             </span>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-[0.85rem] text-text-secondary tabular">
-              <span>{formatRupees(ad.amountSpent)} spent</span>
-              <span>{roasText(ad)} ROAS</span>
-              <span>{formatNumber(ad.impressions)} impressions</span>
-              <span>{formatNumber(ad.ftewvCount)} FTEWV</span>
-              <span>{formatNumber(ad.ncpCount)} NCP</span>
-              <span>{formatNumber(ad.shopifyOrders)} orders</span>
-            </div>
+            <h3 className="ad-lightbox-name" title={ad.adName}>
+              {ad.adName || "—"}
+            </h3>
+
+            <dl className="ad-lightbox-stats tabular">
+              <div>
+                <dt>Spend</dt>
+                <dd>{formatRupees(ad.amountSpent)}</dd>
+              </div>
+              <div>
+                <dt>ROAS</dt>
+                <dd>{roasText(ad)}</dd>
+              </div>
+              <div>
+                <dt>Impressions</dt>
+                <dd>{formatNumber(ad.impressions)}</dd>
+              </div>
+              <div>
+                <dt>FTEWV</dt>
+                <dd>{formatNumber(ad.ftewvCount)}</dd>
+              </div>
+              <div>
+                <dt>NCP</dt>
+                <dd>{formatNumber(ad.ncpCount)}</dd>
+              </div>
+              <div>
+                <dt>Orders</dt>
+                <dd>{formatNumber(ad.shopifyOrders)}</dd>
+              </div>
+            </dl>
+
             {ad.adCreated && (
-              <span className="inline-flex items-center gap-1 text-[0.78rem] text-text-tertiary tabular">
+              <span className="ad-lightbox-date tabular">
                 <CalendarDays size={13} aria-hidden />
                 Ad created {formatDate(ad.adCreated)}
               </span>
             )}
+
             {igUrl && (
               <a
                 href={igUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-auto inline-flex items-center gap-1 text-[0.8rem] font-semibold text-[#3B6FD4] hover:underline"
+                className="ad-lightbox-iglink"
               >
-                <ExternalLink size={13} aria-hidden />
+                <Instagram size={13} aria-hidden />
                 Open on Instagram
+                <ExternalLink size={11} aria-hidden />
               </a>
             )}
           </aside>

@@ -182,6 +182,62 @@ async function resolveRetiredAliases(
   }
 }
 
+/** Legacy sheet dates are DD/MM/YYYY — normalise to ISO, pass ISO through. */
+function archiveDateToIso(raw: unknown): string | null {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const dmy = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return null;
+}
+
+interface ArchivePostDetail {
+  username: string;
+  linkToPost: string;
+  downloadLink: string;
+  postDate: string | null;
+}
+
+/**
+ * Post-level details from the RAW legacy archive, keyed by the FULL token
+ * (historic_creator_data.post_id carries e.g. "SIF-2441-P1" verbatim).
+ * historic_posts.post_link is null for ~9.9k of 11k rows, but the raw archive
+ * kept link_to_post — this is what lets the Ad Preview popup render the live
+ * Instagram embed for historic and retired-ID rows. Fails soft to empty Map.
+ */
+async function fetchArchivePostDetails(
+  supabase: ReturnType<typeof createServiceClient>,
+  tokens: string[],
+): Promise<Map<string, ArchivePostDetail>> {
+  const out = new Map<string, ArchivePostDetail>();
+  if (!tokens.length) return out;
+  try {
+    const CHUNK = 200;
+    for (let i = 0; i < tokens.length; i += CHUNK) {
+      const { data, error } = await (supabase as any)
+        .from("historic_creator_data")
+        .select("post_id, username, link_to_post, content_downloaded_link, post_date")
+        .in("post_id", tokens.slice(i, i + CHUNK));
+      if (error || !data) continue;
+      for (const r of data as Array<Record<string, unknown>>) {
+        const token = String(r.post_id ?? "").trim().toUpperCase();
+        if (!token || out.has(token)) continue;
+        out.set(token, {
+          username: String(r.username ?? "").replace(/^@/, "").trim(),
+          linkToPost: String(r.link_to_post ?? "").trim(),
+          downloadLink: String(r.content_downloaded_link ?? "").trim(),
+          postDate: archiveDateToIso(r.post_date),
+        });
+      }
+    }
+    return out;
+  } catch (err) {
+    console.warn("[ad-status] archive post-detail lookup failed:", err);
+    return out;
+  }
+}
+
 export async function fetchAdStatusData(
   filters: AdStatusFilters,
 ): Promise<{
@@ -412,10 +468,12 @@ export async function fetchAdStatusData(
   const historicTokens = [...warehouseAds.keys()].filter(
     (t) => !livePostIds.has(t),
   );
-  const historicRows = await fetchHistoricWarehouseMatches(
-    supabase,
-    historicTokens,
-  );
+  const [historicRows, archiveDetails] = await Promise.all([
+    fetchHistoricWarehouseMatches(supabase, historicTokens),
+    // Raw-archive details for the SAME tokens — historic_posts.post_link is
+    // mostly null, so post links / dates come from historic_creator_data.
+    fetchArchivePostDetails(supabase, historicTokens),
+  ]);
 
   const seenHistoric = new Set<string>();
   for (const h of historicRows) {
@@ -434,7 +492,11 @@ export async function fetchAdStatusData(
     const cRow =
       creatorMap.get(username.toLowerCase()) ?? ({} as Record<string, unknown>);
 
-    const postDateStr = h.post_date ? String(h.post_date).slice(0, 10) : null;
+    const archive = archiveDetails.get(token);
+    const postDateStr =
+      (h.post_date ? String(h.post_date).slice(0, 10) : null) ??
+      archive?.postDate ??
+      null;
     const daysSince = postDateStr
       ? Math.floor(
           (now - new Date(postDateStr + "T00:00:00Z").getTime()) / 86400000,
@@ -467,8 +529,10 @@ export async function fetchAdStatusData(
       workflowStatus: String(h.workflow_status ?? "Posted"),
       postDate: postDateStr,
       daysSince,
-      linkToPost: String(h.post_link ?? "").trim(),
-      downloadLink: String(h.download_link ?? "").trim(),
+      linkToPost:
+        String(h.post_link ?? "").trim() || archive?.linkToPost || "",
+      downloadLink:
+        String(h.download_link ?? "").trim() || archive?.downloadLink || "",
       adsUsageRights: "",
       adsResults: "",
       adsStatus: "",
@@ -492,8 +556,16 @@ export async function fetchAdStatusData(
   // "Retired ID" marker. Campaign filter hides them (they carry no campaign).
   if (!filters.campaign) {
     const aliasTokens = historicTokens.filter((t) => !seenHistoric.has(t));
-    const aliasMap = await resolveRetiredAliases(supabase, aliasTokens);
-    for (const [token, archiveUsername] of aliasMap) {
+    // Prefer the archive's post-level row (full token in post_id — gives the
+    // username AND the post link/date); sif-prefix lookup covers the rest.
+    const sifAliasMap = await resolveRetiredAliases(
+      supabase,
+      aliasTokens.filter((t) => !archiveDetails.get(t)?.username),
+    );
+    for (const token of aliasTokens) {
+      const archive = archiveDetails.get(token);
+      const archiveUsername = archive?.username || sifAliasMap.get(token);
+      if (!archiveUsername) continue;
       const ads = [...(warehouseAds.get(token) ?? [])].sort(compareAdOccurrence);
       if (!ads.length) continue;
       const uname = archiveUsername.replace(/^@/, "").trim();
@@ -503,6 +575,7 @@ export async function fetchAdStatusData(
       const warehouseCategory = (firstAd?.category ?? "").trim() || null;
       countCategory(warehouseCategory);
 
+      const postDateStr = archive?.postDate ?? null;
       adRun.push({
         postId: token,
         postIdShort: token,
@@ -518,10 +591,14 @@ export async function fetchAdStatusData(
         category: (cRow.category as string | null) ?? null,
         followers: Number(cRow.followers ?? 0) || null,
         workflowStatus: "",
-        postDate: null,
-        daysSince: null,
-        linkToPost: "",
-        downloadLink: "",
+        postDate: postDateStr,
+        daysSince: postDateStr
+          ? Math.floor(
+              (now - new Date(postDateStr + "T00:00:00Z").getTime()) / 86400000,
+            )
+          : null,
+        linkToPost: archive?.linkToPost ?? "",
+        downloadLink: archive?.downloadLink ?? "",
         adsUsageRights: "",
         adsResults: "",
         adsStatus: "",

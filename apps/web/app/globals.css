@@ -12493,18 +12493,46 @@ body:has(.km-backdrop) {
 }
 
 /* Ad creative lightbox — in-app preview popup opened from any thumbnail.
-   Same anatomy as the Posting form's Post Preview (IG embed + stats aside);
-   fb.me frame-blocks embedding, so Meta stays behind an explicit button. */
+   Theater layout: the live Instagram embed fills a dark media pane on the
+   left (same warm near-black as the sidebar), the ad's spec sheet sits on
+   the right. fb.me frame-blocks embedding, so Meta stays behind an explicit
+   button. */
 .ad-lightbox-panel {
-  width: min(45rem, 94vw);
+  width: min(52rem, 94vw);
+}
+.ad-lightbox-panel .modal-body.ad-lightbox-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+.ad-lightbox-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(
+      120% 90% at 50% 0%,
+      rgba(240, 198, 30, 0.08) 0%,
+      transparent 55%
+    ),
+    #241e1a;
+  min-height: 480px;
+  padding: 0.9rem;
+}
+.ad-lightbox-embed {
+  width: 100%;
+  height: 560px;
+  max-height: 68vh;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
 }
 .ad-lightbox-img {
   width: 100%;
   max-height: 62vh;
   object-fit: contain;
   border-radius: 12px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-surface);
 }
 .ad-lightbox-fallback {
   display: flex;
@@ -12512,15 +12540,89 @@ body:has(.km-backdrop) {
   align-items: center;
   gap: 0.5rem;
   padding: 2.2rem 1rem;
-  color: var(--color-text-tertiary);
+  color: rgba(250, 248, 245, 0.72);
   text-align: center;
   font-size: 0.8rem;
-  border: 1px dashed var(--color-border);
+  border: 1px dashed rgba(250, 248, 245, 0.28);
   border-radius: 12px;
 }
-.ad-lightbox-metrics {
-  font-size: 0.72rem;
+.ad-lightbox-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.25rem 1.4rem;
+  min-width: 0;
+}
+.ad-lightbox-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+.ad-lightbox-name {
+  font-family: var(--font-heading, inherit);
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+.ad-lightbox-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 1rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-surface);
+}
+.ad-lightbox-stats dt {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+.ad-lightbox-stats dd {
+  margin: 0.1rem 0 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+.ad-lightbox-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.76rem;
   color: var(--color-text-secondary);
+}
+.ad-lightbox-iglink {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-info-text, #3b6fd4);
+}
+.ad-lightbox-iglink:hover {
+  text-decoration: underline;
+}
+@media (max-width: 700px) {
+  .ad-lightbox-panel .modal-body.ad-lightbox-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ad-lightbox-media {
+    min-height: 0;
+    padding: 0.6rem;
+  }
+  .ad-lightbox-embed {
+    height: 440px;
+  }
 }
 
 /* The big list wraps are work surfaces, not cards — the bento hover lift

@@ -174,8 +174,9 @@ export default function AdStatusKM() {
             embed</em> (videos play, carousels swipe) beside the ad&apos;s
             spend / ROAS / impressions / FTEWV / NCP / orders, with
             &quot;Open in Meta&quot; and &quot;Landing&quot; as explicit
-            buttons. Rows without a post link (retired IDs, some historic)
-            fall back to Meta&apos;s stored creative image.
+            buttons. Post links for historic and retired-ID rows come from
+            the raw legacy archive (~94% coverage); the few rows with no
+            archived link fall back to Meta&apos;s stored creative image.
           </li>
           <li>
             <strong>Landing</strong> · the page the ad points at (product page
