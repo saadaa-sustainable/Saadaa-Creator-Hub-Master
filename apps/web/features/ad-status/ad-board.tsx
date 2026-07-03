@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import {
   BarChart3,
@@ -8,13 +8,13 @@ import {
   Download,
   Eye,
   ExternalLink,
-  Grid3X3,
   HourglassIcon,
   Instagram,
-  List as ListIcon,
   Megaphone,
+  MousePointerClick,
   Search,
   ShieldCheck,
+  ShoppingBag,
   Trophy,
   TrendingUp,
   X,
@@ -22,6 +22,10 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { PartnershipKeyEdit } from "@/components/ui/partnership-key-edit";
+import {
+  ViewModeToggle,
+  type ViewMode,
+} from "@/components/ui/view-mode-toggle";
 import { TileHead } from "@/features/dashboard/bento-kit";
 import { DonutTile, type DonutSeg } from "@/features/dashboard/bento-charts";
 import { cn } from "@/lib/cn";
@@ -33,6 +37,22 @@ import {
 } from "@/lib/formatters";
 import { extractShortcode } from "@/lib/instagram-shortcode";
 import type { AdStatusFilters, AdStatusRow, WarehouseAd } from "./types";
+
+const AD_STATUS_VIEW_STORAGE_KEY = "creatorhub:ad-status:view";
+const AD_STATUS_VIEW_OPTIONS: ViewMode[] = ["cards", "list"];
+type AdStatusViewMode = Extract<ViewMode, "cards" | "list">;
+
+const AD_STATUS_ACCENTS = {
+  untested: "#B57514",
+  meta: "#7B4FBF",
+  winner: "#4F7C4D",
+  incremental: "#3D6B3B",
+  p0: "#3B6FD4",
+  p1: "#B57514",
+  p2: "#D19E3F",
+  discarded: "#C0392B",
+  historic: "#6E695E",
+};
 
 // ---------------------------------------------------------------------------
 // Classification badge — exact legacy colors
@@ -151,6 +171,82 @@ function RowStatusBadge({ row }: { row: AdStatusRow }) {
   );
 }
 
+function rowAccent(row: AdStatusRow): string {
+  if (row.warehouseCategory === "Incremental Winner")
+    return AD_STATUS_ACCENTS.incremental;
+  if (row.warehouseCategory === "Winner") return AD_STATUS_ACCENTS.winner;
+  if (row.warehouseCategory === "P0 analysis") return AD_STATUS_ACCENTS.p0;
+  if (row.warehouseCategory === "P1 analysis") return AD_STATUS_ACCENTS.p1;
+  if (row.warehouseCategory === "P2 analysis") return AD_STATUS_ACCENTS.p2;
+  if (row.warehouseCategory === "Discarded") return AD_STATUS_ACCENTS.discarded;
+  if (row.source === "historic") return AD_STATUS_ACCENTS.historic;
+  if (row.isInMetaAds) return AD_STATUS_ACCENTS.meta;
+  return AD_STATUS_ACCENTS.untested;
+}
+
+function rowStatusText(row: AdStatusRow): string {
+  if (row.warehouseCategory) return row.warehouseCategory;
+  if (row.isInMetaAds) return "In Meta Ads";
+  if (row.adsResults) return row.adsResults;
+  return "Untested";
+}
+
+function rowPrimaryName(row: AdStatusRow): string {
+  return row.primaryAd?.adName || row.name || row.username || row.postIdShort;
+}
+
+function rowSubline(row: AdStatusRow): string {
+  return [
+    row.username ? `@${row.username}` : null,
+    row.campaign || null,
+    row.postIdShort || row.postId,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function rowSpend(row: AdStatusRow): number {
+  return row.primaryAd?.amountSpent ?? 0;
+}
+
+function rowRoas(row: AdStatusRow): number {
+  return row.primaryAd?.roasMa ?? 0;
+}
+
+function rowDateTime(row: AdStatusRow): number {
+  const parsed = Date.parse(row.postDate ?? "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sortAdRows(rows: AdStatusRow[], sortKey: string): AdStatusRow[] {
+  const next = [...rows];
+  switch (sortKey) {
+    case "spend-desc":
+      return next.sort((a, b) => rowSpend(b) - rowSpend(a));
+    case "spend-asc":
+      return next.sort((a, b) => rowSpend(a) - rowSpend(b));
+    case "roas-desc":
+      return next.sort((a, b) => rowRoas(b) - rowRoas(a));
+    case "newest":
+      return next.sort((a, b) => rowDateTime(b) - rowDateTime(a));
+    case "oldest":
+      return next.sort((a, b) => rowDateTime(a) - rowDateTime(b));
+    case "days-desc":
+      return next.sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1));
+    default:
+      return rows;
+  }
+}
+
+function openOnEnter(
+  event: React.KeyboardEvent<HTMLElement>,
+  open: () => void,
+) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  event.preventDefault();
+  open();
+}
+
 function HistoricChip() {
   return (
     <span
@@ -248,7 +344,6 @@ function AdImg({
   );
 }
 
-
 /**
  * In-app ad preview popup — same anatomy as the Posting form's Post Preview.
  * The ad IS an organic post run as an ad, so when the row carries the post
@@ -307,7 +402,7 @@ function AdCreativeLightbox({
         className="modal-panel modal-panel--lg modal-panel--onboarding ad-lightbox-panel"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="modal-head">
+        <header className="modal-head ad-lightbox-head">
           <div className="flex items-center gap-2 min-w-0">
             {shortcode ? (
               <Instagram size={16} aria-hidden className="shrink-0" />
@@ -329,6 +424,9 @@ function AdCreativeLightbox({
 
         <div className="modal-body ad-lightbox-grid">
           <div className="ad-lightbox-media">
+            <span className="ad-lightbox-media-label">
+              {shortcode ? "Live Instagram embed" : "Meta creative fallback"}
+            </span>
             {shortcode ? (
               <iframe
                 src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
@@ -472,12 +570,6 @@ function RowThumb({ row, size = 44 }: { row: AdStatusRow; size?: number }) {
   );
 }
 
-function rowHasThumb(row: AdStatusRow): boolean {
-  return Boolean(
-    row.primaryAd && (row.primaryAd.imageUrl || row.primaryAd.thumbnailUrl),
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Warehouse link chips — Landing (ad_link) + Preview (fb.me real ad preview)
 // ---------------------------------------------------------------------------
@@ -536,124 +628,6 @@ function isWinnerCategory(category: string | null | undefined): boolean {
   return category === "Winner" || category === "Incremental Winner";
 }
 
-/**
- * Clickable-row props — whole list row opens the Ad Overview modal (founder
- * ask: rows must be an Overview affordance, not just the button). Inner
- * links/buttons stopPropagation so they keep their own behavior.
- *
- * Deliberately NO role="button"/tabIndex on the <tr>: rows contain links,
- * buttons and an editable field, and role=button makes those children
- * presentational to assistive tech (axe nested-interactive). The row click is
- * a mouse convenience; the inner controls remain the accessible path.
- */
-function rowClickProps(open: () => void, label: string) {
-  return {
-    title: label,
-    onClick: open,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Link chips — Instagram (pink) + Drive (green), exact legacy colors
-// ---------------------------------------------------------------------------
-
-function LinkChips({ post, drive }: { post?: string; drive?: string }) {
-  if (!post && !drive)
-    return <span className="text-text-tertiary text-[0.78rem]">—</span>;
-  return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      {post && (
-        <a
-          href={post}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[0.74rem] px-[10px] py-[3px] rounded-full bg-[rgba(225,48,108,0.1)] text-[#E1306C] font-semibold no-underline"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Instagram size={11} aria-hidden />
-          Post
-        </a>
-      )}
-      {drive && (
-        <a
-          href={drive}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[0.74rem] px-[10px] py-[3px] rounded-full bg-[rgba(79,124,77,0.1)] text-[var(--success-text)] font-semibold no-underline"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Download size={11} aria-hidden />
-          Drive
-        </a>
-      )}
-    </div>
-  );
-}
-
-function CardLinkActions({
-  post,
-  drive,
-  landing,
-  preview,
-}: {
-  post?: string;
-  drive?: string;
-  landing?: string | null;
-  preview?: string | null;
-}) {
-  if (!post && !drive && !landing && !preview) return null;
-  return (
-    <div className="ob-card-actions ad-status-card-link-actions">
-      {post && (
-        <a
-          href={post}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="action-view ad-status-link-action ad-status-link-action--post"
-        >
-          <Instagram size={12} aria-hidden />
-          Post
-        </a>
-      )}
-      {drive && (
-        <a
-          href={drive}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="action-view ad-status-link-action ad-status-link-action--drive"
-        >
-          <Download size={12} aria-hidden />
-          Drive
-        </a>
-      )}
-      {landing && (
-        <a
-          href={landing}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="action-view ad-status-link-action ad-status-link-action--landing"
-          title={landing}
-        >
-          <ExternalLink size={12} aria-hidden />
-          Landing
-        </a>
-      )}
-      {preview && (
-        <a
-          href={preview}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="action-view ad-status-link-action ad-status-link-action--preview"
-          title="Open Meta ad preview"
-        >
-          <Eye size={12} aria-hidden />
-          Preview
-        </a>
-      )}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Days since — "Today" at 0, "Xd" list / "Xd ago" cards
 // ---------------------------------------------------------------------------
@@ -678,7 +652,7 @@ function DaysSince({
 }
 
 // ---------------------------------------------------------------------------
-// Shared: section header, creator cell, post-id code
+// Shared: section header
 // ---------------------------------------------------------------------------
 
 function SectionHead({
@@ -709,56 +683,6 @@ function SectionHead({
   );
 }
 
-function CreatorCell({ row }: { row: AdStatusRow }) {
-  return (
-    <div className="flex items-center gap-[10px] min-w-0">
-      <Avatar
-        src={row.profilePicUrl}
-        username={row.username}
-        name={row.name}
-        size={32}
-      />
-      <div className="min-w-0">
-        <div className="font-bold text-text-primary leading-[1.2] truncate text-[0.84rem]">
-          {row.name || "—"}
-        </div>
-        <div className="text-[0.74rem] text-text-tertiary truncate">
-          @{row.username || "—"}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PostIdCode({
-  value,
-  collabId,
-}: {
-  value: string;
-  collabId?: string | null;
-}) {
-  return (
-    <span className="inline-flex items-baseline gap-1 flex-wrap">
-      <code className="text-[0.78rem] font-mono text-text-secondary">
-        {value || "—"}
-      </code>
-      {collabId && (
-        <span className="text-text-tertiary text-[0.7rem] tabular">
-          · {collabId}
-        </span>
-      )}
-    </span>
-  );
-}
-
-function AdRunStatusPill({ value }: { value?: string | null }) {
-  return (
-    <span className="pill pill--muted capitalize">
-      {value?.trim() || "Pending"}
-    </span>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Performance stats bento card
 // ---------------------------------------------------------------------------
@@ -785,36 +709,117 @@ function AdPerformanceStats({
     classified > 0 ? ((winners / classified) * 100).toFixed(1) : "0";
   const classRate = total > 0 ? ((classified / total) * 100).toFixed(1) : "0";
   const inMetaAds = adRun.filter((r) => r.isInMetaAds).length;
+  const totalSpend = adRun.reduce((sum, r) => sum + rowSpend(r), 0);
+  const orders = adRun.reduce(
+    (sum, r) => sum + (r.primaryAd?.shopifyOrders ?? 0),
+    0,
+  );
 
-  const tiles = [
-    { label: "Win Rate", value: `${winRate}%`, color: "#4F7C4D" },
-    { label: "Class. Rate", value: `${classRate}%`, color: "#3B6FD4" },
-    { label: "In Meta Ads", value: String(inMetaAds), color: "#7B4FBF" },
+  const statTiles = [
+    {
+      label: "Win Rate",
+      value: `${winRate}%`,
+      color: AD_STATUS_ACCENTS.winner,
+      sub: `${winners} winner-class`,
+    },
+    {
+      label: "Class. Rate",
+      value: `${classRate}%`,
+      color: AD_STATUS_ACCENTS.p0,
+      sub: `${classified}/${total || 0} reviewed`,
+    },
+    {
+      label: "In Meta Ads",
+      value: formatNumber(inMetaAds),
+      color: AD_STATUS_ACCENTS.meta,
+      sub: `${formatNumber(adRun.length)} matched rows`,
+    },
+  ];
+
+  const funnel = [
+    {
+      label: "Eligible",
+      value: total,
+      color: AD_STATUS_ACCENTS.p0,
+    },
+    {
+      label: "In Meta",
+      value: inMetaAds,
+      color: AD_STATUS_ACCENTS.meta,
+    },
+    {
+      label: "Classified",
+      value: classified,
+      color: AD_STATUS_ACCENTS.untested,
+    },
+    {
+      label: "Winners",
+      value: winners,
+      color: AD_STATUS_ACCENTS.winner,
+    },
   ];
 
   return (
-    <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-2">
+    <article className="bento-tile ad-performance-card">
       <TileHead
         icon={<BarChart3 size={12} aria-hidden />}
         info="Win Rate = Winner-class posts (Incremental Winner + Winner) ÷ classified posts. Class. Rate = classified ÷ all eligible posts. In Meta Ads = posts found on the Meta platform."
       >
         Performance Stats
       </TileHead>
-      <div className="grid grid-cols-3 gap-3 flex-1">
-        {tiles.map((t) => (
+      <div className="ad-performance-card__hero">
+        <div>
+          <span>Total eligible universe</span>
+          <strong>{formatNumber(total)}</strong>
+          <small>
+            {formatRupees(totalSpend)} spend · {formatNumber(orders)} orders
+          </small>
+        </div>
+        <div
+          className="ad-performance-card__ring"
+          style={
+            {
+              "--ad-ring": `${Math.min(100, Number(winRate)) * 3.6}deg`,
+            } as CSSProperties
+          }
+        >
+          <strong>{winRate}%</strong>
+          <span>Win Rate</span>
+        </div>
+      </div>
+
+      <div className="ad-performance-card__stats">
+        {statTiles.map((t) => (
           <div
             key={t.label}
-            className="bg-bg-base border border-border rounded-xl p-3 flex flex-col items-center justify-center gap-1"
+            style={{ "--ad-accent": t.color } as CSSProperties}
           >
+            <strong>{t.value}</strong>
+            <span>{t.label}</span>
+            <small>{t.sub}</small>
+          </div>
+        ))}
+      </div>
+
+      <div
+        className="ad-performance-card__funnel"
+        aria-label="Ad status funnel"
+      >
+        {funnel.map((item) => (
+          <div key={item.label}>
+            <div>
+              <span>{item.label}</span>
+              <strong>{formatNumber(item.value)}</strong>
+            </div>
             <span
-              className="text-[1.6rem] font-bold tabular leading-none"
-              style={{ color: t.color }}
-            >
-              {t.value}
-            </span>
-            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.06em] text-text-tertiary text-center leading-tight">
-              {t.label}
-            </span>
+              className="ad-performance-card__bar"
+              style={
+                {
+                  "--ad-accent": item.color,
+                  "--ad-width": `${total > 0 ? Math.max(3, Math.round((item.value / total) * 100)) : 0}%`,
+                } as CSSProperties
+              }
+            />
           </div>
         ))}
       </div>
@@ -1242,120 +1247,132 @@ function UntestedListTable({
   rows: AdStatusRow[];
   onOverview: (row: AdStatusRow) => void;
 }) {
-  // Thumbnails only exist for warehouse-matched rows — in practice a matched
-  // row is never Untested, but keep the column self-healing if that changes.
-  const hasThumbs = rows.some(rowHasThumb);
   if (!rows.length)
     return (
-      <div className="bento-tile ob-list-wrap ad-status-list-wrap">
-        <table className="ob-list-table">
-          <tbody>
-            <tr>
-              <td
-                colSpan={8}
-                className="text-center py-8 text-text-tertiary text-sm"
-              >
-                No untested ads — warehouse classified everything.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div className="campaign-filter-empty ad-status-empty">
+        <Megaphone size={24} aria-hidden />
+        <strong>No untested ads</strong>
+        <span>
+          Warehouse classified everything in the current filter scope.
+        </span>
       </div>
     );
   return (
-    <div className="bento-tile ob-list-wrap ad-status-list-wrap">
-      <div>
-        <table className="ob-list-table">
-          <colgroup>
-            {hasThumbs && <col className="ad-col-thumb" />}
-            <col className="ad-col-creator" />
-            <col className="ad-col-post-id" />
-            <col className="ad-col-campaign" />
-            <col className="ad-col-date" />
-            <col className="ad-col-days" />
-            <col className="ad-col-links" />
-            <col className="ad-col-partnership" />
-            <col className="ad-col-actions" />
-          </colgroup>
-          <thead>
-            <tr>
-              {hasThumbs && <th data-column-id="ad_thumb">Ad</th>}
-              <th data-column-id="creator">Creator</th>
-              <th data-column-id="post_id">Post ID</th>
-              <th data-column-id="campaign">Campaign</th>
-              <th style={{ width: "7rem" }}>Post Date</th>
-              <th style={{ width: "5.5rem" }}>Days Since</th>
-              <th style={{ width: "10rem" }}>Links</th>
-              <th style={{ width: "10rem" }}>Partnership</th>
-              <th data-column-id="actions">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr
-                key={r.postId}
-                className="cursor-pointer"
-                {...rowClickProps(
-                  () => onOverview(r),
-                  `Open ad overview — ${r.name || r.username || r.postIdShort || r.postId}`,
-                )}
-              >
-                {hasThumbs && (
-                  <td data-column-id="ad_thumb">
-                    <RowThumb row={r} />
-                  </td>
-                )}
-                <td data-column-id="creator">
-                  <CreatorCell row={r} />
-                </td>
-                <td data-column-id="post_id">
-                  <PostIdCode
-                    value={r.postIdShort || r.postId}
-                    collabId={r.collabId}
-                  />
-                </td>
-                <td data-column-id="campaign">
-                  {r.campaign ? (
-                    <span className="campaign-chip">{r.campaign}</span>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td className="tabular">{formatDate(r.postDate)}</td>
-                <td>
+    <div className="campaign-list-view ad-status-list-view">
+      {rows.map((r, index) => {
+        const open = () => onOverview(r);
+        return (
+          <article
+            key={r.postId}
+            className="campaign-list-row ad-status-list-row ad-status-list-row--untested"
+            style={
+              {
+                "--campaign-accent": AD_STATUS_ACCENTS.untested,
+                "--campaign-card-index": String(index),
+              } as CSSProperties
+            }
+            tabIndex={0}
+            aria-label={`Open ad overview for ${r.name || r.username || r.postIdShort}`}
+            onClick={open}
+            onKeyDown={(event) => openOnEnter(event, open)}
+          >
+            <div className="campaign-list-row__main ad-status-list-row__main">
+              <div className="ad-status-list-row__identity">
+                <RowThumb row={r} />
+                <div className="min-w-0">
+                  <div className="campaign-card__id-row">
+                    <span className="campaign-card__id">
+                      <strong>{r.postIdShort || r.postId}</strong>
+                    </span>
+                    <AsClassBadge value="" />
+                  </div>
+                  <h3>{r.name || r.username || "Unknown creator"}</h3>
+                  <p>{rowSubline(r)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="campaign-list-row__allocation ad-status-list-row__signal">
+              <div>
+                <span>Pending Sync</span>
+                <strong>
                   <DaysSince days={r.daysSince} />
-                </td>
-                <td>
-                  <LinkChips post={r.linkToPost} drive={r.downloadLink} />
-                </td>
-                <td>
+                </strong>
+              </div>
+              <span className="campaign-list-row__reachouts">
+                <span>
+                  <ShieldCheck size={12} aria-hidden />
+                  {r.adsUsageRights || "Ads rights pending"}
+                </span>
+              </span>
+            </div>
+
+            <dl className="campaign-list-row__stats ad-status-list-row__stats">
+              <div>
+                <dt>Post Date</dt>
+                <dd>{formatDate(r.postDate) || "—"}</dd>
+              </div>
+              <div>
+                <dt>Campaign</dt>
+                <dd>{r.campaign || "—"}</dd>
+              </div>
+              <div>
+                <dt>Collab</dt>
+                <dd>{r.collabId || r.collabType || "—"}</dd>
+              </div>
+              <div>
+                <dt>Partnership</dt>
+                <dd>
                   <PartnershipKeyEdit
                     postId={r.postId}
                     value={r.partnershipId}
                     compact
                     stopPropagation
                   />
-                </td>
-                <td data-column-id="actions">
-                  <span className="ob-row-action">
-                    <button
-                      type="button"
-                      className="action-btn action-btn--view"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOverview(r);
-                      }}
-                    >
-                      <Eye size={11} aria-hidden />
-                      Overview
-                    </button>
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </dd>
+              </div>
+            </dl>
+
+            <div className="campaign-list-row__actions ad-status-list-row__actions">
+              <button
+                type="button"
+                className="campaign-list-action campaign-list-action--brief"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOverview(r);
+                }}
+              >
+                <Eye size={13} aria-hidden />
+                View
+              </button>
+              {r.linkToPost && (
+                <a
+                  href={r.linkToPost}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="campaign-list-action"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Instagram size={13} aria-hidden />
+                  Post
+                </a>
+              )}
+              {r.downloadLink && (
+                <a
+                  href={r.downloadLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="campaign-list-action"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Download size={13} aria-hidden />
+                  Drive
+                </a>
+              )}
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -1373,98 +1390,134 @@ function UntestedCardsGrid({
 }) {
   if (!rows.length)
     return (
-      <div className="ob-empty">
+      <div className="campaign-filter-empty ad-status-empty">
         <Megaphone size={24} aria-hidden />
-        <p>No untested ads — warehouse classified everything.</p>
+        <strong>No untested ads</strong>
+        <span>
+          Warehouse classified everything in the current filter scope.
+        </span>
       </div>
     );
   return (
-    <div className="ob-card-grid">
-      {rows.map((r) => (
+    <div className="campaign-card-grid ad-status-card-grid">
+      {rows.map((r, index) => (
         <article
           key={r.postId}
-          className="ob-card ad-status-card ad-status-card--untested"
+          className="campaign-card ad-status-campaign-card ad-status-campaign-card--untested"
+          style={
+            {
+              "--campaign-accent": AD_STATUS_ACCENTS.untested,
+              "--campaign-card-index": String(index),
+            } as CSSProperties
+          }
+          tabIndex={0}
+          aria-label={`Open ad overview for ${r.name || r.username || r.postIdShort}`}
+          onClick={() => onOverview(r)}
+          onKeyDown={(event) => openOnEnter(event, () => onOverview(r))}
         >
-          <div className="ob-card-head">
-            <Avatar
-              src={r.profilePicUrl}
-              username={r.username}
-              name={r.name}
-              size={44}
-              className="ob-card-avatar"
-            />
-            <div className="ob-card-id min-w-0">
-              <div className="ob-card-name">{r.name || r.username || "—"}</div>
-              {r.username && (
-                <div className="ob-card-handle">@{r.username}</div>
-              )}
+          <div className="campaign-card__head">
+            <div className="min-w-0">
+              <div className="campaign-card__id-row">
+                <span className="campaign-card__id">
+                  <strong>{r.postIdShort || r.postId}</strong>
+                </span>
+                <AsClassBadge value="" />
+              </div>
+              <h3>{r.name || r.username || "Unknown creator"}</h3>
             </div>
+            <RowThumb row={r} size={46} />
           </div>
 
-          <div className="ob-card-pills">
-            <AsClassBadge value="" />
-            <span className="post-id tabular">{r.postIdShort || r.postId}</span>
-            {r.collabId && (
-              <span className="campaign-chip tabular" title="Collab ID">
-                {r.collabId}
-              </span>
-            )}
-            {r.campaign && <span className="campaign-chip">{r.campaign}</span>}
-            {r.adsUsageRights && (
-              <span className="pill pill--info">
-                <ShieldCheck size={10} aria-hidden />
-                Ads: {r.adsUsageRights}
-              </span>
-            )}
+          <p className="campaign-card__message">{rowSubline(r) || "—"}</p>
+
+          <div className="campaign-card__progress ad-status-card-progress">
+            <div>
+              <span>Warehouse Classification</span>
+              <strong>Pending</strong>
+            </div>
+            <span className="campaign-card__progress-track">
+              <span style={{ width: "18%" }} />
+            </span>
           </div>
 
-          <dl className="ob-card-meta-grid ad-status-card-meta">
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Days Since</span>
-              <span className="ob-card-meta-val">
+          <dl className="campaign-card__facts ad-status-card-facts">
+            <div>
+              <dt>
+                <CalendarDays size={11} aria-hidden />
+                Posted
+              </dt>
+              <dd>{formatDate(r.postDate) || "—"}</dd>
+            </div>
+            <div>
+              <dt>
+                <HourglassIcon size={11} aria-hidden />
+                Waiting
+              </dt>
+              <dd>
                 <DaysSince days={r.daysSince} ago />
-              </span>
+              </dd>
             </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Post Date</span>
-              <span className="ob-card-meta-val tabular">
-                {formatDate(r.postDate) || "—"}
-              </span>
-            </div>
-            <div className="ob-card-meta">
-              <span className="ob-card-meta-label">Collab</span>
-              <span
-                className={cn(
-                  "ob-card-meta-val",
-                  !r.collabType && "text-text-tertiary font-normal",
-                )}
-              >
-                {r.collabType || "—"}
-              </span>
-            </div>
-            <div className="ob-card-meta ad-status-card-partnership">
-              <span className="ob-card-meta-label">Partnership</span>
-              <span className="ob-card-meta-val tabular">
-                <PartnershipKeyEdit
-                  postId={r.postId}
-                  value={r.partnershipId}
-                  compact
-                  stopPropagation
-                />
-              </span>
+            <div>
+              <dt>
+                <ShieldCheck size={11} aria-hidden />
+                Rights
+              </dt>
+              <dd>{r.adsUsageRights || "—"}</dd>
             </div>
           </dl>
 
-          <CardLinkActions post={r.linkToPost} drive={r.downloadLink} />
+          <div className="campaign-card__meta-row">
+            {r.campaign && <span>{r.campaign}</span>}
+            {r.collabId && <span>{r.collabId}</span>}
+            <span onClick={(event) => event.stopPropagation()}>
+              <PartnershipKeyEdit
+                postId={r.postId}
+                value={r.partnershipId}
+                compact
+                stopPropagation
+              />
+            </span>
+          </div>
 
-          <div className="ob-card-actions">
-            <button
-              type="button"
-              className="action-view"
-              onClick={() => onOverview(r)}
-            >
-              <Eye size={12} aria-hidden /> Overview
-            </button>
+          <div className="campaign-card__actions">
+            <div className="campaign-card__primary-actions">
+              <button
+                type="button"
+                className="btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOverview(r);
+                }}
+              >
+                <Eye size={13} aria-hidden /> View
+              </button>
+            </div>
+            <div className="campaign-card__secondary-actions">
+              {r.linkToPost && (
+                <a
+                  href={r.linkToPost}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="campaign-brief-link"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Instagram size={13} aria-hidden />
+                  Post
+                </a>
+              )}
+              {r.downloadLink && (
+                <a
+                  href={r.downloadLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="campaign-brief-link"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Download size={13} aria-hidden />
+                  Drive
+                </a>
+              )}
+            </div>
           </div>
         </article>
       ))}
@@ -1473,144 +1526,8 @@ function UntestedCardsGrid({
 }
 
 // ---------------------------------------------------------------------------
-// Ad Run section — list table
+// Ad Run section — list
 // ---------------------------------------------------------------------------
-
-/** Metric cells shared by the primary row and each expanded sibling ad. */
-function AdMetricCells({ ad }: { ad: WarehouseAd | null }) {
-  return (
-    <>
-      <td className="tabular">{ad ? formatDate(ad.adCreated) : "—"}</td>
-      <td className="tabular font-semibold">
-        {ad ? formatRupees(ad.amountSpent) : "—"}
-      </td>
-      <td className="tabular">{roasText(ad)}</td>
-      <td className="tabular">{ad ? formatNumber(ad.ftewvCount) : "—"}</td>
-      <td className="tabular">{ad ? formatNumber(ad.ncpCount) : "—"}</td>
-      <td className="tabular">{ad ? formatNumber(ad.shopifyOrders) : "—"}</td>
-    </>
-  );
-}
-
-/**
- * One Ad Run row group — FIRST-occurrence ad inline; "+N more ads" expands
- * the remaining warehouse ads (occurrence order) as sibling rows with the
- * same columns. The whole row opens the Ad Overview modal.
- */
-function AdRunRowGroup({
-  row,
-  onOverview,
-}: {
-  row: AdStatusRow;
-  onOverview: (row: AdStatusRow) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const primary = row.primaryAd;
-  const extras = row.ads.filter((ad) => ad !== primary);
-  const clickProps = rowClickProps(
-    () => onOverview(row),
-    `Open ad overview — ${row.name || row.username || row.postIdShort || row.postId}`,
-  );
-
-  return (
-    <>
-      <tr className="cursor-pointer" {...clickProps}>
-        <td data-column-id="ad_thumb">
-          <RowThumb row={row} />
-        </td>
-        <td data-column-id="ad_name">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span
-                className="truncate font-bold text-text-primary text-[0.8rem]"
-                title={primary?.adName || row.name || undefined}
-              >
-                {primary?.adName || row.name || row.postIdShort || "—"}
-              </span>
-              {row.source === "historic" && <HistoricChip />}
-              {row.retiredId && <RetiredIdChip />}
-            </div>
-            <div className="flex items-center gap-2 text-[0.72rem] text-text-tertiary min-w-0">
-              <span className="truncate">
-                @{row.username || "—"} · {row.postIdShort || row.postId}
-              </span>
-              {extras.length > 0 && (
-                <button
-                  type="button"
-                  className="ad-more-toggle"
-                  aria-expanded={open}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpen((v) => !v);
-                  }}
-                >
-                  {open ? "Hide ads" : `+${extras.length} more ad${extras.length > 1 ? "s" : ""}`}
-                </button>
-              )}
-            </div>
-          </div>
-        </td>
-        <AdMetricCells ad={primary} />
-        <td>
-          <RowStatusBadge row={row} />
-        </td>
-        <td className="ad-links-cell">
-          {primary ? (
-            <AdLinkChips ad={primary} />
-          ) : (
-            <LinkChips post={row.linkToPost} />
-          )}
-        </td>
-        <td data-column-id="actions">
-          <span className="ob-row-action">
-            <button
-              type="button"
-              className="action-btn action-btn--view"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOverview(row);
-              }}
-            >
-              <Eye size={11} aria-hidden />
-              Overview
-            </button>
-          </span>
-        </td>
-      </tr>
-      {open &&
-        extras.map((ad) => (
-          <tr key={ad.adId} className="ad-extra-row cursor-pointer" {...clickProps}>
-            <td data-column-id="ad_thumb">
-              <AdImg
-                ad={ad}
-                alt={`Ad creative — ${ad.adName}`}
-                size={36}
-                postUrl={row.linkToPost}
-              />
-            </td>
-            <td data-column-id="ad_name">
-              <div className="min-w-0">
-                <span
-                  className="block truncate text-[0.76rem] text-text-secondary"
-                  title={ad.adName}
-                >
-                  {ad.adName}
-                </span>
-              </div>
-            </td>
-            <AdMetricCells ad={ad} />
-            <td>
-              <WhCategoryBadge category={ad.category || "—"} />
-            </td>
-            <td className="ad-links-cell">
-              <AdLinkChips ad={ad} />
-            </td>
-            <td data-column-id="actions" />
-          </tr>
-        ))}
-    </>
-  );
-}
 
 function AdRunListTable({
   rows,
@@ -1621,60 +1538,127 @@ function AdRunListTable({
 }) {
   if (!rows.length)
     return (
-      <div className="bento-tile ob-list-wrap ad-status-list-wrap">
-        <table className="ob-list-table">
-          <tbody>
-            <tr>
-              <td
-                colSpan={11}
-                className="text-center py-8 text-text-tertiary text-sm"
-              >
-                No ads match filters.
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div className="campaign-filter-empty ad-status-empty">
+        <Search size={24} aria-hidden />
+        <strong>No ads match filters</strong>
+        <span>Try a different campaign, status, or classification.</span>
       </div>
     );
   return (
-    <div className="bento-tile ob-list-wrap ad-status-list-wrap">
-      <div>
-        <table className="ob-list-table ad-run-table">
-          <colgroup>
-            <col className="ad-col-thumb" />
-            <col className="ad-col-ad-name" />
-            <col className="ad-col-created" />
-            <col className="ad-col-spend" />
-            <col className="ad-col-metric" />
-            <col className="ad-col-metric" />
-            <col className="ad-col-metric" />
-            <col className="ad-col-metric" />
-            <col className="ad-col-classification" />
-            <col className="ad-col-links" />
-            <col className="ad-col-actions" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th data-column-id="ad_thumb">Ad</th>
-              <th data-column-id="ad_name">Ad Name / Creator</th>
-              <th>Created</th>
-              <th>Spend</th>
-              <th>ROAS</th>
-              <th>FTEWV</th>
-              <th>NCP</th>
-              <th>Shop. Orders</th>
-              <th>Status</th>
-              <th>Links</th>
-              <th data-column-id="actions">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <AdRunRowGroup key={r.postId} row={r} onOverview={onOverview} />
-            ))}
-          </tbody>
-        </table>
-      </div>
+    <div className="campaign-list-view ad-status-list-view">
+      {rows.map((r, index) => {
+        const primary = r.primaryAd;
+        const extras = r.ads.filter((ad) => ad !== primary);
+        const accent = rowAccent(r);
+        const open = () => onOverview(r);
+        return (
+          <article
+            key={r.postId}
+            className="campaign-list-row ad-status-list-row ad-status-list-row--run"
+            style={
+              {
+                "--campaign-accent": accent,
+                "--campaign-card-index": String(index),
+              } as CSSProperties
+            }
+            tabIndex={0}
+            aria-label={`Open ad overview for ${rowPrimaryName(r)}`}
+            onClick={open}
+            onKeyDown={(event) => openOnEnter(event, open)}
+          >
+            <div className="campaign-list-row__main ad-status-list-row__main">
+              <div className="ad-status-list-row__identity">
+                <RowThumb row={r} />
+                <div className="min-w-0">
+                  <div className="campaign-card__id-row">
+                    <span className="campaign-card__id">
+                      <strong>{r.postIdShort || r.postId}</strong>
+                    </span>
+                    <RowStatusBadge row={r} />
+                    {r.source === "historic" && <HistoricChip />}
+                    {r.retiredId && <RetiredIdChip />}
+                  </div>
+                  <h3 title={rowPrimaryName(r)}>{rowPrimaryName(r)}</h3>
+                  <p>{rowSubline(r)}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="campaign-list-row__allocation ad-status-list-row__signal">
+              <div>
+                <span>Meta Performance</span>
+                <strong>{formatRupees(primary?.amountSpent ?? 0)}</strong>
+              </div>
+              <span className="campaign-list-row__reachouts">
+                <span>
+                  <MousePointerClick size={12} aria-hidden />
+                  {extras.length > 0
+                    ? `${extras.length + 1} ad variants`
+                    : "First occurrence"}
+                </span>
+                <strong>{roasText(primary)}</strong>
+              </span>
+            </div>
+
+            <dl className="campaign-list-row__stats ad-status-list-row__stats">
+              <div>
+                <dt>Created</dt>
+                <dd>{formatDate(primary?.adCreated) || "—"}</dd>
+              </div>
+              <div>
+                <dt>FTEWV</dt>
+                <dd>{formatNumber(primary?.ftewvCount)}</dd>
+              </div>
+              <div>
+                <dt>NCP</dt>
+                <dd>{formatNumber(primary?.ncpCount)}</dd>
+              </div>
+              <div>
+                <dt>Orders</dt>
+                <dd>{formatNumber(primary?.shopifyOrders)}</dd>
+              </div>
+            </dl>
+
+            <div className="campaign-list-row__actions ad-status-list-row__actions">
+              <button
+                type="button"
+                className="campaign-list-action campaign-list-action--brief"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOverview(r);
+                }}
+              >
+                <Eye size={13} aria-hidden />
+                View
+              </button>
+              {primary?.previewLink && (
+                <a
+                  href={primary.previewLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="campaign-list-action"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <ExternalLink size={13} aria-hidden />
+                  Meta
+                </a>
+              )}
+              {r.linkToPost && (
+                <a
+                  href={r.linkToPost}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="campaign-list-action"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <Instagram size={13} aria-hidden />
+                  Post
+                </a>
+              )}
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -1692,183 +1676,113 @@ function AdRunCardsGrid({
 }) {
   if (!rows.length)
     return (
-      <div className="ob-empty">
+      <div className="campaign-filter-empty ad-status-empty">
         <Megaphone size={24} aria-hidden />
-        <p>No ads match filters.</p>
+        <strong>No ads match filters</strong>
+        <span>Try a different campaign, status, or classification.</span>
       </div>
     );
   return (
-    <div className="ob-card-grid">
-      {rows.map((r) => {
+    <div className="campaign-card-grid ad-status-card-grid">
+      {rows.map((r, index) => {
         const primary = r.primaryAd;
         const extras = r.ads.filter((ad) => ad !== primary);
-        const wonClass =
-          r.warehouseCategory === "Incremental Winner" ||
-          r.warehouseCategory === "Winner" ||
-          r.adsResults === "Winner";
-        const lostClass =
-          r.warehouseCategory === "Discarded" ||
-          r.adsResults === "Discarded" ||
-          r.adsResults === "Discarded but analyse";
+        const accent = rowAccent(r);
+        const classProgress =
+          rowStatusText(r) === "Untested"
+            ? 18
+            : isWinnerCategory(r.warehouseCategory)
+              ? 100
+              : r.warehouseCategory === "Discarded"
+                ? 100
+                : 72;
         return (
           <article
             key={r.postId}
-            className={cn(
-              "ob-card ad-status-card",
-              wonClass && "ob-card-onboarded",
-              lostClass && "ob-card-pending",
-            )}
+            className="campaign-card ad-status-campaign-card ad-status-campaign-card--run"
+            style={
+              {
+                "--campaign-accent": accent,
+                "--campaign-progress": `${classProgress}%`,
+                "--campaign-card-index": String(index),
+              } as CSSProperties
+            }
+            tabIndex={0}
+            aria-label={`Open ad overview for ${rowPrimaryName(r)}`}
+            onClick={() => onOverview(r)}
+            onKeyDown={(event) => openOnEnter(event, () => onOverview(r))}
           >
-            <div className="ob-card-head">
-              <Avatar
-                src={r.profilePicUrl}
-                username={r.username}
-                name={r.name}
-                size={44}
-                className="ob-card-avatar"
-              />
-              <div className="ob-card-id min-w-0">
-                <div className="ob-card-name">
-                  {r.name || r.username || "—"}
+            <div className="campaign-card__head">
+              <div className="min-w-0">
+                <div className="campaign-card__id-row">
+                  <span className="campaign-card__id">
+                    <strong>{r.postIdShort || r.postId}</strong>
+                  </span>
+                  <RowStatusBadge row={r} />
                 </div>
-                {r.username && (
-                  <div className="ob-card-handle">@{r.username}</div>
-                )}
+                <h3 title={rowPrimaryName(r)}>{rowPrimaryName(r)}</h3>
               </div>
-              {rowHasThumb(r) && primary && (
-                <AdImg
-                  ad={primary}
-                  alt={`Ad creative — ${r.username || r.postIdShort}`}
-                  size={44}
-                  className="ad-card-thumb"
-                  postUrl={r.linkToPost}
-                />
-              )}
+              <RowThumb row={r} size={46} />
             </div>
 
-            <div className="ob-card-pills">
-              <RowStatusBadge row={r} />
+            <p className="campaign-card__message">{rowSubline(r) || "—"}</p>
+
+            <div className="campaign-card__progress ad-status-card-progress">
+              <div>
+                <span>Ad Classification</span>
+                <strong>{rowStatusText(r)}</strong>
+              </div>
+              <span className="campaign-card__progress-track">
+                <span />
+              </span>
+            </div>
+
+            <dl className="campaign-card__facts ad-status-card-facts">
+              <div>
+                <dt>
+                  <BarChart3 size={11} aria-hidden />
+                  Spend
+                </dt>
+                <dd>{formatRupees(primary?.amountSpent ?? 0)}</dd>
+              </div>
+              <div>
+                <dt>
+                  <TrendingUp size={11} aria-hidden />
+                  ROAS
+                </dt>
+                <dd>{roasText(primary)}</dd>
+              </div>
+              <div>
+                <dt>
+                  <ShoppingBag size={11} aria-hidden />
+                  Orders
+                </dt>
+                <dd>{formatNumber(primary?.shopifyOrders)}</dd>
+              </div>
+            </dl>
+
+            <div className="campaign-card__meta-row">
               {r.source === "historic" && <HistoricChip />}
               {r.retiredId && <RetiredIdChip />}
-              <span className="post-id tabular">
-                {r.postIdShort || r.postId}
-              </span>
               {r.collabId && (
-                <span className="campaign-chip tabular" title="Collab ID">
+                <span title="Collab ID">
+                  <MousePointerClick size={11} aria-hidden />
                   {r.collabId}
                 </span>
               )}
               {r.campaign && (
-                <span className="campaign-chip">{r.campaign}</span>
+                <span>
+                  <Megaphone size={11} aria-hidden />
+                  {r.campaign}
+                </span>
               )}
-              {/* Legacy ads_status pill only when the warehouse doesn't know
-                  the post — a matched card already shows the live delivery
-                  status; the stale local value would contradict it. */}
-              {r.adsStatus && !r.ads.length && (
-                <AdRunStatusPill value={r.adsStatus} />
-              )}
-              {r.adsUsageRights && (
-                <span className="pill pill--info">
-                  <ShieldCheck size={10} aria-hidden />
-                  Ads: {r.adsUsageRights}
+              {extras.length > 0 && (
+                <span>
+                  <BarChart3 size={11} aria-hidden />
+                  {extras.length + 1} ad variants
                 </span>
               )}
             </div>
-
-            <dl className="ob-card-meta-grid ad-status-card-meta">
-              {primary ? (
-                <>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">Spend</span>
-                    <span className="ob-card-meta-val tabular">
-                      {formatRupees(primary.amountSpent)}
-                    </span>
-                  </div>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">ROAS</span>
-                    <span className="ob-card-meta-val tabular">
-                      {roasText(primary)}
-                    </span>
-                  </div>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">FTEWV</span>
-                    <span className="ob-card-meta-val tabular">
-                      {formatNumber(primary.ftewvCount)}
-                    </span>
-                  </div>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">NCP</span>
-                    <span className="ob-card-meta-val tabular">
-                      {formatNumber(primary.ncpCount)}
-                    </span>
-                  </div>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">Shop. Orders</span>
-                    <span className="ob-card-meta-val tabular">
-                      {formatNumber(primary.shopifyOrders)}
-                    </span>
-                  </div>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">Ad Created</span>
-                    <span className="ob-card-meta-val tabular">
-                      {formatDate(primary.adCreated) || "—"}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">In Meta Ads</span>
-                    <span
-                      className={cn(
-                        "ob-card-meta-val",
-                        r.isInMetaAds ? "text-success" : "text-text-secondary",
-                      )}
-                    >
-                      {r.isInMetaAds ? "Yes" : "No"}
-                    </span>
-                  </div>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">Post Date</span>
-                    <span className="ob-card-meta-val tabular">
-                      {formatDate(r.postDate) || "—"}
-                    </span>
-                  </div>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">Days Since</span>
-                    <span className="ob-card-meta-val">
-                      <DaysSince days={r.daysSince} ago />
-                    </span>
-                  </div>
-                  <div className="ob-card-meta">
-                    <span className="ob-card-meta-label">Collab</span>
-                    <span
-                      className={cn(
-                        "ob-card-meta-val",
-                        !r.collabType && "text-text-tertiary font-normal",
-                      )}
-                    >
-                      {r.collabType || "—"}
-                    </span>
-                  </div>
-                </>
-              )}
-              <div className="ob-card-meta ad-status-card-partnership">
-                <span className="ob-card-meta-label">Partnership</span>
-                <span className="ob-card-meta-val tabular">
-                  {r.source === "historic" ? (
-                    <span className="text-text-tertiary font-normal">—</span>
-                  ) : (
-                    <PartnershipKeyEdit
-                      postId={r.postId}
-                      value={r.partnershipId}
-                      compact
-                      stopPropagation
-                    />
-                  )}
-                </span>
-              </div>
-            </dl>
 
             {extras.length > 0 && (
               <details className="ad-card-more">
@@ -1902,21 +1816,57 @@ function AdRunCardsGrid({
               </details>
             )}
 
-            <CardLinkActions
-              post={r.linkToPost}
-              drive={r.downloadLink}
-              landing={primary?.adLink}
-              preview={primary?.previewLink}
-            />
-
-            <div className="ob-card-actions">
-              <button
-                type="button"
-                className="action-view"
-                onClick={() => onOverview(r)}
-              >
-                <Eye size={12} aria-hidden /> Overview
-              </button>
+            <div className="campaign-card__actions">
+              <div className="campaign-card__primary-actions">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOverview(r);
+                  }}
+                >
+                  <Eye size={13} aria-hidden /> View
+                </button>
+                {primary?.previewLink && (
+                  <a
+                    href={primary.previewLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="campaign-brief-link"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <ExternalLink size={13} aria-hidden />
+                    Meta
+                  </a>
+                )}
+              </div>
+              <div className="campaign-card__secondary-actions">
+                {r.linkToPost && (
+                  <a
+                    href={r.linkToPost}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="campaign-brief-link"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Instagram size={13} aria-hidden />
+                    Post
+                  </a>
+                )}
+                {r.downloadLink && (
+                  <a
+                    href={r.downloadLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="campaign-brief-link"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Download size={13} aria-hidden />
+                    Drive
+                  </a>
+                )}
+              </div>
             </div>
           </article>
         );
@@ -1938,12 +1888,22 @@ export function AdStatusBoard({
   adRun: AdStatusRow[];
   filters: AdStatusFilters;
 }) {
-  const [view, setView] = useState<"list" | "cards">("cards");
+  const [view, setView] = useState<AdStatusViewMode>("cards");
   const [overviewRow, setOverviewRow] = useState<AdStatusRow | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(AD_STATUS_VIEW_STORAGE_KEY);
+      if (stored === "cards" || stored === "list") setView(stored);
+    } catch {
+      // localStorage unavailable
+    }
+  }, []);
 
   const q = (filters.search ?? "").trim().toLowerCase();
   const classification = filters.classification ?? "";
   const adStatus = (filters.adStatus ?? "").trim().toLowerCase();
+  const sortKey = filters.sort ?? "";
 
   const matchesBase = (r: AdStatusRow) => {
     if (q) {
@@ -1968,14 +1928,14 @@ export function AdStatusBoard({
     // When classification is "untested only", show untested; otherwise always show untested
     // (classification filter targets adRun section). matchesBase drops them
     // under an adStatus filter (no warehouse ad → no delivery status).
-    return untested.filter(matchesBase);
+    return sortAdRows(untested.filter(matchesBase), sortKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [untested, q, adStatus]);
+  }, [untested, q, adStatus, sortKey]);
 
   const filteredAdRun = useMemo(() => {
     // __untested special value → collapse run section
     if (classification === "__untested") return [];
-    return adRun.filter((r) => {
+    const filtered = adRun.filter((r) => {
       if (!matchesBase(r)) return false;
       // Classification matches either vocabulary: legacy result (Winner/ITE/…)
       // or warehouse category (Incremental Winner / P0 analysis / …).
@@ -1987,8 +1947,9 @@ export function AdStatusBoard({
         return false;
       return true;
     });
+    return sortAdRows(filtered, sortKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adRun, q, classification, adStatus]);
+  }, [adRun, q, classification, adStatus, sortKey]);
 
   const total = filteredUntested.length + filteredAdRun.length;
 
@@ -2000,7 +1961,7 @@ export function AdStatusBoard({
   useEffect(() => {
     setUntestedPage(0);
     setAdRunPage(0);
-  }, [q, classification, adStatus, filters.campaign, view]);
+  }, [q, classification, adStatus, filters.campaign, sortKey, view]);
 
   const safeUntestedPage = Math.min(
     untestedPage,
@@ -2053,7 +2014,7 @@ export function AdStatusBoard({
   return (
     <>
       {/* Analytics bento — sits between KPI strip and board */}
-      <section className="bento-stagger grid grid-cols-1 sm:grid-cols-2 gap-4 my-4">
+      <section className="bento-stagger ad-status-insights-grid">
         <DonutTile
           icon={<Trophy size={12} aria-hidden />}
           title="Ad Classification"
@@ -2067,35 +2028,27 @@ export function AdStatusBoard({
       {/* Board */}
       <section className="mt-4 min-w-0">
         {/* Toolbar — view toggle hidden on mobile (cards always shown) */}
-        <div className="order-status-board-toolbar">
-          <span className="text-xs font-bold tabular text-text-secondary bg-bg-ecru border border-border rounded-full px-3 py-1">
-            {total} total
-          </span>
-          <div
-            className="hidden md:flex ob-viewtoggle"
-            role="tablist"
-            aria-label="View"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "list"}
-              className={cn(view === "list" && "active")}
-              onClick={() => setView("list")}
-            >
-              <ListIcon size={12} aria-hidden />
-              List
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "cards"}
-              className={cn(view === "cards" && "active")}
-              onClick={() => setView("cards")}
-            >
-              <Grid3X3 size={12} aria-hidden />
-              Cards
-            </button>
+        <div className="campaign-list-toolbar ad-status-board-toolbar">
+          <div className="ad-status-board-toolbar__copy">
+            <span>{formatNumber(total)} total</span>
+            <strong>
+              {formatNumber(filteredUntested.length)} untested ·{" "}
+              {formatNumber(filteredAdRun.length)} in ad run
+            </strong>
+          </div>
+          <div className="campaign-list-toolbar__meta ad-status-board-toolbar__meta">
+            <span>
+              Showing {formatNumber(total)} of{" "}
+              {formatNumber(untested.length + adRun.length)}
+            </span>
+            <div className="hidden md:block">
+              <ViewModeToggle
+                storageKey={AD_STATUS_VIEW_STORAGE_KEY}
+                options={AD_STATUS_VIEW_OPTIONS}
+                defaultMode={view}
+                onChange={(mode) => setView(mode as AdStatusViewMode)}
+              />
+            </div>
           </div>
         </div>
 

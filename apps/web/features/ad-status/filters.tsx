@@ -2,7 +2,7 @@
 
 import { useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { ArrowDownUp, Hash, Search, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { AdStatusFilterOptions, AdStatusFilters } from "./types";
@@ -12,7 +12,18 @@ const FILTER_KEYS = [
   "campaign",
   "classification",
   "adStatus",
+  "sort",
 ] as const satisfies readonly (keyof AdStatusFilters)[];
+
+const SORT_OPTIONS = [
+  { value: "", label: "Default order" },
+  { value: "spend-desc", label: "Spend high to low" },
+  { value: "spend-asc", label: "Spend low to high" },
+  { value: "roas-desc", label: "ROAS high to low" },
+  { value: "newest", label: "Newest post first" },
+  { value: "oldest", label: "Oldest post first" },
+  { value: "days-desc", label: "Needs review longest" },
+];
 
 export function AdStatusFiltersBar({
   initial,
@@ -50,50 +61,58 @@ export function AdStatusFiltersBar({
   const hasAny = FILTER_KEYS.some((k) => params.get(k));
 
   return (
-    <div className="onboarding-filter-card" aria-busy={pending}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-        <label className="onboarding-filter-field col-span-2 md:col-span-1">
-          <span>Search</span>
-          <div className="relative flex items-center">
-            <Search size={13} aria-hidden className="absolute left-2.5 text-text-tertiary pointer-events-none" />
-            <input
-              type="search"
-              defaultValue={initial.search ?? ""}
-              placeholder="Creator name, @username, post ID…"
-              onBlur={(e) => setParam("search", e.target.value || undefined)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  setParam(
-                    "search",
-                    (e.target as HTMLInputElement).value || undefined,
-                  );
-                }
-              }}
-              className="onboarding-filter-select pl-7"
-            />
-          </div>
-        </label>
+    <div
+      className="campaign-list-toolbar ad-status-filter-toolbar"
+      aria-busy={pending}
+    >
+      <label className="campaign-search-field ad-status-search-field">
+        <Search size={15} aria-hidden="true" />
+        <input
+          type="search"
+          defaultValue={initial.search ?? ""}
+          placeholder="Search creator, @username, post ID, ad name"
+          aria-label="Search ads by creator, username, post ID, or ad name"
+          onBlur={(e) => setParam("search", e.target.value || undefined)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              setParam(
+                "search",
+                (e.target as HTMLInputElement).value || undefined,
+              );
+            }
+          }}
+        />
+      </label>
 
-        <label className="onboarding-filter-field">
-          <span>Campaign</span>
+      <div className="campaign-filter-controls ad-status-filter-controls">
+        <div className="campaign-filter-select campaign-filter-select--combo ad-status-filter-select ad-status-filter-select--campaign">
+          <Hash size={14} aria-hidden="true" />
           <SearchableSelect
             value={initial.campaign ?? ""}
             onChange={(v) => setParam("campaign", v || undefined)}
             options={[
-              { value: "", label: "All Campaigns" },
+              {
+                value: "",
+                label: "All Campaigns",
+                hint: `${options.campaigns.length} campaign IDs`,
+              },
               ...options.campaigns.map((c) => ({
                 value: c.id,
-                label: `${c.id}${c.name && c.name !== c.id ? ` · ${c.name}` : ""}`,
+                label: c.id,
+                hint: c.name && c.name !== c.id ? c.name : undefined,
               })),
             ]}
             placeholder="All Campaigns"
             searchPlaceholder="Search campaigns…"
+            className="campaign-filter-combobox"
+            contentClassName="campaign-id-filter-popover ad-status-id-filter-popover"
+            optionLayout="stacked"
           />
-        </label>
+        </div>
 
-        <label className="onboarding-filter-field">
-          <span>Classification</span>
+        <div className="campaign-filter-select campaign-filter-select--combo ad-status-filter-select">
+          <SlidersHorizontal size={14} aria-hidden="true" />
           <SearchableSelect
             value={initial.classification ?? ""}
             onChange={(v) => setParam("classification", v || undefined)}
@@ -111,11 +130,12 @@ export function AdStatusFiltersBar({
             ]}
             placeholder="All Results"
             searchPlaceholder="Search…"
+            className="campaign-filter-combobox"
           />
-        </label>
+        </div>
 
-        <label className="onboarding-filter-field">
-          <span>Ad Status</span>
+        <div className="campaign-filter-select campaign-filter-select--combo ad-status-filter-select">
+          <SlidersHorizontal size={14} aria-hidden="true" />
           <SearchableSelect
             value={initial.adStatus ?? ""}
             onChange={(v) => setParam("adStatus", v || undefined)}
@@ -132,14 +152,27 @@ export function AdStatusFiltersBar({
             ]}
             placeholder="All"
             searchPlaceholder="Search…"
+            className="campaign-filter-combobox"
           />
-        </label>
+        </div>
+
+        <div className="campaign-filter-select campaign-filter-select--combo ad-status-filter-select">
+          <ArrowDownUp size={14} aria-hidden="true" />
+          <SearchableSelect
+            value={initial.sort ?? ""}
+            onChange={(v) => setParam("sort", v || undefined)}
+            options={SORT_OPTIONS}
+            placeholder="Default order"
+            searchPlaceholder="Search sort…"
+            className="campaign-filter-combobox"
+          />
+        </div>
       </div>
 
       {(typeof resultCount === "number" || hasAny) && (
-        <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+        <div className="campaign-list-toolbar__meta ad-status-filter-meta">
           {typeof resultCount === "number" && (
-            <span className="text-[0.74rem] font-bold tabular text-text-secondary bg-bg-ecru border border-border rounded-full px-3 py-1">
+            <span>
               {resultCount} post{resultCount === 1 ? "" : "s"}
             </span>
           )}

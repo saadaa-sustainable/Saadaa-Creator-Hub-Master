@@ -108,7 +108,11 @@ export type TabSearchParams = Record<string, string | undefined> & {
 // bento command-centre. Wrapped in `.onboarding-stage` so its filter bar / KPI
 // strip / bento get the same grid rhythm (gap 1.25rem) as every standalone
 // page, keeping the Overview tab consistent with its siblings.
-export async function OverviewTabBody({ params }: { params: DashboardFilters }) {
+export async function OverviewTabBody({
+  params,
+}: {
+  params: DashboardFilters;
+}) {
   // Options fetched here (not at page level) so tab switches don't block the
   // dashboard shell on a query only this tab consumes.
   const [data, options] = await Promise.all([
@@ -146,7 +150,8 @@ export async function CreatorAnalyticsTabBody({ sp }: { sp: TabSearchParams }) {
     postedTo: sp.postedTo,
   };
   const pageRaw = Number(sp.cpage ?? sp.page ?? 1);
-  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+  const page =
+    Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
 
   const [{ rows, total }, options] = await Promise.all([
     fetchCreatorAnalyticsPage(creatorFilters, page, CREATOR_PAGE_SIZE),
@@ -250,6 +255,7 @@ export async function AdStatusTabBody({ sp }: { sp: TabSearchParams }) {
     classification: sp.classification,
     adStatus: sp.adStatus,
     search: sp.search,
+    sort: sp.sort,
   };
   const [{ untested, adRun, kpi }, options] = await Promise.all([
     fetchAdStatusData(adFilters),

@@ -73,6 +73,7 @@ export interface AdStatusFilters {
   /** Substring match on adsStatus — e.g. "run" matches "running" */
   adStatus?: string;
   search?: string;
+  sort?: string;
 }
 
 export interface AdStatusFilterOptions {
