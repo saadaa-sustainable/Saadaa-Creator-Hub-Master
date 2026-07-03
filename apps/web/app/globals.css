@@ -6837,6 +6837,47 @@
     white-space: nowrap;
   }
 
+  .campaign-list-row__reachouts {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-width: 0;
+    border-top: 1px dashed
+      color-mix(in oklab, var(--campaign-accent) 16%, var(--color-border));
+    padding-top: 0.4rem;
+    color: var(--color-text-secondary);
+    font-size: 0.64rem;
+    font-weight: 850;
+  }
+
+  .campaign-list-row__reachouts span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .campaign-list-row__reachouts svg {
+    flex: 0 0 auto;
+    color: var(--campaign-accent);
+  }
+
+  .campaign-list-row__reachouts strong {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.35rem;
+    min-height: 1.35rem;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--campaign-accent) 10%, white);
+    color: var(--color-text-primary);
+    font-size: 0.68rem;
+    font-variant-numeric: tabular-nums;
+  }
+
   .campaign-list-row__stats {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -7273,10 +7314,25 @@
   .campaign-card__meta-row span {
     display: inline-flex;
     align-items: center;
+    gap: 0.24rem;
     min-height: 1.45rem;
     border-radius: 999px;
     background: color-mix(in oklab, var(--campaign-accent) 8%, white);
     padding: 0.18rem 0.5rem;
+  }
+
+  .campaign-card__meta-row svg {
+    flex: 0 0 auto;
+    color: var(--campaign-accent);
+  }
+
+  .campaign-card__reachout-chip {
+    background: color-mix(in oklab, var(--campaign-accent) 12%, white) !important;
+    color: color-mix(
+      in oklab,
+      var(--campaign-accent) 58%,
+      var(--color-text-primary)
+    );
   }
 
   .campaign-card__actions {
@@ -7529,7 +7585,7 @@
 
   .campaign-detail-overview {
     display: grid;
-    grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1fr);
+    grid-template-columns: minmax(250px, 0.9fr) minmax(0, 1fr);
     gap: 0.7rem;
   }
 
@@ -7557,12 +7613,12 @@
 
   .campaign-detail-allocation-card {
     display: grid;
-    grid-template-columns: 112px minmax(0, 1fr);
+    grid-template-columns: 104px minmax(0, 1fr);
     align-items: center;
-    gap: 0.86rem;
+    gap: 0.72rem;
     min-width: 0;
     border-radius: 16px;
-    padding: 0.88rem;
+    padding: 0.78rem;
   }
 
   .campaign-detail-ring {
@@ -7609,13 +7665,17 @@
 
   .campaign-detail-allocation-copy {
     display: grid;
-    gap: 0.4rem;
+    gap: 0.36rem;
     min-width: 0;
   }
 
   .campaign-detail-allocation-copy > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--color-text-tertiary);
-    font-size: 0.64rem;
+    font-size: 0.6rem;
     line-height: 1;
     font-weight: 850;
     letter-spacing: 0.06em;
@@ -7631,6 +7691,7 @@
   }
 
   .campaign-detail-progress-track {
+    width: 100%;
     height: 8px;
     margin-top: 0.12rem;
   }
@@ -7639,6 +7700,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.45rem;
+    min-width: 0;
     margin-top: 0.1rem;
   }
 
@@ -7669,6 +7731,7 @@
     text-decoration: none;
     white-space: nowrap;
     box-shadow: 0 10px 22px -18px rgba(22, 21, 19, 0.3);
+    max-width: 100%;
     transition:
       border-color 0.16s ease-out,
       transform 0.16s ease-out,

@@ -489,6 +489,7 @@ export function ExistingCampaigns({
               0,
             );
             const creatorsUsed = campaign.creators_used ?? 0;
+            const reachoutCount = campaign.reachout_creator_rows?.length ?? 0;
             const allocationTarget = creatorCap || target || 0;
             const progressPct =
               allocationTarget > 0
@@ -550,6 +551,13 @@ export function ExistingCampaigns({
                       aria-hidden="true"
                     >
                       <span />
+                    </div>
+                    <div className="campaign-list-row__reachouts">
+                      <span>
+                        <Send size={11} />
+                        Reach-outs
+                      </span>
+                      <strong>{reachoutCount}</strong>
                     </div>
                   </div>
 
@@ -744,6 +752,10 @@ export function ExistingCampaigns({
                 </dl>
 
                 <div className="campaign-card__meta-row">
+                  <span className="campaign-card__reachout-chip">
+                    <Send size={11} />
+                    {reachoutCount} reach-outs
+                  </span>
                   <span>{budgetRows.length} budget lines</span>
                   <span>{campaignWindowLabel(campaign)}</span>
                 </div>
