@@ -169,15 +169,14 @@ export default function AdStatusKM() {
         <KMList>
           <li>
             <strong>Thumbnail</strong> · the ad creative. Clicking it opens
-            the in-app Ad Preview popup: the post&apos;s <em>real video</em>{" "}
-            fetched live from Meta <strong>autoplays</strong> beside the
-            ad&apos;s spend / ROAS / impressions / FTEWV / NCP / orders, with
-            &quot;Open in Meta&quot; and &quot;Landing&quot; as explicit
-            buttons. When Meta can&apos;t serve the file (personal account,
-            very old post) the popup falls back to the Instagram embed, and
-            rows with no archived post link fall back to Meta&apos;s stored
-            creative image. Post links for historic and retired-ID rows come
-            from the raw legacy archive (~94% coverage).
+            the in-app Ad Preview popup: the post&apos;s live Instagram embed
+            (tap once to play — Instagram&apos;s embed doesn&apos;t allow
+            autoplay) beside the ad&apos;s spend / ROAS / impressions / FTEWV
+            / NCP / orders, with &quot;Open in Meta&quot; and
+            &quot;Landing&quot; as explicit buttons. Rows with no archived
+            post link fall back to Meta&apos;s stored creative image. Post
+            links for historic and retired-ID rows come from the raw legacy
+            archive (~94% coverage).
           </li>
           <li>
             <strong>Landing</strong> · the page the ad points at (product page
