@@ -143,7 +143,7 @@ export function CreatorAnalyticsView({
       ) : view === "list" ? (
         <CreatorListTable rows={rows} onOpen={setDetailRow} />
       ) : (
-        <div className="campaign-card-grid stage-campaign-card-grid">
+        <div className="ob-card-grid">
           {rows.map((r, index) => (
             <CreatorCard
               key={r.inf_id}
@@ -288,6 +288,7 @@ function creatorProgress(r: CreatorAnalyticsRow) {
 function creatorStyle(r: CreatorAnalyticsRow, index: number) {
   return {
     "--campaign-accent": creatorTone(r),
+    "--stage-accent": creatorTone(r),
     "--campaign-progress": `${creatorProgress(r)}%`,
     "--campaign-card-index": index,
   } as CSSProperties;
@@ -388,88 +389,84 @@ function CreatorCard({
   onOpen: () => void;
 }) {
   return (
-    <article
-      className="campaign-card stage-campaign-card"
+    <div
+      className={cn(
+        "ob-card",
+        r.is_active === false ? "ob-card-pending" : "ob-card-onboarded",
+      )}
       style={creatorStyle(r, index)}
     >
-      <div className="campaign-card__head">
-        <div className="stage-campaign-card-head">
-          <Avatar
-            src={r.profile_pic}
-            username={r.username}
-            name={r.inf_name}
-            size={46}
-          />
-          <div className="min-w-0">
-            <div className="campaign-card__id-row">
-              <span className="campaign-card__id">
-                <strong>{r.inf_id}</strong>
-              </span>
-              <CreatorTypeChip type={r.creator_type} />
-            </div>
-            <h3>{r.inf_name ?? (r.username || "—")}</h3>
-            {r.username && (
-              <p className="campaign-card__message">@{r.username}</p>
-            )}
+      <div className="ob-card-head">
+        <Avatar
+          src={r.profile_pic}
+          username={r.username}
+          name={r.inf_name}
+          size={44}
+          className="ob-card-avatar"
+        />
+        <div className="ob-card-id">
+          <div className="ob-card-name">
+            {r.inf_name ?? (r.username || "—")}
           </div>
+          {r.username && <div className="ob-card-handle">@{r.username}</div>}
         </div>
       </div>
 
-      <div className="campaign-card__meta-row">
+      <div className="ob-card-pills">
+        <span className="campaign-chip tabular">{r.inf_id}</span>
+        <CreatorTypeChip type={r.creator_type} />
         <DeactivatedBadge isActive={r.is_active} />
         {r.current_stage && <StageCell stage={r.current_stage} />}
         <PartnershipBadge status={r.partnership_status} compact />
         {r.category && <span className="campaign-chip">{r.category}</span>}
       </div>
 
-      <div className="campaign-card__progress">
-        <div>
-          <span>Live Collaboration Share</span>
-          <strong>{creatorProgress(r)}%</strong>
+      <dl className="ob-card-meta-grid">
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Followers</span>
+          <span className="ob-card-meta-val tabular">
+            {formatFollowers(r.followers)}
+          </span>
         </div>
-        <span className="campaign-card__progress-track" aria-hidden>
-          <span />
-        </span>
-      </div>
-
-      <dl className="campaign-card__facts">
-        <div>
-          <dt>Followers</dt>
-          <dd>{formatFollowers(r.followers)}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Region</span>
+          <span className="ob-card-meta-val">{r.state ?? "—"}</span>
         </div>
-        <div>
-          <dt>Collabs</dt>
-          <dd>{collabSummary(r)}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Collabs</span>
+          <span className="ob-card-meta-val tabular">{collabSummary(r)}</span>
         </div>
-        <div>
-          <dt>Deliverables</dt>
-          <dd>{r.deliverable_count}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Last Post</span>
+          <span className="ob-card-meta-val tabular">
+            {formatDate(r.last_post_date)}
+          </span>
         </div>
-        <div>
-          <dt>Last Post</dt>
-          <dd>{formatDate(r.last_post_date)}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Deliverables</span>
+          <span className="ob-card-meta-val tabular">
+            {r.deliverable_count}
+          </span>
         </div>
-        <div>
-          <dt>Region</dt>
-          <dd>{r.state ?? "—"}</dd>
-        </div>
-        <div>
-          <dt>Reach Out</dt>
-          <dd>{formatDate(r.reach_out_from)}</dd>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Reach Out</span>
+          <span className="ob-card-meta-val tabular">
+            {formatDate(r.reach_out_from)}
+          </span>
         </div>
       </dl>
 
-      <div className="campaign-card__actions">
+      <div className="ob-card-actions">
         <button
           type="button"
-          className="campaign-list-action campaign-list-action--brief"
+          className="action-view"
           onClick={onOpen}
         >
           <History size={12} aria-hidden />
           History
         </button>
       </div>
-    </article>
+    </div>
   );
 }
 
