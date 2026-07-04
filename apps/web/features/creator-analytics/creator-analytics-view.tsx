@@ -549,7 +549,7 @@ function CreatorHistoryModal({
   return createPortal(
     <div className="modal-backdrop modal-backdrop--onboarding" onClick={onClose}>
       <div
-        className="modal-panel modal-panel--lg modal-panel--onboarding ob-overview-modal"
+        className="modal-panel modal-panel--lg modal-panel--onboarding ob-overview-modal creator-history-modal"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="modal-head">

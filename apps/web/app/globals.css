@@ -14085,7 +14085,7 @@ body:has(.km-backdrop) {
 
 .ad-detail-ad-card {
   display: grid;
-  grid-template-columns: 52px minmax(250px, 1fr) minmax(250px, 0.72fr);
+  grid-template-columns: 52px minmax(220px, 1fr) minmax(170px, 0.62fr);
   align-items: start;
   gap: 0.88rem;
   min-width: 0;
@@ -14166,12 +14166,36 @@ body:has(.km-backdrop) {
   align-content: flex-start;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.46rem;
+  gap: 0.34rem;
   min-width: 0;
+  overflow: hidden;
 }
 
-.ad-detail-ad-actions :is(.pill, a) {
-  min-height: 28px;
+/* Compact chips — the actions column shares row space with the ad name, so
+   every pill/link here runs one size down from its chip-line sibling. */
+.ad-detail-ad-actions .pill {
+  min-height: 22px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.6rem;
+}
+
+.ad-detail-ad-actions a {
+  min-height: 22px;
+  padding: 0.14rem 0.5rem;
+  font-size: 0.64rem;
+}
+
+/* Creator history modal is narrower than the Ad Status overview — the 3-col
+   desktop card can't fit, so stack: thumb + main on top, actions full-width
+   below (same shape as the <900px viewport variant). */
+.creator-history-modal .ad-detail-ad-card {
+  grid-template-columns: 52px minmax(0, 1fr);
+}
+
+.creator-history-modal .ad-detail-ad-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  padding-left: calc(52px + 0.88rem);
 }
 
 .ad-detail-links {
