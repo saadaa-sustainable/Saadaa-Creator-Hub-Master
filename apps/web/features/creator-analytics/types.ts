@@ -17,6 +17,31 @@ export interface CreatorCollab {
   source: "live" | "historic";
 }
 
+/**
+ * One post-level Meta Ads rollup for a creator — drawn from the
+ * `meta_ads_cache` warehouse mirror. Same counting unit as the Ad Status
+ * board: one entry per post token, wearing its first-occurrence ad's
+ * category/status/spend (board rule), with the variant count alongside.
+ */
+export interface CreatorAdInfo {
+  /** Post token the ad names carry, e.g. "SIF-1905-P2". */
+  token: string;
+  /** Warehouse category of the first-occurrence ad. */
+  category: string | null;
+  /** Meta delivery status of the first-occurrence ad. */
+  adStatus: string | null;
+  /** Spend of the first-occurrence ad (₹). */
+  amountSpent: number;
+  /** Moving-average ROAS of the first-occurrence ad. */
+  roasMa: number;
+  /** ISO date the first-occurrence ad was created on Meta. */
+  adCreated: string | null;
+  /** Total ads (variants) that ran on this post. */
+  adCount: number;
+  /** Token carries a retired (pre-renumbering) SIF from the legacy archive. */
+  retiredId: boolean;
+}
+
 export interface CreatorAnalyticsRow {
   inf_id: string;
   username: string;

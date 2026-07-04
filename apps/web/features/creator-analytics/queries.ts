@@ -1,6 +1,8 @@
 import { unstable_cache } from "next/cache";
+import { pickFirstAd, type WarehouseAd } from "@/lib/supabase/meta-ads";
 import { createServiceClient } from "@/lib/supabase/server";
 import type {
+  CreatorAdInfo,
   CreatorAnalyticsFilterOptions,
   CreatorAnalyticsFilters,
   CreatorAnalyticsRow,
@@ -144,6 +146,127 @@ export async function fetchCreatorCollabHistory(
     postLink: (r.post_link as string | null) ?? null,
     source: (r.source as string | null) === "historic" ? "historic" : "live",
   }));
+}
+
+/**
+ * Meta Ads rollups for ONE creator, from the local `meta_ads_cache` mirror
+ * (never the cross-project warehouse — those scans time out from Vercel).
+ * Two matching passes, mirroring the Ad Status board:
+ *
+ *  1. Direct — cache tokens prefixed with the creator's current SIF
+ *     (`SIF-1905-P%` for inf_id SIF-1905): live + historic posts.
+ *  2. Retired IDs — the legacy archive (`historic_creator_data`) lists every
+ *     post_id the creator's username ever held, including pre-renumbering
+ *     SIFs; any of those tokens found in the cache but not covered by pass 1
+ *     is attached with `retiredId: true`.
+ *
+ * One entry per token, wearing its first-occurrence ad (board rule), newest
+ * ad first. Fails soft to [] — ads are supplemental in the history modal.
+ */
+export async function fetchCreatorAdsInfo(
+  infId: string,
+  username: string | null,
+): Promise<CreatorAdInfo[]> {
+  const id = (infId ?? "").trim().toUpperCase();
+  if (!id) return [];
+
+  const supabase = createServiceClient();
+  const byToken = new Map<string, { ads: WarehouseAd[]; retired: boolean }>();
+
+  const collect = (rows: Raw[] | null | undefined, retired: boolean) => {
+    for (const r of rows ?? []) {
+      const token = String(r.token ?? "").toUpperCase();
+      const ads = (Array.isArray(r.ads) ? r.ads : []) as WarehouseAd[];
+      if (!token || !ads.length || byToken.has(token)) continue;
+      byToken.set(token, { ads, retired });
+    }
+  };
+
+  try {
+    // Pass 1 — current SIF prefix.
+    const direct = await (supabase as any)
+      .from("meta_ads_cache")
+      .select("token, ads")
+      .ilike("token", `${id}-P%`);
+    collect(direct.data as Raw[], false);
+
+    // Pass 2 — other-SIF tokens via the legacy archive (username match).
+    const uname = (username ?? "").trim();
+    if (uname) {
+      const { data: archiveRows } = await (supabase as any)
+        .from("historic_creator_data")
+        .select("post_id")
+        .ilike("username", uname)
+        .limit(500);
+      const archiveTokens = [
+        ...new Set(
+          ((archiveRows ?? []) as Raw[])
+            .map((r) => String(r.post_id ?? "").trim().toUpperCase())
+            .filter((t) => t && !t.startsWith(`${id}-P`)),
+        ),
+      ];
+      // A mismatched-SIF token only counts as "Retired ID" when no real post
+      // row exists for it (the Ad Status board's rule) — otherwise it's an
+      // ordinary historic post that happens to predate the renumbering.
+      const knownPosts = new Set<string>();
+      for (let i = 0; i < archiveTokens.length; i += 200) {
+        const chunk = archiveTokens.slice(i, i + 200);
+        const [cacheRes, liveRes, histRes] = await Promise.all([
+          (supabase as any)
+            .from("meta_ads_cache")
+            .select("token, ads")
+            .in("token", chunk),
+          (supabase as any)
+            .from("posts")
+            .select("post_id_short")
+            .in("post_id_short", chunk),
+          (supabase as any)
+            .from("historic_posts")
+            .select("post_id_short")
+            .in("post_id_short", chunk),
+        ]);
+        for (const r of [
+          ...((liveRes.data ?? []) as Raw[]),
+          ...((histRes.data ?? []) as Raw[]),
+        ]) {
+          knownPosts.add(String(r.post_id_short ?? "").toUpperCase());
+        }
+        for (const r of (cacheRes.data ?? []) as Raw[]) {
+          const token = String(r.token ?? "").toUpperCase();
+          collect([r], !knownPosts.has(token));
+        }
+      }
+    }
+  } catch {
+    return [];
+  }
+
+  const infos: CreatorAdInfo[] = [...byToken.entries()].map(
+    ([token, { ads, retired }]) => {
+      const first = pickFirstAd(ads);
+      return {
+        token,
+        category: first?.category?.trim() || null,
+        adStatus: first?.adStatus?.trim() || null,
+        amountSpent: first?.amountSpent ?? 0,
+        roasMa: first?.roasMa ?? 0,
+        adCreated: first?.adCreated ?? null,
+        adCount: ads.length,
+        retiredId: retired,
+      };
+    },
+  );
+
+  // Newest first-occurrence ad first; undated tokens last.
+  return infos.sort((a, b) => {
+    const ta = a.adCreated ? Date.parse(a.adCreated) : NaN;
+    const tb = b.adCreated ? Date.parse(b.adCreated) : NaN;
+    const aOk = Number.isFinite(ta);
+    const bOk = Number.isFinite(tb);
+    if (aOk && bOk && ta !== tb) return tb - ta;
+    if (aOk !== bOk) return aOk ? -1 : 1;
+    return a.token.localeCompare(b.token);
+  });
 }
 
 export const fetchCreatorAnalyticsFilterOptions = unstable_cache(

@@ -113,6 +113,16 @@ export default function CreatorAnalyticsKM() {
             <KMCode>inf_id-C{"{n}"}</KMCode>). The total splits into live +
             historic so a repeat collaborator is obvious at a glance.
           </li>
+          <li>
+            <strong>Meta Ads section</strong> — when any of the creator&apos;s
+            posts ran as Meta ads (matched in the Meta Ads warehouse mirror,
+            including ads under a <strong>retired pre-renumbering ID</strong>),
+            the modal shows one line per post token: the warehouse category
+            badge, first-occurrence ad spend and ROAS, the variant count, ad
+            created date, and an <strong>Ads</strong> button that jumps to the
+            Ad Status board pre-filtered to that token. The section stays
+            hidden for creators with no ads.
+          </li>
         </KMList>
         <KMCallout tone="warning">
           Deliverable counts come from <strong>live posts only</strong> (reels +

@@ -101,12 +101,13 @@ function AsClassBadge({ value }: { value: string }) {
 // ---------------------------------------------------------------------------
 // Warehouse category badge — Creative Testing Dashboard semantics in our
 // tokens. Incremental Winner gets the filled/stronger green variant.
+// Exported: Creator Analytics' history modal reuses it for its Meta Ads rows.
 // ---------------------------------------------------------------------------
 
 const BADGE_BASE =
   "pill inline-flex items-center gap-1 px-[10px] py-[3px] rounded-full text-[0.7rem] font-extrabold tracking-[0.04em] uppercase leading-tight whitespace-nowrap";
 
-function WhCategoryBadge({ category }: { category: string }) {
+export function WhCategoryBadge({ category }: { category: string }) {
   if (category === "Incremental Winner")
     return (
       <span

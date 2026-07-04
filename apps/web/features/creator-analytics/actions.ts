@@ -1,8 +1,8 @@
 "use server";
 
 import { getActor } from "@/lib/auth";
-import { fetchCreatorCollabHistory } from "./queries";
-import type { CreatorCollab } from "./types";
+import { fetchCreatorAdsInfo, fetchCreatorCollabHistory } from "./queries";
+import type { CreatorAdInfo, CreatorCollab } from "./types";
 
 /**
  * On-demand loader for a single creator's collab history, called from the
@@ -16,4 +16,18 @@ export async function loadCreatorCollabHistory(
   const actor = await getActor();
   if (!actor) throw new Error("Forbidden");
   return fetchCreatorCollabHistory(infId);
+}
+
+/**
+ * On-demand loader for a creator's Meta Ads rollups (from the local
+ * `meta_ads_cache` mirror), shown in the history modal's "Meta Ads" section.
+ * Same actor gate as the collab history.
+ */
+export async function loadCreatorAdsInfo(
+  infId: string,
+  username: string | null,
+): Promise<CreatorAdInfo[]> {
+  const actor = await getActor();
+  if (!actor) throw new Error("Forbidden");
+  return fetchCreatorAdsInfo(infId, username);
 }

@@ -17,6 +17,7 @@ import {
   Inbox,
   List as ListIcon,
   Loader2,
+  Megaphone,
   Sparkles,
   X,
 } from "lucide-react";
@@ -28,10 +29,11 @@ import {
 } from "@/components/ui";
 import { PartnershipBadge } from "@/components/ui/status-pill";
 import { cn } from "@/lib/cn";
-import { formatDate, formatFollowers } from "@/lib/formatters";
+import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
 import type { WorkflowStatus } from "@/lib/supabase/types.gen";
-import { loadCreatorCollabHistory } from "./actions";
-import type { CreatorAnalyticsRow, CreatorCollab } from "./types";
+import { WhCategoryBadge } from "@/features/ad-status/ad-board";
+import { loadCreatorAdsInfo, loadCreatorCollabHistory } from "./actions";
+import type { CreatorAdInfo, CreatorAnalyticsRow, CreatorCollab } from "./types";
 
 export interface CreatorAnalyticsViewProps {
   /** ONE page of creators (server-paginated, already ordered followers desc). */
@@ -479,6 +481,7 @@ function CreatorHistoryModal({
 }) {
   const [mounted, setMounted] = useState(false);
   const [collabs, setCollabs] = useState<CreatorCollab[] | null>(null);
+  const [ads, setAds] = useState<CreatorAdInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);
@@ -510,6 +513,23 @@ function CreatorHistoryModal({
       cancelled = true;
     };
   }, [row.inf_id]);
+
+  // In parallel: the creator's Meta Ads rollups (warehouse mirror). Fail-soft;
+  // the section simply doesn't render when there's nothing (or on error).
+  useEffect(() => {
+    let cancelled = false;
+    setAds(null);
+    loadCreatorAdsInfo(row.inf_id, row.username || null)
+      .then((list) => {
+        if (!cancelled) setAds(list);
+      })
+      .catch(() => {
+        if (!cancelled) setAds([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [row.inf_id, row.username]);
 
   if (!mounted) return null;
 
@@ -606,6 +626,27 @@ function CreatorHistoryModal({
             <DetailItem label="Collab Types" value={row.collab_types ?? "—"} />
           </section>
 
+          {ads && ads.length > 0 && (
+            <section className="mt-3">
+              <div className="mb-2 flex items-center gap-2 text-[0.78rem] text-text-secondary">
+                <Megaphone size={13} aria-hidden />
+                <strong className="text-text-primary">Meta Ads</strong>
+                <span className="pill pill--parent">{ads.length}</span>
+                <span className="tabular text-[0.72rem]">
+                  {formatRupees(
+                    ads.reduce((sum, a) => sum + a.amountSpent, 0),
+                  )}{" "}
+                  spend
+                </span>
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {ads.map((a) => (
+                  <CreatorAdRow key={a.token} a={a} />
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="mt-3">
             <div className="mb-2 flex items-center gap-2 text-[0.78rem] text-text-secondary">
               <History size={13} aria-hidden />
@@ -643,6 +684,55 @@ function CreatorHistoryModal({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * One post token's Meta Ads rollup in the history modal — first-occurrence
+ * category/spend/ROAS (board rule) + variant count. "Ads" jumps to the Ad
+ * Status tab pre-filtered to this token.
+ */
+function CreatorAdRow({ a }: { a: CreatorAdInfo }) {
+  return (
+    <li className="flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-bg-surface px-2.5 py-1.5">
+      <span className="post-id tabular">{a.token}</span>
+      {a.category && <WhCategoryBadge category={a.category} />}
+      {a.retiredId && (
+        <span
+          className="pill pill--muted"
+          title="Ad name uses a retired (pre-renumbering) post ID"
+        >
+          Retired ID
+        </span>
+      )}
+      <span className="tabular text-[0.72rem] font-semibold text-text-primary">
+        {formatRupees(a.amountSpent)}
+      </span>
+      <span className="tabular text-[0.72rem] text-text-secondary">
+        {a.roasMa > 0 ? `${a.roasMa.toFixed(2)}x ROAS` : "— ROAS"}
+      </span>
+      <span className="tabular text-[0.72rem] text-text-secondary">
+        {a.adCount === 1 ? "1 ad" : `${a.adCount} ad variants`}
+      </span>
+      {a.adCreated && (
+        <span className="tabular text-[0.72rem] text-text-tertiary">
+          {formatDate(a.adCreated)}
+        </span>
+      )}
+      <Link
+        href={
+          `/dashboard?tab=ad-status&search=${encodeURIComponent(
+            a.token,
+          )}` as never
+        }
+        className="action-btn action-btn--view ml-auto"
+        aria-label={`Open Ad Status board filtered to ${a.token}`}
+        title="View on the Ad Status board"
+      >
+        <Megaphone size={11} aria-hidden />
+        Ads
+      </Link>
+    </li>
   );
 }
 
