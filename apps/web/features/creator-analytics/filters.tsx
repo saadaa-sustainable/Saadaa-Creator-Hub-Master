@@ -12,6 +12,7 @@ import type {
 
 const FILTER_KEYS = [
   "q",
+  "ads",
   "tier",
   "region",
   "creatorType",
@@ -139,6 +140,17 @@ export function CreatorAnalyticsFiltersBar({
               label: workflowStatusLabel(s),
               value: s,
             })),
+          ]}
+        />
+        <FilterSelect
+          label="Meta Ads"
+          value={initial.ads ?? ""}
+          onChange={(v) => setParam("ads", v)}
+          options={[
+            { label: "All creators", value: "" },
+            { label: "In Meta Ads", value: "in-ads" },
+            { label: "Winner creators", value: "winners" },
+            { label: "Winners · no live collab", value: "winners-idle" },
           ]}
         />
 

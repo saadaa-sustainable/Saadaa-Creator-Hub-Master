@@ -1,8 +1,14 @@
 import { unstable_cache } from "next/cache";
-import { pickFirstAd, type WarehouseAd } from "@/lib/supabase/meta-ads";
+import {
+  compareAdOccurrence,
+  pickFirstAd,
+  type WarehouseAd,
+} from "@/lib/supabase/meta-ads";
 import { createServiceClient } from "@/lib/supabase/server";
 import type {
   CreatorAdInfo,
+  CreatorAdsKpi,
+  CreatorAdsSummary,
   CreatorAnalyticsFilterOptions,
   CreatorAnalyticsFilters,
   CreatorAnalyticsRow,
@@ -33,6 +39,76 @@ function nz(v: string | undefined | null): string | null {
   return s ? s : null;
 }
 
+/** Best→worst rank → category name (mirror of the RPC's CASE). */
+const CATEGORY_BY_RANK: Record<number, string> = {
+  0: "Incremental Winner",
+  1: "Winner",
+  2: "P0 analysis",
+  3: "P1 analysis",
+  4: "P2 analysis",
+  5: "Discarded",
+};
+
+/**
+ * Creator-level Meta Ads rollup — one `creator_ads_rollup()` RPC call
+ * (token→creator resolution + first-occurrence classification all in SQL over
+ * the meta_ads_cache mirror). Cached 5 min: global service data refreshed by
+ * a daily cron, no cookies/actor input. Serialized as entries
+ * (unstable_cache output must be JSON) — callers rebuild the Map.
+ */
+const fetchCreatorAdsRollupEntries = unstable_cache(
+  async (): Promise<Array<[string, CreatorAdsSummary]>> => {
+    try {
+      const supabase = createServiceClient();
+      const { data, error } = await (supabase as any).rpc("creator_ads_rollup");
+      if (error) throw error;
+      return ((data ?? []) as Raw[]).map((r) => [
+        String(r.inf_id ?? ""),
+        {
+          tokens: Number(r.tokens ?? 0) || 0,
+          ads: Number(r.ads ?? 0) || 0,
+          winners: Number(r.winners ?? 0) || 0,
+          bestCategory: CATEGORY_BY_RANK[Number(r.best_rank)] ?? null,
+          spend: Number(r.spend ?? 0) || 0,
+          liveCollabs: Number(r.live_collab_count ?? 0) || 0,
+        },
+      ]);
+    } catch {
+      // Fail soft — the roster renders without ads enrichment.
+      return [];
+    }
+  },
+  ["creator-ads-rollup"],
+  { revalidate: 300 },
+);
+
+export async function fetchCreatorAdsRollup(): Promise<
+  Map<string, CreatorAdsSummary>
+> {
+  return new Map(await fetchCreatorAdsRollupEntries());
+}
+
+/** Which creators an ads filter value selects. */
+function adsFilterMatches(value: string, s: CreatorAdsSummary): boolean {
+  if (value === "winners") return s.winners > 0;
+  if (value === "winners-idle") return s.winners > 0 && s.liveCollabs === 0;
+  return true; // "in-ads"
+}
+
+/** Counts for the clickable ads KPI tiles. */
+export async function fetchCreatorAdsKpis(): Promise<CreatorAdsKpi> {
+  const rollup = await fetchCreatorAdsRollup();
+  let winners = 0;
+  let winnersIdle = 0;
+  let spend = 0;
+  for (const s of rollup.values()) {
+    if (s.winners > 0) winners += 1;
+    if (s.winners > 0 && s.liveCollabs === 0) winnersIdle += 1;
+    spend += s.spend;
+  }
+  return { inAds: rollup.size, winners, winnersIdle, spend };
+}
+
 /**
  * One page of the creator roster. Maps the filter set → the RPC params
  * (`p_offset = (page-1)*pageSize`, `p_limit = pageSize`; empty filter → null),
@@ -48,6 +124,19 @@ export async function fetchCreatorAnalyticsPage(
   const supabase = createServiceClient();
   const safePage = page > 0 ? page : 1;
 
+  // Ads filter → resolve the matching inf_id allow-list from the cached
+  // rollup, pushed into the RPC so pagination + total_count stay server-side.
+  // An empty match set must return 0 rows, not "no filter" — hence sentinel.
+  const rollup = await fetchCreatorAdsRollup();
+  const adsFilter = nz(filters.ads);
+  let adsInfIds: string[] | null = null;
+  if (adsFilter) {
+    adsInfIds = [...rollup.entries()]
+      .filter(([, s]) => adsFilterMatches(adsFilter, s))
+      .map(([id]) => id);
+    if (adsInfIds.length === 0) adsInfIds = ["__none__"];
+  }
+
   const { data, error } = await (supabase as any).rpc("creator_analytics_page", {
     p_search: nz(filters.q),
     p_tier: nz(filters.tier),
@@ -60,6 +149,7 @@ export async function fetchCreatorAnalyticsPage(
     p_posted_to: nz(filters.postedTo),
     p_limit: pageSize,
     p_offset: (safePage - 1) * pageSize,
+    p_inf_ids: adsInfIds,
   });
 
   if (error) throw error;
@@ -87,6 +177,7 @@ export async function fetchCreatorAnalyticsPage(
     instagram_link: (r.instagram_link as string | null) ?? null,
     is_active: r.is_active == null ? null : Boolean(r.is_active),
     partnership_status: null,
+    adsSummary: rollup.get(String(r.inf_id ?? "")) ?? null,
   }));
 
   // Meta partnership status lives on `posts.partnership_status` (stamped
@@ -176,8 +267,20 @@ export async function fetchCreatorAdsInfo(
   const collect = (rows: Raw[] | null | undefined, retired: boolean) => {
     for (const r of rows ?? []) {
       const token = String(r.token ?? "").toUpperCase();
-      const ads = (Array.isArray(r.ads) ? r.ads : []) as WarehouseAd[];
-      if (!token || !ads.length || byToken.has(token)) continue;
+      const raw = (Array.isArray(r.ads) ? r.ads : []) as Array<
+        Record<string, unknown>
+      >;
+      if (!token || !raw.length || byToken.has(token)) continue;
+      // Seeder/cron may store either thumbnail key spelling — normalise, same
+      // as fetchWarehouseAdRows.
+      const ads = raw.map((a) => ({
+        ...(a as unknown as WarehouseAd),
+        thumbnailUrl:
+          (a.thumbnailUrl as string | null | undefined) ??
+          (a.thumbUrl as string | null | undefined) ??
+          null,
+        imageUrl: (a.imageUrl as string | null | undefined) ?? null,
+      }));
       byToken.set(token, { ads, retired });
     }
   };
@@ -241,8 +344,40 @@ export async function fetchCreatorAdsInfo(
     return [];
   }
 
+  // Instagram post links for the modal's per-ad cards (thumbnail lightbox):
+  // live posts first, then the legacy archive (historic_posts.post_link is
+  // null for most rows — the raw archive kept the links). Fail-soft.
+  const postLinks = new Map<string, string>();
+  try {
+    const tokens = [...byToken.keys()];
+    for (let i = 0; i < tokens.length; i += 200) {
+      const chunk = tokens.slice(i, i + 200);
+      const [liveRes, archRes] = await Promise.all([
+        (supabase as any)
+          .from("posts")
+          .select("post_id_short, post_link")
+          .in("post_id_short", chunk),
+        (supabase as any)
+          .from("historic_creator_data")
+          .select("post_id, link_to_post")
+          .in("post_id", chunk),
+      ]);
+      for (const r of (archRes.data ?? []) as Raw[]) {
+        const link = String(r.link_to_post ?? "").trim();
+        if (link) postLinks.set(String(r.post_id ?? "").toUpperCase(), link);
+      }
+      for (const r of (liveRes.data ?? []) as Raw[]) {
+        const link = String(r.post_link ?? "").trim();
+        if (link) postLinks.set(String(r.post_id_short ?? "").toUpperCase(), link);
+      }
+    }
+  } catch {
+    // links are decoration — cards fall back to the stored creative
+  }
+
   const infos: CreatorAdInfo[] = [...byToken.entries()].map(
     ([token, { ads, retired }]) => {
+      const ordered = [...ads].sort(compareAdOccurrence);
       const first = pickFirstAd(ads);
       return {
         token,
@@ -253,6 +388,8 @@ export async function fetchCreatorAdsInfo(
         adCreated: first?.adCreated ?? null,
         adCount: ads.length,
         retiredId: retired,
+        ads: ordered,
+        postLink: postLinks.get(token) ?? null,
       };
     },
   );

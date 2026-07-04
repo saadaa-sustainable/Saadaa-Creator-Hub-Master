@@ -84,8 +84,10 @@ import {
 
 // ── Creator Analytics ──────────────────────────────────────────────────────────
 import { CreatorAnalyticsFiltersBar } from "@/features/creator-analytics/filters";
+import { CreatorAdsKpiStrip } from "@/features/creator-analytics/kpi-strip";
 import { CreatorAnalyticsView } from "@/features/creator-analytics/creator-analytics-view";
 import {
+  fetchCreatorAdsKpis,
   fetchCreatorAnalyticsPage,
   fetchCreatorAnalyticsFilterOptions,
 } from "@/features/creator-analytics/queries";
@@ -140,6 +142,7 @@ export async function OverviewTabBody({
 export async function CreatorAnalyticsTabBody({ sp }: { sp: TabSearchParams }) {
   const creatorFilters: CreatorAnalyticsFilters = {
     q: sp.q,
+    ads: sp.ads,
     tier: sp.tier,
     region: sp.region,
     creatorType: sp.creatorType,
@@ -153,13 +156,15 @@ export async function CreatorAnalyticsTabBody({ sp }: { sp: TabSearchParams }) {
   const page =
     Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
 
-  const [{ rows, total }, options] = await Promise.all([
+  const [{ rows, total }, options, adsKpi] = await Promise.all([
     fetchCreatorAnalyticsPage(creatorFilters, page, CREATOR_PAGE_SIZE),
     fetchCreatorAnalyticsFilterOptions(),
+    fetchCreatorAdsKpis(),
   ]);
   return (
     <div className="onboarding-stage creator-analytics-stage">
       <CreatorAnalyticsFiltersBar initial={creatorFilters} options={options} />
+      <CreatorAdsKpiStrip kpi={adsKpi} active={sp.ads ?? null} sp={sp} />
       <CreatorAnalyticsView
         rows={rows}
         total={total}

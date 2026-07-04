@@ -639,6 +639,77 @@ function isWinnerCategory(category: string | null | undefined): boolean {
   return category === "Winner" || category === "Incremental Winner";
 }
 
+/**
+ * Per-ad variant cards (thumbnail lightbox, name, Spend/ROAS/Impr./Orders,
+ * first-occurrence tag, category badge, Landing + Preview chips). `ads` must
+ * be first-occurrence order — entry 0 IS the first-occurrence ad. Exported:
+ * the Ad Overview modal here and Creator Analytics' history modal share it.
+ */
+export function AdVariantCards({
+  ads,
+  postUrl,
+}: {
+  ads: WarehouseAd[];
+  postUrl?: string | null;
+}) {
+  return (
+    <ul className="ad-detail-ad-list">
+      {ads.map((ad, i) => (
+        <li key={ad.adId} className="ad-detail-ad-card">
+          <AdImg
+            ad={ad}
+            alt={`Ad creative — ${ad.adName}`}
+            size={44}
+            postUrl={postUrl}
+          />
+          <div className="ad-detail-ad-main">
+            <span className="ad-detail-ad-name" title={ad.adName}>
+              {ad.adName}
+            </span>
+            <dl className="ad-detail-ad-metrics">
+              <div>
+                <dt>Spend</dt>
+                <dd>{formatRupees(ad.amountSpent)}</dd>
+              </div>
+              <div>
+                <dt>ROAS</dt>
+                <dd>{roasText(ad)}</dd>
+              </div>
+              <div>
+                <dt>Impr.</dt>
+                <dd>{formatNumber(ad.impressions)}</dd>
+              </div>
+              <div>
+                <dt>Orders</dt>
+                <dd>{formatNumber(ad.shopifyOrders)}</dd>
+              </div>
+            </dl>
+          </div>
+          <div className="ad-detail-ad-actions">
+            {i === 0 && (
+              <span
+                className={cn(
+                  "pill text-[0.62rem] font-bold uppercase tracking-[0.05em] shrink-0 whitespace-nowrap",
+                  isWinnerCategory(ad.category)
+                    ? "bg-[#ECF1E9] text-[#4F7C4D]"
+                    : "pill--muted",
+                )}
+                title="Earliest ad created from this post — drives the row's status"
+              >
+                {isWinnerCategory(ad.category)
+                  ? "First winner"
+                  : "First occurrence"}
+              </span>
+            )}
+            <WhCategoryBadge category={ad.category || "—"} />
+            <AdLinkChips ad={ad} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Days since — "Today" at 0, "Xd" list / "Xd ago" cards
 // ---------------------------------------------------------------------------
@@ -1151,62 +1222,7 @@ function AdStatusOverviewModal({
                 </div>
                 <strong>{formatRupees(adSpend)}</strong>
               </div>
-              <ul className="ad-detail-ad-list">
-                {/* `ads` is first-occurrence order (earliest created first) —
-                    entry 0 IS the first-occurrence ad. */}
-                {row.ads.map((ad, i) => (
-                  <li key={ad.adId} className="ad-detail-ad-card">
-                    <AdImg
-                      ad={ad}
-                      alt={`Ad creative — ${ad.adName}`}
-                      size={44}
-                      postUrl={row.linkToPost}
-                    />
-                    <div className="ad-detail-ad-main">
-                      <span className="ad-detail-ad-name" title={ad.adName}>
-                        {ad.adName}
-                      </span>
-                      <dl className="ad-detail-ad-metrics">
-                        <div>
-                          <dt>Spend</dt>
-                          <dd>{formatRupees(ad.amountSpent)}</dd>
-                        </div>
-                        <div>
-                          <dt>ROAS</dt>
-                          <dd>{roasText(ad)}</dd>
-                        </div>
-                        <div>
-                          <dt>Impr.</dt>
-                          <dd>{formatNumber(ad.impressions)}</dd>
-                        </div>
-                        <div>
-                          <dt>Orders</dt>
-                          <dd>{formatNumber(ad.shopifyOrders)}</dd>
-                        </div>
-                      </dl>
-                    </div>
-                    <div className="ad-detail-ad-actions">
-                      {i === 0 && (
-                        <span
-                          className={cn(
-                            "pill text-[0.62rem] font-bold uppercase tracking-[0.05em] shrink-0 whitespace-nowrap",
-                            isWinnerCategory(ad.category)
-                              ? "bg-[#ECF1E9] text-[#4F7C4D]"
-                              : "pill--muted",
-                          )}
-                          title="Earliest ad created from this post — drives the row's status"
-                        >
-                          {isWinnerCategory(ad.category)
-                            ? "First winner"
-                            : "First occurrence"}
-                        </span>
-                      )}
-                      <WhCategoryBadge category={ad.category || "—"} />
-                      <AdLinkChips ad={ad} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <AdVariantCards ads={row.ads} postUrl={row.linkToPost} />
             </section>
           )}
 

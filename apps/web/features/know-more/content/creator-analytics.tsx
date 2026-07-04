@@ -36,6 +36,14 @@ export default function CreatorAnalyticsKM() {
             reach-out window overlaps the range. <strong>Posted from / to</strong>{" "}
             — matches on the creator&apos;s most-recent post date.
           </li>
+          <li>
+            <strong>Meta Ads</strong> — ads-derived filter: <em>In Meta Ads</em>{" "}
+            (≥1 warehouse-matched ad), <em>Winner creators</em> (≥1 post whose
+            first-occurrence ad is Winner / Incremental Winner) and{" "}
+            <em>Winners · no live collab</em> — proven winners not currently
+            working with us, the re-engagement shortlist. The KPI tiles above
+            the roster set the same filter on click (click again to clear).
+          </li>
         </KMList>
         <KMCallout tone="info">
           Filters sync to the URL (<KMCode>?tab=creators</KMCode> +{" "}
@@ -57,6 +65,14 @@ export default function CreatorAnalyticsKM() {
             tier, followers, total collabs rendered as{" "}
             <KMCode>5 (2 live · 3 historic)</KMCode>, deliverable count and the
             last post date.
+          </li>
+          <li>
+            <strong>Ads at a glance</strong> — creators who ran as Meta ads
+            carry their <strong>best warehouse category badge</strong> (Incr.
+            Winner → Discarded, same colors as the Ad Status board) in the chip
+            line, plus a <strong>Meta Ads</strong> stat like{" "}
+            <KMCode>3 in ads · ₹75.1K</KMCode> (post tokens · total spend
+            across all their ad creatives). Ad-less creators show &ldquo;—&rdquo;.
           </li>
         </KMList>
         <KMCallout tone="info">
@@ -114,14 +130,18 @@ export default function CreatorAnalyticsKM() {
             historic so a repeat collaborator is obvious at a glance.
           </li>
           <li>
-            <strong>Meta Ads section</strong> — when any of the creator&apos;s
-            posts ran as Meta ads (matched in the Meta Ads warehouse mirror,
-            including ads under a <strong>retired pre-renumbering ID</strong>),
-            the modal shows one line per post token: the warehouse category
-            badge, first-occurrence ad spend and ROAS, the variant count, ad
-            created date, and an <strong>Ads</strong> button that jumps to the
-            Ad Status board pre-filtered to that token. The section stays
-            hidden for creators with no ads.
+            <strong>Meta Ads Performance section</strong> — when any of the
+            creator&apos;s posts ran as Meta ads (matched in the Meta Ads
+            warehouse mirror, including ads under a{" "}
+            <strong>retired pre-renumbering ID</strong>), the modal renders one
+            block per post token — post ID, first-occurrence category badge,
+            Retired ID marker where applicable, and an <strong>Ad Status</strong>{" "}
+            deep-link — over the <strong>same per-ad creative cards as the Ad
+            Status board&apos;s overview</strong>: thumbnail (opens the Ad
+            Preview popup), ad name, Spend / ROAS / Impressions / Orders,
+            per-ad category badge and Landing + Preview links. The header
+            totals spend across ALL the creator&apos;s ad creatives. Hidden
+            for creators with no ads.
           </li>
         </KMList>
         <KMCallout tone="warning">

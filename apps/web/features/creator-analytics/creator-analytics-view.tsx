@@ -31,7 +31,7 @@ import { PartnershipBadge } from "@/components/ui/status-pill";
 import { cn } from "@/lib/cn";
 import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
 import type { WorkflowStatus } from "@/lib/supabase/types.gen";
-import { WhCategoryBadge } from "@/features/ad-status/ad-board";
+import { AdVariantCards, WhCategoryBadge } from "@/features/ad-status/ad-board";
 import { loadCreatorAdsInfo, loadCreatorCollabHistory } from "./actions";
 import type { CreatorAdInfo, CreatorAnalyticsRow, CreatorCollab } from "./types";
 
@@ -68,6 +68,13 @@ function CreatorTypeChip({ type }: { type: string | null }) {
 /** "5 (2 live · 3 historic)" — total with live/historic split. */
 function collabSummary(r: CreatorAnalyticsRow): string {
   return `${r.total_collab_count} (${r.live_collab_count} live · ${r.historic_collab_count} historic)`;
+}
+
+/** "3 in ads · ₹75.1K" — compact ads-cell text, or "—" for ad-less creators. */
+function adsCellText(r: CreatorAnalyticsRow): string {
+  const s = r.adsSummary;
+  if (!s) return "—";
+  return `${s.tokens} in ads · ₹${formatFollowers(Math.round(s.spend))}`;
 }
 
 function StageCell({ stage }: { stage: string | null }) {
@@ -323,6 +330,9 @@ function CreatorListRow({
               <strong>{r.inf_id}</strong>
             </span>
             <CreatorTypeChip type={r.creator_type} />
+            {r.adsSummary?.bestCategory && (
+              <WhCategoryBadge category={r.adsSummary.bestCategory} />
+            )}
             <DeactivatedBadge isActive={r.is_active} />
           </div>
           <h3>{r.inf_name ?? (r.username || "—")}</h3>
@@ -349,8 +359,8 @@ function CreatorListRow({
 
       <dl className="campaign-list-row__stats">
         <div>
-          <dt>Followers</dt>
-          <dd>{formatFollowers(r.followers)}</dd>
+          <dt>Meta Ads</dt>
+          <dd>{adsCellText(r)}</dd>
         </div>
         <div>
           <dt>Collabs</dt>
@@ -417,6 +427,9 @@ function CreatorCard({
       <div className="ob-card-pills">
         <span className="campaign-chip tabular">{r.inf_id}</span>
         <CreatorTypeChip type={r.creator_type} />
+        {r.adsSummary?.bestCategory && (
+          <WhCategoryBadge category={r.adsSummary.bestCategory} />
+        )}
         <DeactivatedBadge isActive={r.is_active} />
         {r.current_stage && <StageCell stage={r.current_stage} />}
         <PartnershipBadge status={r.partnership_status} compact />
@@ -451,10 +464,8 @@ function CreatorCard({
           </span>
         </div>
         <div className="ob-card-meta">
-          <span className="ob-card-meta-label">Reach Out</span>
-          <span className="ob-card-meta-val tabular">
-            {formatDate(r.reach_out_from)}
-          </span>
+          <span className="ob-card-meta-label">Meta Ads</span>
+          <span className="ob-card-meta-val tabular">{adsCellText(r)}</span>
         </div>
       </dl>
 
@@ -624,26 +635,36 @@ function CreatorHistoryModal({
               mono
             />
             <DetailItem label="Collab Types" value={row.collab_types ?? "—"} />
+            <DetailItem label="Meta Ads" value={adsCellText(row)} mono />
           </section>
 
           {ads && ads.length > 0 && (
             <section className="mt-3">
-              <div className="mb-2 flex items-center gap-2 text-[0.78rem] text-text-secondary">
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-[0.78rem] text-text-secondary">
                 <Megaphone size={13} aria-hidden />
-                <strong className="text-text-primary">Meta Ads</strong>
+                <strong className="text-text-primary">
+                  Meta Ads Performance
+                </strong>
                 <span className="pill pill--parent">{ads.length}</span>
                 <span className="tabular text-[0.72rem]">
                   {formatRupees(
-                    ads.reduce((sum, a) => sum + a.amountSpent, 0),
+                    Math.round(
+                      ads.reduce(
+                        (sum, a) =>
+                          sum +
+                          a.ads.reduce((s, ad) => s + (ad.amountSpent || 0), 0),
+                        0,
+                      ),
+                    ),
                   )}{" "}
-                  spend
+                  spend across all creatives
                 </span>
               </div>
-              <ul className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-3">
                 {ads.map((a) => (
-                  <CreatorAdRow key={a.token} a={a} />
+                  <CreatorAdTokenBlock key={a.token} a={a} />
                 ))}
-              </ul>
+              </div>
             </section>
           )}
 
@@ -688,51 +709,45 @@ function CreatorHistoryModal({
 }
 
 /**
- * One post token's Meta Ads rollup in the history modal — first-occurrence
- * category/spend/ROAS (board rule) + variant count. "Ads" jumps to the Ad
- * Status tab pre-filtered to this token.
+ * One post token's Meta Ads block in the history modal — token header (post
+ * ID chip, first-occurrence category, Retired ID marker, Ad Status deep-link)
+ * over the same per-ad variant cards the Ad Status overview modal renders
+ * (shared AdVariantCards: thumbnail lightbox, Spend/ROAS/Impr./Orders,
+ * category badge, Landing + Preview).
  */
-function CreatorAdRow({ a }: { a: CreatorAdInfo }) {
+function CreatorAdTokenBlock({ a }: { a: CreatorAdInfo }) {
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-bg-surface px-2.5 py-1.5">
-      <span className="post-id tabular">{a.token}</span>
-      {a.category && <WhCategoryBadge category={a.category} />}
-      {a.retiredId && (
-        <span
-          className="pill pill--muted"
-          title="Ad name uses a retired (pre-renumbering) post ID"
+    <div className="rounded-[var(--radius)] border border-border bg-bg-surface p-2.5">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="post-id tabular">{a.token}</span>
+        {a.category && <WhCategoryBadge category={a.category} />}
+        {a.retiredId && (
+          <span
+            className="pill pill--muted"
+            title="Ad name uses a retired (pre-renumbering) post ID — attached to the creator via the legacy archive"
+          >
+            Retired ID
+          </span>
+        )}
+        <span className="tabular text-[0.72rem] text-text-secondary">
+          {a.adCount === 1 ? "1 creative" : `${a.adCount} creatives`}
+        </span>
+        <Link
+          href={
+            `/dashboard?tab=ad-status&search=${encodeURIComponent(
+              a.token,
+            )}` as never
+          }
+          className="action-btn action-btn--view ml-auto"
+          aria-label={`Open Ad Status board filtered to ${a.token}`}
+          title="View on the Ad Status board"
         >
-          Retired ID
-        </span>
-      )}
-      <span className="tabular text-[0.72rem] font-semibold text-text-primary">
-        {formatRupees(a.amountSpent)}
-      </span>
-      <span className="tabular text-[0.72rem] text-text-secondary">
-        {a.roasMa > 0 ? `${a.roasMa.toFixed(2)}x ROAS` : "— ROAS"}
-      </span>
-      <span className="tabular text-[0.72rem] text-text-secondary">
-        {a.adCount === 1 ? "1 ad" : `${a.adCount} ad variants`}
-      </span>
-      {a.adCreated && (
-        <span className="tabular text-[0.72rem] text-text-tertiary">
-          {formatDate(a.adCreated)}
-        </span>
-      )}
-      <Link
-        href={
-          `/dashboard?tab=ad-status&search=${encodeURIComponent(
-            a.token,
-          )}` as never
-        }
-        className="action-btn action-btn--view ml-auto"
-        aria-label={`Open Ad Status board filtered to ${a.token}`}
-        title="View on the Ad Status board"
-      >
-        <Megaphone size={11} aria-hidden />
-        Ads
-      </Link>
-    </li>
+          <Megaphone size={11} aria-hidden />
+          Ad Status
+        </Link>
+      </div>
+      <AdVariantCards ads={a.ads} postUrl={a.postLink} />
+    </div>
   );
 }
 

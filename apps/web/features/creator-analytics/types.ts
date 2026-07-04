@@ -17,11 +17,14 @@ export interface CreatorCollab {
   source: "live" | "historic";
 }
 
+import type { WarehouseAd } from "@/lib/supabase/meta-ads";
+
 /**
  * One post-level Meta Ads rollup for a creator — drawn from the
  * `meta_ads_cache` warehouse mirror. Same counting unit as the Ad Status
  * board: one entry per post token, wearing its first-occurrence ad's
- * category/status/spend (board rule), with the variant count alongside.
+ * category/status/spend (board rule), with every ad variant carried along
+ * for the modal's per-ad cards.
  */
 export interface CreatorAdInfo {
   /** Post token the ad names carry, e.g. "SIF-1905-P2". */
@@ -40,6 +43,38 @@ export interface CreatorAdInfo {
   adCount: number;
   /** Token carries a retired (pre-renumbering) SIF from the legacy archive. */
   retiredId: boolean;
+  /** Every ad variant on this token, first-occurrence order (earliest first). */
+  ads: WarehouseAd[];
+  /** Instagram post URL (posts.post_link → archive link_to_post fallback). */
+  postLink: string | null;
+}
+
+/**
+ * Creator-level Meta Ads rollup from the `creator_ads_rollup` RPC — one row
+ * per creator with ≥1 warehouse-matched ad. Token→creator resolution and the
+ * first-occurrence rule live in the RPC (board semantics).
+ */
+export interface CreatorAdsSummary {
+  /** Distinct post tokens that ran as ads. */
+  tokens: number;
+  /** Total ad variants across those tokens. */
+  ads: number;
+  /** Tokens whose first-occurrence ad is Winner / Incremental Winner. */
+  winners: number;
+  /** Best first-occurrence category across tokens (rank order). */
+  bestCategory: string | null;
+  /** Total spend across ALL ad variants (₹). */
+  spend: number;
+  /** Creator's live collab count (0 = not currently working with us). */
+  liveCollabs: number;
+}
+
+/** Counts for the clickable ads KPI tiles above the roster. */
+export interface CreatorAdsKpi {
+  inAds: number;
+  winners: number;
+  winnersIdle: number;
+  spend: number;
 }
 
 export interface CreatorAnalyticsRow {
@@ -79,11 +114,15 @@ export interface CreatorAnalyticsRow {
    * creator has no stored state (or the lookup failed — fail-soft).
    */
   partnership_status: string | null;
+  /** Meta Ads rollup for this creator — null when they never ran as an ad. */
+  adsSummary: CreatorAdsSummary | null;
 }
 
 export interface CreatorAnalyticsFilters {
   /** Free-text search across inf_id / name / username. */
   q?: string;
+  /** Ads-derived filter: in-ads | winners | winners-idle. */
+  ads?: string;
   /** Tier = creators.category. */
   tier?: string;
   /** Region = creators.state. */
