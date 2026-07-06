@@ -94,6 +94,10 @@ export default function PartnershipStatusKM() {
             at least one post in that category.
           </li>
           <li>
+            <strong>Team Member</strong> — who onboarded the creator&apos;s
+            collabs (shown on each card too).
+          </li>
+          <li>
             <strong>Requested from / to</strong> — window on the request date.
           </li>
           <li>

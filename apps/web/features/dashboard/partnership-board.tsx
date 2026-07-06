@@ -122,6 +122,7 @@ const FILTER_KEYS = [
   "campaign",
   "status",
   "testStatus",
+  "team",
   "sentFrom",
   "sentTo",
   "postedFrom",
@@ -347,6 +348,15 @@ export function PartnershipBoard({
             value={initialFilters.testStatus ?? ""}
             onChange={(v) => setParam("testStatus", v)}
             options={TEST_STATUS_OPTIONS}
+          />
+          <FilterSelect
+            label="Team Member"
+            value={initialFilters.team ?? ""}
+            onChange={(v) => setParam("team", v)}
+            options={[
+              { value: "", label: "All team members" },
+              ...data.teamOptions.map((t) => ({ value: t, label: t })),
+            ]}
           />
           <FilterDate
             label="Requested from"
@@ -600,6 +610,14 @@ function PartnershipCardTile({
             <dt className="text-text-tertiary">Campaigns</dt>
             <dd className="tabular text-text-secondary truncate">
               {card.campaigns.join(", ")}
+            </dd>
+          </div>
+        )}
+        {card.teamMembers.length > 0 && (
+          <div className="flex justify-between gap-2">
+            <dt className="text-text-tertiary">Team</dt>
+            <dd className="text-text-secondary truncate">
+              {card.teamMembers.join(", ")}
             </dd>
           </div>
         )}

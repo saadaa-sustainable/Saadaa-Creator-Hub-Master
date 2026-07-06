@@ -303,11 +303,14 @@ export async function fetchAdStatusData(
   const [postsRes, creatorsRes, igCacheRes, coveredSetRaw, warehouseAds] =
     await Promise.all([
       fetchPosts(),
-      (supabase as any).from("creators").select(CREATOR_COLS).limit(5000),
+      // 20k headroom — the creator base passed 5,000 rows (8.3k on 2026-07-06)
+      // and a truncated map silently dropped enrichment (tier/followers/
+      // current inf_id) for late-SIF creators on retired/historic rows.
+      (supabase as any).from("creators").select(CREATOR_COLS).limit(20000),
       (supabase as any)
         .from("instagram_cache")
         .select("username, profile_pic")
-        .limit(5000),
+        .limit(20000),
       warehouseWithTimeout,
       warehouseAdsWithTimeout,
     ]);

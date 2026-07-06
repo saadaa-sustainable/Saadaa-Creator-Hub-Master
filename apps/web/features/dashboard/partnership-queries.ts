@@ -47,6 +47,8 @@ export interface PartnershipCard {
   /** Distinct live posts rows carrying this creator's partnership state. */
   postCount: number;
   campaigns: string[];
+  /** Team members (posts.onboarded_by) who own this creator's collabs. */
+  teamMembers: string[];
   /** Meta Ads rollup — set on tested cards (null = never ran as an ad). */
   adsSummary: CreatorAdsSummary | null;
   /** Last send-failure message (send-failed lane only). */
@@ -66,6 +68,7 @@ export interface PartnershipBoardData {
     total: number;
   };
   campaignOptions: string[];
+  teamOptions: string[];
 }
 
 export interface PartnershipFilters {
@@ -87,6 +90,8 @@ export interface PartnershipFilters {
   adId?: string;
   /** Warehouse ad name substring (tested creators). */
   adName?: string;
+  /** Team member (posts.onboarded_by). */
+  team?: string;
 }
 
 const maxIso = (a: string | null, b: string | null): string | null =>
@@ -114,7 +119,7 @@ export async function fetchPartnershipBoard(
     (supabase as any)
       .from("posts")
       .select(
-        "inf_id, username, campaign_id, post_date, onboard_date, partnership_status, partnership_sent_at, partnership_approved_at, partnership_declined_at",
+        "inf_id, username, campaign_id, post_date, onboard_date, onboarded_by, partnership_status, partnership_sent_at, partnership_approved_at, partnership_declined_at",
       )
       .not("partnership_status", "is", null),
     // Unresolved invite/resend failures → the send-failed lane.
@@ -147,6 +152,7 @@ export async function fetchPartnershipBoard(
       campaigns: Set<string>;
       postDates: string[];
       onboardDates: string[];
+      teamMembers: Set<string>;
     }
   >();
   for (const r of (postsRes.data ?? []) as Array<Record<string, any>>) {
@@ -165,6 +171,7 @@ export async function fetchPartnershipBoard(
       campaigns: new Set<string>(),
       postDates: [],
       onboardDates: [],
+      teamMembers: new Set<string>(),
     };
     agg.state = state; // rows are stamped uniformly per creator
     agg.username = agg.username ?? ((r.username as string | null) ?? null);
@@ -175,6 +182,7 @@ export async function fetchPartnershipBoard(
     if (r.campaign_id) agg.campaigns.add(String(r.campaign_id));
     if (r.post_date) agg.postDates.push(String(r.post_date));
     if (r.onboard_date) agg.onboardDates.push(String(r.onboard_date));
+    if (r.onboarded_by) agg.teamMembers.add(String(r.onboarded_by).trim());
     byCreator.set(key, agg);
   }
 
@@ -247,6 +255,7 @@ export async function fetchPartnershipBoard(
       declinedAt: c.declinedAt,
       postCount: c.postCount,
       campaigns: Array.from(c.campaigns).sort(),
+      teamMembers: Array.from(c.teamMembers).sort(),
       adsSummary: ads,
       errorMessage: null,
       errorAt: null,
@@ -282,6 +291,7 @@ export async function fetchPartnershipBoard(
       declinedAt: null,
       postCount: 0,
       campaigns: [],
+      teamMembers: [],
       adsSummary: infId.startsWith("@") ? null : (rollup.get(infId) ?? null),
       errorMessage: fail.message,
       errorAt: fail.at,
@@ -290,6 +300,9 @@ export async function fetchPartnershipBoard(
 
   const campaignOptions = Array.from(
     new Set(cards.flatMap((c) => c.campaigns)),
+  ).sort();
+  const teamOptions = Array.from(
+    new Set(cards.flatMap((c) => c.teamMembers)),
   ).sort();
 
   // Filters (applied after the rollup — the corpus is per-creator).
@@ -303,6 +316,9 @@ export async function fetchPartnershipBoard(
   }
   if (filters.campaign) {
     cards = cards.filter((c) => c.campaigns.includes(filters.campaign!));
+  }
+  if (filters.team) {
+    cards = cards.filter((c) => c.teamMembers.includes(filters.team!));
   }
   if (filters.status) {
     cards = cards.filter((c) => c.state === filters.status);
@@ -363,5 +379,5 @@ export async function fetchPartnershipBoard(
     total: cards.length,
   };
 
-  return { cards, kpi, campaignOptions };
+  return { cards, kpi, campaignOptions, teamOptions };
 }

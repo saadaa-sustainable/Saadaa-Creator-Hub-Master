@@ -65,8 +65,10 @@ export default function AdStatusKM() {
             that was retired during the creator-data cleanup (the creator was
             renumbered). These ads are resolved through the legacy archive to
             the creator&apos;s current profile and shown with a{" "}
-            <strong>Retired ID</strong> chip — the spend and category are real,
-            but no specific post exists behind the row.
+            <strong>Retired ID</strong> chip plus a green{" "}
+            <strong>Now SIF-…</strong> chip carrying the creator&apos;s current
+            INF ID — the spend and category are real, but no specific post
+            exists behind the row.
           </li>
           <li>
             <strong>Eligibility</strong> · a post is tracked here when its ads

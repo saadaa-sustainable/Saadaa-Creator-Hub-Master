@@ -188,6 +188,7 @@ export async function PartnershipTabBody({ sp }: { sp: TabSearchParams }) {
     campaign: sp.campaign,
     status: sp.status,
     testStatus: sp.testStatus,
+    team: sp.team,
     sentFrom: sp.sentFrom,
     sentTo: sp.sentTo,
     postedFrom: sp.postedFrom,

@@ -273,6 +273,19 @@ function RetiredIdChip() {
   );
 }
 
+/** The creator's CURRENT canonical ID for a retired-token row — the old SIF
+ * in the ad name was renumbered away during the archive cleanup. */
+function CurrentIdChip({ infId }: { infId: string }) {
+  return (
+    <span
+      className="pill text-[0.62rem] font-bold uppercase tracking-[0.05em] shrink-0 tabular bg-[#ECF1E9] text-[#4F7C4D]"
+      title="The creator's current INF ID — the ad name carries their retired (pre-renumbering) one"
+    >
+      Now {infId}
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Ad creative thumbnail — plain <img> (Meta CDN blocks proxying), lazy, no
 // referrer. Clicking opens the in-app creative lightbox (NOT fb.me — that
@@ -1056,6 +1069,7 @@ function AdStatusOverviewModal({
               <RowStatusBadge row={row} />
               {row.source === "historic" && <HistoricChip />}
               {row.retiredId && <RetiredIdChip />}
+              {row.retiredId && row.infId && <CurrentIdChip infId={row.infId} />}
             </div>
             <h2>{row.name || row.username || row.postIdShort}</h2>
             <p className="campaign-detail-subtitle">
@@ -1660,6 +1674,9 @@ function AdRunListTable({
                     <RowStatusBadge row={r} />
                     {r.source === "historic" && <HistoricChip />}
                     {r.retiredId && <RetiredIdChip />}
+                    {r.retiredId && r.infId && (
+                      <CurrentIdChip infId={r.infId} />
+                    )}
                   </div>
                   <h3 title={rowPrimaryName(r)}>{rowPrimaryName(r)}</h3>
                   <p>{rowSubline(r)}</p>
@@ -1847,6 +1864,7 @@ function AdRunCardsGrid({
             <div className="campaign-card__meta-row">
               {r.source === "historic" && <HistoricChip />}
               {r.retiredId && <RetiredIdChip />}
+              {r.retiredId && r.infId && <CurrentIdChip infId={r.infId} />}
               {r.collabId && (
                 <span title="Collab ID">
                   <MousePointerClick size={11} aria-hidden />
