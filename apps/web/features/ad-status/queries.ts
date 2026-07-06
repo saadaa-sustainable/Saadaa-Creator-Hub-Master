@@ -46,6 +46,7 @@ const POSTS_COLS_BASE = [
 const POSTS_COLS_EXTENDED = POSTS_COLS_BASE + ",ads_results,ads_status";
 
 const CREATOR_COLS = [
+  "inf_id",
   "username",
   "inf_name",
   "profile_pic",
