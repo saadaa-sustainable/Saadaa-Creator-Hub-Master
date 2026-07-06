@@ -177,16 +177,25 @@ export async function CreatorAnalyticsTabBody({ sp }: { sp: TabSearchParams }) {
 }
 
 // ── Partnership Status ───────────────────────────────────────────────────────
-// Dashboard-native 3-lane kanban (Requested / Accepted / Rejected) over the
-// per-creator Meta branded-content permission mirrored on posts. The client
-// board owns the filter bar + KPI strip + lanes and live-refreshes pending
-// creators against Meta on mount (stamping approved_at / declined_at in DB).
+// Dashboard-native 5-lane kanban (Requested / Rejected / Accepted·Not Tested /
+// Accepted & Tested / Failure on Sending) over the per-creator Meta
+// branded-content permission mirrored on posts + creators. The client board
+// owns the filter bar + KPI strip + lanes and live-refreshes pending creators
+// against Meta on mount (stamping approved_at / declined_at in DB).
 export async function PartnershipTabBody({ sp }: { sp: TabSearchParams }) {
   const filters: PartnershipFilters = {
     q: sp.q,
     campaign: sp.campaign,
+    status: sp.status,
+    testStatus: sp.testStatus,
     sentFrom: sp.sentFrom,
     sentTo: sp.sentTo,
+    postedFrom: sp.postedFrom,
+    postedTo: sp.postedTo,
+    onboardFrom: sp.onboardFrom,
+    onboardTo: sp.onboardTo,
+    adId: sp.adId,
+    adName: sp.adName,
   };
   const data = await fetchPartnershipBoard(filters);
   return (

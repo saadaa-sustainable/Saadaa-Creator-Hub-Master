@@ -67,6 +67,12 @@ export interface CreatorAdsSummary {
   spend: number;
   /** Creator's live collab count (0 = not currently working with us). */
   liveCollabs: number;
+  /** Distinct first-occurrence categories across the creator's tokens. */
+  categories: string[];
+  /** Every warehouse ad id on the creator's tokens. */
+  adIds: string[];
+  /** Every warehouse ad name on the creator's tokens. */
+  adNames: string[];
 }
 
 /** Counts for the clickable ads KPI tiles above the roster. */
@@ -116,6 +122,10 @@ export interface CreatorAnalyticsRow {
   partnership_status: string | null;
   /** Meta Ads rollup for this creator — null when they never ran as an ad. */
   adsSummary: CreatorAdsSummary | null;
+  /** When the creator accepted the Meta partnership (creators mirror). */
+  partnership_accepted_at: string | null;
+  /** When the creator declined/revoked the Meta partnership. */
+  partnership_declined_at: string | null;
 }
 
 export interface CreatorAnalyticsFilters {

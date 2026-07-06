@@ -636,6 +636,23 @@ function CreatorHistoryModal({
             />
             <DetailItem label="Collab Types" value={row.collab_types ?? "—"} />
             <DetailItem label="Meta Ads" value={adsCellText(row)} mono />
+            <DetailItem
+              label="Partnership"
+              value={
+                row.partnership_status
+                  ? `${row.partnership_status}${
+                      row.partnership_status === "approved" &&
+                      row.partnership_accepted_at
+                        ? ` · ${formatDate(row.partnership_accepted_at)}`
+                        : (row.partnership_status === "rejected" ||
+                              row.partnership_status === "revoked") &&
+                            row.partnership_declined_at
+                          ? ` · ${formatDate(row.partnership_declined_at)}`
+                          : ""
+                    }`
+                  : "—"
+              }
+            />
           </section>
 
           {ads && ads.length > 0 && (

@@ -71,6 +71,11 @@ const fetchCreatorAdsRollupEntries = unstable_cache(
           bestCategory: CATEGORY_BY_RANK[Number(r.best_rank)] ?? null,
           spend: Number(r.spend ?? 0) || 0,
           liveCollabs: Number(r.live_collab_count ?? 0) || 0,
+          categories: Array.isArray(r.categories)
+            ? (r.categories as string[])
+            : [],
+          adIds: Array.isArray(r.ad_ids) ? (r.ad_ids as string[]) : [],
+          adNames: Array.isArray(r.ad_names) ? (r.ad_names as string[]) : [],
         },
       ]);
     } catch {
@@ -178,31 +183,37 @@ export async function fetchCreatorAnalyticsPage(
     is_active: r.is_active == null ? null : Boolean(r.is_active),
     partnership_status: null,
     adsSummary: rollup.get(String(r.inf_id ?? "")) ?? null,
+    partnership_accepted_at: null,
+    partnership_declined_at: null,
   }));
 
-  // Meta partnership status lives on `posts.partnership_status` (stamped
-  // creator-level, uniform across a creator's rows) and isn't part of the RPC,
-  // so one extra lookup covers the whole page. Fail-soft: on error the page
-  // simply renders without partnership badges.
+  // Meta partnership state + lifecycle dates live on the creators row
+  // (mirrored by lib/partnership-sync.ts since 2026-07-06); one batched
+  // lookup covers the page. Fail-soft: on error the page simply renders
+  // without partnership badges/dates.
   const infIds = [...new Set(rows.map((r) => r.inf_id).filter(Boolean))];
   if (infIds.length > 0) {
-    // is_test rows included on purpose — test entries stay visible until their
-    // Test Mode scope purges them (project convention).
     const { data: statusData, error: statusError } = await (supabase as any)
-      .from("posts")
-      .select("inf_id, partnership_status")
+      .from("creators")
+      .select("inf_id, partnership_status, partnership_accepted_at, partnership_declined_at")
       .in("inf_id", infIds)
       .not("partnership_status", "is", null);
 
     if (!statusError) {
-      const statusByInf = new Map<string, string>();
+      const byInf = new Map<string, Raw>();
       for (const p of (statusData ?? []) as Raw[]) {
         const id = String(p.inf_id ?? "");
-        const status = String(p.partnership_status ?? "").trim();
-        if (id && status && !statusByInf.has(id)) statusByInf.set(id, status);
+        if (id && !byInf.has(id)) byInf.set(id, p);
       }
       for (const row of rows) {
-        row.partnership_status = statusByInf.get(row.inf_id) ?? null;
+        const p = byInf.get(row.inf_id);
+        if (!p) continue;
+        row.partnership_status =
+          String(p.partnership_status ?? "").trim() || null;
+        row.partnership_accepted_at =
+          (p.partnership_accepted_at as string | null) ?? null;
+        row.partnership_declined_at =
+          (p.partnership_declined_at as string | null) ?? null;
       }
     }
   }

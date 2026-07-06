@@ -168,7 +168,68 @@ export async function syncCreatorPartnership(opts: {
     );
   }
 
+  // Mirror the creator-level truth onto the creators row too (roster surfaces
+  // read it from there). Same first-transition rule for the timestamps.
+  await stampCreatorRow(supabase, infId, resolvedHandle, state, {
+    sent: invited || read.status.exists,
+    now,
+  });
+
   return { ok: true, state, invited };
+}
+
+/**
+ * Stamp the account-level partnership state onto the `creators` row —
+ * status always; sent/accepted/declined timestamps only when currently NULL
+ * (first transition), matching the posts stamping rule. Fail-soft: creators
+ * mirroring must never fail a sync that already stamped posts.
+ */
+async function stampCreatorRow(
+  supabase: any,
+  infId: string,
+  handle: string,
+  state: PartnershipState | null,
+  opts: { sent: boolean; now: string; overwriteSent?: boolean },
+): Promise<void> {
+  try {
+    const matchC = (q: any) =>
+      infId ? q.eq("inf_id", infId) : q.eq("username", handle);
+    await matchC(
+      (supabase as any).from("creators").update({ partnership_status: state }),
+    );
+    if (opts.overwriteSent) {
+      await matchC(
+        (supabase as any)
+          .from("creators")
+          .update({ partnership_sent_at: opts.now }),
+      );
+    } else if (opts.sent) {
+      await matchC(
+        (supabase as any)
+          .from("creators")
+          .update({ partnership_sent_at: opts.now })
+          .is("partnership_sent_at", null),
+      );
+    }
+    if (state === "approved") {
+      await matchC(
+        (supabase as any)
+          .from("creators")
+          .update({ partnership_accepted_at: opts.now })
+          .is("partnership_accepted_at", null),
+      );
+    }
+    if (state === "rejected" || state === "revoked") {
+      await matchC(
+        (supabase as any)
+          .from("creators")
+          .update({ partnership_declined_at: opts.now })
+          .is("partnership_declined_at", null),
+      );
+    }
+  } catch {
+    // fail-soft — posts stamps are the source of truth for gates
+  }
 }
 
 /**
@@ -247,5 +308,11 @@ export async function resendCreatorPartnershipInvite(opts: {
     });
     return { ok: false, state: "pending", invited: true, error: updErr.message };
   }
+  // Creators mirror — a resend is a NEW request, so sent_at is overwritten.
+  await stampCreatorRow(supabase, infId, resolvedHandle, "pending", {
+    sent: true,
+    now: String(payload.partnership_sent_at),
+    overwriteSent: true,
+  });
   return { ok: true, state: "pending", invited: true };
 }

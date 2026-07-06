@@ -10909,6 +10909,23 @@ body:has(.km-backdrop) {
     scroll-snap-align: start;
   }
 }
+
+/* Partnership Status — 5 business lanes. Explicit columns per breakpoint
+   (never auto-fit): 5 across on wide screens, horizontal scroll below. */
+.partnership-kanban {
+  grid-template-columns: repeat(5, minmax(240px, 1fr));
+}
+@media (max-width: 1440px) {
+  .partnership-kanban {
+    grid-template-columns: repeat(5, 300px);
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+  }
+  .partnership-kanban .acc-kb-col {
+    scroll-snap-align: start;
+  }
+}
 .acc-kb-col {
   display: flex;
   flex-direction: column;

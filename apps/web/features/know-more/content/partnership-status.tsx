@@ -20,22 +20,35 @@ export default function PartnershipStatusKM() {
         </p>
       </KMSection>
 
-      <KMSection tag="The three lanes">
+      <KMSection tag="The five lanes">
         <KMList>
           <li>
-            <strong>Requested</strong> — invite sent, awaiting the creator. The
-            card shows when the request went out.
+            <strong>1 · Requested</strong> — invite sent, awaiting the creator.
+            The card shows when the request went out.
           </li>
           <li>
-            <strong>Accepted</strong> — the creator approved. The card shows
-            both the request date and the acceptance date. Payments and ad
-            usage for this creator are unblocked.
-          </li>
-          <li>
-            <strong>Rejected</strong> — the creator declined (or revoked a
+            <strong>2 · Rejected</strong> — the creator declined (or revoked a
             previous approval). The card shows the rejection date and a{" "}
             <strong>Resend request</strong> button — resending is always a
             deliberate manual action, never automatic.
+          </li>
+          <li>
+            <strong>3 · Accepted · Not Tested</strong> — the creator approved
+            but none of their posts has run as a Meta ad yet. Payments and ad
+            usage are unblocked; the creative just hasn&apos;t gone to testing.
+          </li>
+          <li>
+            <strong>4 · Accepted &amp; Tested</strong> — approved AND the
+            creator&apos;s content is in the Meta Ads warehouse. The card wears
+            the best creative-test category badge (same colors as Ad Status),
+            the ads count + total spend, and a <strong>View on Ad Status</strong>{" "}
+            deep-link.
+          </li>
+          <li>
+            <strong>5 · Failure on Sending</strong> — the automatic invite (or a
+            resend) errored on Instagram&apos;s side and the creator has no
+            active request. The card shows the exact error and a{" "}
+            <strong>Retry send</strong> button.
           </li>
         </KMList>
       </KMSection>
@@ -72,14 +85,32 @@ export default function PartnershipStatusKM() {
             selected campaign.
           </li>
           <li>
+            <strong>Partnership Status</strong> — the raw permission state
+            (Pending / Approved / Rejected / Revoked) across all lanes.
+          </li>
+          <li>
+            <strong>Creative Test Status</strong> — warehouse category (Winner,
+            Discarded, …) mapped from the Ad Status view; matches creators with
+            at least one post in that category.
+          </li>
+          <li>
             <strong>Requested from / to</strong> — window on the request date.
+          </li>
+          <li>
+            <strong>Posted from / to</strong> — matches creators with at least
+            one stamped post in the date range.
+          </li>
+          <li>
+            <strong>Onboarding from / to</strong> — same, on the onboard date.
+          </li>
+          <li>
+            <strong>Ad ID / Ad Name</strong> — find the creator behind a
+            specific warehouse ad (tested creators only).
           </li>
         </KMList>
         <KMCallout tone="info">
-          Filters sync to the URL (<KMCode>?tab=partnerships</KMCode> +{" "}
-          <KMCode>q</KMCode> / <KMCode>campaign</KMCode> /{" "}
-          <KMCode>sentFrom</KMCode> / <KMCode>sentTo</KMCode>), so a filtered
-          view is linkable and survives refresh.
+          All filters sync to the URL (<KMCode>?tab=partnerships</KMCode> + the
+          filter params), so a filtered view is linkable and survives refresh.
         </KMCallout>
       </KMSection>
 
@@ -90,6 +121,12 @@ export default function PartnershipStatusKM() {
             board, the posting form header, the <strong>Journey</strong> cards
             and the <strong>Accounts Hub</strong> ledger — one shared mapping
             everywhere.
+          </li>
+          <li>
+            The state and its dates are also stored on the{" "}
+            <strong>creator record</strong> itself — Creator Analytics shows
+            the partnership state with its acceptance (or rejection) date in
+            every creator&apos;s history modal.
           </li>
           <li>
             <strong>Payments</strong>: a collab with ad-usage rights can only be
