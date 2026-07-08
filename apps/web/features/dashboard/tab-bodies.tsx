@@ -147,6 +147,8 @@ export async function CreatorAnalyticsTabBody({ sp }: { sp: TabSearchParams }) {
     region: sp.region,
     creatorType: sp.creatorType,
     stage: sp.stage,
+    reachOutBy: sp.reachOutBy,
+    onboardBy: sp.onboardBy,
     reachOutFrom: sp.reachOutFrom,
     reachOutTo: sp.reachOutTo,
     postedFrom: sp.postedFrom,

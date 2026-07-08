@@ -33,7 +33,11 @@ import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
 import type { WorkflowStatus } from "@/lib/supabase/types.gen";
 import { AdVariantCards, WhCategoryBadge } from "@/features/ad-status/ad-board";
 import { loadCreatorAdsInfo, loadCreatorCollabHistory } from "./actions";
-import type { CreatorAdInfo, CreatorAnalyticsRow, CreatorCollab } from "./types";
+import type {
+  CreatorAdInfo,
+  CreatorAnalyticsRow,
+  CreatorCollabEpisode,
+} from "./types";
 
 export interface CreatorAnalyticsViewProps {
   /** ONE page of creators (server-paginated, already ordered followers desc). */
@@ -491,7 +495,7 @@ function CreatorHistoryModal({
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  const [collabs, setCollabs] = useState<CreatorCollab[] | null>(null);
+  const [collabs, setCollabs] = useState<CreatorCollabEpisode[] | null>(null);
   const [ads, setAds] = useState<CreatorAdInfo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -692,6 +696,9 @@ function CreatorHistoryModal({
               {!loading && !error && (
                 <span className="pill pill--parent">{collabs.length}</span>
               )}
+              <span className="text-[0.7rem] text-text-tertiary">
+                one card per collab (keyed on collab ID)
+              </span>
             </div>
             {loading ? (
               <div className="flex items-center justify-center gap-2 py-8 text-text-tertiary">
@@ -705,9 +712,9 @@ function CreatorHistoryModal({
                 No collaborations recorded for this creator yet.
               </p>
             ) : (
-              <ul className="flex flex-col gap-1.5">
-                {collabs.map((c, i) => (
-                  <CollabRow key={`${c.collabId}-${c.source}-${i}`} c={c} />
+              <ul className="flex flex-col gap-2">
+                {collabs.map((c) => (
+                  <CollabEpisodeCard key={c.collabKey} c={c} />
                 ))}
               </ul>
             )}
@@ -768,45 +775,93 @@ function CreatorAdTokenBlock({ a }: { a: CreatorAdInfo }) {
   );
 }
 
-function CollabRow({ c }: { c: CreatorCollab }) {
-  const hasLink = !!c.postLink && /^https?:\/\//i.test(c.postLink.trim());
+/**
+ * One collab EPISODE card — keyed on collab_id, folding all its deliverable
+ * rows into a single card with the collab's team, dates, campaign, type and
+ * deliverable count (row-level detail, mirroring the Ad Status cards). Reach-out
+ * episodes (no collab minted yet) render with the reach-out date + a Reach Out
+ * marker instead of a collab id.
+ */
+function CollabEpisodeCard({ c }: { c: CreatorCollabEpisode }) {
+  const title = c.collabId ?? "Reach Out";
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-[var(--radius)] border border-border bg-bg-surface px-2.5 py-1.5">
-      <span className="post-id tabular">{c.collabId}</span>
-      {c.contentType && (
-        <span className="pill pill--muted">{c.contentType}</span>
-      )}
-      <span className="tabular text-[0.72rem] text-text-secondary">
-        {formatDate(c.postDate)}
-      </span>
-      {c.paymentStatus && (
-        <span className="pill pill--muted">{c.paymentStatus}</span>
-      )}
-      {c.source === "historic" ? (
-        <span className="pill pill--muted" title="From the legacy archive">
-          <History size={9} aria-hidden />
-          Historic
-        </span>
-      ) : (
-        <span className="pill pill--info" title="From the live system">
-          <Sparkles size={9} aria-hidden />
-          Live
-        </span>
-      )}
-      {hasLink && (
-        <a
-          href={c.postLink!.trim()}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="action-btn action-btn--view ml-auto"
-          aria-label={`Open Instagram post for ${c.collabId}`}
-          title="Open Instagram post"
-        >
-          <ExternalLink size={11} aria-hidden />
-          Post
-        </a>
+    <li className="rounded-[var(--radius)] border border-border bg-bg-surface p-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="post-id tabular">{title}</span>
+        {c.campaign && <span className="campaign-chip">{c.campaign}</span>}
+        {c.stage && <WorkflowStatusPill status={c.stage as WorkflowStatus} />}
+        {c.collabType && <span className="pill pill--muted">{c.collabType}</span>}
+        {c.contentTypes.map((ct) => (
+          <span key={ct} className="pill pill--muted">
+            {ct}
+          </span>
+        ))}
+        {!c.isReachout && (
+          <span
+            className="tabular text-[0.72rem] text-text-secondary"
+            title="Deliverables in this collab"
+          >
+            {c.deliverableCount === 1
+              ? "1 deliverable"
+              : `${c.deliverableCount} deliverables`}
+          </span>
+        )}
+        {c.source === "historic" ? (
+          <span
+            className="pill pill--muted ml-auto"
+            title="From the legacy archive"
+          >
+            <History size={9} aria-hidden />
+            Historic
+          </span>
+        ) : (
+          <span className="pill pill--info ml-auto" title="From the live system">
+            <Sparkles size={9} aria-hidden />
+            Live
+          </span>
+        )}
+      </div>
+      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[0.72rem] sm:grid-cols-4">
+        <EpisodeStat label="Reach out" value={formatDate(c.reachOutDate)} />
+        <EpisodeStat label="Onboard" value={formatDate(c.onboardDate)} />
+        <EpisodeStat label="Posted" value={formatDate(c.postDate)} />
+        <EpisodeStat
+          label="Commercial"
+          value={c.commercial > 0 ? formatRupees(c.commercial) : "—"}
+        />
+        <EpisodeStat label="Reach out by" value={c.reachOutBy ?? "—"} />
+        <EpisodeStat label="Onboard by" value={c.onboardBy ?? "—"} />
+      </dl>
+      {c.postLinks.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {c.postLinks.map((link, i) => (
+            <a
+              key={link}
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="action-btn action-btn--view"
+              aria-label={`Open Instagram post ${i + 1} for ${title}`}
+              title="Open Instagram post"
+            >
+              <ExternalLink size={11} aria-hidden />
+              {c.postLinks.length === 1 ? "Post" : `Post ${i + 1}`}
+            </a>
+          ))}
+        </div>
       )}
     </li>
+  );
+}
+
+function EpisodeStat({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex flex-col">
+      <dt className="text-[0.62rem] uppercase tracking-[0.04em] text-text-tertiary">
+        {label}
+      </dt>
+      <dd className="tabular font-semibold text-text-primary">{value}</dd>
+    </div>
   );
 }
 

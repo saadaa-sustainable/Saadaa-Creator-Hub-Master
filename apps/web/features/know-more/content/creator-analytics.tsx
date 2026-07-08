@@ -32,6 +32,13 @@ export default function CreatorAnalyticsKM() {
             most-recent live post).
           </li>
           <li>
+            <strong>Reach Out By</strong> (<KMCode>posts.logged_by</KMCode>) ·{" "}
+            <strong>Onboard By</strong> (<KMCode>posts.onboarded_by</KMCode>) —
+            team-member filters over the canonical User Panel names, matched
+            across the creator&apos;s live ∪ historic posts. Combine with the ads
+            and other filters (all constraints intersect).
+          </li>
+          <li>
             <strong>Reach-out from / to</strong> — matches creators whose
             reach-out window overlaps the range. <strong>Posted from / to</strong>{" "}
             — matches on the creator&apos;s most-recent post date.
@@ -113,21 +120,27 @@ export default function CreatorAnalyticsKM() {
         <KMList>
           <li>
             Clicking a creator opens a <strong>collab-history modal</strong>{" "}
-            that <strong>loads on demand</strong> — a brief spinner, then every
-            collaboration from <KMCode>posts</KMCode> ∪{" "}
+            that <strong>loads on demand</strong> — a brief spinner, then{" "}
+            <strong>one card per collab</strong> from <KMCode>posts</KMCode> ∪{" "}
             <KMCode>historic_posts</KMCode> (via the{" "}
             <KMCode>creator_collab_history</KMCode> RPC), ordered newest first.
-            Each line shows the collab id, content type, post date, payment
-            status, a <strong>Live / Historic</strong> source badge and a
-            post-link button when an IG URL is present. The header stats (total
-            collabs, deliverables, dates, collab-type tally) come from the row
-            already in hand, so they show instantly.
+            Each card is keyed on the <strong>collab_id</strong> (minted at
+            onboarding) — a creator reached out for two campaigns shows{" "}
+            <strong>two cards</strong>, each with its own campaign, dates and team
+            member. The card carries the collab id (or a{" "}
+            <strong>Reach Out</strong> marker for a not-yet-onboarded reach-out),
+            campaign chip, stage, collab type, content type(s), deliverable count,
+            a row-level stat grid (reach-out / onboard / posted dates · commercial
+            · reach-out-by · onboard-by), a <strong>Live / Historic</strong>{" "}
+            source badge and a post-link button per captured IG URL.
           </li>
           <li>
-            Counts are <strong>distinct collabs</strong> — deliverable rows of one
-            collab fold into a single collab_id (legacy rows coalesce to{" "}
-            <KMCode>inf_id-C{"{n}"}</KMCode>). The total splits into live +
-            historic so a repeat collaborator is obvious at a glance.
+            Deliverable rows of one collab fold into a{" "}
+            <strong>single collab_id card</strong> (P1/P2/P3 → one card; legacy
+            rows coalesce to <KMCode>inf_id-C{"{n}"}</KMCode>); un-onboarded
+            reach-outs each become their own <KMCode>RO-{"{id}"}</KMCode> episode.
+            The header stats (total collabs, deliverables, dates, collab-type
+            tally) come from the row already in hand, so they show instantly.
           </li>
           <li>
             <strong>Meta Ads Performance section</strong> — when any of the

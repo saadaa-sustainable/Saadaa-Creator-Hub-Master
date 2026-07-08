@@ -17,6 +17,8 @@ const FILTER_KEYS = [
   "region",
   "creatorType",
   "stage",
+  "reachOutBy",
+  "onboardBy",
   "reachOutFrom",
   "reachOutTo",
   "postedFrom",
@@ -151,6 +153,24 @@ export function CreatorAnalyticsFiltersBar({
             { label: "In Meta Ads", value: "in-ads" },
             { label: "Winner creators", value: "winners" },
             { label: "Winners · no live collab", value: "winners-idle" },
+          ]}
+        />
+        <FilterSelect
+          label="Reach Out By"
+          value={initial.reachOutBy ?? ""}
+          onChange={(v) => setParam("reachOutBy", v)}
+          options={[
+            { label: "All team members", value: "" },
+            ...options.teamMembers.map((t) => ({ label: t, value: t })),
+          ]}
+        />
+        <FilterSelect
+          label="Onboard By"
+          value={initial.onboardBy ?? ""}
+          onChange={(v) => setParam("onboardBy", v)}
+          options={[
+            { label: "All team members", value: "" },
+            ...options.teamMembers.map((t) => ({ label: t, value: t })),
           ]}
         />
 

@@ -2,7 +2,7 @@
 
 import { getActor } from "@/lib/auth";
 import { fetchCreatorAdsInfo, fetchCreatorCollabHistory } from "./queries";
-import type { CreatorAdInfo, CreatorCollab } from "./types";
+import type { CreatorAdInfo, CreatorCollabEpisode } from "./types";
 
 /**
  * On-demand loader for a single creator's collab history, called from the
@@ -12,7 +12,7 @@ import type { CreatorAdInfo, CreatorCollab } from "./types";
  */
 export async function loadCreatorCollabHistory(
   infId: string,
-): Promise<CreatorCollab[]> {
+): Promise<CreatorCollabEpisode[]> {
   const actor = await getActor();
   if (!actor) throw new Error("Forbidden");
   return fetchCreatorCollabHistory(infId);

@@ -4,16 +4,41 @@
  * the `?tab=creators` tab inside the main Dashboard.
  */
 
-/** One collab in a creator's history — drawn from posts ∪ historic_posts. */
-export interface CreatorCollab {
-  /** Display collab id (collab_id, else inf_id-C{n}, else post id). */
-  collabId: string;
-  contentType: string | null;
+/**
+ * One collab EPISODE in a creator's history — a group of deliverable rows
+ * (posts ∪ historic_posts) sharing a collab_id, or a single un-onboarded
+ * reach-out row. The collab_id (minted at onboarding) is the differentiation
+ * key: a creator reached out for two campaigns has two episodes, each with its
+ * own date / team member / campaign — mirroring the Ad Status row-level cards.
+ */
+export interface CreatorCollabEpisode {
+  /** Grouping key — collab_id, else inf_id-C{n}, else RO-{postId} per reach-out. */
+  collabKey: string;
+  /** Display collab id (collab_id / inf_id-C{n}); null for un-onboarded reach-outs. */
+  collabId: string | null;
+  campaign: string | null;
+  /** Distinct content types across the episode's deliverables. */
+  contentTypes: string[];
+  reachOutDate: string | null;
+  onboardDate: string | null;
+  /** Latest posted-deliverable date in the episode. */
   postDate: string | null;
-  paymentStatus: string | null;
-  /** Instagram post URL for this collab, when one was captured. */
-  postLink: string | null;
-  /** Which corpus this collab came from. */
+  /** Team member who logged the reach-out (canonical). */
+  reachOutBy: string | null;
+  /** Team member who onboarded the collab (canonical). */
+  onboardBy: string | null;
+  collabType: string | null;
+  /** Total agreed commercial across the episode's deliverables (₹). */
+  commercial: number;
+  /** Most-advanced workflow status across the episode's deliverables. */
+  stage: string | null;
+  /** How many deliverable rows fold into this episode. */
+  deliverableCount: number;
+  /** True when this is an un-onboarded reach-out (no collab minted yet). */
+  isReachout: boolean;
+  /** Instagram post URLs captured on the episode's deliverables. */
+  postLinks: string[];
+  /** Which corpus the episode came from. */
   source: "live" | "historic";
 }
 
@@ -141,6 +166,10 @@ export interface CreatorAnalyticsFilters {
   creatorType?: string;
   /** Current workflow stage of the creator's most-recent live post. */
   stage?: string;
+  /** Team member who logged the reach-out (posts.logged_by). */
+  reachOutBy?: string;
+  /** Team member who onboarded the collab (posts.onboarded_by). */
+  onboardBy?: string;
   reachOutFrom?: string;
   reachOutTo?: string;
   postedFrom?: string;
@@ -153,4 +182,6 @@ export interface CreatorAnalyticsFilterOptions {
   regions: string[];
   statuses: string[];
   creatorTypes: string[];
+  /** Canonical team members (posts/historic_posts onboarded_by ∪ logged_by). */
+  teamMembers: string[];
 }

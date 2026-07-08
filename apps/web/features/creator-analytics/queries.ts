@@ -12,7 +12,7 @@ import type {
   CreatorAnalyticsFilterOptions,
   CreatorAnalyticsFilters,
   CreatorAnalyticsRow,
-  CreatorCollab,
+  CreatorCollabEpisode,
 } from "./types";
 
 /**
@@ -100,6 +100,39 @@ function adsFilterMatches(value: string, s: CreatorAdsSummary): boolean {
   return true; // "in-ads"
 }
 
+/**
+ * Distinct `inf_id`s whose posts (live ∪ historic) carry `value` in the given
+ * team column (`onboarded_by` or `logged_by`). Used to push a team-member
+ * filter into the roster RPC as a `p_inf_ids` allow-list, mirroring the ads
+ * filter — keeps pagination + total_count server-side. Returns null on error
+ * (fail-open: the filter simply doesn't constrain rather than blanking the page).
+ */
+async function resolveInfIdsByTeam(
+  column: "onboarded_by" | "logged_by",
+  value: string,
+): Promise<Set<string> | null> {
+  const supabase = createServiceClient();
+  const ids = new Set<string>();
+  try {
+    for (const table of ["posts", "historic_posts"] as const) {
+      const { data, error } = await (supabase as any)
+        .from(table)
+        .select("inf_id")
+        .eq(column, value)
+        .not("inf_id", "is", null)
+        .limit(FETCH_LIMIT);
+      if (error) throw error;
+      for (const r of (data ?? []) as Raw[]) {
+        const id = String(r.inf_id ?? "").trim();
+        if (id) ids.add(id);
+      }
+    }
+    return ids;
+  } catch {
+    return null;
+  }
+}
+
 /** Counts for the clickable ads KPI tiles. */
 export async function fetchCreatorAdsKpis(): Promise<CreatorAdsKpi> {
   const rollup = await fetchCreatorAdsRollup();
@@ -129,17 +162,41 @@ export async function fetchCreatorAnalyticsPage(
   const supabase = createServiceClient();
   const safePage = page > 0 ? page : 1;
 
-  // Ads filter → resolve the matching inf_id allow-list from the cached
-  // rollup, pushed into the RPC so pagination + total_count stay server-side.
-  // An empty match set must return 0 rows, not "no filter" — hence sentinel.
+  // Allow-list filters (ads + team member) all resolve to an inf_id set that is
+  // INTERSECTED and pushed into the RPC as `p_inf_ids`, so pagination +
+  // total_count stay server-side. Each active constraint contributes a set; an
+  // empty intersection returns 0 rows (sentinel), not "no filter".
   const rollup = await fetchCreatorAdsRollup();
+  const constraints: Set<string>[] = [];
+
   const adsFilter = nz(filters.ads);
-  let adsInfIds: string[] | null = null;
   if (adsFilter) {
-    adsInfIds = [...rollup.entries()]
-      .filter(([, s]) => adsFilterMatches(adsFilter, s))
-      .map(([id]) => id);
-    if (adsInfIds.length === 0) adsInfIds = ["__none__"];
+    constraints.push(
+      new Set(
+        [...rollup.entries()]
+          .filter(([, s]) => adsFilterMatches(adsFilter, s))
+          .map(([id]) => id),
+      ),
+    );
+  }
+
+  const reachOutBy = nz(filters.reachOutBy);
+  if (reachOutBy) {
+    const set = await resolveInfIdsByTeam("logged_by", reachOutBy);
+    if (set) constraints.push(set);
+  }
+  const onboardBy = nz(filters.onboardBy);
+  if (onboardBy) {
+    const set = await resolveInfIdsByTeam("onboarded_by", onboardBy);
+    if (set) constraints.push(set);
+  }
+
+  let adsInfIds: string[] | null = null;
+  if (constraints.length > 0) {
+    // Intersect all constraint sets.
+    const [first, ...rest] = constraints;
+    const inter = [...first].filter((id) => rest.every((s) => s.has(id)));
+    adsInfIds = inter.length > 0 ? inter : ["__none__"];
   }
 
   const { data, error } = await (supabase as any).rpc("creator_analytics_page", {
@@ -222,14 +279,43 @@ export async function fetchCreatorAnalyticsPage(
   return { rows, total };
 }
 
+/** Best→worst workflow-stage rank for "most-advanced status" in an episode. */
+const STAGE_RANK: Record<string, number> = {
+  "reach out": 0,
+  "on board": 1,
+  "order sent": 2,
+  posted: 3,
+  delivered: 4,
+  rto: 5,
+  cancelled: 5,
+};
+function stageRank(s: string | null): number {
+  return STAGE_RANK[(s ?? "").trim().toLowerCase()] ?? -1;
+}
+
+/** max of two nullable ISO date strings (later wins; nulls lose). */
+function laterDate(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a >= b ? a : b;
+}
+function earlierDate(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a <= b ? a : b;
+}
+
 /**
- * Full merged collab history for ONE creator (posts ∪ historic_posts, newest
- * first), fetched on demand when that creator's history modal opens. Backed by
- * the `creator_collab_history` RPC.
+ * Full collab history for ONE creator, grouped into EPISODES by collab_id
+ * (posts ∪ historic_posts), fetched on demand when the history modal opens.
+ * Backed by the `creator_collab_history` RPC (per-post rows). Each episode folds
+ * its deliverable rows into one card with the collab's dates, team members,
+ * campaign, type and deliverable count. Un-onboarded reach-outs come back as
+ * their own single-row episodes. Newest first (post → onboard → reach-out date).
  */
 export async function fetchCreatorCollabHistory(
   infId: string,
-): Promise<CreatorCollab[]> {
+): Promise<CreatorCollabEpisode[]> {
   const id = (infId ?? "").trim();
   if (!id) return [];
 
@@ -237,17 +323,64 @@ export async function fetchCreatorCollabHistory(
   const { data, error } = await (supabase as any).rpc("creator_collab_history", {
     p_inf_id: id,
   });
-
   if (error) throw error;
 
-  return ((data ?? []) as Raw[]).map((r) => ({
-    collabId: String(r.collab_id ?? "—"),
-    contentType: (r.content_type as string | null) ?? null,
-    postDate: (r.post_date as string | null) ?? null,
-    paymentStatus: (r.payment_status as string | null) ?? null,
-    postLink: (r.post_link as string | null) ?? null,
-    source: (r.source as string | null) === "historic" ? "historic" : "live",
-  }));
+  const groups = new Map<string, CreatorCollabEpisode & { _ct: Set<string>; _pl: Set<string> }>();
+  for (const r of (data ?? []) as Raw[]) {
+    const key = String(r.collab_key ?? "").trim();
+    if (!key) continue;
+    const source = (r.source as string | null) === "historic" ? "historic" : "live";
+    let g = groups.get(key);
+    if (!g) {
+      g = {
+        collabKey: key,
+        collabId: (r.collab_id as string | null) ?? null,
+        campaign: (r.campaign_id as string | null) ?? null,
+        contentTypes: [],
+        reachOutDate: null,
+        onboardDate: null,
+        postDate: null,
+        reachOutBy: (r.reach_out_by as string | null) ?? null,
+        onboardBy: (r.onboard_by as string | null) ?? null,
+        collabType: (r.collab_type as string | null) ?? null,
+        commercial: 0,
+        stage: null,
+        deliverableCount: 0,
+        isReachout: Boolean(r.is_reachout),
+        postLinks: [],
+        source,
+        _ct: new Set<string>(),
+        _pl: new Set<string>(),
+      };
+      groups.set(key, g);
+    }
+    g.deliverableCount += 1;
+    g.reachOutDate = earlierDate(g.reachOutDate, (r.reach_out_date as string | null) ?? null);
+    g.onboardDate = earlierDate(g.onboardDate, (r.onboard_date as string | null) ?? null);
+    g.postDate = laterDate(g.postDate, (r.post_date as string | null) ?? null);
+    g.commercial += Number(r.commercial_amount ?? 0) || 0;
+    if (!g.campaign && r.campaign_id) g.campaign = String(r.campaign_id);
+    if (!g.reachOutBy && r.reach_out_by) g.reachOutBy = String(r.reach_out_by);
+    if (!g.onboardBy && r.onboard_by) g.onboardBy = String(r.onboard_by);
+    if (!g.collabType && r.collab_type) g.collabType = String(r.collab_type);
+    const ct = String(r.content_type ?? "").trim();
+    if (ct) g._ct.add(ct);
+    const pl = String(r.post_link ?? "").trim();
+    if (/^https?:\/\//i.test(pl)) g._pl.add(pl);
+    if (stageRank(r.workflow_status as string | null) > stageRank(g.stage)) {
+      g.stage = (r.workflow_status as string | null) ?? g.stage;
+    }
+  }
+
+  const episodes = [...groups.values()].map((g) => {
+    const { _ct, _pl, ...rest } = g;
+    return { ...rest, contentTypes: [..._ct], postLinks: [..._pl] };
+  });
+
+  // Newest first — by the episode's furthest date (post → onboard → reach-out).
+  const sortDate = (e: CreatorCollabEpisode) =>
+    e.postDate ?? e.onboardDate ?? e.reachOutDate ?? "";
+  return episodes.sort((a, b) => sortDate(b).localeCompare(sortDate(a)));
 }
 
 /**
@@ -420,12 +553,19 @@ export async function fetchCreatorAdsInfo(
 export const fetchCreatorAnalyticsFilterOptions = unstable_cache(
   async (): Promise<CreatorAnalyticsFilterOptions> => {
     const supabase = createServiceClient();
-    const [creatorsRes, postsRes] = await Promise.all([
+    const [creatorsRes, postsRes, histRes] = await Promise.all([
       (supabase as any)
         .from("creators")
         .select("category, state, creator_type")
         .limit(FETCH_LIMIT),
-      (supabase as any).from("posts").select("workflow_status").limit(FETCH_LIMIT),
+      (supabase as any)
+        .from("posts")
+        .select("workflow_status, onboarded_by, logged_by")
+        .limit(FETCH_LIMIT),
+      (supabase as any)
+        .from("historic_posts")
+        .select("onboarded_by, logged_by")
+        .limit(FETCH_LIMIT),
     ]);
 
     const tiers = new Set<string>();
@@ -440,16 +580,26 @@ export const fetchCreatorAnalyticsFilterOptions = unstable_cache(
       if (t) creatorTypes.add(t);
     }
     const statuses = new Set<string>();
+    const teamMembers = new Set<string>();
+    const addTeam = (r: Raw) => {
+      const ob = String(r.onboarded_by ?? "").trim();
+      if (ob) teamMembers.add(ob);
+      const lb = String(r.logged_by ?? "").trim();
+      if (lb) teamMembers.add(lb);
+    };
     for (const p of (postsRes.data ?? []) as Raw[]) {
       const s = String(p.workflow_status ?? "").trim();
       if (s) statuses.add(s);
+      addTeam(p);
     }
+    for (const h of (histRes.data ?? []) as Raw[]) addTeam(h);
 
     return {
       tiers: [...tiers].sort(),
       regions: [...regions].sort(),
       statuses: [...statuses].sort(),
       creatorTypes: [...creatorTypes].sort(),
+      teamMembers: [...teamMembers].sort(),
     };
   },
   ["creator-analytics-filter-options"],
