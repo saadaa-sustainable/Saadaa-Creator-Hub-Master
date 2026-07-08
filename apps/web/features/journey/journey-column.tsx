@@ -1,6 +1,14 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { JourneyCard, JourneyColumn } from "./types";
 import { JourneyCardItem } from "./journey-card";
 import { cn } from "@/lib/cn";
+
+/** Cards rendered per column before the "View more" reveal. Keeps the DOM light
+ *  when a stage holds hundreds of collabs — the header count stays the true
+ *  total, only the rendered slice grows on demand. */
+const PAGE = 25;
 
 const COLUMN_STYLE: Record<
   JourneyColumn["id"],
@@ -38,6 +46,14 @@ export function JourneyColumnView({
   const { id, title, cards } = column;
   const style = COLUMN_STYLE[id];
 
+  // Render only the first `visible` cards; "View more" grows the slice. Reset to
+  // the first page whenever the card set changes (a new filter re-buckets it).
+  const [visible, setVisible] = useState(PAGE);
+  useEffect(() => setVisible(PAGE), [cards]);
+
+  const shown = cards.slice(0, visible);
+  const remaining = cards.length - shown.length;
+
   return (
     <section
       className={cn(
@@ -64,14 +80,25 @@ export function JourneyColumnView({
             Nothing here yet
           </div>
         ) : (
-          cards.map((card: JourneyCard) => (
-            <JourneyCardItem
-              key={card.post_id}
-              card={card}
-              colId={id}
-              onClick={onCardClick ? () => onCardClick(card) : undefined}
-            />
-          ))
+          <>
+            {shown.map((card: JourneyCard) => (
+              <JourneyCardItem
+                key={card.post_id}
+                card={card}
+                colId={id}
+                onClick={onCardClick ? () => onCardClick(card) : undefined}
+              />
+            ))}
+            {remaining > 0 && (
+              <button
+                type="button"
+                onClick={() => setVisible((v) => v + PAGE)}
+                className="mt-1 w-full rounded-xl border border-border bg-bg-white/70 hover:bg-bg-white py-2 text-[0.68rem] font-bold uppercase tracking-[0.05em] text-text-secondary transition-colors"
+              >
+                View {Math.min(PAGE, remaining)} more · {remaining} left
+              </button>
+            )}
+          </>
         )}
       </div>
     </section>
