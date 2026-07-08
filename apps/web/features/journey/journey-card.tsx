@@ -220,9 +220,9 @@ export function JourneyCardItem({
         )}
       </dl>
 
-      {card.onboarded_by ? (
+      {card.onboarded_by ?? card.logged_by ? (
         <footer className="pt-1.5 border-t border-border text-[0.62rem] font-semibold text-text-secondary truncate">
-          {card.onboarded_by}
+          {card.onboarded_by ?? card.logged_by}
         </footer>
       ) : null}
     </article>

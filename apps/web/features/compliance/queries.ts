@@ -31,6 +31,7 @@ const POSTS_SELECT = [
   "onboard_date",
   "post_date",
   "onboarded_by",
+  "logged_by",
   "deliverable_index",
   "inf_id",
   "collab_number",
@@ -254,7 +255,9 @@ export async function fetchComplianceData(): Promise<ComplianceData> {
       campaignMap.set(cid, c);
     }
 
-    const team = String(r.onboarded_by ?? "").trim();
+    // Team = row owner (CALLOUT BY = logged_by, always set); onboarded_by is
+    // only set on onboarded rows since 2026-07-08, so it would under-count.
+    const team = String(r.onboarded_by ?? r.logged_by ?? "").trim();
     if (team) teamMap.set(team, (teamMap.get(team) ?? 0) + 1);
   }
 
