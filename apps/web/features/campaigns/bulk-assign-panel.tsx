@@ -40,7 +40,7 @@ export function BulkAssignCampaignPanel({
       (r) =>
         (r.username ?? "").toLowerCase().includes(needle) ||
         (r.inf_id ?? "").toLowerCase().includes(needle) ||
-        (r.onboarded_by ?? "").toLowerCase().includes(needle),
+        (r.logged_by ?? "").toLowerCase().includes(needle),
     );
   }, [rows, q]);
 
@@ -243,7 +243,7 @@ export function BulkAssignCampaignPanel({
                             {r.content_type ?? "—"}
                           </td>
                           <td className="px-2 py-1.5 text-text-secondary">
-                            {r.onboarded_by ?? "—"}
+                            {r.logged_by ?? "—"}
                           </td>
                         </tr>
                       );

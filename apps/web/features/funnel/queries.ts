@@ -9,6 +9,7 @@ const POSTS_SELECT = [
   "collab_type",
   "order_status",
   "onboarded_by",
+  "logged_by",
   "campaign_id",
   "deliverable_index",
 ].join(",");
@@ -137,7 +138,10 @@ export async function fetchFunnelData(
     const status = statusKey(row.workflow_status);
     const collab = statusKey(row.collab_type);
     const orderStatus = statusKey(row.order_status);
-    const team = String(row.onboarded_by ?? "").trim();
+    // Team = row owner (sheet CALLOUT BY = logged_by, always set). onboarded_by
+    // is only set on onboarded rows since 2026-07-08, so keying on it here
+    // under-counted every team member (Vijaydeep 228 vs ~2,052 reach-outs).
+    const team = String(row.logged_by ?? row.onboarded_by ?? "").trim();
     const isParent =
       row.deliverable_index == null || Number(row.deliverable_index) === 1;
     if (team) teamsSet.add(team);

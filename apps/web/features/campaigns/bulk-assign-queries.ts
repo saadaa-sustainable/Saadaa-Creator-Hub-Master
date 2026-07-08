@@ -12,7 +12,9 @@ export interface UnassignedReachOut {
   reach_out_date: string | null;
   content_type: string | null;
   reachout_direction: string | null;
-  onboarded_by: string | null;
+  /** Callout-by = who logged the reach-out (logged_by). onboarded_by is null on
+   *  reach-out rows since 2026-07-08, so the "By" column reads logged_by. */
+  logged_by: string | null;
   notes: string | null;
 }
 
@@ -27,7 +29,7 @@ export async function fetchUnassignedReachOuts(): Promise<UnassignedReachOut[]> 
   const { data, error } = await (supabase as any)
     .from("posts")
     .select(
-      "id, inf_id, username, reach_out_date, content_type, reachout_direction, onboarded_by, notes",
+      "id, inf_id, username, reach_out_date, content_type, reachout_direction, logged_by, notes",
     )
     .is("campaign_id", null)
     .eq("workflow_status", "Reach Out")
