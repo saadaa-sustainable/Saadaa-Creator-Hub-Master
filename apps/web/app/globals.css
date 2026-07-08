@@ -14236,6 +14236,97 @@ body:has(.km-backdrop) {
   border-top: 0;
 }
 
+.team-rows-modal,
+.team-row-detail-modal {
+  width: min(920px, 94vw);
+  max-height: min(90dvh, 920px);
+}
+
+.team-rows-modal__head .campaign-detail-subtitle {
+  font-variant-numeric: tabular-nums;
+}
+
+.team-rows-modal__body {
+  max-height: calc(min(90dvh, 920px) - 132px);
+}
+
+.team-rows-modal__filters {
+  gap: 0.62rem;
+  padding: 0.72rem;
+}
+
+.team-rows-modal__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.team-rows-modal__list {
+  min-height: 310px;
+  padding: 0.7rem;
+}
+
+.team-rows-modal__cards {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.team-row-card {
+  min-height: 78px;
+  border-color: color-mix(
+    in oklab,
+    var(--campaign-accent, #b57514) 10%,
+    var(--color-border)
+  );
+  border-radius: 14px !important;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 252, 248, 0.92),
+      rgba(250, 248, 245, 0.72)
+    ),
+    var(--color-bg-white);
+  box-shadow: 0 14px 30px -28px rgba(22, 21, 19, 0.34);
+}
+
+.team-row-card:hover {
+  transform: translateY(-1px);
+}
+
+.team-rows-modal__state {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.team-rows-modal__footer {
+  gap: 0.55rem;
+}
+
+.team-rows-modal__footer-count {
+  margin-right: auto;
+  color: var(--color-text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.team-row-detail-section {
+  gap: 0.58rem;
+}
+
+.team-row-detail-grid > div {
+  min-height: 72px;
+}
+
+.team-row-detail-grid a {
+  overflow-wrap: anywhere;
+}
+
 .ad-preview-modal {
   width: min(72rem, 94vw);
   max-height: min(90dvh, 880px);
@@ -14424,9 +14515,36 @@ body:has(.km-backdrop) {
     max-height: calc(100dvh - 1rem);
   }
 
+  .team-rows-modal,
+  .team-row-detail-modal {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+  }
+
   .ad-detail-body {
     max-height: calc(100dvh - 9.4rem);
     padding: 0.72rem;
+  }
+
+  .team-rows-modal__body {
+    max-height: calc(100dvh - 9.4rem);
+  }
+
+  .team-rows-modal__list {
+    min-height: 240px;
+  }
+
+  .team-row-card {
+    min-height: 72px;
+  }
+
+  .team-rows-modal__footer {
+    flex-wrap: wrap;
+  }
+
+  .team-rows-modal__footer-count {
+    flex: 1 0 100%;
+    margin-right: 0;
   }
 
   .ad-detail-profile-card {

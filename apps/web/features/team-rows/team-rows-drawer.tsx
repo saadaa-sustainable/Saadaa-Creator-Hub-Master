@@ -31,12 +31,32 @@ function stageOf(r: TeamRow): Stage {
   if (s.includes("on board") || s === "order sent") return "onboard";
   return "reach";
 }
-const STAGE_META: Record<Stage, { label: string; cls: string }> = {
-  reach: { label: "Reach Out", cls: "bg-[#EAF1FB] text-[#3B6FD4]" },
-  onboard: { label: "Onboard", cls: "bg-[#F1EAFB] text-[#7B4FBF]" },
-  posted: { label: "Posted", cls: "bg-[#E7F0FB] text-[#3B6FD4]" },
-  delivered: { label: "Delivered", cls: "bg-success-bg text-success-text" },
-  closed: { label: "RTO / Cancelled", cls: "bg-danger-bg text-danger-text" },
+const STAGE_META: Record<Stage, { label: string; cls: string; accent: string }> = {
+  reach: {
+    label: "Reach Out",
+    cls: "bg-[#EAF1FB] text-[#3B6FD4]",
+    accent: "#3B6FD4",
+  },
+  onboard: {
+    label: "Onboard",
+    cls: "bg-[#F1EAFB] text-[#7B4FBF]",
+    accent: "#7B4FBF",
+  },
+  posted: {
+    label: "Posted",
+    cls: "bg-[#E7F0FB] text-[#3B6FD4]",
+    accent: "#3B6FD4",
+  },
+  delivered: {
+    label: "Delivered",
+    cls: "bg-success-bg text-success-text",
+    accent: "#4F7C4D",
+  },
+  closed: {
+    label: "RTO / Cancelled",
+    cls: "bg-danger-bg text-danger-text",
+    accent: "#C0392B",
+  },
 };
 const STAGE_FILTERS: Array<{ key: Stage | "all"; label: string }> = [
   { key: "all", label: "All" },
@@ -48,6 +68,8 @@ const STAGE_FILTERS: Array<{ key: Stage | "all"; label: string }> = [
 ];
 
 const PAGE = 30;
+const AD_OVERVIEW_MODAL_CLASSES =
+  "modal-panel modal-panel--lg modal-panel--onboarding campaign-detail-modal ob-overview-modal ad-overview-modal ad-detail-modal";
 
 function fmtDate(s: string | null): string {
   if (!s) return "—";
@@ -174,7 +196,12 @@ function RowCard({ row, onOpen }: { row: TeamRow; onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="w-full text-left rounded-2xl border border-border bg-bg-white hover:border-[#DCD6C4] hover:shadow-sm transition-all p-2.5 sm:p-3 flex items-center gap-3 min-w-0"
+      className={cn(
+        "team-row-card w-full min-w-0 text-left",
+        "flex items-center gap-3 rounded-2xl border border-border",
+        "bg-bg-white p-2.5 transition-all hover:border-[#DCD6C4]",
+        "hover:shadow-sm sm:p-3",
+      )}
     >
       <Avatar
         src={proxyAvatarUrl(row.profile_pic, 88)}
@@ -215,23 +242,23 @@ function RowCard({ row, onOpen }: { row: TeamRow; onOpen: () => void }) {
 // ── Detail modal — every Tracker field ──────────────────────────────────────
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-border bg-bg-surface/60 px-3 py-2 min-w-0">
-      <div className="text-[0.52rem] font-extrabold uppercase tracking-[0.06em] text-text-tertiary">
-        {label}
-      </div>
-      <div className="text-[0.74rem] font-bold text-text-primary break-words">
-        {value ?? "—"}
-      </div>
+    <div>
+      <dt>{label}</dt>
+      <dd>{value ?? "—"}</dd>
     </div>
   );
 }
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-2">
-      <h3 className="text-[0.6rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
-        {title}
-      </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{children}</div>
+    <section className="campaign-detail-section team-row-detail-section">
+      <div className="campaign-detail-section-head">
+        <div>
+          <h3>{title}</h3>
+        </div>
+      </div>
+      <dl className="campaign-detail-stat-grid ad-detail-context-grid team-row-detail-grid">
+        {children}
+      </dl>
     </section>
   );
 }
@@ -260,40 +287,102 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
       onClick={onClose}
     >
       <div
-        className="modal-panel modal-panel--lg modal-panel--onboarding"
-        style={{ maxWidth: 900, width: "96vw", "--campaign-accent": meta.cls } as CSSProperties}
+        className={`${AD_OVERVIEW_MODAL_CLASSES} team-row-detail-modal`}
+        style={{ "--campaign-accent": meta.accent } as CSSProperties}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="modal-head" style={{ alignItems: "flex-start" }}>
-          <div className="flex items-center gap-3 min-w-0">
-            <Avatar src={proxyAvatarUrl(row.profile_pic, 96)} username={row.username} name={row.username} size={48} />
-            <div className="min-w-0">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[0.6rem] font-extrabold text-text-secondary bg-bg-surface border border-border rounded-full px-1.5 py-0.5">
-                  {dash(row.post_id_short ?? row.inf_id)}
+        <header className="modal-head campaign-detail-head ad-detail-head">
+          <div className="min-w-0">
+            <div className="campaign-card__id-row">
+              <span className="campaign-card__id tabular">
+                {dash(row.post_id_short ?? row.inf_id)}
+              </span>
+              {row.collab_id && (
+                <span className="campaign-card__status tabular">
+                  {row.collab_id}
                 </span>
-                <span className={cn("text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5", meta.cls)}>
-                  {meta.label}
-                </span>
-                <span className="text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5 bg-bg-surface text-text-tertiary border border-border">
-                  Historic
-                </span>
-              </div>
-              <h2 className="text-base font-extrabold text-text-primary truncate">@{dash(row.username)}</h2>
-              <p className="text-[0.62rem] text-text-tertiary truncate">
-                {dash(row.campaign_id)} · {dash(row.nomenclature)}
-              </p>
+              )}
+              <span
+                className={cn(
+                  "text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5",
+                  meta.cls,
+                )}
+              >
+                {meta.label}
+              </span>
+              <span className="campaign-card__status tabular">Historic</span>
             </div>
+            <h2>@{dash(row.username)}</h2>
+            <p className="campaign-detail-subtitle">
+              {dash(row.campaign_id)} · {dash(row.nomenclature)}
+            </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="modal-head__actions">
             <PostPreview link={row.post_link} label={row.username ?? ""} />
-            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-              <X size={14} aria-hidden />
+            <button
+              type="button"
+              className="icon-btn campaign-detail-close-btn"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X size={16} aria-hidden />
             </button>
           </div>
         </header>
 
-        <div className="modal-body flex flex-col gap-4" style={{ maxHeight: "72vh", overflowY: "auto" }}>
+        <div className="modal-body campaign-detail-body ad-detail-body">
+          <section className="campaign-detail-overview ad-detail-overview">
+            <div className="campaign-detail-allocation-card ad-detail-profile-card">
+              <div className="ad-detail-avatar-frame">
+                <Avatar
+                  src={proxyAvatarUrl(row.profile_pic, 116)}
+                  username={row.username}
+                  name={row.username}
+                  size={74}
+                />
+              </div>
+              <div className="campaign-detail-allocation-copy">
+                <span>Creator / Row</span>
+                <strong>@{dash(row.username)}</strong>
+                <p className="ad-detail-profile-sub">
+                  {dash(row.influencer_category)} · {fmtNum(row.followers)} followers ·{" "}
+                  {dash(row.content_type)}
+                </p>
+                <span className="campaign-detail-progress-track ad-detail-progress-track">
+                  <span
+                    style={
+                      {
+                        "--ad-width": row.post_link ? "100%" : "12%",
+                        "--ad-accent": meta.accent,
+                      } as CSSProperties
+                    }
+                  />
+                </span>
+                <div className="campaign-detail-quick-actions">
+                  <span className="campaign-detail-reachout-button">
+                    <Instagram size={13} aria-hidden />
+                    {row.post_link ? "Post Linked" : "No Post Link"}
+                  </span>
+                  <span className="campaign-detail-reachout-button">
+                    {meta.label}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <dl className="campaign-detail-stat-grid ad-detail-stat-grid">
+              <Field label="Campaign" value={dash(row.campaign_id)} />
+              <Field label="Post Date" value={fmtDate(row.post_date)} />
+              <Field
+                label="Delivery"
+                value={dash(row.order_status ?? row.workflow_status)}
+              />
+              <Field label="Followers" value={fmtNum(row.followers)} />
+              <Field label="Commercial" value={fmtMoney(row.commercial_amount)} />
+              <Field label="Order" value={dash(row.order_id)} />
+            </dl>
+          </section>
+
           <Group title="Identity">
             <Field label="Post ID" value={dash(row.post_id_short)} />
             <Field label="Legacy Post ID" value={dash(row.post_id)} />
@@ -345,7 +434,12 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
               label="Link to Post"
               value={
                 row.post_link ? (
-                  <a href={row.post_link} target="_blank" rel="noreferrer" className="text-[#3B6FD4] hover:underline break-all">
+                  <a
+                    href={row.post_link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#3B6FD4] hover:underline break-all"
+                  >
                     {row.post_link}
                   </a>
                 ) : "—"
@@ -355,7 +449,12 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
               label="Download Link"
               value={
                 row.download_link ? (
-                  <a href={row.download_link} target="_blank" rel="noreferrer" className="text-[#3B6FD4] hover:underline break-all">
+                  <a
+                    href={row.download_link}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#3B6FD4] hover:underline break-all"
+                  >
                     Open
                   </a>
                 ) : "—"
@@ -364,6 +463,23 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
             <Field label="Notes" value={dash(row.notes)} />
           </Group>
         </div>
+
+        <footer className="modal-foot ob-overview-footer">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Close
+          </button>
+          {row.post_link && (
+            <a
+              href={row.post_link}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary-cta"
+            >
+              <ExternalLink size={14} aria-hidden />
+              <span className="hidden sm:inline">Open on </span>Instagram
+            </a>
+          )}
+        </footer>
       </div>
     </div>,
     document.body,
@@ -417,6 +533,8 @@ export function TeamRowsDrawer({
   }, [rows, q, stage]);
 
   if (!mounted || typeof document === "undefined") return null;
+  const visibleRows = filtered.slice(0, visible);
+  const hasMore = rows != null && filtered.length > visible;
 
   return createPortal(
     <div
@@ -424,87 +542,120 @@ export function TeamRowsDrawer({
       role="dialog"
       aria-modal="true"
       aria-label={`${team} — rows`}
-      style={{ zIndex: 70, alignItems: "stretch", justifyContent: "flex-end" }}
+      style={{ zIndex: 70 }}
       onClick={onClose}
     >
       <div
-        className="bg-bg-base h-full w-full sm:max-w-[720px] flex flex-col shadow-2xl"
-        style={{ borderTopLeftRadius: 20, borderBottomLeftRadius: 20 }}
+        className={`${AD_OVERVIEW_MODAL_CLASSES} team-rows-modal`}
+        style={{ "--campaign-accent": "#B57514" } as CSSProperties}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
+        <header className="modal-head campaign-detail-head ad-detail-head team-rows-modal__head">
           <div className="min-w-0">
-            <span className="text-[0.58rem] font-extrabold uppercase tracking-[0.07em] text-text-tertiary">
-              Historic rows · team member
-            </span>
-            <h2 className="text-base font-extrabold text-text-primary truncate">{team}</h2>
+            <div className="campaign-card__id-row">
+              <span className="campaign-card__id">Historic Rows</span>
+              <span className="campaign-card__status">Team Member</span>
+            </div>
+            <h2>{team}</h2>
+            <p className="campaign-detail-subtitle">
+              {rows == null
+                ? "Loading rows"
+                : `${filtered.length.toLocaleString("en-IN")} rows`}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[0.68rem] font-extrabold text-text-secondary bg-bg-surface border border-border rounded-full px-2.5 py-1">
-              {rows == null ? "…" : `${filtered.length} rows`}
-            </span>
-            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+          <div className="modal-head__actions">
+            <button
+              type="button"
+              className="icon-btn campaign-detail-close-btn"
+              onClick={onClose}
+              aria-label="Close"
+            >
               <X size={16} aria-hidden />
             </button>
           </div>
         </header>
 
-        <div className="px-4 py-2.5 flex flex-col gap-2 border-b border-border">
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" aria-hidden />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search creator, POST ID, campaign, order…"
-              className="w-full rounded-full border border-border bg-bg-white pl-8 pr-3 h-9 text-[0.75rem] focus:outline-none focus:border-[#DCD6C4]"
-            />
-          </div>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {STAGE_FILTERS.map((f) => (
-              <button
-                key={f.key}
-                type="button"
-                onClick={() => setStage(f.key)}
+        <div className="modal-body campaign-detail-body ad-detail-body team-rows-modal__body">
+          <section className="campaign-detail-section team-rows-modal__filters">
+            <div className="relative">
+              <Search
+                size={13}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
+                aria-hidden
+              />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search creator, POST ID, campaign, order..."
                 className={cn(
-                  "text-[0.62rem] font-extrabold rounded-full px-2.5 py-1 border transition-colors",
-                  stage === f.key
-                    ? "bg-[#2C2420] text-[#F0C61E] border-[#2C2420]"
-                    : "bg-bg-white text-text-secondary border-border hover:border-[#DCD6C4]",
+                  "h-9 w-full rounded-full border border-border",
+                  "bg-bg-white pl-8 pr-3 text-[0.75rem]",
+                  "focus:border-[#DCD6C4] focus:outline-none",
                 )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
+              />
+            </div>
+            <div className="team-rows-modal__chips">
+              {STAGE_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setStage(f.key)}
+                  className={cn(
+                    "text-[0.62rem] font-extrabold rounded-full px-2.5 py-1 border transition-colors",
+                    stage === f.key
+                      ? "bg-[#2C2420] text-[#F0C61E] border-[#2C2420]"
+                      : "bg-bg-white text-text-secondary border-border hover:border-[#DCD6C4]",
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="campaign-detail-section team-rows-modal__list">
+            {rows == null ? (
+              <div className="team-rows-modal__state">
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="team-rows-modal__state">
+                No rows match.
+              </div>
+            ) : (
+              <div className="team-rows-modal__cards">
+                {visibleRows.map((r, i) => (
+                  <RowCard
+                    key={`${r.post_id_short ?? r.post_id ?? "row"}-${i}`}
+                    row={r}
+                    onOpen={() => setSelected(r)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
-          {rows == null ? (
-            <div className="flex-1 grid place-items-center text-text-tertiary">
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex-1 grid place-items-center text-[0.75rem] text-text-tertiary italic py-10">
-              No rows match.
-            </div>
-          ) : (
-            <>
-              {filtered.slice(0, visible).map((r, i) => (
-                <RowCard key={`${r.post_id_short ?? r.post_id ?? "row"}-${i}`} row={r} onOpen={() => setSelected(r)} />
-              ))}
-              {filtered.length > visible && (
-                <button
-                  type="button"
-                  onClick={() => setVisible((v) => v + PAGE)}
-                  className="mt-1 w-full rounded-xl border border-border bg-bg-white/70 hover:bg-bg-white py-2 text-[0.68rem] font-bold uppercase tracking-[0.05em] text-text-secondary transition-colors"
-                >
-                  View {Math.min(PAGE, filtered.length - visible)} more ·{" "}
-                  {filtered.length - visible} left
-                </button>
-              )}
-            </>
+        <footer className="modal-foot ob-overview-footer team-rows-modal__footer">
+          {rows != null && filtered.length > 0 && (
+            <span className="team-rows-modal__footer-count">
+              {Math.min(visible, filtered.length).toLocaleString("en-IN")} of{" "}
+              {filtered.length.toLocaleString("en-IN")}
+            </span>
           )}
-        </div>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Close
+          </button>
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setVisible((v) => v + PAGE)}
+              className="btn-primary-cta"
+            >
+              View {Math.min(PAGE, filtered.length - visible)} more
+            </button>
+          )}
+        </footer>
       </div>
 
       {selected && <RowDetailModal row={selected} onClose={() => setSelected(null)} />}

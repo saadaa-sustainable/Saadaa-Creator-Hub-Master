@@ -27,6 +27,11 @@ export default function HistoricAnalyticsKM() {
             donuts, monthly funnel trend, spends-per-campaign, top creators, team
             leaderboard and the 4-stage mini board.
           </li>
+          <li>
+            <strong>Team rows</strong> — Funnel and Internal team selections open
+            the same centered overview popup pattern used by Ad Status, with
+            search, stage filters, row pagination and row-level Tracker details.
+          </li>
         </KMList>
       </KMSection>
 
