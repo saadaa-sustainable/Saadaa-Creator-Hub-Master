@@ -6,7 +6,7 @@ import { assertPermission } from "@/lib/rbac.server";
 import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
-import { isVoidedStatus } from "@/lib/workflow";
+import { checkReachoutAllowed } from "./guards";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -98,39 +98,14 @@ export async function submitInboundBatch(
       continue;
     }
 
-    // New rule (2026-06-24): Reach Out (inbound too) is for NEW creators only.
-    // Existing creators start repeat collabs (C2+) via Onboarding, not reach-out.
-    const { data: existsRow } = await (supabase as any)
-      .from("creators")
-      .select("inf_id")
-      .ilike("username", username)
-      .maybeSingle();
-    if (existsRow) {
-      failures.push({
-        row: i + 1,
-        error: "Existing creator — use Onboarding (repeat collab C2+)",
-      });
-      continue;
-    }
-
-    // Shrishti duplicate-creator guard (per-campaign; Cancelled OR voided/
-    // Offboarded allow re-add). Sequential loop → a prior row's commit is
-    // visible to later rows, so intra-batch duplicates are caught too.
-    const { data: dupes } = await (supabase as any)
-      .from("posts")
-      .select("workflow_status")
-      .ilike("username", username)
-      .eq("campaign_id", campaignId)
-      .limit(10);
-    const activeDup = (
-      (dupes ?? []) as Array<{ workflow_status: string | null }>
-    ).some(
-      (p) =>
-        String(p.workflow_status ?? "") !== "Cancelled" &&
-        !isVoidedStatus(p.workflow_status),
-    );
-    if (activeDup) {
-      failures.push({ row: i + 1, error: "Already in this campaign" });
+    // Reach-Out eligibility (2026-07-08): existing creators may be re-reached
+    // (submit_reachout reuses their SIF), gated by the rolling 30-day cooldown
+    // and the per-campaign rule. Cancelled/voided reach-outs free re-engagement.
+    // Sequential loop → a prior row's commit is visible to later rows, so
+    // intra-batch duplicates are caught too.
+    const block = await checkReachoutAllowed(supabase, username, campaignId);
+    if (block) {
+      failures.push({ row: i + 1, error: block.hint });
       continue;
     }
 

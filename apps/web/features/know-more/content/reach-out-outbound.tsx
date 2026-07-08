@@ -66,9 +66,12 @@ export default function ReachOutOutboundKM() {
       <KMSection tag="Lookup pipeline (lookupCreator action) — INSTANT via Meta">
         <KMList>
           <li>
-            <strong>1. creators</strong> — existing row wins (no re-fetch). Also
-            caught by legacy <KMCode>profile_id</KMCode> even if the handle
-            changed → submit blocked, guided to Onboarding for a repeat collab.
+            <strong>1. creators</strong> — existing row is matched by handle (or
+            legacy <KMCode>profile_id</KMCode> if the handle changed), then{" "}
+            <strong>refreshed live from Meta</strong> and updated in place —{" "}
+            <em>same SIF, same profile_id, no new creator</em>. Badge:{" "}
+            &quot;Existing · Refreshed&quot;. Re-reach is allowed (submit no
+            longer blocked) subject to the eligibility rules below.
           </li>
           <li>
             <strong>2. Meta business_discovery</strong> — LIVE fetch on the
@@ -162,11 +165,21 @@ export default function ReachOutOutboundKM() {
             before submit.
           </li>
           <li>
-            <strong>Duplicate-creator guard</strong> — submitting a creator
-            already in the same campaign is blocked with a field error on the
-            Instagram URL, unless the prior collab was{" "}
-            <KMCode>Cancelled</KMCode> or <KMCode>Offboarded</KMCode> (voided) —
-            either frees the handle to be reached out again for the campaign.
+            <strong>Reach-out eligibility (2026-07-08)</strong> — an existing
+            creator CAN be reached out again (the old &quot;existing creator →
+            Onboarding only&quot; block is gone). Two rules gate it, both
+            ignoring <KMCode>Cancelled</KMCode>/<KMCode>Offboarded</KMCode>{" "}
+            (voided) reach-outs so a dead collab frees re-engagement:
+            <br />
+            <strong>· Cooldown</strong> — one active reach-out per creator per
+            rolling <strong>30 days</strong> (across all campaigns).
+            <br />
+            <strong>· Per-campaign</strong> — never a second active reach-out for
+            the same campaign; free to map to a different campaign next cycle.
+            <br />
+            Enforced server-side in{" "}
+            <KMCode>guards.ts › checkReachoutAllowed</KMCode> (shared by outbound
+            + inbound), with a field error on the Instagram URL.
           </li>
           <li>
             <strong>Reach-out is unlimited; the cap is an ONBOARDING cap</strong>{" "}

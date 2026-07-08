@@ -17,7 +17,7 @@ import {
 } from "@/lib/meta-graph";
 import { checkMetaGate, recordMetaUsage } from "@/lib/meta-rate-limit";
 import { logSystemError } from "@/lib/system-errors";
-import { isVoidedStatus } from "@/lib/workflow";
+import { checkReachoutAllowed } from "./guards";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
@@ -97,44 +97,18 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     return { ok: false, error: "Could not derive username from URL" };
   }
 
-  // New rule (2026-06-24): Reach Out is for NEW creators only. An existing
-  // creator starts a repeat collab (C2+) via Onboarding, not reach-out — so
-  // C1 is only ever created at reach-out. Block if the creator already exists.
-  const { data: existingCreator } = await (supabase as any)
-    .from("creators")
-    .select("inf_id")
-    .ilike("username", username)
-    .maybeSingle();
-  if (existingCreator) {
+  // Reach-Out eligibility (2026-07-08). An existing creator CAN now be reached
+  // out again — the old "existing creator → Onboarding only" hard block is gone.
+  // `submit_reachout` reuses the creator's SIF (no new SIF; the row is updated in
+  // place). Two rules gate it (see checkReachoutAllowed): a rolling 30-day
+  // cooldown across all campaigns, and never a second active reach-out for the
+  // SAME campaign. Cancelled/voided reach-outs are dead and free re-engagement.
+  const block = await checkReachoutAllowed(supabase, username, v.campaignId);
+  if (block) {
     return {
       ok: false,
-      error:
-        "Existing creator — reach-out is for new creators only. Use Onboarding to start a repeat collab (C2+).",
-      fieldErrors: { instagramLink: "Existing creator — use Onboarding" },
-    };
-  }
-
-  // Shrishti error-handling: duplicate-creator guard. Block re-reaching the
-  // same creator within the same campaign unless the prior collab was
-  // Cancelled OR voided/Offboarded (per-campaign; RTO/Delivered/etc. still
-  // count as active). Voiding a collab frees the slot — we're done with that
-  // collab, so the creator can be reached out fresh for the campaign.
-  const { data: dupes } = await (supabase as any)
-    .from("posts")
-    .select("post_id, workflow_status")
-    .ilike("username", username)
-    .eq("campaign_id", v.campaignId)
-    .limit(10);
-  const activeDup = ((dupes ?? []) as Array<{ workflow_status: string | null }>).find(
-    (p) =>
-      String(p.workflow_status ?? "") !== "Cancelled" &&
-      !isVoidedStatus(p.workflow_status),
-  );
-  if (activeDup) {
-    return {
-      ok: false,
-      error: "This creator is already in this campaign.",
-      fieldErrors: { instagramLink: "Already reached out in this campaign" },
+      error: block.error,
+      fieldErrors: { instagramLink: block.hint },
     };
   }
 
@@ -508,6 +482,12 @@ export interface CreatorLookupHit {
   verification: "Yes" | "No" | null;
   /** Optional human note for non-data tiers (deactivated/error). */
   note?: string | null;
+  /**
+   * True when this is an existing creator whose metrics were just refreshed from
+   * a live Meta fetch (re-reach flow). The identity (inf_id, profile_id) is
+   * unchanged — only followers/ER/avatar/tier/name were updated in place.
+   */
+  refreshed?: boolean;
 }
 
 /** Derive Nano/Micro/Mid-tier/Macro/Mega from follower count (matches creators.category). */
@@ -567,6 +547,66 @@ function creatorLookupFromRow(
           ? "No"
           : null,
   };
+}
+
+/**
+ * Re-reach flow (2026-07-08): an existing creator is being looked up for a fresh
+ * reach-out. Overlay LIVE Meta metrics (followers, ER, avg likes, avatar, tier,
+ * name, verified badge) onto the stored identity and persist them to the
+ * `creators` row IN PLACE — same inf_id, same profile_id (only filled if the row
+ * lacked one). No new SIF is ever minted. Falls back to the stored row untouched
+ * when Meta is cooling down / failed, so a hiccup never wipes known data.
+ */
+async function refreshExistingCreator(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  username: string,
+  creatorRow: Record<string, unknown>,
+  meta: MetaDiscoveryResult,
+  igVerified: boolean | null,
+): Promise<CreatorLookupHit> {
+  const hit = creatorLookupFromRow(username, creatorRow);
+  if (meta.status !== "ok" || !meta.node) return hit; // keep stored data on failure
+
+  const n = meta.node;
+  const followers = n.followers ?? hit.followers;
+  const tier = tierFor(followers) ?? hit.category;
+  // Overlay fresh metrics on the returned hit (identity fields untouched).
+  hit.followers = followers;
+  hit.category = tier;
+  hit.avg_likes = n.avg_likes ?? hit.avg_likes;
+  hit.er = n.er ?? hit.er;
+  hit.profile_pic = n.profile_pic ?? hit.profile_pic;
+  hit.inf_name = n.name ?? hit.inf_name;
+  hit.biography = n.biography ?? hit.biography ?? null;
+  if (igVerified !== null) hit.verification = igVerified ? "Yes" : "No";
+  // profile_id stays as-is; only backfill if the creator never had one.
+  if (!hit.profile_id && n.ig_id) hit.profile_id = n.ig_id;
+  hit.refreshed = true;
+
+  // Persist fresh metrics to the creators row in place. Only send keys we have a
+  // fresh value for → never null-out an existing field on a partial Meta node.
+  const infId =
+    typeof creatorRow.inf_id === "string" ? creatorRow.inf_id : hit.inf_id;
+  if (infId) {
+    const upd: Record<string, unknown> = {};
+    if (followers != null) upd.followers = followers;
+    if (tier != null) upd.category = tier;
+    if (n.profile_pic) upd.profile_pic = n.profile_pic;
+    if (n.name) upd.inf_name = n.name;
+    if (n.er != null) upd.er = n.er;
+    if (n.avg_likes != null) upd.avg_likes = n.avg_likes;
+    if (!creatorRow.profile_id && n.ig_id) upd.profile_id = n.ig_id;
+    if (Object.keys(upd).length > 0) {
+      const { error } = await supabase
+        .from("creators")
+        .update(upd)
+        .eq("inf_id", infId);
+      if (error)
+        console.error("[refreshExistingCreator] update failed:", error.message);
+    }
+  }
+  return hit;
 }
 
 /**
@@ -796,12 +836,10 @@ export async function lookupCreator(
     console.error("[lookupCreator] creators select error:", creatorErr.message);
   }
 
-  if (creatorRow) {
-    return creatorLookupFromRow(
-      username,
-      creatorRow as Record<string, unknown>,
-    );
-  }
+  // NOTE: an existing creator no longer short-circuits here. Reach-Out now allows
+  // re-reaching an existing creator, and the re-reach must pull FRESH Instagram
+  // data — so we still run the live Meta fetch below and refresh the stored row
+  // in place (same SIF/profile_id) via refreshExistingCreator.
 
   // Historic fallback data for this handle (used by every tier below). One read
   // each: ig_data_historic (legacy profile_id + cached followers/avg_likes/pic)
@@ -860,8 +898,20 @@ export async function lookupCreator(
     await recordMetaUsage(1, meta.usagePct ?? 0);
   }
 
+  // Existing creator by username (tier 1) → re-reach: refresh from live Meta and
+  // update the row in place (same SIF/profile_id). No new SIF minted.
+  if (creatorRow) {
+    return refreshExistingCreator(
+      supabase,
+      username,
+      creatorRow as Record<string, unknown>,
+      meta,
+      igVerified,
+    );
+  }
+
   // Returning creator who CHANGED their handle: username missed tier 1, but the
-  // legacy profile_id matches → treat as an existing creator (submit blocked).
+  // legacy profile_id matches → same existing creator. Refresh in place too.
   if (meta.status === "ok" && meta.node?.ig_id) {
     const { data: byPid } = await supabase
       .from("creators")
@@ -870,9 +920,12 @@ export async function lookupCreator(
       .maybeSingle();
     if (byPid) {
       const r = byPid as Record<string, unknown>;
-      return creatorLookupFromRow(
+      return refreshExistingCreator(
+        supabase,
         typeof r.username === "string" ? r.username : username,
         r,
+        meta,
+        igVerified,
       );
     }
   }

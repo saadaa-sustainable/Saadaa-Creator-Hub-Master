@@ -249,7 +249,11 @@ export function OutboundForm({
       else setValue("verification", "Pending", { shouldDirty: true });
 
       if (result.source === "creator")
-        toast.success("Loaded from Creator Data — existing creator");
+        toast.success(
+          result.refreshed
+            ? "Existing creator — refreshed live from Instagram"
+            : "Loaded from Creator Data — existing creator",
+        );
       else if (result.source === "meta")
         toast.success("Fetched live from Instagram");
       else if (result.source === "historic")
@@ -298,13 +302,8 @@ export function OutboundForm({
 
   const onSubmit = (event: React.FormEvent) => {
     setSubmitAttempted(true);
-    if (isExistingCreator) {
-      event.preventDefault();
-      toast.error(
-        "Existing creator — reach-out is for new creators only. Use Onboarding to start a repeat collab (C2+).",
-      );
-      return;
-    }
+    // Existing creators may now be re-reached (server enforces the 30-day cooldown
+    // + per-campaign rule and refreshes their data). No client-side block.
     handleSubmit(
       (values) => {
         startSubmit(async () => {
@@ -653,11 +652,13 @@ export function OutboundForm({
                         <AlertCircle className="h-3 w-3" />
                       )}
                       {hit.source === "creator"
-                        ? hit.creator_type === "historic_creator"
-                          ? "From Records · Historic"
-                          : hit.creator_type === "new_creator"
-                            ? "From Records · New"
-                            : "From Records"
+                        ? hit.refreshed
+                          ? "Existing · Refreshed"
+                          : hit.creator_type === "historic_creator"
+                            ? "From Records · Historic"
+                            : hit.creator_type === "new_creator"
+                              ? "From Records · New"
+                              : "From Records"
                         : hit.source === "meta"
                           ? "Live"
                           : hit.source === "historic"
@@ -952,11 +953,7 @@ export function OutboundForm({
       <div className="space-y-3">
         <MissingFieldsAlert fields={missingFieldLabels} />
         <div className="text-end">
-          <button
-            type="submit"
-            className="btn-submit"
-            disabled={submitting || isExistingCreator}
-          >
+          <button type="submit" className="btn-submit" disabled={submitting}>
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -965,7 +962,7 @@ export function OutboundForm({
             {submitting
               ? "Submitting…"
               : isExistingCreator
-                ? "Existing creator — use Onboarding"
+                ? "Re-Reach Out"
                 : "Create Reach Out"}
           </button>
         </div>
