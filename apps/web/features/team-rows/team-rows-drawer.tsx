@@ -15,9 +15,7 @@ import {
   Loader2,
   Play,
 } from "lucide-react";
-import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import { proxyAvatarUrl } from "@/lib/formatters";
 import { extractShortcode } from "@/lib/instagram-shortcode";
 import { fetchTeamRows, type TeamRow } from "./actions";
 
@@ -58,16 +56,35 @@ const STAGE_META: Record<Stage, { label: string; cls: string; accent: string }> 
     accent: "#C0392B",
   },
 };
-const STAGE_FILTERS: Array<{ key: Stage | "all"; label: string }> = [
+/** Board stages + two derived buckets: "posted_no_order" (posted content whose
+ *  order_id was never mapped = posted-but-not-onboarded) and "due" (onboarded,
+ *  awaiting the post). */
+type FilterKey = Stage | "all" | "posted_no_order" | "due";
+const STAGE_FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "All" },
   { key: "reach", label: "Reach Out" },
   { key: "onboard", label: "Onboard" },
+  { key: "due", label: "Due" },
   { key: "posted", label: "Posted" },
+  { key: "posted_no_order", label: "Posted · No Order" },
   { key: "delivered", label: "Delivered" },
   { key: "closed", label: "RTO / Cancelled" },
 ];
+function hasOrder(r: TeamRow): boolean {
+  return !!(r.order_id ?? "").trim();
+}
+function matchesFilter(r: TeamRow, f: FilterKey): boolean {
+  if (f === "all") return true;
+  if (f === "posted_no_order") {
+    const st = stageOf(r);
+    return (st === "posted" || st === "delivered") && !hasOrder(r);
+  }
+  // Onboarded (On Board / Order Sent) but the post hasn't landed → content due.
+  if (f === "due") return stageOf(r) === "onboard";
+  return stageOf(r) === f;
+}
 
-const PAGE = 30;
+const PAGE = 500;
 const AD_OVERVIEW_MODAL_CLASSES =
   "modal-panel modal-panel--lg modal-panel--onboarding campaign-detail-modal ob-overview-modal ad-overview-modal ad-detail-modal";
 
@@ -87,6 +104,57 @@ function fmtNum(n: number | null): string {
 }
 function fmtMoney(n: number | null): string {
   return n == null ? "—" : `₹${Number(n).toLocaleString("en-IN")}`;
+}
+function avatarInitials(username: string | null): string {
+  const base = (username ?? "").trim();
+  if (!base) return "?";
+  const parts = base.split(/[\s._]+/).filter(Boolean);
+  return (
+    parts.length === 1
+      ? parts[0].slice(0, 2)
+      : parts[0][0] + parts[parts.length - 1][0]
+  ).toUpperCase();
+}
+
+// Raw-image avatar — Instagram fbcdn URLs 403 through the weserv proxy, but a
+// direct <img> with referrerPolicy="no-referrer" loads the non-expired ones
+// (same technique as the Ad Status board). Expired/dead URLs fall back to
+// initials. Not the shared weserv Avatar, which double-proxies + blocks fbcdn.
+function RowAvatar({
+  pic,
+  username,
+  size = 44,
+}: {
+  pic: string | null;
+  username: string | null;
+  size?: number;
+}) {
+  const [failed, setFailed] = useState(false);
+  const show = pic && !failed;
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-warm bg-bg-muted font-semibold text-text-secondary"
+      style={{
+        width: size,
+        height: size,
+        fontSize: Math.max(10, Math.floor(size * 0.36)),
+      }}
+    >
+      {show ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={pic as string}
+          alt={username ?? "avatar"}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span>{avatarInitials(username)}</span>
+      )}
+    </span>
+  );
 }
 
 // ── Instagram post preview (thumbnail button → live embed lightbox) ────────
@@ -140,7 +208,7 @@ function PostLightbox({
       role="dialog"
       aria-modal="true"
       aria-label={`Post preview — ${label}`}
-      style={{ zIndex: 90 }}
+      style={{ zIndex: 2000 }}
       onClick={(e) => {
         e.stopPropagation();
         onClose();
@@ -203,10 +271,9 @@ function RowCard({ row, onOpen }: { row: TeamRow; onOpen: () => void }) {
         "hover:shadow-sm sm:p-3",
       )}
     >
-      <Avatar
-        src={proxyAvatarUrl(row.profile_pic, 88)}
+      <RowAvatar
+        pic={row.creator_pic ?? row.profile_pic}
         username={row.username}
-        name={row.username}
         size={44}
       />
       <div className="min-w-0 flex-1">
@@ -334,10 +401,9 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
           <section className="campaign-detail-overview ad-detail-overview">
             <div className="campaign-detail-allocation-card ad-detail-profile-card">
               <div className="ad-detail-avatar-frame">
-                <Avatar
-                  src={proxyAvatarUrl(row.profile_pic, 116)}
+                <RowAvatar
+                  pic={row.creator_pic ?? row.profile_pic}
                   username={row.username}
-                  name={row.username}
                   size={74}
                 />
               </div>
@@ -496,7 +562,7 @@ export function TeamRowsDrawer({
 }) {
   const [rows, setRows] = useState<TeamRow[] | null>(null);
   const [q, setQ] = useState("");
-  const [stage, setStage] = useState<Stage | "all">("all");
+  const [stage, setStage] = useState<FilterKey>("all");
   const [visible, setVisible] = useState(PAGE);
   const [selected, setSelected] = useState<TeamRow | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -521,7 +587,7 @@ export function TeamRowsDrawer({
     const src = rows ?? [];
     const ql = q.trim().toLowerCase();
     return src.filter((r) => {
-      if (stage !== "all" && stageOf(r) !== stage) return false;
+      if (!matchesFilter(r, stage)) return false;
       if (!ql) return true;
       return (
         (r.username ?? "").toLowerCase().includes(ql) ||

@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -8,7 +7,6 @@ import {
   formatDate,
   formatFollowers,
   formatRupees,
-  proxyAvatarUrl,
   workflowStatusLabel,
 } from "@/lib/formatters";
 
@@ -46,9 +44,12 @@ function initialsFor(name?: string | null, username?: string | null): string {
 }
 
 /**
- * Shared avatar — always proxies via weserv.nl to bypass Instagram CDN Referer blocks.
- * Falls back to initials on error or missing src.
- * Per memory `feedback_profile_image_consistency.md`: never reinvent per-view.
+ * Shared avatar — renders the raw Instagram CDN URL with
+ * `referrerPolicy="no-referrer"` (the browser sends no Referer, so fbcdn/
+ * cdninstagram serve the image). The weserv proxy was replaced 2026-07-09: it
+ * 403s on fbcdn URLs (~8k creators showed only initials). Falls back to initials
+ * on error or missing src. Per `feedback_profile_image_consistency.md`: never
+ * reinvent per-view — fix this shared component and every surface benefits.
  */
 export function Avatar({
   src,
@@ -64,8 +65,7 @@ export function Avatar({
   const [overview, setOverview] = useState<CreatorOverview | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
-  const proxied = proxyAvatarUrl(src, size * 2);
-  const showImage = proxied && !failed;
+  const showImage = !!src && !failed;
   const label = name ?? username ?? "Avatar";
   // Only clickable when a handle exists AND the avatar is interactive.
   const handle = interactive ? (username?.trim().toLowerCase() ?? "") : "";
@@ -139,14 +139,14 @@ export function Avatar({
         }}
       >
         {showImage ? (
-          <Image
-            src={proxied}
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={src as string}
             alt={label}
-            fill
-            sizes={`${size}px`}
-            className="object-cover"
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="h-full w-full object-cover"
             onError={() => setFailed(true)}
-            unoptimized
           />
         ) : (
           <span>{initialsFor(name, username)}</span>
@@ -186,7 +186,7 @@ export function Avatar({
               <CreatorOverviewContent
                 fallbackName={name}
                 fallbackUsername={username}
-                fallbackImage={proxied}
+                fallbackImage={src}
                 overview={overview}
                 loading={overviewLoading}
                 error={overviewError}
@@ -218,8 +218,7 @@ function CreatorOverviewContent({
   const displayName =
     stringValue(creator?.inf_name) ?? fallbackName ?? fallbackUsername ?? "—";
   const username = stringValue(creator?.username) ?? fallbackUsername ?? "";
-  const image =
-    proxyAvatarUrl(stringValue(creator?.profile_pic), 320) ?? fallbackImage;
+  const image = stringValue(creator?.profile_pic) ?? fallbackImage;
   const initials = initialsFor(displayName, username);
   const tier = stringValue(creator?.category) ?? "—";
   const engagementRate = percentValue(creator?.er ?? creator?.er_percent);
@@ -231,13 +230,13 @@ function CreatorOverviewContent({
         <div className="creator-overview-profile-body">
           <div className="creator-overview-avatar">
             {image ? (
-              <Image
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
                 src={image}
                 alt={displayName}
-                fill
-                sizes="96px"
-                className="object-cover"
-                unoptimized
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="h-full w-full object-cover"
               />
             ) : (
               <span>{initials}</span>
