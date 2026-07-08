@@ -5,13 +5,12 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 
-type HistoricView = "overview" | "funnel" | "internal" | "ad-status";
+type HistoricView = "overview" | "funnel" | "internal";
 
 const HISTORIC_VIEWS: { id: HistoricView; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "funnel", label: "Funnel View" },
   { id: "internal", label: "Internal Dashboard" },
-  { id: "ad-status", label: "Ad Status" },
 ];
 
 /**
