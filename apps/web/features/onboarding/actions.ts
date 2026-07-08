@@ -1177,12 +1177,14 @@ export async function lookupShopifyOrder(orderId: string) {
   if (first.error) return { found: false, error: first.error.message } as const;
   if (first.data) return { found: true, order: first.data } as const;
 
-  // Not synced yet — try the same on-demand live Shopify pull that submit uses
-  // (Option B: only upserts if the order carries the `inf` tag), then re-check.
-  // Keeps the inline preview consistent with what Submit will do.
+  // Not synced yet — try the same on-demand live Shopify pull that submit uses.
+  // The edge function resolves the order by NUMBER (not internal id) and only
+  // upserts when it carries the `inf` influencer tag (Option B). Keeps the
+  // inline preview consistent with what Submit will do.
   if (serverEnv.NEXT_PUBLIC_SUPABASE_URL && serverEnv.SUPABASE_SERVICE_KEY) {
+    let untagged = false;
     try {
-      await fetch(
+      const res = await fetch(
         `${serverEnv.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sync-shopify-orders?order_id=${encodeURIComponent(id)}`,
         {
           method: "POST",
@@ -1193,6 +1195,12 @@ export async function lookupShopifyOrder(orderId: string) {
           },
         },
       );
+      // A live order that exists but lacks the `inf` tag is a deliberate
+      // rejection, not a miss — surface why so the team can fix the tag.
+      const body = (await res.json().catch(() => null)) as
+        | { found?: boolean; tagged?: boolean }
+        | null;
+      if (body?.found && body.tagged === false) untagged = true;
     } catch (err) {
       console.error("[onboarding] preview on-demand Shopify pull failed:", err);
     }
@@ -1202,6 +1210,12 @@ export async function lookupShopifyOrder(orderId: string) {
       .eq("order_id", id)
       .maybeSingle();
     if (retry.data) return { found: true, order: retry.data } as const;
+    if (untagged) {
+      return {
+        found: false,
+        error: "Order found in Shopify but not tagged “inf” — add the influencer tag, then fetch again.",
+      } as const;
+    }
   }
   return { found: false } as const;
 }

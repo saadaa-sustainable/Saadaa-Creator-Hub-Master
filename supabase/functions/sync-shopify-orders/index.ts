@@ -4,10 +4,11 @@
 //  1. BULK (no params) — runs every 3 hours via pg_cron. Pulls Shopify Admin
 //     API orders tagged `inf` within the date window and upserts them into
 //     `shopify_orders` (Supabase = sole source of truth).
-//  2. SINGLE-ORDER on-demand (?order_id=X or POST { order_id }) — fetches ONE
-//     order live by its Shopify id, and (Option B) upserts it ONLY if it carries
-//     the `inf` influencer tag. Used by onboarding to validate a freshly-placed
-//     order that the 3-hr bulk sync hasn't picked up yet, without waiting.
+//  2. SINGLE-ORDER on-demand (?order_id=X or POST { order_id }) — resolves ONE
+//     order live by its order NUMBER (the value the team enters + posts.order_id
+//     stores, e.g. 1444809 — NOT Shopify's internal id) and (Option B) upserts it
+//     ONLY if it carries the `inf` influencer tag. Used by onboarding to validate
+//     a freshly-placed order the 3-hr bulk sync hasn't picked up yet.
 //
 // Env (Supabase Edge secrets):
 //   SUPABASE_URL                — auto-injected by runtime
@@ -229,22 +230,31 @@ async function handleSingleOrder(
   supabase: ReturnType<typeof createClient>,
   orderId: string,
 ): Promise<Response> {
-  const clean = orderId.trim().replace(/[^0-9]/g, ""); // Shopify order id is numeric
+  const clean = orderId.trim().replace(/[^0-9]/g, ""); // team enters digits only
   if (!clean) return json({ ok: true, found: false, matched: 0, reason: "bad_id" });
 
+  // The team enters the order NUMBER (e.g. 1444809 → name "#1444809"), which is
+  // NOT Shopify's internal order id (e.g. 7143874855158). GET /orders/{id}.json
+  // expects the internal id and 404s on an order number, so resolve by the
+  // `name` search endpoint and keep the exact order_number match. `status=any`
+  // so paid draft-order conversions and archived orders resolve too.
   const url =
-    `https://${SHOPIFY_STORE_DOMAIN}/admin/api/${SHOPIFY_API_VERSION}/orders/${clean}.json?fields=${ORDER_FIELDS}`;
+    `https://${SHOPIFY_STORE_DOMAIN}/admin/api/${SHOPIFY_API_VERSION}/orders.json` +
+    `?status=any&name=${encodeURIComponent(clean)}&limit=50&fields=${ORDER_FIELDS}`;
   const res = await shopifyFetch(url);
 
-  if (res.status === 404) {
-    return json({ ok: true, found: false, matched: 0, reason: "not_found" });
-  }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     return json({ ok: false, error: `Shopify ${res.status}`, body: body.slice(0, 300) }, 502);
   }
 
-  const { order } = (await res.json()) as { order?: ShopifyOrder };
+  const { orders } = (await res.json()) as { orders?: ShopifyOrder[] };
+  // Name search can be fuzzy — keep the exact order_number, falling back to an
+  // internal-id match in case a raw internal id was ever passed in.
+  const order =
+    (orders ?? []).find((o) => String(o.order_number ?? "") === clean) ??
+    (orders ?? []).find((o) => String(o.id ?? "") === clean) ??
+    null;
   if (!order) return json({ ok: true, found: false, matched: 0, reason: "not_found" });
 
   // Option B — require the influencer tag before accepting the order.

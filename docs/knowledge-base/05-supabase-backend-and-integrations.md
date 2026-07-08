@@ -31,7 +31,7 @@ Mode decided in `Deno.serve`: reads `searchParams.get("order_id")`, falls back t
 
 ### 1.3 External API — Shopify Admin REST
 
-- **Single-order:** `GET https://${STORE}/admin/api/${VERSION}/orders/${id}.json?fields=${ORDER_FIELDS}` (id sanitized to digits).
+- **Single-order (2026-07-08 fix):** resolves by order **NUMBER**, not internal id. `GET …/orders.json?status=any&name=${clean}&limit=50&fields=${ORDER_FIELDS}` then keeps the exact `order_number === clean` match (internal-id match as fallback). The old `GET /orders/${id}.json` was wrong — the team enters the order NUMBER (e.g. `1444809`, name `#1444809`), but that path expects Shopify's 13-digit internal id (`7143874855158`) and 404'd on every real order, so onboarding always showed "Order not found in Shopify sync" even for tagged influencer orders. `status=any` so paid draft-order conversions resolve too.
 - **Bulk:** `GET …/orders.json?status=any&limit=250&updated_at_min=${sinceIso}&fields=${ORDER_FIELDS}`, `sinceIso` = now − `DAYS_BACK`; cursor pagination via `Link` header `rel="next"`.
 - **Auth:** `X-Shopify-Access-Token`. **429** → 2s sleep + recursive retry.
 
@@ -48,7 +48,7 @@ Mode decided in `Deno.serve`: reads `searchParams.get("order_id")`, falls back t
 ### 1.6 Error handling
 
 - Bulk non-OK → `502`; per-page upsert errors collected into `failed[]`; no DB-side retry (next 3-hr tick re-pulls via `updated_at_min`); truncation at `MAX_PAGES` sets `truncated:true`.
-- Single 404 → `{found:false}`; other non-OK → `502`.
+- Single: no name match → `{found:false,reason:"not_found"}`; non-OK Shopify → `502`. `lookupShopifyOrder` reads the JSON response and, on `{found:true,tagged:false}`, surfaces a distinct "Order found in Shopify but not tagged 'inf'" message instead of a generic miss.
 
 ### 1.7 App invocation of single-order mode (onboarding)
 
