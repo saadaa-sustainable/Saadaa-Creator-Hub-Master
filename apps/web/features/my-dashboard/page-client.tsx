@@ -14,6 +14,39 @@ import { MyDashboardKpiStrip } from "./kpi-strip";
 import { PendingActionsSection } from "./pending-actions";
 import { MyDashboardWorkloadBoard } from "./workload-board";
 
+/** Inclusive date-range test on an ISO date string (compares the YYYY-MM-DD
+ *  prefix). Empty from/to means unbounded on that side. */
+function inRange(d: string | null, from: string, to: string): boolean {
+  if (!from && !to) return true;
+  if (!d) return false;
+  const day = d.slice(0, 10);
+  if (from && day < from) return false;
+  if (to && day > to) return false;
+  return true;
+}
+
+function FilterDate({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="onboarding-filter-field">
+      <span>{label}</span>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="onboarding-filter-select"
+      />
+    </label>
+  );
+}
+
 export interface MyDashboardBodyProps {
   kpi: MyDashboardKpi;
   pendingActions: PendingAction[];
@@ -38,6 +71,12 @@ export function MyDashboardBody({
     campaign: "",
     status: "",
     tier: "",
+    reachFrom: "",
+    reachTo: "",
+    onboardFrom: "",
+    onboardTo: "",
+    postFrom: "",
+    postTo: "",
   });
 
   const filteredPosts = useMemo(() => {
@@ -57,12 +96,32 @@ export function MyDashboardBody({
       if (filters.tier && post.creator?.category !== filters.tier) {
         return false;
       }
+      if (!inRange(post.reach_out_date, filters.reachFrom, filters.reachTo)) {
+        return false;
+      }
+      if (!inRange(post.onboard_date, filters.onboardFrom, filters.onboardTo)) {
+        return false;
+      }
+      if (!inRange(post.post_date, filters.postFrom, filters.postTo)) {
+        return false;
+      }
       return true;
     });
   }, [filters, posts]);
 
   const clearFilters = () =>
-    setFilters({ q: "", campaign: "", status: "", tier: "" });
+    setFilters({
+      q: "",
+      campaign: "",
+      status: "",
+      tier: "",
+      reachFrom: "",
+      reachTo: "",
+      onboardFrom: "",
+      onboardTo: "",
+      postFrom: "",
+      postTo: "",
+    });
 
   return (
     <>
@@ -143,6 +202,36 @@ export function MyDashboardBody({
                 searchPlaceholder="Search tiers…"
               />
             </label>
+            <FilterDate
+              label="Reached From"
+              value={filters.reachFrom}
+              onChange={(v) => setFilters((prev) => ({ ...prev, reachFrom: v }))}
+            />
+            <FilterDate
+              label="Reached To"
+              value={filters.reachTo}
+              onChange={(v) => setFilters((prev) => ({ ...prev, reachTo: v }))}
+            />
+            <FilterDate
+              label="Onboarded From"
+              value={filters.onboardFrom}
+              onChange={(v) => setFilters((prev) => ({ ...prev, onboardFrom: v }))}
+            />
+            <FilterDate
+              label="Onboarded To"
+              value={filters.onboardTo}
+              onChange={(v) => setFilters((prev) => ({ ...prev, onboardTo: v }))}
+            />
+            <FilterDate
+              label="Posted From"
+              value={filters.postFrom}
+              onChange={(v) => setFilters((prev) => ({ ...prev, postFrom: v }))}
+            />
+            <FilterDate
+              label="Posted To"
+              value={filters.postTo}
+              onChange={(v) => setFilters((prev) => ({ ...prev, postTo: v }))}
+            />
           </div>
           {Object.values(filters).some(Boolean) && (
             <div className="flex justify-end mt-3">
