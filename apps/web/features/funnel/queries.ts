@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { isVoidedStatus } from "@/lib/workflow";
+import { isContentLink, isVoidedStatus } from "@/lib/workflow";
 import type { FunnelData, FunnelMetrics, FunnelPeriodBucket } from "./types";
 
 const POSTS_SELECT = [
@@ -149,11 +149,12 @@ export async function fetchFunnelData(
 
     const reachDate = parseDate(row.reach_out_date);
     const postDate = parseDate(row.post_date);
-    // "Posted" = the creator published content = a LINK TO POST exists (the
-    // sheet's truth), OR the workflow reached Posted/Delivered. post_date alone
+    // "Posted" = the creator published content = a real LINK TO POST exists
+    // (http/IG/YouTube URL), OR the workflow reached Posted/Delivered. A bare
+    // non-URL string in post_link ("Ghosted", status notes) is NOT a link and
+    // must not count as posted — those creators ghosted. post_date alone
     // under-counts — many posted rows carry a link/status but no date recorded.
-    const hasLink =
-      typeof row.post_link === "string" && row.post_link.trim() !== "";
+    const hasLink = isContentLink(row.post_link as string | null);
     const isPostedRow =
       hasLink ||
       status.includes("posted") ||

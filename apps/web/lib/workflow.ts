@@ -12,6 +12,23 @@
  */
 export const VOIDED_STATUSES = ["Offboarded", "Offboarding"] as const;
 
+/**
+ * True when a `post_link` value is an actual content URL (Instagram reel/post,
+ * YouTube Short, etc.) rather than a status note the sheet parked in the same
+ * column. The migrated Influencer Tracker uses LINK TO POST as a free-text
+ * cell — most rows hold a URL, but ghosted creators carry the literal word
+ * "Ghosted" and some rows hold notes ("not picking up…", "Story posted"). A
+ * bare non-URL string is NOT a post: counting it inflates "posted" and steals
+ * from the GHOSTED bucket. Accept http(s) links and scheme-less
+ * instagram.com/youtube URLs; reject everything else. NULL-safe.
+ */
+export function isContentLink(link: string | null | undefined): boolean {
+  if (typeof link !== "string") return false;
+  return /(?:https?:\/\/|(?:www\.)?(?:instagram\.com|youtube\.com|youtu\.be))/i.test(
+    link.trim(),
+  );
+}
+
 /** True when a workflow_status marks a voided (offboarded) collab. NULL-safe. */
 export function isVoidedStatus(status: string | null | undefined): boolean {
   return status === "Offboarded" || status === "Offboarding";

@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { isVoidedStatus } from "@/lib/workflow";
+import { isContentLink, isVoidedStatus } from "@/lib/workflow";
 import type { FunnelMetrics, FunnelPeriodBucket } from "@/features/funnel/types";
 import type { InternalDashboardData } from "./types";
 
@@ -143,11 +143,11 @@ export async function fetchInternalDashboardData(
 
     const reachDate = parseDate(row.reach_out_date);
     const postDate = parseDate(row.post_date);
-    // "Posted" = a LINK TO POST exists (the sheet's truth) OR the workflow
-    // reached Posted/Delivered — post_date alone under-counts (many posted
-    // rows carry a link/status but no recorded date).
-    const hasLink =
-      typeof row.post_link === "string" && row.post_link.trim() !== "";
+    // "Posted" = a real LINK TO POST exists (http/IG/YouTube URL) OR the
+    // workflow reached Posted/Delivered — a bare non-URL string ("Ghosted",
+    // notes) is not a link and must not count as posted. post_date alone
+    // under-counts (many posted rows carry a link/status but no recorded date).
+    const hasLink = isContentLink(row.post_link as string | null);
     const isPostedRow =
       hasLink ||
       status.includes("posted") ||
