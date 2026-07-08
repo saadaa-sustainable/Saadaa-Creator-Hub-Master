@@ -15,6 +15,7 @@ import {
   Loader2,
   Play,
   Eye,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { extractShortcode } from "@/lib/instagram-shortcode";
@@ -57,10 +58,15 @@ const STAGE_META: Record<Stage, { label: string; cls: string; accent: string }> 
     accent: "#C0392B",
   },
 };
-/** Board stages + two derived buckets: "posted_no_order" (posted content whose
- *  order_id was never mapped = posted-but-not-onboarded) and "due" (onboarded,
- *  awaiting the post). */
-type FilterKey = Stage | "all" | "posted_no_order" | "due";
+/** Board stages + derived buckets: "posted_no_order" (posted content whose
+ *  order_id was never mapped = posted-but-not-onboarded), "due" (onboarded,
+ *  awaiting the post) and "issues" (data-quality flags). */
+type FilterKey =
+  | Stage
+  | "all"
+  | "posted_no_order"
+  | "due"
+  | "issues";
 const STAGE_FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "All" },
   { key: "reach", label: "Reach Out" },
@@ -75,7 +81,7 @@ function hasOrder(r: TeamRow): boolean {
   return !!(r.order_id ?? "").trim();
 }
 function matchesFilter(r: TeamRow, f: FilterKey): boolean {
-  if (f === "all") return true;
+  if (f === "all" || f === "issues") return true; // "issues" handled by _issue flag
   if (f === "posted_no_order") {
     const st = stageOf(r);
     return (st === "posted" || st === "delivered") && !hasOrder(r);
@@ -84,6 +90,19 @@ function matchesFilter(r: TeamRow, f: FilterKey): boolean {
   if (f === "due") return stageOf(r) === "onboard";
   return stageOf(r) === f;
 }
+
+// Data-quality flags surfaced in the drawer.
+const CONTENT_LINK_RE =
+  /(?:https?:\/\/|(?:www\.)?(?:instagram\.com|youtube\.com|youtu\.be))/i;
+function contentLinkOk(link: string | null): boolean {
+  return typeof link === "string" && CONTENT_LINK_RE.test(link.trim());
+}
+type FlaggedRow = TeamRow & {
+  /** "junk" = counts as posted but post_link isn't a real URL; "dup" = the reel
+   *  shortcode is shared with a DIFFERENT creator's row (one link is wrong). */
+  _issue?: "junk" | "dup" | null;
+  _sharedWith?: string[];
+};
 
 const PAGE = 500;
 const AD_OVERVIEW_MODAL_CLASSES =
@@ -279,7 +298,7 @@ function PostLightbox({
 }
 
 // ── Row card ────────────────────────────────────────────────────────────────
-function RowCard({ row, onOpen }: { row: TeamRow; onOpen: () => void }) {
+function RowCard({ row, onOpen }: { row: FlaggedRow; onOpen: () => void }) {
   const stage = stageOf(row);
   const meta = STAGE_META[stage];
   const igUrl = row.username
@@ -310,6 +329,19 @@ function RowCard({ row, onOpen }: { row: TeamRow; onOpen: () => void }) {
           <span className="text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5 bg-bg-surface text-text-tertiary border border-border">
             Historic
           </span>
+          {row._issue && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5 bg-danger-bg text-danger-text border border-danger-text/40"
+              title={
+                row._issue === "junk"
+                  ? "Post link isn't a real URL but counts as posted"
+                  : `Reel shared with ${row._sharedWith?.join(", ")}`
+              }
+            >
+              <AlertTriangle size={9} aria-hidden />
+              {row._issue === "junk" ? "Bad link" : "Dup reel"}
+            </span>
+          )}
         </div>
         <div className="text-[0.8rem] font-extrabold text-text-primary truncate mt-0.5">
           @{row.username ?? "—"}
@@ -374,7 +406,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void }) {
+function RowDetailModal({ row, onClose }: { row: FlaggedRow; onClose: () => void }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -440,6 +472,26 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
         </header>
 
         <div className="modal-body campaign-detail-body ad-detail-body">
+          {row._issue && (
+            <div className="flex items-start gap-2 rounded-xl border border-danger-text/40 bg-danger-bg px-3 py-2 text-[0.7rem] text-danger-text">
+              <AlertTriangle size={14} aria-hidden className="mt-0.5 shrink-0" />
+              <span>
+                {row._issue === "junk" ? (
+                  <>
+                    <strong>Data issue — bad post link.</strong> The LINK TO POST
+                    isn&apos;t a real URL ({dash(row.post_link)}) yet this row
+                    counts as posted. Fix it in the Tracker.
+                  </>
+                ) : (
+                  <>
+                    <strong>Data issue — duplicate reel.</strong> This reel is also
+                    on {row._sharedWith?.join(", ")}. One of the LINK TO POST
+                    entries is wrong — verify who actually posted it.
+                  </>
+                )}
+              </span>
+            </div>
+          )}
           <section className="campaign-detail-overview ad-detail-overview">
             <div className="campaign-detail-allocation-card ad-detail-profile-card">
               <div className="ad-detail-avatar-frame">
@@ -628,11 +680,52 @@ export function TeamRowsDrawer({
   }, [onClose, selected]);
   useEffect(() => setVisible(PAGE), [q, stage]);
 
+  // Compute data-quality flags: junk post_link (counts as posted but isn't a
+  // real URL) + cross-creator duplicate reels (same shortcode on another
+  // creator's row → one link is wrong).
+  const flagged = useMemo<FlaggedRow[]>(() => {
+    const src = (rows ?? []) as FlaggedRow[];
+    const bySc = new Map<string, FlaggedRow[]>();
+    for (const r of src) {
+      const sc = extractShortcode(r.post_link ?? "");
+      if (sc) {
+        const arr = bySc.get(sc);
+        if (arr) arr.push(r);
+        else bySc.set(sc, [r]);
+      }
+    }
+    return src.map((r) => {
+      const link = (r.post_link ?? "").trim();
+      const sc = extractShortcode(link);
+      let issue: "junk" | "dup" | null = null;
+      let sharedWith: string[] = [];
+      if (link && !contentLinkOk(link)) {
+        issue = "junk";
+      } else if (sc) {
+        const peers = (bySc.get(sc) ?? []).filter(
+          (o) => o !== r && (o.username ?? "") !== (r.username ?? ""),
+        );
+        if (peers.length) {
+          issue = "dup";
+          sharedWith = [
+            ...new Set(peers.map((p) => `@${p.username} (${p.post_id_short ?? "—"})`)),
+          ];
+        }
+      }
+      return { ...r, _issue: issue, _sharedWith: sharedWith };
+    });
+  }, [rows]);
+  const issueCount = useMemo(
+    () => flagged.filter((r) => r._issue).length,
+    [flagged],
+  );
+
   const filtered = useMemo(() => {
-    const src = rows ?? [];
     const ql = q.trim().toLowerCase();
-    return src.filter((r) => {
-      if (!matchesFilter(r, stage)) return false;
+    return flagged.filter((r) => {
+      if (stage === "issues") {
+        if (!r._issue) return false;
+      } else if (!matchesFilter(r, stage)) return false;
       if (!ql) return true;
       return (
         (r.username ?? "").toLowerCase().includes(ql) ||
@@ -641,7 +734,7 @@ export function TeamRowsDrawer({
         (r.order_id ?? "").toLowerCase().includes(ql)
       );
     });
-  }, [rows, q, stage]);
+  }, [flagged, q, stage]);
 
   if (!mounted || typeof document === "undefined") return null;
   const visibleRows = filtered.slice(0, visible);
@@ -720,6 +813,21 @@ export function TeamRowsDrawer({
                   {f.label}
                 </button>
               ))}
+              {issueCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStage("issues")}
+                  className={cn(
+                    "text-[0.62rem] font-extrabold rounded-full px-2.5 py-1 border transition-colors inline-flex items-center gap-1",
+                    stage === "issues"
+                      ? "bg-danger-text text-white border-danger-text"
+                      : "bg-danger-bg text-danger-text border-danger-text/40 hover:border-danger-text",
+                  )}
+                  title="Rows with a data issue: junk post link or a reel shared with another creator"
+                >
+                  <AlertTriangle size={11} aria-hidden /> Issues {issueCount}
+                </button>
+              )}
             </div>
           </section>
 
