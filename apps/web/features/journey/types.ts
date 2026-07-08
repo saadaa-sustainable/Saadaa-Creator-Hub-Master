@@ -23,6 +23,7 @@ export interface JourneyPost {
   collab_id: string | null;
   inf_id: string | null;
   onboarded_by: string | null;
+  logged_by: string | null;
   /** Normalized branded-content permission state (posts.partnership_status). */
   partnership_status: string | null;
 }

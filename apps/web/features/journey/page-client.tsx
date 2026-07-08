@@ -24,7 +24,11 @@ function deriveOptions(cards: JourneyCard[]): {
 
   for (const c of cards) {
     if (c.username) influencers.add(c.username);
+    // A team member "owns" a row via either column: reach-out rows carry
+    // logged_by (onboarded_by is null until onboarding), onboarded rows carry
+    // onboarded_by. List both so the filter covers every stage.
     if (c.onboarded_by) teamMembers.add(c.onboarded_by);
+    if (c.logged_by) teamMembers.add(c.logged_by);
   }
 
   return {
@@ -63,8 +67,14 @@ function applyClientFilters(
     // Influencer: match by username
     if (influencer && card.username !== influencer) return false;
 
-    // Team member: match by onboarded_by
-    if (teamMember && card.onboarded_by !== teamMember) return false;
+    // Team member: match either column (reach-out owner = logged_by,
+    // onboard owner = onboarded_by) so a person's whole pipeline shows.
+    if (
+      teamMember &&
+      card.onboarded_by !== teamMember &&
+      card.logged_by !== teamMember
+    )
+      return false;
 
     // Tier: match by creator.category
     if (tier && card.creator?.category !== tier) return false;
