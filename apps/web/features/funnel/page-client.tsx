@@ -15,9 +15,11 @@ import {
   Truck,
   Users,
 } from "lucide-react";
+import { Rows3 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
+import { TeamRowsDrawer } from "@/features/team-rows/team-rows-drawer";
 import { FunnelChart } from "./funnel-chart";
 import type { FunnelData, FunnelMetrics, FunnelPeriodMode } from "./types";
 
@@ -46,6 +48,7 @@ export function FunnelBody({ data }: { data: FunnelData }) {
   const [mode, setMode] = useState<FunnelPeriodMode>("month");
   const [team, setTeam] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
+  const [rowsOpen, setRowsOpen] = useState(false);
 
   const buckets = mode === "month" ? data.byMonth : data.byWeek;
   const teamBuckets = mode === "month" ? data.byMonthTeam : data.byWeekTeam;
@@ -94,6 +97,7 @@ export function FunnelBody({ data }: { data: FunnelData }) {
         teams={data.teams}
         onModeChange={setMode}
         onTeamChange={setTeam}
+        onViewRows={() => setRowsOpen(true)}
         onRefresh={() => {
           setRefreshing(true);
           router.refresh();
@@ -101,6 +105,9 @@ export function FunnelBody({ data }: { data: FunnelData }) {
         }}
         refreshing={refreshing}
       />
+      {rowsOpen && team && (
+        <TeamRowsDrawer team={team} onClose={() => setRowsOpen(false)} />
+      )}
 
       <KpiStrip totals={totals} />
 
@@ -125,6 +132,7 @@ function FilterRow({
   teams,
   onModeChange,
   onTeamChange,
+  onViewRows,
   onRefresh,
   refreshing,
 }: {
@@ -133,6 +141,7 @@ function FilterRow({
   teams: string[];
   onModeChange: (mode: FunnelPeriodMode) => void;
   onTeamChange: (team: string) => void;
+  onViewRows: () => void;
   onRefresh: () => void;
   refreshing: boolean;
 }) {
@@ -169,7 +178,21 @@ function FilterRow({
             searchPlaceholder="Search team…"
           />
         </label>
-        <div className="onboarding-filter-actions">
+        <div className="onboarding-filter-actions flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onViewRows}
+            disabled={!team}
+            title={team ? `View ${team}'s row-level data` : "Select a team member first"}
+            className={cn(
+              "inline-flex h-[2.85rem] w-full items-center justify-center gap-1.5 rounded-[0.65rem] border px-3 text-[0.82rem] font-extrabold transition-all sm:w-auto",
+              team
+                ? "border-[#2C2420] bg-[#2C2420] text-[#F0C61E] hover:shadow-md active:scale-[0.98]"
+                : "border-border bg-bg-surface text-text-tertiary cursor-not-allowed opacity-70",
+            )}
+          >
+            <Rows3 size={14} aria-hidden /> View rows
+          </button>
           <button
             type="button"
             onClick={onRefresh}

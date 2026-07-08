@@ -18,11 +18,13 @@ import {
   Truck,
   UserCheck,
   Users,
+  Rows3,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { FunnelChart } from "@/features/funnel/funnel-chart";
+import { TeamRowsDrawer } from "@/features/team-rows/team-rows-drawer";
 import type { FunnelMetrics } from "@/features/funnel/types";
 import type { InternalDashboardData } from "./types";
 
@@ -57,6 +59,7 @@ export function InternalDashboardBody({ data }: { data: InternalDashboardData })
   const [week, setWeek] = useState<string>("");
   const [team, setTeam] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
+  const [rowsOpen, setRowsOpen] = useState(false);
 
   const monthOptions = useMemo(
     () => data.byMonth.map((b) => b.key),
@@ -142,6 +145,7 @@ export function InternalDashboardBody({ data }: { data: InternalDashboardData })
         onMonthChange={setMonth}
         onWeekChange={setWeek}
         onTeamChange={setTeam}
+        onViewRows={() => setRowsOpen(true)}
         onRefresh={() => {
           setRefreshing(true);
           router.refresh();
@@ -149,6 +153,9 @@ export function InternalDashboardBody({ data }: { data: InternalDashboardData })
         }}
         refreshing={refreshing}
       />
+      {rowsOpen && team && (
+        <TeamRowsDrawer team={team} onClose={() => setRowsOpen(false)} />
+      )}
 
       <KpiStrip totals={scoped.totals} />
 
@@ -207,6 +214,7 @@ function FilterRow({
   onMonthChange,
   onWeekChange,
   onTeamChange,
+  onViewRows,
   onRefresh,
   refreshing,
 }: {
@@ -221,6 +229,7 @@ function FilterRow({
   onMonthChange: (v: string) => void;
   onWeekChange: (v: string) => void;
   onTeamChange: (v: string) => void;
+  onViewRows: () => void;
   onRefresh: () => void;
   refreshing: boolean;
 }) {
@@ -290,7 +299,21 @@ function FilterRow({
             searchPlaceholder="Search team…"
           />
         </label>
-        <div className="onboarding-filter-actions">
+        <div className="onboarding-filter-actions flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onViewRows}
+            disabled={!team}
+            title={team ? `View ${team}'s row-level data` : "Select a team member first"}
+            className={cn(
+              "inline-flex items-center justify-center gap-1.5 px-3.5 h-9 rounded-full text-[0.72rem] font-extrabold border transition-all",
+              team
+                ? "bg-[#2C2420] text-[#F0C61E] border-[#2C2420] hover:scale-[1.03] hover:shadow-md active:scale-[0.97]"
+                : "bg-bg-surface text-text-tertiary border-border cursor-not-allowed opacity-70",
+            )}
+          >
+            <Rows3 size={12} aria-hidden /> View rows
+          </button>
           <button
             type="button"
             onClick={onRefresh}
