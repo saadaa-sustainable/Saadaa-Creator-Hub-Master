@@ -12,6 +12,7 @@ import type { InternalDashboardData } from "./types";
 const POSTS_SELECT = [
   "reach_out_date",
   "post_date",
+  "post_link",
   "workflow_status",
   "collab_type",
   "order_status",
@@ -142,6 +143,16 @@ export async function fetchInternalDashboardData(
 
     const reachDate = parseDate(row.reach_out_date);
     const postDate = parseDate(row.post_date);
+    // "Posted" = a LINK TO POST exists (the sheet's truth) OR the workflow
+    // reached Posted/Delivered — post_date alone under-counts (many posted
+    // rows carry a link/status but no recorded date).
+    const hasLink =
+      typeof row.post_link === "string" && row.post_link.trim() !== "";
+    const isPostedRow =
+      hasLink ||
+      status.includes("posted") ||
+      status.includes("delivered") ||
+      !!postDate;
 
     // Parent-only cohort metrics (matches funnel rule).
     if (reachDate && isParent) {
@@ -149,7 +160,7 @@ export async function fetchInternalDashboardData(
       const isGhost = status.includes("ghost");
       const isBarter = collab === "barter";
       const isDelivered = orderStatus === "delivered";
-      const isPosted = !!postDate;
+      const isPosted = isPostedRow;
       const isPend = isOnboarded && !isPosted && !isGhost;
       const daysSinceReach = (now - reachDate.getTime()) / DAY_MS;
       const isOverdue = isPend && daysSinceReach > OVERDUE_DAYS;
@@ -182,12 +193,14 @@ export async function fetchInternalDashboardData(
       }
     }
 
-    // Posted bucketed by post_date (per-deliverable).
-    if (postDate) {
+    // Posted (link/status/date), bucketed by post_date when present, else the
+    // reach-out date so link-without-date rows still land in a team bucket.
+    const postBucketDate = postDate ?? reachDate;
+    if (isPostedRow && postBucketDate) {
       const delta: Partial<FunnelMetrics> = { p: 1 };
       addMetrics(totals, delta);
-      const mKey = monthKey(postDate);
-      const wKey = isoWeekKey(postDate);
+      const mKey = monthKey(postBucketDate);
+      const wKey = isoWeekKey(postBucketDate);
       if (!byMonth.has(mKey)) byMonth.set(mKey, emptyMetrics());
       if (!byWeek.has(wKey)) byWeek.set(wKey, emptyMetrics());
       addMetrics(byMonth.get(mKey)!, delta);
