@@ -162,6 +162,10 @@ function PlayCard({
             className="h-full w-full object-cover"
             onError={() => setFailed(true)}
           />
+        ) : shortcode ? (
+          // Posted row, no loadable avatar → clean branded play tile (not a
+          // broken grey box). The play button opens the live reel embed.
+          <span className="absolute inset-0 bg-gradient-to-br from-[#F0EAD6] to-[#DCD6C4]" aria-hidden />
         ) : (
           <span
             className="flex h-full w-full items-center justify-center font-semibold text-text-secondary"
@@ -171,7 +175,12 @@ function PlayCard({
           </span>
         )}
         {shortcode && (
-          <span className="absolute inset-0 grid place-items-center bg-black/30 transition-colors">
+          <span
+            className={cn(
+              "absolute inset-0 grid place-items-center transition-colors",
+              showImg ? "bg-black/30" : "bg-black/0",
+            )}
+          >
             <span
               className="grid place-items-center rounded-full bg-[#F0C61E] text-[#161513] shadow"
               style={{ width: size * 0.44, height: size * 0.44 }}
