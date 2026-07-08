@@ -1,16 +1,15 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { isVoidedStatus } from "@/lib/workflow";
+import { computeJourney } from "./compute";
 import type {
   JourneyCard,
   JourneyColumn,
-  JourneyColumnId,
   JourneyCreator,
   JourneyFilterOptions,
   JourneyFilters,
   JourneyFunnel,
   JourneyKpi,
-  JourneyPost,
 } from "./types";
 
 const POSTS_SELECT = [
@@ -45,38 +44,14 @@ const CREATORS_SELECT = [
   "is_active",
 ].join(",");
 
-/** Ordered column definitions — left → right in the kanban. */
-export const JOURNEY_COLUMNS: Omit<JourneyColumn, "cards">[] = [
-  {
-    id: "reach-out",
-    title: "Reach Out",
-    accent: "#B57514",
-    statuses: ["Reach Out"],
-  },
-  {
-    id: "on-board",
-    title: "Onboard",
-    accent: "#4F7C4D",
-    statuses: ["On Board", "Order Sent"],
-  },
-  {
-    id: "posted",
-    title: "Posted",
-    accent: "#3B6FD4",
-    statuses: ["Posted", "Delivered"],
-  },
-  {
-    id: "payment",
-    title: "Payment",
-    accent: "#F0C61E",
-    statuses: ["Posted", "Delivered"],
-  },
-];
 
 export async function fetchJourneyData(filters: JourneyFilters): Promise<{
   columns: JourneyColumn[];
   kpi: JourneyKpi;
   funnel: JourneyFunnel;
+  /** Flat, non-void card list — the client re-derives columns/KPI/funnel from
+   *  this after applying its (unpersisted) Team Member / Tier / etc. filters. */
+  cards: JourneyCard[];
 }> {
   const supabase = createServiceClient();
 
@@ -140,72 +115,17 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
     }
   }
 
-  // Group posts into columns.
-  const reachOutBucket: JourneyCard[] = [];
-  const onBoardBucket: JourneyCard[] = [];
-  const postedBucket: JourneyCard[] = [];
-  const paymentBucket: JourneyCard[] = [];
-
-  let activeCount = 0;
-  let postedCount = 0;
-  let closedCount = 0;
-
-  // Funnel — cumulative collab counts (parent rows only). Each collab is
-  // counted at every stage it has reached, so rates are monotonic.
-  let reachedCount = 0;
-  let onboardedCount = 0;
-  let postedFunnelCount = 0;
-  let paidCount = 0;
-
-  for (const p of posts) {
-    const statusRaw = String(p.workflow_status ?? "").trim();
-    const statusKey = statusRaw.toLowerCase();
-
-    // Accumulate KPI counts.
-    if (statusKey.includes("reach out") || statusKey.includes("on board")) {
-      activeCount++;
-    } else if (statusKey.includes("posted") || statusKey.includes("delivered")) {
-      postedCount++;
-    } else if (
-      statusKey === "rto" ||
-      statusKey === "cancelled" ||
-      statusKey.startsWith("rto")
-    ) {
-      closedCount++;
-    }
-
-    // Funnel — parent collabs only. Determine the furthest stage reached, then
-    // increment every prior stage too (cumulative). RTO/Cancelled collabs that
-    // had been onboarded/posted still count toward those stages.
-    const isParentRow =
-      p.deliverable_index == null || Number(p.deliverable_index) === 1;
-    if (isParentRow) {
-      const reachedOnboard =
-        statusKey.includes("on board") ||
-        statusKey === "order sent" ||
-        statusKey.includes("posted") ||
-        statusKey.includes("delivered") ||
-        statusKey.startsWith("rto") ||
-        statusKey === "cancelled";
-      const reachedPost =
-        statusKey.includes("posted") || statusKey.includes("delivered");
-      const reachedPaid =
-        String(p.payment_status ?? "").trim().toLowerCase() === "done";
-
-      reachedCount++; // every parent collab entered at Reach Out
-      if (reachedOnboard) onboardedCount++;
-      if (reachedPost) postedFunnelCount++;
-      if (reachedPaid) paidCount++;
-    }
-
+  // Build the flat card list (creator-joined). Columns, KPI and funnel are all
+  // derived from this single set by computeJourney — the same function the
+  // client re-runs after applying its filters, so the two never disagree.
+  const cards: JourneyCard[] = posts.map((p) => {
     const username = String(p.username ?? "").trim().toLowerCase();
     const creator = creatorMap.get(username) ?? null;
-
-    const card: JourneyCard = {
+    return {
       post_id: String(p.post_id ?? ""),
       username: (p.username as string | null) ?? null,
       campaign_id: (p.campaign_id as string | null) ?? null,
-      workflow_status: statusRaw || null,
+      workflow_status: String(p.workflow_status ?? "").trim() || null,
       reach_out_date: (p.reach_out_date as string | null) ?? null,
       onboard_date: (p.onboard_date as string | null) ?? null,
       post_date: (p.post_date as string | null) ?? null,
@@ -226,69 +146,10 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
       inf_name: creator?.inf_name ?? null,
       creator,
     };
+  });
 
-    // Column 1: Reach Out
-    if (statusKey.includes("reach out") || statusKey === "") {
-      reachOutBucket.push(card);
-      continue;
-    }
-
-    // Column 2: On Board (includes Order Sent)
-    if (statusKey.includes("on board") || statusKey === "order sent") {
-      onBoardBucket.push(card);
-      continue;
-    }
-
-    // Column 3: Posted — every deliverable in posted/delivered
-    if (statusKey.includes("posted") || statusKey.includes("delivered")) {
-      postedBucket.push(card);
-    }
-
-    // Column 4: Payment — parent rows only (deliverable_index IS NULL or = 1)
-    // that are in posted/delivered status.
-    if (statusKey.includes("posted") || statusKey.includes("delivered")) {
-      const isChild =
-        p.deliverable_index != null && Number(p.deliverable_index) > 1;
-      if (!isChild) {
-        paymentBucket.push(card);
-      }
-    }
-  }
-
-  // Assemble final column array — preserving JOURNEY_COLUMNS order.
-  const bucketMap = new Map<JourneyColumnId, JourneyCard[]>([
-    ["reach-out", reachOutBucket],
-    ["on-board", onBoardBucket],
-    ["posted", postedBucket],
-    ["payment", paymentBucket],
-  ]);
-
-  const columns: JourneyColumn[] = JOURNEY_COLUMNS.map((col) => ({
-    ...col,
-    cards: bucketMap.get(col.id) ?? [],
-  }));
-
-  const kpi: JourneyKpi = {
-    inPipeline: posts.length,
-    active: activeCount,
-    posted: postedCount,
-    closed: closedCount,
-  };
-
-  const rate = (num: number, den: number) =>
-    den > 0 ? Math.round((num / den) * 1000) / 10 : 0;
-
-  const funnel: JourneyFunnel = {
-    reached: reachedCount,
-    onboarded: onboardedCount,
-    posted: postedFunnelCount,
-    paid: paidCount,
-    reachToOnboard: rate(onboardedCount, reachedCount),
-    onboardToPost: rate(postedFunnelCount, onboardedCount),
-    postToPayment: rate(paidCount, postedFunnelCount),
-  };
-
-  return { columns, kpi, funnel };
+  const { columns, kpi, funnel } = computeJourney(cards);
+  return { columns, kpi, funnel, cards };
 }
 
 export const fetchJourneyFilterOptions = unstable_cache(

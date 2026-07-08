@@ -11,3 +11,5 @@ build/
 coverage/
 .cache/
 next-env.d.ts
+.vercel
+.env*

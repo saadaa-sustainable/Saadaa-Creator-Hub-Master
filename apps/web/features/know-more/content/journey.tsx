@@ -14,12 +14,16 @@ export default function JourneyKM() {
             <strong>1. PageHeader</strong> — Route icon + title + this Know More button.
           </li>
           <li>
-            <strong>2. Filter bar</strong> — Campaign selector. URL-driven; share the URL
-            to hand off a filtered view. Hit &quot;Clear&quot; to reset.
+            <strong>2. Filter bar</strong> — Campaign (URL-driven; share the URL to
+            hand off a filtered view) plus instant client-side filters: Search,
+            Influencer, Team Member, Tier, Order Status, Collab Type. Hit
+            &quot;Clear&quot; to reset.
           </li>
           <li>
             <strong>3. KPI strip</strong> — In Pipeline · Active · Posted · Closed.
-            Always reflects the filtered corpus.
+            Recomputed live from the filtered card set, so the KPI strip, funnel
+            and board always agree — every filter (Team Member, Tier, …) moves all
+            three together.
           </li>
           <li>
             <strong>4. Kanban board</strong> — 5 columns left → right (see below).

@@ -55,6 +55,34 @@ export interface JourneyColumn {
   cards: JourneyCard[];
 }
 
+/** Ordered column definitions — left → right in the kanban. */
+export const JOURNEY_COLUMNS: Omit<JourneyColumn, "cards">[] = [
+  {
+    id: "reach-out",
+    title: "Reach Out",
+    accent: "#B57514",
+    statuses: ["Reach Out"],
+  },
+  {
+    id: "on-board",
+    title: "Onboard",
+    accent: "#4F7C4D",
+    statuses: ["On Board", "Order Sent"],
+  },
+  {
+    id: "posted",
+    title: "Posted",
+    accent: "#3B6FD4",
+    statuses: ["Posted", "Delivered"],
+  },
+  {
+    id: "payment",
+    title: "Payment",
+    accent: "#F0C61E",
+    statuses: ["Posted", "Delivered"],
+  },
+];
+
 export interface JourneyKpi {
   inPipeline: number;
   active: number;

@@ -211,7 +211,7 @@ export async function PartnershipTabBody({ sp }: { sp: TabSearchParams }) {
 // strip, funnel strip and board, so embedding it = the full journey view.
 export async function JourneyTabBody({ sp }: { sp: TabSearchParams }) {
   const journeyFilters: JourneyFilters = { campaign: sp.campaign };
-  const [{ columns, kpi, funnel }, filterOptions] = await Promise.all([
+  const [{ cards }, filterOptions] = await Promise.all([
     fetchJourneyData(journeyFilters),
     fetchJourneyFilterOptions(),
   ]);
@@ -221,9 +221,7 @@ export async function JourneyTabBody({ sp }: { sp: TabSearchParams }) {
   return (
     <div className="onboarding-stage journey-stage">
       <JourneyPageClient
-        columns={columns}
-        kpi={kpi}
-        funnel={funnel}
+        cards={cards}
         initialFilters={journeyFilters}
         filterOptions={filterOptions}
       />

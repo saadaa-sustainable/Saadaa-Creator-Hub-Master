@@ -32,16 +32,14 @@ export default async function JourneyPage({
 }
 
 async function JourneyBody({ params }: { params: JourneyFilters }) {
-  const [{ columns, kpi, funnel }, filterOptions] = await Promise.all([
+  const [{ cards }, filterOptions] = await Promise.all([
     fetchJourneyData(params),
     fetchJourneyFilterOptions(),
   ]);
 
   return (
     <JourneyPageClient
-      columns={columns}
-      kpi={kpi}
-      funnel={funnel}
+      cards={cards}
       initialFilters={params}
       filterOptions={filterOptions}
     />
