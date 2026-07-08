@@ -43,7 +43,13 @@ const EMPTY: FunnelMetrics = {
  *  - Performance Funnel chart
  *  - Today's Activity by Team Member
  */
-export function FunnelBody({ data }: { data: FunnelData }) {
+export function FunnelBody({
+  data,
+  source = "live",
+}: {
+  data: FunnelData;
+  source?: "historic" | "live";
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<FunnelPeriodMode>("month");
   const [team, setTeam] = useState<string>("");
@@ -106,7 +112,11 @@ export function FunnelBody({ data }: { data: FunnelData }) {
         refreshing={refreshing}
       />
       {rowsOpen && team && (
-        <TeamRowsDrawer team={team} onClose={() => setRowsOpen(false)} />
+        <TeamRowsDrawer
+          team={team}
+          source={source}
+          onClose={() => setRowsOpen(false)}
+        />
       )}
 
       <KpiStrip totals={totals} />

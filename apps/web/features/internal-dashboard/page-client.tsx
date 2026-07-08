@@ -52,7 +52,13 @@ const TEAM_COLORS = [
   "#9A9384",
 ];
 
-export function InternalDashboardBody({ data }: { data: InternalDashboardData }) {
+export function InternalDashboardBody({
+  data,
+  source = "live",
+}: {
+  data: InternalDashboardData;
+  source?: "historic" | "live";
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<PeriodMode>("month");
   const [month, setMonth] = useState<string>("");
@@ -154,7 +160,11 @@ export function InternalDashboardBody({ data }: { data: InternalDashboardData })
         refreshing={refreshing}
       />
       {rowsOpen && team && (
-        <TeamRowsDrawer team={team} onClose={() => setRowsOpen(false)} />
+        <TeamRowsDrawer
+          team={team}
+          source={source}
+          onClose={() => setRowsOpen(false)}
+        />
       )}
 
       <KpiStrip totals={scoped.totals} />

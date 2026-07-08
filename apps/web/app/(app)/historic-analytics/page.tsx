@@ -123,7 +123,7 @@ async function HistoricFunnelBody() {
   // full FunnelBody, but fed by the migrated archive corpus.
   return (
     <div className="onboarding-stage funnel-stage">
-      <FunnelBody data={data} />
+      <FunnelBody data={data} source="historic" />
     </div>
   );
 }
@@ -133,7 +133,7 @@ async function HistoricInternalBody() {
   // Mirrors /internal-dashboard below its header, fed by the migrated archive.
   return (
     <div className="onboarding-stage internal-dashboard-stage">
-      <InternalDashboardBody data={data} />
+      <InternalDashboardBody data={data} source="historic" />
     </div>
   );
 }

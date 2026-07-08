@@ -69,15 +69,30 @@ const HISTORIC_COLS = [
   "deliverable_index",
 ].join(",");
 
+// `posts` (live pipeline) carries every collab field EXCEPT the creator-
+// denormalised ones (followers/category/gender/avatar/ER) — those come from the
+// creators join below. No source_tag on posts.
+const LIVE_COLS = [
+  "post_id_short", "post_id", "inf_id", "collab_id", "username", "campaign_id",
+  "nomenclature", "workflow_status", "reachout_direction", "content_type",
+  "collab_type", "commercial_amount", "payment_status", "order_id", "tracking_id",
+  "order_status", "garment_qty", "garments_sent", "reach_out_date", "onboard_date",
+  "post_date", "est_delivery", "post_link", "download_link", "email",
+  "onboarded_by", "logged_by", "agency_name", "state", "city", "notes",
+  "post_number", "collab_number", "deliverable_index",
+].join(",");
+
 /**
  * Fetch every row owned by `team` (matches the dashboards' team keying:
- * `logged_by ?? onboarded_by`), newest first. Historic source reads the
- * denormalised `historic_posts` archive. Capped high — a team drawer paginates
- * rendering client-side.
+ * `logged_by ?? onboarded_by`), newest first. `source`:
+ *   - "historic" → the denormalised `historic_posts` archive (Historic Analytics).
+ *   - "live"     → the live `posts` pipeline (main Dashboard) + a `creators` join
+ *                  for the fields `posts` doesn't denormalise.
+ * Capped high — the drawer paginates rendering client-side.
  */
 export async function fetchTeamRows(
   team: string,
-  source: "historic" = "historic",
+  source: "historic" | "live" = "historic",
 ): Promise<TeamRow[]> {
   await assertPermission("performance_view");
   const t = (team ?? "").trim();
@@ -88,7 +103,7 @@ export async function fetchTeamRows(
   const orFilter = `logged_by.eq.${t},and(logged_by.is.null,onboarded_by.eq.${t})`;
   const { data, error } = await (supabase as any)
     .from(source === "historic" ? "historic_posts" : "posts")
-    .select(HISTORIC_COLS)
+    .select(source === "historic" ? HISTORIC_COLS : LIVE_COLS)
     .or(orFilter)
     .order("post_date", { ascending: false, nullsFirst: false })
     .order("reach_out_date", { ascending: false, nullsFirst: false })
@@ -99,26 +114,32 @@ export async function fetchTeamRows(
   }
   const rows = (data ?? []) as TeamRow[];
 
-  // Overlay the fresher creators.profile_pic (scrape-updated) by inf_id — more
-  // likely to be a non-expired URL than the archive's frozen copy.
+  // Join creators by inf_id: the fresher profile_pic (both sources) and, for the
+  // live source, the denormalised creator fields `posts` lacks.
   const infIds = [...new Set(rows.map((r) => r.inf_id).filter(Boolean))] as string[];
-  if (infIds.length > 0) {
-    const picById = new Map<string, string | null>();
-    for (let i = 0; i < infIds.length; i += 500) {
-      const chunk = infIds.slice(i, i + 500);
-      const { data: creators } = await (supabase as any)
-        .from("creators")
-        .select("inf_id,profile_pic")
-        .in("inf_id", chunk);
-      for (const c of (creators ?? []) as Array<{ inf_id: string; profile_pic: string | null }>) {
-        picById.set(c.inf_id, c.profile_pic);
-      }
+  const byId = new Map<string, Record<string, unknown>>();
+  for (let i = 0; i < infIds.length; i += 500) {
+    const chunk = infIds.slice(i, i + 500);
+    const { data: creators } = await (supabase as any)
+      .from("creators")
+      .select("inf_id,profile_pic,category,gender,followers,avg_likes,er")
+      .in("inf_id", chunk);
+    for (const c of (creators ?? []) as Array<Record<string, unknown>>) {
+      byId.set(c.inf_id as string, c);
     }
-    for (const r of rows) {
-      r.creator_pic = (r.inf_id && picById.get(r.inf_id)) || r.profile_pic || null;
+  }
+  for (const r of rows) {
+    const c = r.inf_id ? byId.get(r.inf_id) : undefined;
+    r.creator_pic = ((c?.profile_pic as string) || r.profile_pic) ?? null;
+    if (source === "live") {
+      r.source_tag = null;
+      r.profile_pic = (c?.profile_pic as string) ?? null;
+      r.influencer_category = (c?.category as string) ?? null;
+      r.gender = (c?.gender as string) ?? r.gender ?? null;
+      r.followers = (c?.followers as number) ?? null;
+      r.avg_likes = (c?.avg_likes as number) ?? null;
+      r.engaged_rate = (c?.er as number) ?? null;
     }
-  } else {
-    for (const r of rows) r.creator_pic = r.profile_pic ?? null;
   }
   return rows;
 }

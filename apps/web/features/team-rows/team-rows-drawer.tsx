@@ -599,9 +599,11 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
 export function TeamRowsDrawer({
   team,
   onClose,
+  source = "historic",
 }: {
   team: string;
   onClose: () => void;
+  source?: "historic" | "live";
 }) {
   const [rows, setRows] = useState<TeamRow[] | null>(null);
   const [q, setQ] = useState("");
@@ -614,11 +616,11 @@ export function TeamRowsDrawer({
   useEffect(() => {
     let alive = true;
     setRows(null);
-    fetchTeamRows(team).then((r) => alive && setRows(r));
+    fetchTeamRows(team, source).then((r) => alive && setRows(r));
     return () => {
       alive = false;
     };
-  }, [team]);
+  }, [team, source]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !selected && onClose();
     window.addEventListener("keydown", onKey);
