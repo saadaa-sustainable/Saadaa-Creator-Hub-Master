@@ -60,7 +60,11 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
   let postsQuery = (supabase as any)
     .from("posts")
     .select(POSTS_SELECT)
-    .limit(2000);
+    // Must exceed the live posts row count — a low cap silently truncates the
+    // board and every per-team count (2,419 posts as of the 2026-07-08 Influenza
+    // migration was already over the old 2000 cap → Lakshita showed 216/286).
+    // Matches Funnel + Internal Dashboard (50k).
+    .limit(50_000);
 
   if (filters.campaign) {
     postsQuery = postsQuery.eq("campaign_id", filters.campaign);
@@ -94,7 +98,7 @@ export async function fetchJourneyData(filters: JourneyFilters): Promise<{
       .from("creators")
       .select(CREATORS_SELECT)
       .in("username", usernames)
-      .limit(2000);
+      .limit(50_000);
 
     if (creatorsError) {
       // Non-fatal — cards render with initials fallback.
