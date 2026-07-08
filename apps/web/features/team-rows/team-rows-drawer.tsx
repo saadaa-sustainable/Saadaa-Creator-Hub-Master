@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Loader2,
   Play,
+  Eye,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { extractShortcode } from "@/lib/instagram-shortcode";
@@ -116,66 +117,78 @@ function avatarInitials(username: string | null): string {
   ).toUpperCase();
 }
 
-// Raw-image avatar — Instagram fbcdn URLs 403 through the weserv proxy, but a
-// direct <img> with referrerPolicy="no-referrer" loads the non-expired ones
-// (same technique as the Ad Status board). Expired/dead URLs fall back to
-// initials. Not the shared weserv Avatar, which double-proxies + blocks fbcdn.
-function RowAvatar({
+// ── Square preview card — avatar thumbnail + play overlay → live embed ─────
+// Mirrors the Ad Status row thumbnail: a square you click to play the post.
+// No post link → plain square avatar (no play button).
+function PlayCard({
   pic,
+  link,
   username,
-  size = 44,
+  size = 60,
 }: {
   pic: string | null;
+  link: string | null;
   username: string | null;
   size?: number;
 }) {
-  const [failed, setFailed] = useState(false);
-  const show = pic && !failed;
-  return (
-    <span
-      className="inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border-warm bg-bg-muted font-semibold text-text-secondary"
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.max(10, Math.floor(size * 0.36)),
-      }}
-    >
-      {show ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={pic as string}
-          alt={username ?? "avatar"}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          className="h-full w-full object-cover"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <span>{avatarInitials(username)}</span>
-      )}
-    </span>
-  );
-}
-
-// ── Instagram post preview (thumbnail button → live embed lightbox) ────────
-function PostPreview({ link, label }: { link: string | null; label: string }) {
   const shortcode = extractShortcode(link ?? "");
   const [open, setOpen] = useState(false);
-  if (!shortcode) return null;
+  const [failed, setFailed] = useState(false);
+  const showImg = pic && !failed;
   return (
     <>
       <button
         type="button"
+        disabled={!shortcode}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen(true);
+          if (shortcode) setOpen(true);
         }}
-        className="inline-flex items-center gap-1.5 rounded-full bg-[#2C2420] text-[#F0C61E] px-2.5 py-1 text-[0.62rem] font-extrabold hover:scale-[1.03] transition-transform shrink-0"
-        title="Play the post"
+        className={cn(
+          "relative shrink-0 overflow-hidden rounded-xl border border-border-warm bg-bg-muted",
+          shortcode ? "cursor-pointer hover:border-[#B57514]" : "cursor-default",
+        )}
+        style={{ width: size, height: size }}
+        title={shortcode ? "Play the post" : undefined}
+        aria-label={shortcode ? `Play post — ${username ?? ""}` : username ?? "creator"}
       >
-        <Play size={11} aria-hidden /> Preview
+        {showImg ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={pic as string}
+            alt={username ?? ""}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="h-full w-full object-cover"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <span
+            className="flex h-full w-full items-center justify-center font-semibold text-text-secondary"
+            style={{ fontSize: Math.max(11, Math.floor(size * 0.3)) }}
+          >
+            {avatarInitials(username)}
+          </span>
+        )}
+        {shortcode && (
+          <span className="absolute inset-0 grid place-items-center bg-black/30 transition-colors">
+            <span
+              className="grid place-items-center rounded-full bg-[#F0C61E] text-[#161513] shadow"
+              style={{ width: size * 0.44, height: size * 0.44 }}
+            >
+              <Play
+                size={Math.round(size * 0.22)}
+                aria-hidden
+                fill="currentColor"
+                className="translate-x-[1px]"
+              />
+            </span>
+          </span>
+        )}
       </button>
-      {open && <PostLightbox shortcode={shortcode} label={label} onClose={() => setOpen(false)} />}
+      {open && shortcode && (
+        <PostLightbox shortcode={shortcode} label={username ?? ""} onClose={() => setOpen(false)} />
+      )}
     </>
   );
 }
@@ -260,21 +273,19 @@ function PostLightbox({
 function RowCard({ row, onOpen }: { row: TeamRow; onOpen: () => void }) {
   const stage = stageOf(row);
   const meta = STAGE_META[stage];
+  const igUrl = row.username
+    ? `https://www.instagram.com/${row.username}/`
+    : null;
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn(
-        "team-row-card w-full min-w-0 text-left",
-        "flex items-center gap-3 rounded-2xl border border-border",
-        "bg-bg-white p-2.5 transition-all hover:border-[#DCD6C4]",
-        "hover:shadow-sm sm:p-3",
-      )}
+    <div
+      className="team-row-card flex w-full min-w-0 items-center gap-3 rounded-2xl border border-border bg-bg-white p-2.5 transition-all hover:border-[#DCD6C4] hover:shadow-sm sm:p-3"
+      style={{ borderLeft: `3px solid ${meta.accent}` }}
     >
-      <RowAvatar
+      <PlayCard
         pic={row.creator_pic ?? row.profile_pic}
+        link={row.post_link}
         username={row.username}
-        size={44}
+        size={60}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -287,6 +298,9 @@ function RowCard({ row, onOpen }: { row: TeamRow; onOpen: () => void }) {
           <span className={cn("text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5", meta.cls)}>
             {meta.label}
           </span>
+          <span className="text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5 bg-bg-surface text-text-tertiary border border-border">
+            Historic
+          </span>
         </div>
         <div className="text-[0.8rem] font-extrabold text-text-primary truncate mt-0.5">
           @{row.username ?? "—"}
@@ -296,13 +310,34 @@ function RowCard({ row, onOpen }: { row: TeamRow; onOpen: () => void }) {
           {row.content_type ?? "—"}
         </div>
       </div>
-      <div className="flex flex-col items-end gap-1 shrink-0">
+      <div className="flex flex-col items-end gap-1.5 shrink-0">
         <span className="text-[0.58rem] text-text-tertiary">
           {fmtDate(row.post_date ?? row.reach_out_date)}
         </span>
-        <PostPreview link={row.post_link} label={row.username ?? row.post_id_short ?? ""} />
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="inline-flex items-center gap-1 rounded-lg border border-border bg-bg-white px-2 py-1 text-[0.6rem] font-extrabold text-text-secondary hover:border-[#DCD6C4] hover:text-text-primary transition-colors"
+            title="Open row overview"
+          >
+            <Eye size={11} aria-hidden /> Overview
+          </button>
+          {igUrl && (
+            <a
+              href={igUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-bg-white px-2 py-1 text-[0.6rem] font-extrabold text-text-secondary hover:border-[#DCD6C4] hover:text-text-primary transition-colors"
+              title="Visit Instagram profile"
+            >
+              <Instagram size={11} aria-hidden /> Profile
+            </a>
+          )}
+        </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -350,7 +385,6 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
       role="dialog"
       aria-modal="true"
       aria-label={`Row detail — ${row.username}`}
-      style={{ zIndex: 80 }}
       onClick={onClose}
     >
       <div
@@ -385,7 +419,6 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
             </p>
           </div>
           <div className="modal-head__actions">
-            <PostPreview link={row.post_link} label={row.username ?? ""} />
             <button
               type="button"
               className="icon-btn campaign-detail-close-btn"
@@ -401,10 +434,11 @@ function RowDetailModal({ row, onClose }: { row: TeamRow; onClose: () => void })
           <section className="campaign-detail-overview ad-detail-overview">
             <div className="campaign-detail-allocation-card ad-detail-profile-card">
               <div className="ad-detail-avatar-frame">
-                <RowAvatar
+                <PlayCard
                   pic={row.creator_pic ?? row.profile_pic}
+                  link={row.post_link}
                   username={row.username}
-                  size={74}
+                  size={84}
                 />
               </div>
               <div className="campaign-detail-allocation-copy">
@@ -608,7 +642,6 @@ export function TeamRowsDrawer({
       role="dialog"
       aria-modal="true"
       aria-label={`${team} — rows`}
-      style={{ zIndex: 70 }}
       onClick={onClose}
     >
       <div
