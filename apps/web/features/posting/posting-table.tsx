@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Eye, Grid3X3, Inbox, List as ListIcon, Send } from "lucide-react";
-import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
+import { PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
+import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { PartnershipBadge } from "@/components/ui/status-pill";
 import {
   formatDate,
@@ -191,10 +192,10 @@ function PostingListRow({
       style={postingStyle(r, index)}
     >
       <div className="stage-campaign-identity">
-        <Avatar
-          src={r.creator?.profile_pic}
+        <InstagramPreviewCard
+          link={r.post_link}
+          pic={r.creator?.profile_pic}
           username={r.creator?.username}
-          name={r.creator?.inf_name}
           size={46}
         />
         <div className="campaign-list-row__main">
@@ -300,10 +301,10 @@ function PostingCard({
       )}
     >
       <div className="ob-card-head">
-        <Avatar
-          src={r.creator?.profile_pic}
+        <InstagramPreviewCard
+          link={r.post_link}
+          pic={r.creator?.profile_pic}
           username={r.creator?.username}
-          name={r.creator?.inf_name}
           size={44}
           className="ob-card-avatar"
         />

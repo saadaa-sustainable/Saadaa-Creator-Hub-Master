@@ -13,7 +13,8 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react";
-import { Avatar, PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
+import { PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
+import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { formatDate, formatRupees } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import {
@@ -79,11 +80,11 @@ export function PostingOverviewModal({
         <div className="modal-body ob-overview-body">
           <section className="ob-overview-card">
             <div className="ob-overview-head">
-              <Avatar
-                src={row.creator?.profile_pic}
+              <InstagramPreviewCard
+                link={row.post_link}
+                pic={row.creator?.profile_pic}
                 username={row.creator?.username}
-                name={row.creator?.inf_name}
-                size={48}
+                size={56}
               />
               <div className="ob-overview-identity">
                 <strong>

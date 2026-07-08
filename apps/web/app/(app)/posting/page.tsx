@@ -12,8 +12,6 @@ import {
 } from "@/features/posting/queries";
 import type { PostingFilters } from "@/features/posting/types";
 import { assertPermission } from "@/lib/rbac.server";
-import { hasPermission } from "@/lib/rbac";
-import { PartnershipTestCard } from "@/features/posting/partnership-test-card";
 
 export const metadata = { title: "Posting" };
 
@@ -22,16 +20,13 @@ export default async function PostingPage({
 }: {
   searchParams: Promise<PostingFilters>;
 }) {
-  const actor = await assertPermission("posting_submit");
-  const isAdmin = hasPermission(actor, "admin");
+  await assertPermission("posting_submit");
   const params = await searchParams;
   const options = await fetchPostingFilterOptions();
 
   return (
     <div className="onboarding-stage">
       <PageHeader icon={Send} title="Posting" knowMore="posting" />
-
-      {isAdmin && <PartnershipTestCard />}
 
       <PostingFiltersBar initial={params} options={options} />
 

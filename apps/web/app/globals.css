@@ -12563,8 +12563,7 @@ body:has(.km-backdrop) {
 }
 .ad-lightbox-embed {
   width: 100%;
-  height: 560px;
-  max-height: 68vh;
+  height: min(82dvh, 680px);
   border: 0;
   border-radius: 12px;
   background: #fff;
@@ -12670,7 +12669,7 @@ body:has(.km-backdrop) {
     padding: 0.6rem;
   }
   .ad-lightbox-embed {
-    height: 440px;
+    height: min(78dvh, 620px);
   }
 }
 
@@ -13298,8 +13297,7 @@ body:has(.km-backdrop) {
 }
 
 .ad-lightbox-embed {
-  height: 610px;
-  max-height: 70vh;
+  height: min(82dvh, 680px);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 16px;
   box-shadow: 0 28px 70px -42px rgba(0, 0, 0, 0.8);
@@ -13536,7 +13534,7 @@ body:has(.km-backdrop) {
   }
 
   .ad-lightbox-embed {
-    height: 440px;
+    height: min(78dvh, 620px);
   }
 }
 
@@ -14023,6 +14021,48 @@ body:has(.km-backdrop) {
 .ad-detail-body {
   overflow-y: auto;
   max-height: calc(min(90dvh, 920px) - 132px);
+}
+
+/* Mobile: force the ad-overview / team-rows detail header to STACK so the
+   Profile/Post/Close actions never overlap the id-row badges, and shrink the
+   header chrome (badges, title, buttons) so it isn't congested. Two-class
+   selector out-specifies the base grid rules. Applies to both the Ad Status
+   overview modal and the team-member row detail modal (same classes). */
+@media (max-width: 767px) {
+  .ad-detail-head.campaign-detail-head {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    padding: 0.85rem 0.9rem 0.75rem;
+  }
+  .ad-detail-head .modal-head__actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+  .ad-detail-head .campaign-detail-edit-btn {
+    min-height: 32px;
+    padding: 0.3rem 0.62rem;
+    font-size: 0.72rem;
+    border-radius: 9px;
+  }
+  .ad-detail-head .campaign-card__id-row {
+    gap: 0.32rem;
+  }
+  .ad-detail-modal .campaign-card__id,
+  .ad-detail-modal .campaign-card__status {
+    font-size: 0.58rem;
+    padding: 0.08rem 0.42rem;
+  }
+  .ad-detail-modal .modal-head h2 {
+    font-size: 1rem;
+    margin-top: 0.35rem;
+  }
+  .ad-detail-modal .campaign-detail-subtitle {
+    font-size: 0.72rem;
+    margin-top: 0.3rem;
+  }
 }
 
 .ad-detail-overview {

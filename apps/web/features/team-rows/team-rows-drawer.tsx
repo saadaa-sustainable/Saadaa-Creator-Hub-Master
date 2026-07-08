@@ -13,12 +13,12 @@ import {
   X,
   ExternalLink,
   Loader2,
-  Play,
   Eye,
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { extractShortcode } from "@/lib/instagram-shortcode";
+import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { fetchTeamRows, type TeamRow } from "./actions";
 
 // ── stage bucketing (mirrors the dashboard column logic) ───────────────────
@@ -125,177 +125,7 @@ function fmtNum(n: number | null): string {
 function fmtMoney(n: number | null): string {
   return n == null ? "—" : `₹${Number(n).toLocaleString("en-IN")}`;
 }
-function avatarInitials(username: string | null): string {
-  const base = (username ?? "").trim();
-  if (!base) return "?";
-  const parts = base.split(/[\s._]+/).filter(Boolean);
-  return (
-    parts.length === 1
-      ? parts[0].slice(0, 2)
-      : parts[0][0] + parts[parts.length - 1][0]
-  ).toUpperCase();
-}
 
-// ── Square preview card — avatar thumbnail + play overlay → live embed ─────
-// Mirrors the Ad Status row thumbnail: a square you click to play the post.
-// No post link → plain square avatar (no play button).
-function PlayCard({
-  pic,
-  link,
-  username,
-  size = 60,
-}: {
-  pic: string | null;
-  link: string | null;
-  username: string | null;
-  size?: number;
-}) {
-  const shortcode = extractShortcode(link ?? "");
-  const [open, setOpen] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const showImg = pic && !failed;
-  return (
-    <>
-      <button
-        type="button"
-        disabled={!shortcode}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (shortcode) setOpen(true);
-        }}
-        className={cn(
-          "relative shrink-0 overflow-hidden rounded-xl border border-border-warm bg-bg-muted",
-          shortcode ? "cursor-pointer hover:border-[#B57514]" : "cursor-default",
-        )}
-        style={{ width: size, height: size }}
-        title={shortcode ? "Play the post" : undefined}
-        aria-label={shortcode ? `Play post — ${username ?? ""}` : username ?? "creator"}
-      >
-        {showImg ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={pic as string}
-            alt={username ?? ""}
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="h-full w-full object-cover"
-            onError={() => setFailed(true)}
-          />
-        ) : shortcode ? (
-          // Posted row, no loadable avatar → clean branded play tile (not a
-          // broken grey box). The play button opens the live reel embed.
-          <span className="absolute inset-0 bg-gradient-to-br from-[#F0EAD6] to-[#DCD6C4]" aria-hidden />
-        ) : (
-          <span
-            className="flex h-full w-full items-center justify-center font-semibold text-text-secondary"
-            style={{ fontSize: Math.max(11, Math.floor(size * 0.3)) }}
-          >
-            {avatarInitials(username)}
-          </span>
-        )}
-        {shortcode && (
-          <span
-            className={cn(
-              "absolute inset-0 grid place-items-center transition-colors",
-              showImg ? "bg-black/30" : "bg-black/0",
-            )}
-          >
-            <span
-              className="grid place-items-center rounded-full bg-[#F0C61E] text-[#161513] shadow"
-              style={{ width: size * 0.44, height: size * 0.44 }}
-            >
-              <Play
-                size={Math.round(size * 0.22)}
-                aria-hidden
-                fill="currentColor"
-                className="translate-x-[1px]"
-              />
-            </span>
-          </span>
-        )}
-      </button>
-      {open && shortcode && (
-        <PostLightbox shortcode={shortcode} label={username ?? ""} onClose={() => setOpen(false)} />
-      )}
-    </>
-  );
-}
-
-function PostLightbox({
-  shortcode,
-  label,
-  onClose,
-}: {
-  shortcode: string;
-  label: string;
-  onClose: () => void;
-}) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
-  if (!mounted || typeof document === "undefined") return null;
-  return createPortal(
-    <div
-      className="modal-backdrop modal-backdrop--onboarding"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Post preview — ${label}`}
-      style={{ zIndex: 2000 }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClose();
-      }}
-    >
-      <div
-        className="modal-panel modal-panel--onboarding"
-        style={{ maxWidth: 420, width: "94vw" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="modal-head" style={{ paddingBottom: 8 }}>
-          <div className="min-w-0">
-            <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary">
-              <Instagram size={12} aria-hidden /> Live Instagram embed
-            </span>
-            <h2 className="text-sm font-extrabold text-text-primary truncate">{label}</h2>
-          </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-            <X size={14} aria-hidden />
-          </button>
-        </header>
-        <div className="modal-body" style={{ padding: 0 }}>
-          <iframe
-            src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
-            title="Instagram post preview"
-            loading="lazy"
-            allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
-            allowFullScreen
-            style={{ width: "100%", height: 560, border: 0, background: "#fff" }}
-          />
-        </div>
-        <div className="p-3 text-end">
-          <a
-            href={`https://www.instagram.com/p/${shortcode}/`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 text-[0.68rem] font-extrabold text-[#3B6FD4] hover:underline"
-          >
-            <ExternalLink size={12} aria-hidden /> Open on Instagram
-          </a>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
-}
 
 // ── Row card ────────────────────────────────────────────────────────────────
 function RowCard({ row, onOpen }: { row: FlaggedRow; onOpen: () => void }) {
@@ -309,7 +139,7 @@ function RowCard({ row, onOpen }: { row: FlaggedRow; onOpen: () => void }) {
       className="team-row-card flex w-full min-w-0 items-center gap-3 rounded-2xl border border-border bg-bg-white p-2.5 transition-all hover:border-[#DCD6C4] hover:shadow-sm sm:p-3"
       style={{ borderLeft: `3px solid ${meta.accent}` }}
     >
-      <PlayCard
+      <InstagramPreviewCard
         pic={row.creator_pic ?? row.profile_pic}
         link={row.post_link}
         username={row.username}
@@ -495,7 +325,7 @@ function RowDetailModal({ row, onClose }: { row: FlaggedRow; onClose: () => void
           <section className="campaign-detail-overview ad-detail-overview">
             <div className="campaign-detail-allocation-card ad-detail-profile-card">
               <div className="ad-detail-avatar-frame">
-                <PlayCard
+                <InstagramPreviewCard
                   pic={row.creator_pic ?? row.profile_pic}
                   link={row.post_link}
                   username={row.username}
