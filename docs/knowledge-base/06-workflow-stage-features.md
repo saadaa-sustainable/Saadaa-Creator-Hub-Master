@@ -119,10 +119,13 @@ Resolves email, address (`parseShopifyAddress` → street/city/state/pincode usi
 - **Flow:** `submitRepeatCollab` → RPC `create_repeat_collab(inf_id, campaign_id, content_type)` mints the C2+ parent (atomic per-creator P/C, `workflow_status='Reach Out'`) → delegates to the untouched `submitOnboarding` (Shopify order validation, On Board, child spawn). On failure the just-created parent is deleted (no orphan). Migration `2026_06_24_phase3_create_repeat_collab.sql`.
 
 ### Collab email
-- **Deliverable breakdown** rendered as `{posts}P : {reels}R[: {stories}S]`; count chip reads "N deliverables" with breakdown tooltip.
-- Recipient: `post.email` → creator email → shopify order email.
-- Attachments: campaign brief (only `campaigns.brief_link`/`internal_brief_link` — never `post.creator_brief_link`; rejects Spreadsheet URLs, extracts Drive file id) + permanent T&C PDF.
-- `sendCollabEmail` stamps `collab_email_sent_at` immediately (UI updates without waiting for SMTP), then sends + logs to `email_logs` via `after()`. `skipCollabEmail` sets `collab_email_skipped=true`. Email + payment live on the collab representative (lowest post_id).
+- **Template (2026-07-09):** approved copy — intro → Agreed Deliverables (`[n] Collaboration Reel` / `[n] Story` / `[n] Months of Ads Usage Rights…`) → Commercials → Timelines (Script 3d / Draft 7d / Live 10d, from product delivery) → Payment Terms (**15th/30th** cycle) → Content Guidelines (`#RAHOSAADAA #PEHNOSAADAA #SAADAA`) → Content Direction → confirmation clause → "SAADAA Team". Subject **`Collaboration Confirmation | Collab ID: <id>`**. `buildCollabEmailHtml` (server) + `buildPreviewHtml` (modal) kept in sync.
+- **Collab ID display** = `posts.collab_id` (`SIF-N-C{n}`), fallback `inf_id-C{collab_number}` — NOT the deliverable/post id.
+- **Commercials — barter = garment quantity** (`posts.garment_qty`) for BOTH Barter and Barter + Paid: renders `Barter Quantity: [N] Products`; Barter + Paid also shows `Total Agreed Amount: ₹[amount]`. Carried through the `barterAmount` field (modal input "BARTER (No. of Products)").
+- **Deliverable breakdown** chip on the card rendered as `{posts}P : {reels}R[: {stories}S]`; count chip reads "N deliverables" with breakdown tooltip.
+- Recipient: `post.email` → creator email → shopify order email. **CC** = the acting user; **BCC** = `tanvi@saadaa.in`.
+- **Attachments (3):** campaign brief (only `campaigns.brief_link`/`internal_brief_link` — never `post.creator_brief_link`; rejects Spreadsheet URLs, extracts Drive file id) + T&C PDF (Drive-primary `TERMS_DRIVE_FILE_ID` → repo-bundled fallback) + pronunciation voice note (`PRONUNCIATION_DRIVE_FILE_ID`, `Saadaa_Pronunciation.m4a`). **Send is hard-gated on brief + T&C + CC** (see Error Portal ch07); the voice note is best-effort and does NOT gate.
+- `sendCollabEmail` resolves attachments + validates the gate **before** stamping `collab_email_sent_at` (blocked sends stamp nothing and log `collab_email_blocked`); on pass it stamps immediately then sends + logs to `email_logs` via `after()`. `skipCollabEmail` sets `collab_email_skipped=true`. Email + payment live on the collab representative (lowest post_id).
 
 ### KPIs
 Count COLLABS (grouped by `collab_id`): totalOnboarded, pendingOnboardings (Reach Out), completionRate, adRightsSelected/noAdRights, pendingEmail, avg deliverables per collab, shopifyValidationRate.

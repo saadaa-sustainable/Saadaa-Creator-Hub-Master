@@ -1,4 +1,10 @@
 
+### Collab email — new template, barter = garment quantity, pronunciation voice note (2026-07-09)
+- **New email template** — rewrote the confirmation email to the approved copy: intro → Agreed Deliverables (`[n] Collaboration Reel`, `[n] Story`, `[n] Months of Ads Usage Rights for ads/whitelisting and brand platforms`) → Commercials → Timelines → Payment Terms → Content Guidelines → Content Direction → confirmation clause → "SAADAA Team". Subject is now **`Collaboration Confirmation | Collab ID: <id>`**. Payment cycle text = **15th / 30th**. Hashtags trimmed to `#RAHOSAADAA #PEHNOSAADAA #SAADAA`. Server email (`buildCollabEmailHtml`) and the modal live preview (`buildPreviewHtml`) both updated to match.
+- **Barter value = garment quantity** for **both** Barter and Barter + Paid (was the meaningless `product worth INR 0`). Sourced from `posts.garment_qty`. Commercials renders **`Barter Quantity: [N] Products`**; Barter + Paid also shows `Total Agreed Amount: ₹[amount]`. Modal input relabelled **`BARTER (No. of Products)`**; the `barterAmount` field now carries the garment count end-to-end.
+- **Pronunciation voice note** attached to every collab email — `Saadaa_Pronunciation.m4a` pulled from Drive (`PRONUNCIATION_DRIVE_FILE_ID`, default `1sNQB9CozBjI4IiujLjNGbaz2FB9RCEBt`, Anyone-with-link) as a 3rd attachment, force-named/typed `audio/mp4`. **Best-effort — it does NOT gate the send** (only Campaign Brief + T&C + sender CC block). Shown in the modal attachment list. Guidelines bullet notes "a pronunciation voice note is attached".
+- Files: `features/onboarding/actions.ts`, `features/onboarding/collab-email-modal.tsx`.
+
 ### Collab email — show the Collab ID, not the deliverable ID (2026-07-09)
 - The confirmation email header / subject / "reply with Collab ID" all showed the **deliverable/post id** (`SIF-10764-P1`) instead of the **collab id** (`SIF-10764-C1`). `getCollabEmailPreview` was returning `collabId = post.post_id`. Now returns `post.collab_id` (fallback `inf_id-C{collab_number}`, then post_id). Flows through the email body, subject, and `email_logs.collab_id`. File: `features/onboarding/actions.ts`.
 
