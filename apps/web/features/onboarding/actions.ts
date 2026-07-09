@@ -818,7 +818,7 @@ export type SendCollabEmailResult =
   | { ok: false; error: string };
 
 export interface CollabEmailAttachment {
-  kind: "campaignBrief" | "terms";
+  kind: "campaignBrief" | "terms" | "voiceNote";
   label: string;
   fileName: string;
   status: "attached" | "missing" | "unavailable";
@@ -826,6 +826,17 @@ export interface CollabEmailAttachment {
   driveId?: string | null;
   note?: string;
 }
+
+// Saadaa pronunciation voice note — a fixed brand asset attached to every collab
+// email. Shared "Anyone with the link" in Drive; override the ID via env if the
+// file is ever replaced. Best-effort (does NOT gate the send).
+const PRONUNCIATION_DRIVE_FILE_ID = (
+  process.env.PRONUNCIATION_DRIVE_FILE_ID ?? "1sNQB9CozBjI4IiujLjNGbaz2FB9RCEBt"
+).trim();
+const PRONUNCIATION_ATTACHMENT = {
+  fileName: "Saadaa_Pronunciation.m4a",
+  mimeType: "audio/mp4",
+} as const;
 
 function extractDriveFileId(urlOrId: string | null | undefined): string | null {
   const value = String(urlOrId || "").trim();
@@ -848,7 +859,7 @@ export async function getCollabEmailPreview(
   const { data: postRaw, error: postErr } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, collab_id, collab_number, inf_id, campaign_id, reels, static_posts, stories, commercial_amount, collab_type, ads_usage_rights, email, order_id, creator_brief_link",
+      "post_id, collab_id, collab_number, inf_id, campaign_id, reels, static_posts, stories, commercial_amount, garment_qty, collab_type, ads_usage_rights, email, order_id, creator_brief_link",
     )
     .eq("post_id", postId.trim())
     .maybeSingle();
@@ -909,7 +920,8 @@ export async function getCollabEmailPreview(
   const staticPosts = (post.static_posts as number | null) ?? 0;
   const stories = (post.stories as number | null) ?? 0;
   const deliverables: string[] = [];
-  if (reels > 0) deliverables.push(`${reels} Reel${reels > 1 ? "s" : ""}`);
+  if (reels > 0)
+    deliverables.push(`${reels} Collaboration Reel${reels > 1 ? "s" : ""}`);
   if (staticPosts > 0)
     deliverables.push(
       `${staticPosts} Static Post${staticPosts > 1 ? "s" : ""}`,
@@ -920,6 +932,9 @@ export async function getCollabEmailPreview(
   const collabType = (post.collab_type as string | null) ?? "";
   const isPureBarter = collabType.toLowerCase() === "barter";
   const commercials = String((post.commercial_amount as number | null) ?? 0);
+  // Barter value is now the GARMENT QUANTITY (number of products), for BOTH
+  // Barter and Barter + Paid. Passed through the `barterAmount` field.
+  const garmentQty = String((post.garment_qty as string | null) ?? "").trim();
 
   // Only use campaign's brief_link / brief_pdf_url.
   // Never fall back to post.creator_brief_link — that field holds the internal
@@ -967,6 +982,16 @@ export async function getCollabEmailPreview(
         ? "Will be attached to the email."
         : "T&C PDF unavailable (Drive fetch + bundled fallback both failed).",
     },
+    {
+      // Fixed brand asset, resolved server-side from Drive at send time (not from
+      // the client) — no driveId here so it never enters attachmentDriveIds.
+      kind: "voiceNote",
+      label: "Pronunciation Voice Note",
+      fileName: PRONUNCIATION_ATTACHMENT.fileName,
+      status: "attached",
+      url: null,
+      note: "Saadaa pronunciation clip — attached to the email.",
+    },
   ];
 
   // The email must show the COLLAB id (SIF-N-C{n}), not the deliverable/post id
@@ -984,7 +1009,7 @@ export async function getCollabEmailPreview(
     emailTo,
     deliverables,
     agreedAmount: isPureBarter ? "0" : commercials,
-    barterAmount: "0",
+    barterAmount: garmentQty, // now = garment quantity (products), both types
     collabType,
     adsUsageRights: (post.ads_usage_rights as string | null) ?? "",
     campaignId,
@@ -1018,12 +1043,20 @@ function buildCollabEmailHtml(opts: {
   const deliverableLines = opts.deliverables
     .map((d) => `<li>${escHtml(d)}</li>`)
     .join("");
+  const garments = barterAmount.trim();
+  const barterText = garments
+    ? `${garments} product${garments === "1" ? "" : "s"}`
+    : "products as per order confirmation";
   const adsLine = adsUsageRights
-    ? `<li>Ads usage rights: <strong>${adsUsageRights}</strong></li>`
-    : `<li>Ads usage rights</li>`;
+    ? `<li><strong>${adsUsageRights}</strong> of Ads Usage Rights for ads/whitelisting and brand platforms</li>`
+    : `<li>Ads Usage Rights for ads/whitelisting and brand platforms</li>`;
   const commercialsHtml = isPureBarter
-    ? `<li>Barter collaboration: product worth <strong>INR ${barterAmount}</strong></li>`
-    : `<li>Agreed amount: <strong>INR ${agreedAmount}</strong></li>${Number(barterAmount) > 0 ? `<li>Barter value: <strong>INR ${barterAmount}</strong></li>` : ""}`;
+    ? `<li>Barter: <strong>${barterText}</strong></li>`
+    : `<li>Total Agreed Amount: <strong>₹${agreedAmount}</strong></li><li>Barter: <strong>${barterText}</strong></li>`;
+
+  const H3 =
+    'color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:22px 0 10px;';
+  const UL = "padding-left:20px;margin:0 0 8px;color:#161513;";
 
   return `<div style="font-family:Arial,sans-serif;color:#161513;max-width:600px;margin:0 auto;line-height:1.65;background:#FAF8F5;">
 <div style="background:#2C2420;padding:24px 28px;border-radius:12px 12px 0 0;">
@@ -1031,24 +1064,28 @@ function buildCollabEmailHtml(opts: {
 </div>
 <div style="background:#FAF8F5;padding:26px 28px;border:1px solid #E7E2D2;border-top:none;border-radius:0 0 12px 12px;">
 <p style="margin:0 0 10px;">Hi <strong>${creatorName}</strong>,</p>
-<p style="margin:0 0 16px;">We're excited to move forward with a collaboration with you.</p>
-<p style="margin:0 0 18px;"><span style="display:inline-block;background:#F0EAD6;color:#2C2420;font-size:0.76rem;font-weight:800;padding:5px 12px;border-radius:999px;">COLLAB ID: ${collabId}</span></p>
-<h3 style="color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:20px 0 10px;">Agreed Deliverables</h3>
-<ul style="padding-left:20px;margin:0 0 18px;color:#161513;">${deliverableLines}${adsLine}</ul>
-<h3 style="color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:20px 0 10px;">Commercials</h3>
-<ul style="padding-left:20px;margin:0 0 18px;color:#161513;">${commercialsHtml}</ul>
-<h3 style="color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:20px 0 10px;">Important Guidelines</h3>
-<p style="margin-bottom:6px;"><strong>Hashtags &amp; Tags:</strong></p>
-<ul style="padding-left:20px;margin-bottom:16px;color:#161513;"><li>Use hashtags: <strong>#RAHOSAADAA #PEHNOSAADAA #SAADAA #saadaa_women #saadaa_men</strong></li><li>Send a collaboration request to <strong>@saadaadesigns</strong> and <strong>@saadaa_women</strong> or <strong>@saadaa_men</strong></li></ul>
-<p style="margin-bottom:6px;"><strong>Timelines:</strong></p>
-<ul style="padding-left:20px;margin-bottom:16px;color:#161513;"><li>Script to be shared on the <strong>3rd day</strong> after receiving the product</li><li>First draft to be shared on the <strong>7th day</strong> after receiving the product</li><li>Final content to go live on the <strong>10th day</strong> after receiving the product</li></ul>
+<p style="margin:0 0 16px;">We're excited to move forward with this collaboration. Please find the confirmed collaboration details, timelines, payment terms, and content guidelines below.</p>
+<p style="margin:0 0 8px;"><span style="display:inline-block;background:#F0EAD6;color:#2C2420;font-size:0.76rem;font-weight:800;padding:5px 12px;border-radius:999px;">COLLAB ID: ${collabId}</span></p>
+<h3 style="${H3}">Agreed Deliverables</h3>
+<ul style="${UL}">${deliverableLines}${adsLine}</ul>
+<h3 style="${H3}">Commercials</h3>
+<ul style="${UL}">${commercialsHtml}</ul>
+<h3 style="${H3}">Timelines</h3>
+<ul style="${UL}"><li>Script Submission: <strong>Within 3 days</strong> of product delivery</li><li>First Draft Submission: <strong>Within 7 days</strong> of product delivery</li><li>Content Go Live: <strong>Within 10 days</strong> of product delivery</li></ul>
+<p style="margin:0 0 8px;font-size:0.86rem;color:#6E695E;">All timelines will be counted from the date the product is delivered.</p>
+<h3 style="${H3}">Payment Terms</h3>
+<ul style="${UL}"><li>Payment will be processed once all agreed deliverables are live and the required ad partnership is active.</li><li>Payments are processed as per our standard payment cycle, one month after the content goes live, on the next applicable payment date, either the <strong>15th or the 30th</strong>.</li><li>To process the payment, please reply to this email with your generated invoice/bill for the agreed amount, clearly mentioning <strong>Collab ID: ${collabId}</strong>.</li></ul>
+<h3 style="${H3}">Content Guidelines</h3>
+<ul style="${UL}"><li>Use the hashtags: <strong>#RAHOSAADAA #PEHNOSAADAA #SAADAA</strong></li><li>Send the collaboration request to the agreed SAADAA Instagram handle.</li><li>Tag the relevant handles: <strong>@saadaadesigns</strong> and <strong>@saadaa_women</strong> or <strong>@saadaa_men</strong>.</li><li>Please include <strong>@saadaadesigns</strong> and the relevant handle (@saadaa_women or @saadaa_men) in the caption.</li><li>Ensure that the SAADAA brand name is pronounced correctly in the content <em>(a pronunciation voice note is attached).</em></li><li>Use the correct spelling of SAADAA throughout the video, caption, and all overlay text.</li><li>Ensure the product is properly ironed and presented neatly before shooting.</li><li>You're free to write the caption in your own style, as long as it clearly highlights the brand and product.</li></ul>
+<h3 style="${H3}">Content Direction</h3>
+<p style="margin:0 0 8px;">Keep the content authentic and aligned with your usual content style. The storytelling should feel natural, engaging, and relevant to your audience.</p>
+<p style="margin:0 0 14px;">Focus on clean visuals that clearly highlight the product's fit, fabric, and overall look. Please ensure that both the product and brand are clearly visible throughout the content.</p>
 <div style="background:#F0EAD6;border:1px solid #E8C87A;border-radius:10px;padding:13px 16px;margin:18px 0;">
-<p style="margin:0 0 6px;font-size:0.88rem;"><strong>Payment:</strong> Processed one month after content goes live, either on the <strong>10th or 25th</strong> of the following month.</p>
-<p style="margin:0;font-size:0.88rem;"><strong>To receive payment, reply to this email with your invoice/bill</strong> mentioning Collab ID <strong>${collabId}</strong>. Payments without a bill and Collab ID cannot be processed.</p>
+<p style="margin:0;font-size:0.88rem;">Kindly review all the details carefully and reply to this email with your confirmation. By confirming, you acknowledge and agree to the deliverables, commercials, timelines, payment terms, content guidelines, and usage rights mentioned above.</p>
 </div>
-<p>Kindly confirm from your side so we can proceed with the next steps. We're looking forward to creating something impactful together.</p>
-<p style="margin-top:24px;margin-bottom:0;">Thanks and Regards,</p>
-<p style="margin-top:4px;font-size:1.08rem;font-weight:800;color:#2C2420;letter-spacing:0.4px;">Saadaa</p>
+<p style="margin:0 0 4px;">Looking forward to working together and creating great content.</p>
+<p style="margin-top:20px;margin-bottom:0;">Thanks &amp; Regards,</p>
+<p style="margin-top:4px;font-size:1.08rem;font-weight:800;color:#2C2420;letter-spacing:0.4px;">SAADAA Team</p>
 </div>
 <p style="font-size:0.7rem;color:#9A9384;text-align:center;margin-top:10px;padding-bottom:8px;">This email was sent via CreatorHub, Saadaa's Influencer Management Platform.</p>
 </div>`;
@@ -1101,14 +1138,18 @@ export async function sendCollabEmail(payload: {
   const senderCc = (actor.email ?? "").trim();
   const COLLAB_EMAIL_BCC = "tanvi@saadaa.in";
 
-  // HARD GATE — the creator must never receive an incomplete email. Resolve BOTH
-  // required attachments (campaign brief + T&C) up front and confirm the sender
-  // CC. If any is missing, block the send entirely, log it to the Error Portal
-  // (so the team can fix + retry), and do NOT stamp collab_email_sent_at.
-  const [termsFile, briefFile] = await Promise.all([
+  // HARD GATE — the creator must never receive an incomplete email. Resolve the
+  // two REQUIRED attachments (campaign brief + T&C) up front and confirm the
+  // sender CC. If any is missing, block the send entirely, log it to the Error
+  // Portal (so the team can fix + retry), and do NOT stamp collab_email_sent_at.
+  // The pronunciation voice note is a best-effort brand asset — it does NOT gate.
+  const [termsFile, briefFile, voiceRaw] = await Promise.all([
     readTermsAttachmentFile(),
     payload.attachmentDriveIds?.[0]
       ? fetchDriveFileAsAttachment(payload.attachmentDriveIds[0])
+      : Promise.resolve(null),
+    PRONUNCIATION_DRIVE_FILE_ID
+      ? fetchDriveFileAsAttachment(PRONUNCIATION_DRIVE_FILE_ID)
       : Promise.resolve(null),
   ]);
 
@@ -1128,10 +1169,18 @@ export async function sendCollabEmail(payload: {
     revalidatePath("/errors");
     return { ok: false, error: reason };
   }
-  // Both attachments guaranteed non-null past this point.
-  const attachments = [termsFile, briefFile] as NonNullable<
-    Awaited<ReturnType<typeof readTermsAttachmentFile>>
-  >[];
+  // Both required attachments guaranteed non-null past this point. The voice note
+  // (if it resolved) is force-named/typed and appended best-effort.
+  const voiceNote = voiceRaw
+    ? {
+        ...voiceRaw,
+        fileName: PRONUNCIATION_ATTACHMENT.fileName,
+        mimeType: PRONUNCIATION_ATTACHMENT.mimeType,
+      }
+    : null;
+  const attachments = [termsFile, briefFile, voiceNote].filter(
+    (f): f is NonNullable<typeof f> => f !== null,
+  );
 
   const htmlBody = buildCollabEmailHtml({
     collabId: payload.collabId,
@@ -1161,7 +1210,7 @@ export async function sendCollabEmail(payload: {
       to: sendPayload.emailTo,
       cc: senderCc || undefined,
       bcc: COLLAB_EMAIL_BCC,
-      subject: `Collaboration Confirmation - ${sendPayload.collabId}`,
+      subject: `Collaboration Confirmation | Collab ID: ${sendPayload.collabId}`,
       htmlBody: sendPayload.htmlBody,
       attachments: sendPayload.attachments,
     });
@@ -1170,7 +1219,7 @@ export async function sendCollabEmail(payload: {
       post_id: sendPayload.postId,
       collab_id: sendPayload.collabId,
       sent_to: sendPayload.emailTo,
-      subject: `Collaboration Confirmation - ${sendPayload.collabId}`,
+      subject: `Collaboration Confirmation | Collab ID: ${sendPayload.collabId}`,
       email_type: "collab",
       status: result.ok ? "sent" : "failed",
       error: result.ok ? null : (result.error ?? "unknown"),

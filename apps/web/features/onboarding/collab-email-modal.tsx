@@ -78,42 +78,49 @@ function buildPreviewHtml(opts: {
   collabType: string;
 }): string {
   const isPureBarter = opts.collabType.toLowerCase() === "barter";
+  const garments = opts.barterAmount.trim();
+  const barterText = garments
+    ? `${garments} product${garments === "1" ? "" : "s"}`
+    : "products as per order confirmation";
   const delivLines =
     opts.deliverables.map((d) => `<li>${esc(d)}</li>`).join("") +
     (opts.adsUsageRights
-      ? `<li>Ads usage rights: <strong>${esc(opts.adsUsageRights)}</strong></li>`
-      : `<li>Ads usage rights</li>`);
+      ? `<li><strong>${esc(opts.adsUsageRights)}</strong> of Ads Usage Rights for ads/whitelisting and brand platforms</li>`
+      : `<li>Ads Usage Rights for ads/whitelisting and brand platforms</li>`);
   const commercialsHtml = isPureBarter
-    ? `<li>Barter: product worth <strong>INR ${esc(opts.barterAmount)}</strong></li>`
-    : `<li>Agreed amount: <strong>INR ${esc(opts.agreedAmount)}</strong></li>${Number(opts.barterAmount) > 0 ? `<li>Barter value: <strong>INR ${esc(opts.barterAmount)}</strong></li>` : ""}`;
+    ? `<li>Barter: <strong>${esc(barterText)}</strong></li>`
+    : `<li>Total Agreed Amount: <strong>₹${esc(opts.agreedAmount)}</strong></li><li>Barter: <strong>${esc(barterText)}</strong></li>`;
+
+  const H =
+    "font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;";
 
   return `<div style="background:#2C2420;margin:-18px -18px 18px;padding:18px 20px;border-radius:10px 10px 0 0;">
 <div style="color:#F0C61E;font-weight:800;font-size:1rem;line-height:1.2;">Collaboration Confirmation</div>
 <div style="color:rgba(255,255,255,0.64);font-size:0.72rem;margin-top:4px;letter-spacing:0.04em;text-transform:uppercase;">Collab ID: <strong style="color:#FFFCF8;">${esc(opts.collabId)}</strong></div>
 </div>
 <p style="margin:0 0 10px;">Hi <strong>${esc(opts.creatorName || "creator")}</strong>,</p>
-<p style="margin:0 0 14px;">We're excited to move forward with a collaboration with you.</p>
-<p style="margin:0 0 16px;"><span style="display:inline-block;background:#F0EAD6;color:#2C2420;font-size:0.74rem;font-weight:800;padding:5px 10px;border-radius:999px;">COLLAB ID: ${esc(opts.collabId)}</span></p>
-<p style="font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;">Agreed Deliverables</p>
-<ul style="margin:0 0 14px;padding-left:18px;">${delivLines}</ul>
-<p style="font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;">Commercials</p>
-<ul style="margin:0 0 14px;padding-left:18px;">${commercialsHtml}</ul>
-<p style="font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;">Important Guidelines</p>
-<p style="margin-bottom:4px;"><strong>Hashtags &amp; Tags:</strong></p>
-<ul style="margin-top:0;padding-left:18px;"><li><strong>#RAHOSAADAA #PEHNOSAADAA #SAADAA #saadaa_women #saadaa_men</strong></li><li>Tag <strong>@saadaadesigns</strong> and <strong>@saadaa_women</strong> or <strong>@saadaa_men</strong></li></ul>
-<p style="margin-bottom:4px;"><strong>Timelines:</strong></p>
-<ul style="margin-top:0;padding-left:18px;">
-<li>Script: <strong>Day 3</strong></li>
-<li>First draft: <strong>Day 7</strong></li>
-<li>Go live: <strong>Day 10</strong></li>
-</ul>
-<div style="background:#F0EAD6;border:1px solid #E8C87A;border-radius:10px;padding:12px 14px;margin:16px 0;">
-<p style="margin:0 0 6px;font-size:0.82rem;"><strong>Payment:</strong> Processed one month after content goes live, either on the <strong>10th or 25th</strong> of the following month.</p>
-<p style="margin:0;font-size:0.82rem;"><strong>Reply to this email with your invoice/bill</strong> mentioning Collab ID <strong>${esc(opts.collabId)}</strong> to receive payment.</p>
+<p style="margin:0 0 14px;">We're excited to move forward with this collaboration. Please find the confirmed collaboration details, timelines, payment terms, and content guidelines below.</p>
+<p style="margin:0 0 8px;"><span style="display:inline-block;background:#F0EAD6;color:#2C2420;font-size:0.74rem;font-weight:800;padding:5px 10px;border-radius:999px;">COLLAB ID: ${esc(opts.collabId)}</span></p>
+<p style="${H}">Agreed Deliverables</p>
+<ul style="margin:0 0 8px;padding-left:18px;">${delivLines}</ul>
+<p style="${H}">Commercials</p>
+<ul style="margin:0 0 8px;padding-left:18px;">${commercialsHtml}</ul>
+<p style="${H}">Timelines</p>
+<ul style="margin:0 0 4px;padding-left:18px;"><li>Script Submission: <strong>Within 3 days</strong> of product delivery</li><li>First Draft Submission: <strong>Within 7 days</strong> of product delivery</li><li>Content Go Live: <strong>Within 10 days</strong> of product delivery</li></ul>
+<p style="margin:0 0 8px;font-size:0.8rem;color:#6E695E;">All timelines counted from the date the product is delivered.</p>
+<p style="${H}">Payment Terms</p>
+<ul style="margin:0 0 8px;padding-left:18px;"><li>Payment is processed once all deliverables are live and the required ad partnership is active.</li><li>Standard cycle: one month after go-live, on the next applicable date — the <strong>15th or the 30th</strong>.</li><li>Reply with your invoice/bill mentioning <strong>Collab ID: ${esc(opts.collabId)}</strong>.</li></ul>
+<p style="${H}">Content Guidelines</p>
+<ul style="margin:0 0 8px;padding-left:18px;"><li>Hashtags: <strong>#RAHOSAADAA #PEHNOSAADAA #SAADAA</strong></li><li>Send the collaboration request to the agreed SAADAA handle.</li><li>Tag <strong>@saadaadesigns</strong> and <strong>@saadaa_women</strong> or <strong>@saadaa_men</strong>, and include them in the caption.</li><li>Pronounce SAADAA correctly <em>(voice note attached)</em> and spell it correctly in video, caption &amp; overlays.</li><li>Ensure the product is ironed and neatly presented before shooting.</li><li>Write the caption in your own style, clearly highlighting the brand and product.</li></ul>
+<p style="${H}">Content Direction</p>
+<p style="margin:0 0 6px;font-size:0.86rem;">Keep the content authentic and aligned with your usual style — natural, engaging, relevant to your audience.</p>
+<p style="margin:0 0 12px;font-size:0.86rem;">Focus on clean visuals highlighting the product's fit, fabric, and look. Product and brand clearly visible throughout.</p>
+<div style="background:#F0EAD6;border:1px solid #E8C87A;border-radius:10px;padding:12px 14px;margin:14px 0;">
+<p style="margin:0;font-size:0.82rem;">Kindly review all details and reply with your confirmation. By confirming, you agree to the deliverables, commercials, timelines, payment terms, content guidelines, and usage rights above.</p>
 </div>
-<p>Kindly confirm from your side so we can proceed. We're looking forward to creating something impactful together.</p>
-<p style="margin-top:16px;margin-bottom:0;">Thanks and Regards,</p>
-<p style="margin-top:4px;font-weight:800;color:#2C2420;font-size:1rem;letter-spacing:0.5px;">Saadaa</p>`;
+<p style="margin:0 0 4px;">Looking forward to working together and creating great content.</p>
+<p style="margin-top:16px;margin-bottom:0;">Thanks &amp; Regards,</p>
+<p style="margin-top:4px;font-weight:800;color:#2C2420;font-size:1rem;letter-spacing:0.5px;">SAADAA Team</p>`;
 }
 
 /**
@@ -352,7 +359,7 @@ export function CollabEmailPane({
                 <input
                   type="text"
                   className="ob-input"
-                  value={`Collaboration Confirmation - ${preview.collabId}`}
+                  value={`Collaboration Confirmation | Collab ID: ${preview.collabId}`}
                   readOnly
                 />
               </div>
@@ -371,7 +378,7 @@ export function CollabEmailPane({
               </div>
               <div className="collab-email-field">
                 <div>
-                  <label className="ob-form-label">AGREED AMOUNT (₹)</label>
+                  <label className="ob-form-label">TOTAL AGREED AMOUNT (₹)</label>
                   <input
                     type="text"
                     className="ob-input"
@@ -387,10 +394,11 @@ export function CollabEmailPane({
               </div>
               <div className="collab-email-field">
                 <div>
-                  <label className="ob-form-label">BARTER VALUE (₹)</label>
+                  <label className="ob-form-label">BARTER (No. of Products)</label>
                   <input
                     type="text"
                     className="ob-input"
+                    inputMode="numeric"
                     value={barterAmount}
                     onChange={(e) => setBarterAmount(e.target.value)}
                   />
