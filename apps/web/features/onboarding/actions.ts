@@ -964,7 +964,7 @@ export async function getCollabEmailPreview(
       url: termsFile ? TERMS_ATTACHMENT.url : null,
       note: termsFile
         ? "Will be attached to the email."
-        : "Permanent T&C PDF was not found in the project root.",
+        : "T&C PDF unavailable (Drive fetch + bundled fallback both failed).",
     },
   ];
 
