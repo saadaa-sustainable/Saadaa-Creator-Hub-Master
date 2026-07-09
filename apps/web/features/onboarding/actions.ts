@@ -848,7 +848,7 @@ export async function getCollabEmailPreview(
   const { data: postRaw, error: postErr } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, inf_id, campaign_id, reels, static_posts, stories, commercial_amount, collab_type, ads_usage_rights, email, order_id, creator_brief_link",
+      "post_id, collab_id, collab_number, inf_id, campaign_id, reels, static_posts, stories, commercial_amount, collab_type, ads_usage_rights, email, order_id, creator_brief_link",
     )
     .eq("post_id", postId.trim())
     .maybeSingle();
@@ -969,9 +969,17 @@ export async function getCollabEmailPreview(
     },
   ];
 
+  // The email must show the COLLAB id (SIF-N-C{n}), not the deliverable/post id
+  // (SIF-N-P{n}). Prefer the stamped collab_id; fall back to inf_id-C{collab_number}
+  // for legacy rows, and only then to post_id.
+  const collabDisplayId =
+    (post.collab_id as string | null) ||
+    (infId ? `${infId}-C${Number(post.collab_number ?? 1)}` : null) ||
+    (post.post_id as string);
+
   return {
     ok: true,
-    collabId: post.post_id as string,
+    collabId: collabDisplayId,
     creatorName,
     emailTo,
     deliverables,
