@@ -1045,14 +1045,14 @@ function buildCollabEmailHtml(opts: {
     .join("");
   const garments = barterAmount.trim();
   const barterText = garments
-    ? `${garments} product${garments === "1" ? "" : "s"}`
-    : "products as per order confirmation";
+    ? `${garments} Product${garments === "1" ? "" : "s"}`
+    : "as per order confirmation";
   const adsLine = adsUsageRights
     ? `<li><strong>${adsUsageRights}</strong> of Ads Usage Rights for ads/whitelisting and brand platforms</li>`
     : `<li>Ads Usage Rights for ads/whitelisting and brand platforms</li>`;
   const commercialsHtml = isPureBarter
-    ? `<li>Barter: <strong>${barterText}</strong></li>`
-    : `<li>Total Agreed Amount: <strong>₹${agreedAmount}</strong></li><li>Barter: <strong>${barterText}</strong></li>`;
+    ? `<li>Barter Quantity: <strong>${barterText}</strong></li>`
+    : `<li>Total Agreed Amount: <strong>₹${agreedAmount}</strong></li><li>Barter Quantity: <strong>${barterText}</strong></li>`;
 
   const H3 =
     'color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:22px 0 10px;';

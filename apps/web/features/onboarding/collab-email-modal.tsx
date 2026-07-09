@@ -80,16 +80,16 @@ function buildPreviewHtml(opts: {
   const isPureBarter = opts.collabType.toLowerCase() === "barter";
   const garments = opts.barterAmount.trim();
   const barterText = garments
-    ? `${garments} product${garments === "1" ? "" : "s"}`
-    : "products as per order confirmation";
+    ? `${garments} Product${garments === "1" ? "" : "s"}`
+    : "as per order confirmation";
   const delivLines =
     opts.deliverables.map((d) => `<li>${esc(d)}</li>`).join("") +
     (opts.adsUsageRights
       ? `<li><strong>${esc(opts.adsUsageRights)}</strong> of Ads Usage Rights for ads/whitelisting and brand platforms</li>`
       : `<li>Ads Usage Rights for ads/whitelisting and brand platforms</li>`);
   const commercialsHtml = isPureBarter
-    ? `<li>Barter: <strong>${esc(barterText)}</strong></li>`
-    : `<li>Total Agreed Amount: <strong>₹${esc(opts.agreedAmount)}</strong></li><li>Barter: <strong>${esc(barterText)}</strong></li>`;
+    ? `<li>Barter Quantity: <strong>${esc(barterText)}</strong></li>`
+    : `<li>Total Agreed Amount: <strong>₹${esc(opts.agreedAmount)}</strong></li><li>Barter Quantity: <strong>${esc(barterText)}</strong></li>`;
 
   const H =
     "font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;";
