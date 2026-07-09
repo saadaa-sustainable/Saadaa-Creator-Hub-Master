@@ -1081,12 +1081,16 @@ export async function sendCollabEmail(payload: {
   collabType: string;
   attachmentDriveIds?: string[];
 }): Promise<SendCollabEmailResult> {
-  await assertPermission("onboarding_write");
+  const actor = await assertPermission("onboarding_write");
 
   const emailTo = payload.emailTo.trim();
   if (!emailTo || !emailTo.includes("@")) {
     return { ok: false, error: "Invalid email address" };
   }
+
+  // The person sending the mail is CC'd; tanvi@saadaa.in is always BCC'd.
+  const senderCc = (actor.email ?? "").trim();
+  const COLLAB_EMAIL_BCC = "tanvi@saadaa.in";
 
   const htmlBody = buildCollabEmailHtml({
     collabId: payload.collabId,
@@ -1123,6 +1127,8 @@ export async function sendCollabEmail(payload: {
     );
     const result = await sendMail({
       to: sendPayload.emailTo,
+      cc: senderCc || undefined,
+      bcc: COLLAB_EMAIL_BCC,
       subject: `Collaboration Confirmation - ${sendPayload.collabId}`,
       htmlBody: sendPayload.htmlBody,
       attachments: attachments.length ? attachments : undefined,

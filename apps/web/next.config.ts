@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
   reactStrictMode: true,
   typedRoutes: true,
+  // Bundle the T&C PDF into every serverless function so fs.readFile works in
+  // prod (the collab email attaches it; it used to live outside the repo and
+  // silently vanished on Vercel).
+  outputFileTracingIncludes: {
+    "/**": ["./legal/**"],
+  },
   experimental: {
     optimizePackageImports: ["lucide-react"],
     // Client router cache reuses visited/prefetched pages for 30s (dynamic) —
