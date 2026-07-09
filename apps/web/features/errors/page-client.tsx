@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   AlertOctagon,
   AlertTriangle,
@@ -14,11 +15,14 @@ import {
   Filter,
   Info,
   Instagram,
+  Loader2,
   Mail,
+  MailX,
   PackageCheck,
   RefreshCw,
   Search,
   Send,
+  ShieldAlert,
   Truck,
   Users,
   Wallet,
@@ -27,15 +31,22 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatDate, formatRupees, workflowStatusLabel } from "@/lib/formatters";
+import { formatDate, workflowStatusLabel } from "@/lib/formatters";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { resendBlockedCollabEmail } from "./actions";
 import type {
   AuditViolation,
+  BlockedEmailRow,
   ErrorPortalData,
   ErrorSeverity,
   MissingEmailRow,
   SystemErrorRow,
 } from "./types";
+
+const BLOCKED_EMAIL_TYPES = new Set([
+  "collab_email_blocked",
+  "collab_email_send_failed",
+]);
 
 type Severity = "all" | "HIGH" | "MEDIUM" | "LOW";
 
@@ -64,6 +75,8 @@ export function ErrorPortalBody({ data }: { data: ErrorPortalData }) {
   const filteredSystemErrors = useMemo(
     () =>
       data.systemErrors.filter((e) => {
+        // Collab-email blocks/failures have their own actionable card below.
+        if (BLOCKED_EMAIL_TYPES.has(e.type)) return false;
         if (!showResolved && e.resolved) return false;
         if (normalizedQuery) {
           const hay = `${e.type} ${e.key ?? ""} ${e.message} ${e.source ?? ""}`.toLowerCase();
@@ -105,10 +118,25 @@ export function ErrorPortalBody({ data }: { data: ErrorPortalData }) {
         lastScannedAt={data.lastScannedAt}
       />
 
-      <KpiStrip summary={data.summary} />
+      <KpiStrip
+        summary={data.summary}
+        onBlockedClick={() =>
+          document
+            .getElementById("blocked-emails-card")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" })
+        }
+      />
 
       {/* Bento layout — desktop 12-col, mobile single */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
+        {data.blockedEmails.length > 0 && (
+          <div
+            id="blocked-emails-card"
+            className="lg:col-span-12 min-w-0 scroll-mt-24"
+          >
+            <BlockedEmailsCard rows={data.blockedEmails} />
+          </div>
+        )}
         <div className="lg:col-span-12 min-w-0">
           <DataHealthGrid health={data.health} />
         </div>
@@ -245,9 +273,23 @@ function formatRelativeTime(iso: string): string {
 // KPI Strip — 5 cards using shared .acc-kpi chrome
 // ─────────────────────────────────────────────────────────────────────────────
 
-function KpiStrip({ summary }: { summary: ErrorPortalData["summary"] }) {
+function KpiStrip({
+  summary,
+  onBlockedClick,
+}: {
+  summary: ErrorPortalData["summary"];
+  onBlockedClick: () => void;
+}) {
   return (
     <div className="acc-kpi-grid">
+      <KpiTile
+        tone="danger"
+        icon={ShieldAlert}
+        label="Email Blocked"
+        primary={String(summary.blockedEmails)}
+        secondary="Missing docs · retry"
+        onClick={summary.blockedEmails > 0 ? onBlockedClick : undefined}
+      />
       <KpiTile
         tone="danger"
         icon={AlertOctagon}
@@ -307,12 +349,14 @@ function KpiTile({
   label,
   primary,
   secondary,
+  onClick,
 }: {
   tone: "accent" | "info" | "warning" | "success" | "danger" | "muted";
   icon: LucideIcon;
   label: string;
   primary: string;
   secondary: string;
+  onClick?: () => void;
 }) {
   const toneCls = {
     accent: "acc-kpi--accent",
@@ -322,8 +366,8 @@ function KpiTile({
     danger: "acc-kpi--danger",
     muted: "acc-kpi--muted",
   }[tone];
-  return (
-    <div className={cn("acc-kpi", toneCls)}>
+  const inner = (
+    <>
       <div className="acc-kpi__head">
         <span className="acc-kpi__icon" aria-hidden>
           <Icon size={14} />
@@ -332,8 +376,24 @@ function KpiTile({
       </div>
       <div className="acc-kpi__primary">{primary}</div>
       <div className="acc-kpi__secondary">{secondary}</div>
-    </div>
+    </>
   );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          "acc-kpi text-left transition-transform hover:scale-[1.02] hover:shadow-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]",
+          toneCls,
+        )}
+        title="Jump to blocked emails"
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <div className={cn("acc-kpi", toneCls)}>{inner}</div>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -552,6 +612,120 @@ function MissingEmailsCard({ rows }: { rows: MissingEmailRow[] }) {
         )}
       </ul>
     </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Blocked collab emails — actionable "Send again" cards
+// ─────────────────────────────────────────────────────────────────────────────
+
+function BlockedEmailsCard({ rows }: { rows: BlockedEmailRow[] }) {
+  return (
+    <Card
+      title="Collab Emails Blocked"
+      icon={MailX}
+      subtitle={`${rows.length} not sent`}
+    >
+      <p className="text-[0.62rem] text-text-secondary -mt-1 mb-1">
+        These emails were <strong>not sent</strong> to the creator — the send was
+        blocked because a required attachment (Campaign Brief / T&amp;C) or the
+        sender CC was missing, or SMTP failed. Fix the cause, then retry.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        {rows.map((r) => (
+          <BlockedEmailItem key={`${r.post_id}-${r.kind}`} row={r} />
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function BlockedEmailItem({ row }: { row: BlockedEmailRow }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [done, setDone] = useState(false);
+
+  const onResend = () => {
+    startTransition(async () => {
+      const res = await resendBlockedCollabEmail(row.post_id);
+      if (res.ok) {
+        setDone(true);
+        toast.success(`Email sent to ${res.sentTo ?? "creator"}`);
+        router.refresh();
+      } else {
+        toast.error(res.error ?? "Still blocked — fix the cause and retry");
+      }
+    });
+  };
+
+  return (
+    <article className="rounded-xl border border-danger/25 bg-danger-bg/40 p-2.5 flex flex-col gap-2 text-[0.7rem] min-w-0">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-extrabold text-text-primary truncate">
+          {row.inf_name ?? row.username ?? row.post_id}
+        </span>
+        <span className="text-[0.55rem] text-text-tertiary tabular whitespace-nowrap">
+          {row.collab_id ?? row.post_id}
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 flex-wrap text-[0.6rem] text-text-secondary">
+        {row.username && <span>@{row.username}</span>}
+        {row.campaign_id && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border border-border bg-bg-white tabular text-text-tertiary text-[0.55rem]">
+            {row.campaign_id}
+          </span>
+        )}
+        {row.workflow_status && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full border border-border bg-bg-white text-text-secondary text-[0.55rem]">
+            {workflowStatusLabel(row.workflow_status)}
+          </span>
+        )}
+        <span
+          className={cn(
+            "inline-flex items-center px-1.5 py-0.5 rounded-full text-[0.55rem] font-extrabold border whitespace-nowrap",
+            row.kind === "send_failed"
+              ? "bg-warning-bg text-warning border-warning/20"
+              : "bg-danger-bg text-danger border-danger/20",
+          )}
+        >
+          {row.kind === "send_failed" ? "SMTP failed" : "Blocked"}
+        </span>
+      </div>
+      <p className="text-[0.62rem] text-danger leading-snug flex items-start gap-1">
+        <AlertTriangle size={11} aria-hidden className="mt-0.5 shrink-0" />
+        <span className="min-w-0">{row.reason}</span>
+      </p>
+      <div className="flex items-center justify-between gap-2 pt-0.5">
+        <span className="text-[0.55rem] text-text-tertiary">
+          {formatRelativeTime(row.created_at)}
+        </span>
+        <button
+          type="button"
+          onClick={onResend}
+          disabled={pending || done}
+          className={cn(
+            "inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-[0.66rem] font-extrabold border transition-all",
+            done
+              ? "bg-success-bg text-success border-success/20 cursor-default"
+              : "bg-[--accent] text-text-primary border-[--accent] hover:scale-[1.03] hover:shadow-md active:scale-[0.97] disabled:opacity-70 disabled:cursor-wait",
+          )}
+        >
+          {done ? (
+            <>
+              <CheckCircle2 size={12} aria-hidden /> Sent
+            </>
+          ) : pending ? (
+            <>
+              <Loader2 size={12} className="animate-spin" aria-hidden /> Sending…
+            </>
+          ) : (
+            <>
+              <Send size={12} aria-hidden /> Send again
+            </>
+          )}
+        </button>
+      </div>
+    </article>
   );
 }
 

@@ -130,7 +130,8 @@
 - **5 audit rules:** INVALID_POST_ID (HIGH), DUPLICATE_UTR (HIGH), PAYMENT_BEFORE_POSTING (MEDIUM), MISSING_BANK_DETAILS (MEDIUM), MISSING_TRACKING (LOW, order >2 days old).
 - **Data health:** stage counts + missing bank/email/tracking/order/postLink + paymentsDue + totalPaidOut + totalCreators.
 - **MISSING_COLLAB_EMAIL** worklist: parent + onboarded/posted/delivered + `collab_email_sent_at IS NULL`.
-- **Summary:** HIGH/MEDIUM/LOW + apiFails (`system_errors` type ig_fetch/apify_fail) + missingEmail.
+- **EMAIL BLOCKED card + KPI (2026-07-09):** `sendCollabEmail` is now **hard-gated** — it resolves BOTH required attachments (campaign brief via `fetchDriveFileAsAttachment` + T&C via `readTermsAttachmentFile`) **and** confirms the sender CC *before* sending; if any is missing it does NOT send, does NOT stamp `collab_email_sent_at`, and logs `system_errors` type `collab_email_blocked` (key = post_id, source `sendCollabEmail`). SMTP failures log `collab_email_send_failed`. Both surface in the **Collab Emails Blocked** card (`features/errors/page-client.tsx` `BlockedEmailsCard`) enriched from posts (creator/campaign/status/reason) + a clickable **Email Blocked** KPI that scrolls to it. Each card has a **Send again** button → `resendBlockedCollabEmail(post_id)` (`features/errors/actions.ts`) rebuilds the payload from `getCollabEmailPreview` and re-runs the gated send; on success `resolveSystemError` clears the row. Guarantees **no incomplete email ever reaches a creator**.
+- **Summary:** HIGH/MEDIUM/LOW + apiFails (`system_errors` type ig_fetch/apify_fail) + missingEmail + blockedEmails.
 
 ## User Panel / Admin Users — Invite, Roles, Audit, CSV
 **Routes:** `/admin/users` + `/admin/users/[email]` — both redirect unless `hasPermission(actor,"admin")`.

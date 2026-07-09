@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import type {
   AuditViolation,
+  BlockedEmailRow,
   DataHealth,
   ErrorPortalData,
   ErrorPortalSummary,
@@ -52,6 +53,7 @@ function emptyData(): ErrorPortalData {
       missingEmail: 0,
       metaFetchFails: 0,
       metaProfileUnavailable: 0,
+      blockedEmails: 0,
     },
     health: {
       reachOut: 0,
@@ -70,6 +72,7 @@ function emptyData(): ErrorPortalData {
     violations: [],
     systemErrors: [],
     missingEmails: [],
+    blockedEmails: [],
     lastScannedAt: new Date().toISOString(),
   };
 }
@@ -276,28 +279,64 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
     }
   }
 
-  // Pull creator names for the missing-email rows.
-  if (missingEmails.length > 0) {
-    const infIds = [
-      ...new Set(missingEmails.map((m) => m.inf_id).filter(Boolean)),
-    ] as string[];
-    if (infIds.length > 0) {
-      const { data: creators } = await (supabase as any)
-        .from("creators")
-        .select("inf_id, inf_name")
-        .in("inf_id", infIds)
-        .limit(2000);
-      const nameMap = new Map<string, string>();
-      for (const c of (creators ?? []) as Array<{
-        inf_id: string | null;
-        inf_name: string | null;
-      }>) {
-        const id = String(c.inf_id ?? "").trim();
-        if (id && c.inf_name) nameMap.set(id, c.inf_name);
-      }
-      for (const m of missingEmails) {
-        if (m.inf_id) m.inf_name = nameMap.get(m.inf_id) ?? null;
-      }
+  // Collab emails the send gate refused (missing brief / T&C / CC) or that
+  // failed at SMTP — sourced from system_errors, enriched from posts. `key` is
+  // the post_id, which drives the portal "Send again" retry.
+  const blockedEmails: BlockedEmailRow[] = [];
+  for (const e of sysErrors) {
+    if (e.type !== "collab_email_blocked" && e.type !== "collab_email_send_failed")
+      continue;
+    const pid = String(e.key ?? "").trim();
+    if (!pid) continue;
+    const post = postByPostId.get(pid);
+    blockedEmails.push({
+      post_id: pid,
+      collab_id:
+        (post?.collab_id as string | null) ??
+        (post?.inf_id
+          ? `${post.inf_id}-C${Number(post.collab_number ?? 1)}`
+          : null),
+      inf_name: null,
+      username: (post?.username as string | null) ?? null,
+      campaign_id: (post?.campaign_id as string | null) ?? null,
+      workflow_status: (post?.workflow_status as string | null) ?? null,
+      reason: e.message,
+      kind: e.type === "collab_email_send_failed" ? "send_failed" : "blocked",
+      created_at: e.created_at,
+    });
+  }
+
+  // Pull creator names for the missing-email + blocked-email rows (one query).
+  const nameInfIds = [
+    ...new Set(
+      [
+        ...missingEmails.map((m) => m.inf_id),
+        ...blockedEmails.map(
+          (b) => (postByPostId.get(b.post_id)?.inf_id as string | null) ?? null,
+        ),
+      ].filter(Boolean),
+    ),
+  ] as string[];
+  if (nameInfIds.length > 0) {
+    const { data: creators } = await (supabase as any)
+      .from("creators")
+      .select("inf_id, inf_name")
+      .in("inf_id", nameInfIds)
+      .limit(2000);
+    const nameMap = new Map<string, string>();
+    for (const c of (creators ?? []) as Array<{
+      inf_id: string | null;
+      inf_name: string | null;
+    }>) {
+      const id = String(c.inf_id ?? "").trim();
+      if (id && c.inf_name) nameMap.set(id, c.inf_name);
+    }
+    for (const m of missingEmails) {
+      if (m.inf_id) m.inf_name = nameMap.get(m.inf_id) ?? null;
+    }
+    for (const b of blockedEmails) {
+      const bInfId = (postByPostId.get(b.post_id)?.inf_id as string | null) ?? null;
+      if (bInfId) b.inf_name = nameMap.get(bInfId) ?? null;
     }
   }
 
@@ -315,6 +354,7 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
     metaProfileUnavailable: sysErrors.filter(
       (e) => e.type === "meta_profile_unavailable",
     ).length,
+    blockedEmails: blockedEmails.length,
   };
 
   return {
@@ -323,6 +363,7 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
     violations,
     systemErrors: sysErrors,
     missingEmails,
+    blockedEmails,
     lastScannedAt: new Date().toISOString(),
   };
 }

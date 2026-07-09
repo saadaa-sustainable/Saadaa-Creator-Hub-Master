@@ -46,6 +46,26 @@ export interface MissingEmailRow {
   onboard_date: string | null;
 }
 
+/**
+ * A collab email the send gate refused to send (missing brief / T&C / CC) or
+ * that failed at SMTP. Sourced from `system_errors` type
+ * `collab_email_blocked` / `collab_email_send_failed`, enriched from posts.
+ * `post_id` drives the Error Portal "Send again" retry.
+ */
+export interface BlockedEmailRow {
+  post_id: string;
+  collab_id: string | null;
+  inf_name: string | null;
+  username: string | null;
+  campaign_id: string | null;
+  workflow_status: string | null;
+  /** The reason the send was blocked / failed (system_errors.message). */
+  reason: string;
+  /** system_errors row kind — distinguishes a hard block from an SMTP failure. */
+  kind: "blocked" | "send_failed";
+  created_at: string;
+}
+
 export interface DataHealth {
   reachOut: number;
   onBoard: number;
@@ -70,6 +90,7 @@ export interface ErrorPortalSummary {
   // Reach Out Meta lookup issues, split so the team can triage each separately:
   metaFetchFails: number; // API itself failed (rate-limit / network / token) — type meta_fetch_failed
   metaProfileUnavailable: number; // API worked but the profile is unavailable (personal/dead/deactivated) — type meta_profile_unavailable
+  blockedEmails: number; // collab emails blocked/failed the gate — retry from portal
 }
 
 export interface ErrorPortalData {
@@ -78,5 +99,6 @@ export interface ErrorPortalData {
   violations: AuditViolation[]; // open audit findings
   systemErrors: SystemErrorRow[]; // unresolved rows from system_errors
   missingEmails: MissingEmailRow[];
+  blockedEmails: BlockedEmailRow[]; // gate-blocked / SMTP-failed collab emails
   lastScannedAt: string;
 }

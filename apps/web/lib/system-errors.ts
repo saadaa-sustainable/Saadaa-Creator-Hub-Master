@@ -61,3 +61,28 @@ export async function logSystemError({
     console.error("logSystemError failed", err);
   }
 }
+
+/**
+ * Mark matching unresolved error rows as resolved. Called when the underlying
+ * problem is fixed (e.g. a blocked collab email is successfully re-sent) so the
+ * row drops out of the Error Portal instead of lingering. Never throws.
+ */
+export async function resolveSystemError(
+  type: string,
+  key?: string | null,
+  source?: string | null,
+): Promise<void> {
+  try {
+    const supabase = createServiceClient();
+    let q = (supabase as any)
+      .from("system_errors")
+      .update({ resolved: true, resolved_at: new Date().toISOString() })
+      .eq("type", type)
+      .eq("resolved", false);
+    q = key != null ? q.eq("key", key) : q.is("key", null);
+    if (source != null) q = q.eq("source", source);
+    await q;
+  } catch (err) {
+    console.error("resolveSystemError failed", err);
+  }
+}

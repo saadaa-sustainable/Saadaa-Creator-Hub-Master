@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { readTermsAttachmentFile, TERMS_ATTACHMENT } from "@/lib/attachments";
+import { logSystemError, resolveSystemError } from "@/lib/system-errors";
 import { assertPermission } from "@/lib/rbac.server";
 import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -1092,6 +1093,38 @@ export async function sendCollabEmail(payload: {
   const senderCc = (actor.email ?? "").trim();
   const COLLAB_EMAIL_BCC = "tanvi@saadaa.in";
 
+  // HARD GATE — the creator must never receive an incomplete email. Resolve BOTH
+  // required attachments (campaign brief + T&C) up front and confirm the sender
+  // CC. If any is missing, block the send entirely, log it to the Error Portal
+  // (so the team can fix + retry), and do NOT stamp collab_email_sent_at.
+  const [termsFile, briefFile] = await Promise.all([
+    readTermsAttachmentFile(),
+    payload.attachmentDriveIds?.[0]
+      ? fetchDriveFileAsAttachment(payload.attachmentDriveIds[0])
+      : Promise.resolve(null),
+  ]);
+
+  const missing: string[] = [];
+  if (!briefFile) missing.push("Campaign brief");
+  if (!termsFile) missing.push("T&C document");
+  if (!senderCc) missing.push("Sender CC email");
+
+  if (missing.length > 0) {
+    const reason = `Email to ${emailTo} blocked — missing ${missing.join(", ")}. No email sent to the creator.`;
+    await logSystemError({
+      type: "collab_email_blocked",
+      key: payload.postId,
+      message: reason,
+      source: "sendCollabEmail",
+    });
+    revalidatePath("/errors");
+    return { ok: false, error: reason };
+  }
+  // Both attachments guaranteed non-null past this point.
+  const attachments = [termsFile, briefFile] as NonNullable<
+    Awaited<ReturnType<typeof readTermsAttachmentFile>>
+  >[];
+
   const htmlBody = buildCollabEmailHtml({
     collabId: payload.collabId,
     creatorName: payload.creatorName,
@@ -1114,24 +1147,15 @@ export async function sendCollabEmail(payload: {
   revalidatePath("/onboarding");
 
   // Send email + log after response is returned (non-blocking via after()).
-  const sendPayload = { ...payload, htmlBody };
+  const sendPayload = { ...payload, htmlBody, attachments };
   after(async () => {
-    const [termsFile, briefFile] = await Promise.all([
-      readTermsAttachmentFile(),
-      sendPayload.attachmentDriveIds?.[0]
-        ? fetchDriveFileAsAttachment(sendPayload.attachmentDriveIds[0])
-        : Promise.resolve(null),
-    ]);
-    const attachments = [termsFile, briefFile].filter(
-      (f): f is NonNullable<typeof f> => f !== null,
-    );
     const result = await sendMail({
       to: sendPayload.emailTo,
       cc: senderCc || undefined,
       bcc: COLLAB_EMAIL_BCC,
       subject: `Collaboration Confirmation - ${sendPayload.collabId}`,
       htmlBody: sendPayload.htmlBody,
-      attachments: attachments.length ? attachments : undefined,
+      attachments: sendPayload.attachments,
     });
     const sb = createServiceClient();
     await (sb as any).from("email_logs").insert({
@@ -1143,6 +1167,27 @@ export async function sendCollabEmail(payload: {
       status: result.ok ? "sent" : "failed",
       error: result.ok ? null : (result.error ?? "unknown"),
     });
+    if (result.ok) {
+      // Clear any prior block/send-failure for this collab.
+      await resolveSystemError(
+        "collab_email_blocked",
+        sendPayload.postId,
+        "sendCollabEmail",
+      );
+      await resolveSystemError(
+        "collab_email_send_failed",
+        sendPayload.postId,
+        "sendCollabEmail",
+      );
+    } else {
+      // SMTP itself failed — surface in the Error Portal for retry.
+      await logSystemError({
+        type: "collab_email_send_failed",
+        key: sendPayload.postId,
+        message: `SMTP send to ${sendPayload.emailTo} failed: ${result.error ?? "unknown"}`,
+        source: "sendCollabEmail",
+      });
+    }
   });
 
   return { ok: true, sentTo: emailTo };

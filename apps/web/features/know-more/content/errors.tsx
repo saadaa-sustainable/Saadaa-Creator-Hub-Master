@@ -14,14 +14,16 @@ export default function ErrorsKM() {
             <strong>1. PageHeader</strong> — ShieldAlert icon + title + Know More button.
           </li>
           <li>
-            <strong>2. KPI strip</strong> — CRITICAL · WARNING · INFO · API Failures ·
-            Meta Fetch Fails · Profile Unavailable · Missing Email. Counts of
-            unresolved errors per category. The two Reach Out lookup KPIs split
-            the cases the team triages separately: <KMCode>meta_fetch_failed</KMCode>{" "}
-            (the Meta API itself errored — rate-limit / network / token, retry)
-            vs <KMCode>meta_profile_unavailable</KMCode> (API worked but the
-            handle is private / personal / deactivated). Both are logged from the
-            Reach Out Fetch and deduped per handle.
+            <strong>2. KPI strip</strong> — Email Blocked · CRITICAL · WARNING ·
+            INFO · API Failures · Meta Fetch Fails · Profile Unavailable ·
+            Missing Email. Counts of unresolved errors per category. The two
+            Reach Out lookup KPIs split the cases the team triages separately:{" "}
+            <KMCode>meta_fetch_failed</KMCode> (the Meta API itself errored —
+            rate-limit / network / token, retry) vs{" "}
+            <KMCode>meta_profile_unavailable</KMCode> (API worked but the handle
+            is private / personal / deactivated). Both are logged from the Reach
+            Out Fetch and deduped per handle. <strong>Email Blocked</strong> is
+            clickable — it jumps to the Collab Emails Blocked card.
           </li>
           <li>
             <strong>3. Filter strip</strong> — category, resolved status, date range.
@@ -54,6 +56,16 @@ export default function ErrorsKM() {
           <li>
             <strong>MISSING_EMAIL</strong> · collabs where email is required but missing,
             blocking collab confirmation sends.
+          </li>
+          <li>
+            <strong>EMAIL BLOCKED</strong> · the collab email send gate refused to
+            send because a required attachment (Campaign Brief or T&amp;C) or the
+            sender CC was missing (<KMCode>collab_email_blocked</KMCode>), or the
+            SMTP send failed (<KMCode>collab_email_send_failed</KMCode>).{" "}
+            <strong>No email reaches the creator</strong> in either case. Each row
+            has a <KMCode>Send again</KMCode> button that rebuilds the email from
+            the live preview (picking up a since-fixed brief / T&amp;C / email)
+            and retries; on success the error auto-resolves and drops off.
           </li>
         </KMList>
       </KMSection>
