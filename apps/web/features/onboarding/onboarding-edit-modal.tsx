@@ -360,7 +360,10 @@ export function OnboardingEditModal({
           )}
         </div>
 
-        <footer className="modal-foot">
+        <footer
+          className="modal-foot"
+          style={{ bottom: 0, marginBottom: 0, paddingBottom: "0.95rem" }}
+        >
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>

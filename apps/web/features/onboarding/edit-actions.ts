@@ -117,7 +117,7 @@ export async function fetchOrderForEdit(
   const { data, error } = await (supabase as any)
     .from("shopify_orders")
     .select(
-      "order_id, customer_name, email, address, garments_sent, tracking_id, order_status, total_price",
+      "order_id, customer_name, email, address, garments_sent, tracking_id, fulfillment, total_price",
     )
     .eq("order_id", id)
     .maybeSingle();
@@ -136,7 +136,7 @@ export async function fetchOrderForEdit(
       address: data.address ?? null,
       garments_sent: data.garments_sent ?? null,
       tracking_id: data.tracking_id ?? null,
-      order_status: data.order_status ?? null,
+      order_status: data.fulfillment ?? null,
       total_price: data.total_price != null ? Number(data.total_price) : null,
     },
   };
@@ -292,14 +292,14 @@ async function applyOnboardingEdit(
   if (after.order_id && after.order_id !== (before.order_id ?? "")) {
     const { data: ord } = await supabase
       .from("shopify_orders")
-      .select("email, tracking_id, garments_sent, address, order_status")
+      .select("email, tracking_id, garments_sent, address, fulfillment")
       .eq("order_id", after.order_id)
       .maybeSingle();
     if (ord) {
       if (ord.email != null) patch.email = ord.email;
       if (ord.tracking_id != null) patch.tracking_id = ord.tracking_id;
       if (ord.garments_sent != null) patch.garments_sent = ord.garments_sent;
-      if (ord.order_status != null) patch.order_status = ord.order_status;
+      if (ord.fulfillment != null) patch.order_status = ord.fulfillment;
       const parsed = deriveStateCity(String(ord.address ?? ""));
       if (parsed.state) patch.state = parsed.state;
       if (parsed.city) patch.city = parsed.city;
