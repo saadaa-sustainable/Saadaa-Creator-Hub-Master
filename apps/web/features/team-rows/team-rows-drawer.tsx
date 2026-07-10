@@ -257,7 +257,7 @@ function BacklogFillSection({
   const [downloadLink, setDownloadLink] = useState("");
   const [rawDump, setRawDump] = useState("");
   const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
   // Live post-date preview — decoded from the pasted link's shortcode, exactly
   // what the save will write (falls back to today when not decodable).
   const derivedDate = postLink.trim() ? postDateFromUrl(postLink) : null;
@@ -266,10 +266,30 @@ function BacklogFillSection({
   if (done) {
     return (
       <div className="rounded-xl border border-success-text/30 bg-success-bg px-3 py-2 text-[0.7rem] text-success-text font-bold">
-        Post saved — date auto-set, partnership invite sent.
+        {done}
       </div>
     );
   }
+
+  // Truthful partnership wording — mirrors the live Posting flow's outcomes.
+  const partnershipMessage = (
+    state: string | null | undefined,
+    invited: boolean | undefined,
+  ): string => {
+    if (invited) return "Partnership invite sent.";
+    switch ((state ?? "").toLowerCase()) {
+      case "approved":
+        return "Partnership already approved.";
+      case "pending":
+        return "Partnership invite already pending with the creator.";
+      case "rejected":
+        return "Partnership was rejected by the creator — resend from Partnerships.";
+      case "revoked":
+        return "Partnership was revoked by the creator — resend from Partnerships.";
+      default:
+        return "Partnership status could not be checked.";
+    }
+  };
 
   const savePost = () => {
     if (row.id == null) return;
@@ -281,10 +301,11 @@ function BacklogFillSection({
           toast.error(res.error ?? "Could not save the post");
           return;
         }
+        const pMsg = partnershipMessage(res.partnershipState, res.invited);
         toast.success(
-          `Posted — date ${res.postDate}${res.dateSource === "shortcode" ? " (from the post link)" : ""}. Partnership invite sent.`,
+          `Posted — date ${res.postDate}${res.dateSource === "shortcode" ? " (from the post link)" : ""}. ${pMsg}`,
         );
-        setDone(true);
+        setDone(`Post saved — date auto-set. ${pMsg}`);
         onUpdated?.();
       },
     );
@@ -343,8 +364,8 @@ function BacklogFillSection({
         />
       </div>
       <span className="text-[0.6rem] text-text-tertiary">
-        Post date auto-derives from the link; the creator&apos;s partnership
-        invite is auto-sent.
+        Post date auto-derives from the link. The creator&apos;s partnership is
+        checked live — an invite is sent only if they haven&apos;t accepted yet.
       </span>
     </div>
   );

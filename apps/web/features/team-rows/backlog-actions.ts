@@ -1,6 +1,5 @@
 "use server";
 
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -30,6 +29,11 @@ export interface BacklogPostingResult {
   error?: string;
   postDate?: string;
   dateSource?: "shortcode" | "today";
+  /** Real partnership outcome (same semantics as the live Posting flow):
+   *  state = approved/pending/rejected/revoked/none; invited = an invite was
+   *  actually sent NOW. Null when the check itself failed. */
+  partnershipState?: string | null;
+  invited?: boolean;
 }
 
 /** Fill the post link on a historic row — auto post-date + auto partnership invite. */
@@ -82,27 +86,34 @@ export async function historicBacklogPosting(input: {
 
   revalidatePath("/historic-analytics");
 
-  // Auto-invite the creator's Meta partnership (best-effort, never blocks).
+  // Partnership check + auto-invite — AWAITED (same semantics as the live
+  // Posting flow) so the UI can report the REAL outcome: an already-approved
+  // creator gets no invite (state=approved, invited=false); only a creator
+  // with no active permission gets one (invited=true). Never fails the save.
+  let partnershipState: string | null = null;
+  let invited = false;
   const infId = (row.inf_id as string | null) ?? null;
   const username = (row.username as string | null) ?? null;
   if (infId || username) {
-    after(async () => {
-      try {
-        await syncCreatorPartnership({
-          infId,
-          username,
-          autoInvite: true,
-          source: "historic-backlog",
-        });
-      } catch (err) {
-        console.error("[historic-backlog] partnership invite failed:", err);
-      }
-    });
+    try {
+      const sync = await syncCreatorPartnership({
+        infId,
+        username,
+        autoInvite: true,
+        source: "historic-backlog",
+      });
+      partnershipState = sync.state ?? null;
+      invited = sync.invited;
+    } catch (err) {
+      console.error("[historic-backlog] partnership sync failed:", err);
+    }
   }
 
   return {
     ok: true,
     postDate,
     dateSource: decoded ? "shortcode" : "today",
+    partnershipState,
+    invited,
   };
 }
