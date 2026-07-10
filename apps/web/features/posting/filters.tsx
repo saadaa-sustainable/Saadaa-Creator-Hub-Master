@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubmissionToggle } from "@/components/ui";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { PostingFilters } from "./types";
 
 interface FilterOptions {
@@ -26,6 +27,7 @@ const FILTER_KEYS = [
   "adsRights",
   "onboardedBy",
   "contentType",
+  "collabType",
   "onboardDateFrom",
   "onboardDateTo",
   "submitted",
@@ -47,6 +49,21 @@ export function PostingFiltersBar({
       const next = new URLSearchParams(params.toString());
       if (!value) next.delete(key);
       else next.set(key, value);
+      startTransition(() =>
+        router.replace(`?${next.toString()}`, { scroll: false }),
+      );
+    },
+    [params, router, startTransition],
+  );
+
+  // Atomic multi-key update (the date-range picker sets from + to together).
+  const setParams = useCallback(
+    (entries: Partial<Record<keyof PostingFilters, string | undefined>>) => {
+      const next = new URLSearchParams(params.toString());
+      for (const [key, value] of Object.entries(entries)) {
+        if (!value) next.delete(key);
+        else next.set(key, value);
+      }
       startTransition(() =>
         router.replace(`?${next.toString()}`, { scroll: false }),
       );
@@ -97,7 +114,7 @@ export function PostingFiltersBar({
             <input
               type="search"
               defaultValue={initial.q ?? ""}
-              placeholder="ID, name, username, URL…"
+              placeholder="ID, name, username, order ID…"
               onChange={(e) => onSearch(e.target.value)}
               className="onboarding-filter-select pl-7"
             />
@@ -151,16 +168,36 @@ export function PostingFiltersBar({
             ...options.contentTypes.map((c) => ({ label: c, value: c })),
           ]}
         />
-        <FilterDate
-          label="Onboarded from"
-          value={initial.onboardDateFrom ?? ""}
-          onBlur={(value) => setParam("onboardDateFrom", value)}
+        <FilterSelect
+          label="Collab Type"
+          value={initial.collabType ?? ""}
+          onChange={(v) => setParam("collabType", v)}
+          options={[
+            { label: "All collab types", value: "" },
+            { label: "Barter", value: "Barter" },
+            { label: "Barter + Paid", value: "Barter + Paid" },
+          ]}
         />
-        <FilterDate
-          label="Onboarded to"
-          value={initial.onboardDateTo ?? ""}
-          onBlur={(value) => setParam("onboardDateTo", value)}
-        />
+        <label className="onboarding-filter-field">
+          <span>
+            {initial.submitted === "yes" ? "Posted" : "Onboarded"} date
+          </span>
+          <DateRangePicker
+            label={
+              initial.submitted === "yes" ? "Posted date" : "Onboarded date"
+            }
+            value={{
+              from: initial.onboardDateFrom ?? "",
+              to: initial.onboardDateTo ?? "",
+            }}
+            onChange={(range) =>
+              setParams({
+                onboardDateFrom: range.from || undefined,
+                onboardDateTo: range.to || undefined,
+              })
+            }
+          />
+        </label>
         <div className="onboarding-filter-actions">
           {hasAny && (
             <Button
@@ -195,26 +232,6 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
         options={options.map((o) => ({ value: o.value, label: o.label }))}
         placeholder={`All ${label.toLowerCase()}`}
         searchPlaceholder={`Search ${label.toLowerCase()}…`}
-      />
-    </label>
-  );
-}
-
-interface FilterDateProps {
-  label: string;
-  value: string;
-  onBlur: (value: string | undefined) => void;
-}
-
-function FilterDate({ label, value, onBlur }: FilterDateProps) {
-  return (
-    <label className="onboarding-filter-field">
-      <span>{label}</span>
-      <input
-        type="date"
-        defaultValue={value}
-        onBlur={(e) => onBlur(e.target.value || undefined)}
-        className="onboarding-filter-select"
       />
     </label>
   );

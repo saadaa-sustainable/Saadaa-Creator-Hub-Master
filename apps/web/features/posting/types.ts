@@ -77,6 +77,8 @@ export interface PostingFilters {
   onboardedBy?: string;
   /** Content type code (posts.content_type). */
   contentType?: string;
+  /** Collab type (posts.collab_type): Barter / Barter + Paid. */
+  collabType?: string;
   onboardDateFrom?: string;
   onboardDateTo?: string;
   /**

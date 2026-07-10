@@ -83,14 +83,17 @@ export async function fetchPostingTable(
   // Team member who onboarded the collab.
   if (filters.onboardedBy) q = q.eq("onboarded_by", filters.onboardedBy);
   if (filters.contentType) q = q.eq("content_type", filters.contentType);
+  if (filters.collabType) q = q.eq("collab_type", filters.collabType);
   // Ad-rights filter is applied in JS below (see ADS_YES). ads_usage_rights is
   // free-text and frequently stores a DURATION ("11 months", "12 Months", …)
   // rather than the literal "Yes", so a PostgREST `.eq("ads_usage_rights","Yes")`
   // silently dropped every valid duration. We instead match on TRUTHINESS,
   // mirroring features/accounts-hub/queries.ts ADS_YES.
-  if (filters.onboardDateFrom)
-    q = q.gte("onboard_date", filters.onboardDateFrom);
-  if (filters.onboardDateTo) q = q.lte("onboard_date", filters.onboardDateTo);
+  // Submitted view filters on the POSTED date; the work queue on onboard date.
+  // Same URL params either way — the picker relabels itself.
+  const dateCol = submittedYes ? "post_date" : "onboard_date";
+  if (filters.onboardDateFrom) q = q.gte(dateCol, filters.onboardDateFrom);
+  if (filters.onboardDateTo) q = q.lte(dateCol, filters.onboardDateTo);
 
   const { data, error } = await q
     .order("onboard_date", { ascending: false })
@@ -118,6 +121,7 @@ export async function fetchPostingTable(
         r.post_id,
         r.post_id_short,
         r.collab_id,
+        r.order_id,
         r.campaign?.campaign_id,
         r.campaign?.campaign_name,
         r.creator?.inf_name,

@@ -116,6 +116,8 @@ export interface OnboardingFilters {
   reachedOutBy?: string;
   /** Content type code (posts.content_type). */
   contentType?: string;
+  /** Collab type (posts.collab_type): Barter / Barter + Paid. */
+  collabType?: string;
   reachoutDateFrom?: string;
   reachoutDateTo?: string;
   /**

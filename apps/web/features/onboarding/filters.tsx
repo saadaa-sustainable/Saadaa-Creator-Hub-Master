@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubmissionToggle } from "@/components/ui";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { OnboardingFilters } from "./types";
 
 interface FilterOptions {
@@ -26,6 +27,7 @@ const FILTER_KEYS = [
   "region",
   "reachedOutBy",
   "contentType",
+  "collabType",
   "reachoutDateFrom",
   "reachoutDateTo",
   "submitted",
@@ -47,6 +49,21 @@ export function OnboardingFiltersBar({
       const next = new URLSearchParams(params.toString());
       if (!value) next.delete(key);
       else next.set(key, value);
+      startTransition(() =>
+        router.replace(`?${next.toString()}`, { scroll: false }),
+      );
+    },
+    [params, router, startTransition],
+  );
+
+  // Atomic multi-key update (the date-range picker sets from + to together).
+  const setParams = useCallback(
+    (entries: Partial<Record<keyof OnboardingFilters, string | undefined>>) => {
+      const next = new URLSearchParams(params.toString());
+      for (const [key, value] of Object.entries(entries)) {
+        if (!value) next.delete(key);
+        else next.set(key, value);
+      }
       startTransition(() =>
         router.replace(`?${next.toString()}`, { scroll: false }),
       );
@@ -97,7 +114,7 @@ export function OnboardingFiltersBar({
             <input
               type="search"
               defaultValue={initial.q ?? ""}
-              placeholder="ID, name, username, URL…"
+              placeholder="ID, name, username, order ID…"
               onChange={(e) => onSearch(e.target.value)}
               className="onboarding-filter-select pl-7"
             />
@@ -151,16 +168,36 @@ export function OnboardingFiltersBar({
             ...options.contentTypes.map((c) => ({ label: c, value: c })),
           ]}
         />
-        <FilterDate
-          label="Reach Out from"
-          value={initial.reachoutDateFrom ?? ""}
-          onBlur={(value) => setParam("reachoutDateFrom", value)}
+        <FilterSelect
+          label="Collab Type"
+          value={initial.collabType ?? ""}
+          onChange={(v) => setParam("collabType", v)}
+          options={[
+            { label: "All collab types", value: "" },
+            { label: "Barter", value: "Barter" },
+            { label: "Barter + Paid", value: "Barter + Paid" },
+          ]}
         />
-        <FilterDate
-          label="Reach Out to"
-          value={initial.reachoutDateTo ?? ""}
-          onBlur={(value) => setParam("reachoutDateTo", value)}
-        />
+        <label className="onboarding-filter-field">
+          <span>
+            {initial.submitted === "yes" ? "Onboarded" : "Reach Out"} date
+          </span>
+          <DateRangePicker
+            label={
+              initial.submitted === "yes" ? "Onboarded date" : "Reach Out date"
+            }
+            value={{
+              from: initial.reachoutDateFrom ?? "",
+              to: initial.reachoutDateTo ?? "",
+            }}
+            onChange={(range) =>
+              setParams({
+                reachoutDateFrom: range.from || undefined,
+                reachoutDateTo: range.to || undefined,
+              })
+            }
+          />
+        </label>
         <div className="onboarding-filter-actions">
           {hasAny && (
             <Button
@@ -200,22 +237,3 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
   );
 }
 
-interface FilterDateProps {
-  label: string;
-  value: string;
-  onBlur: (value: string | undefined) => void;
-}
-
-function FilterDate({ label, value, onBlur }: FilterDateProps) {
-  return (
-    <label className="onboarding-filter-field">
-      <span>{label}</span>
-      <input
-        type="date"
-        defaultValue={value}
-        onBlur={(e) => onBlur(e.target.value || undefined)}
-        className="onboarding-filter-select"
-      />
-    </label>
-  );
-}

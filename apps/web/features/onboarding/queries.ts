@@ -74,10 +74,12 @@ export async function fetchOnboardingTable(
   // Team member who logged the reach-out (stable; never overwritten).
   if (filters.reachedOutBy) q = q.eq("logged_by", filters.reachedOutBy);
   if (filters.contentType) q = q.eq("content_type", filters.contentType);
-  if (filters.reachoutDateFrom)
-    q = q.gte("reach_out_date", filters.reachoutDateFrom);
-  if (filters.reachoutDateTo)
-    q = q.lte("reach_out_date", filters.reachoutDateTo);
+  if (filters.collabType) q = q.eq("collab_type", filters.collabType);
+  // Submitted view filters on the ONBOARDED date; the work queue on reach-out.
+  // Same URL params either way — the picker relabels itself.
+  const dateCol = submittedYes ? "onboard_date" : "reach_out_date";
+  if (filters.reachoutDateFrom) q = q.gte(dateCol, filters.reachoutDateFrom);
+  if (filters.reachoutDateTo) q = q.lte(dateCol, filters.reachoutDateTo);
 
   const { data, error } = await q
     .order("reach_out_date", { ascending: false })
@@ -96,6 +98,7 @@ export async function fetchOnboardingTable(
         r.post_id,
         r.post_id_short,
         r.collab_id,
+        r.order_id,
         r.campaign?.campaign_id,
         r.campaign?.campaign_name,
         r.creator?.inf_name,
