@@ -103,17 +103,21 @@ export interface AccountsFilters {
 }
 
 /**
- * Kanban column groupings — Reach Out / Onboard / Posted plus a terminal
- * "Payment Done" lane. The first three bucket by `workflow_status`; Payment
- * Done is special-cased in the board: any collab whose payment is fully `Done`
- * moves here regardless of workflow_status (so Posted shows only unpaid
- * collabs). The Paid CSV is exactly this column's set (payment.status="Done").
+ * Kanban column groupings — Onboarded / Posted / Payments / Partial Payments.
+ * The board buckets in priority order:
+ *   1. Partial Payments — any collab with an outstanding balance (`_isPartial`),
+ *      regardless of workflow / payment status.
+ *   2. Payments — fully paid collabs (`payment.status === "Done"`). This is the
+ *      Paid CSV's set.
+ *   3. Onboarded / Posted — the remaining collabs bucketed by `workflow_status`.
+ * Reach Out is intentionally absent (no order/payment yet). Sole-barter collabs
+ * are excluded from Onboarded/Posted — they carry no payment and live in the
+ * "INF Orders" view instead.
  */
 export const KANBAN_COLUMNS = [
-  { id: "reach-out", label: "Reach Out", statuses: ["Reach Out"] as const },
   {
     id: "on-board",
-    label: "Onboard",
+    label: "Onboarded",
     statuses: ["On Board", "Order Sent"] as const,
   },
   {
@@ -123,8 +127,14 @@ export const KANBAN_COLUMNS = [
   },
   {
     // Payment-status lane — filled by the board's paid check, not workflow_status.
-    id: "payment-done",
-    label: "Payment Done",
+    id: "payments",
+    label: "Payments",
+    statuses: [] as const,
+  },
+  {
+    // Outstanding-balance lane — filled by the `_isPartial` check.
+    id: "partial",
+    label: "Partial Payments",
     statuses: [] as const,
   },
 ] as const;

@@ -34,17 +34,23 @@ export default function AccountsHubKM() {
             full payment isn&apos;t done. Silent when nothing is outstanding.
           </li>
           <li>
-            <strong>4. Toolbar</strong> — Downloads (Due CSV · Paid CSV · All)
-            on the left, Kanban / List view toggle on the right.
+            <strong>4. Toolbar</strong> — Downloads (Due CSV · Paid CSV ·{" "}
+            <strong>Partial Payment</strong> · All) on the left, Kanban / List
+            view toggle on the right. The <strong>Partial Payment</strong> export
+            only appears when at least one collab has an outstanding balance.
           </li>
           <li>
-            <strong>5. Board</strong> — Kanban (4 columns: Reach Out · Onboard ·
-            Posted · <strong>Payment Done</strong>) or List table. A collab
-            whose payment is fully <KMCode>Done</KMCode> leaves the Posted lane
-            and moves to Payment Done (card turns green). Posted also holds
-            collabs that are not payment-ready yet; they show no payment state
-            until all posting forms are complete and the creator accepts the
-            partnership. The Paid CSV is exactly the Payment Done set.
+            <strong>5. Board</strong> — Kanban (4 columns:{" "}
+            <strong>Onboarded · Posted · Payments · Partial Payments</strong>) or
+            List table. Buckets in priority order: a collab with an outstanding
+            balance → <strong>Partial Payments</strong>; a fully{" "}
+            <KMCode>Done</KMCode> collab → <strong>Payments</strong> (card turns
+            green, = the Paid CSV set); everything else by stage. Reach Out is
+            absent (no order/payment yet). <strong>Sole-barter collabs are
+            excluded</strong> from Onboarded/Posted — they carry no payment and
+            live in the <strong>INF Orders</strong> view. Posted also holds
+            collabs not payment-ready yet; they show no payment state until all
+            posting forms are complete and the creator accepts the partnership.
           </li>
         </KMList>
       </KMSection>

@@ -13,8 +13,11 @@ import { cn } from "@/lib/cn";
  */
 export function AccountsExportBar({
   variant = "desktop",
+  hasPartial = false,
 }: {
   variant?: "desktop" | "mobile";
+  /** Show the "Partial Payment" export only when a partial payment exists. */
+  hasPartial?: boolean;
 }) {
   return (
     <div className={cn("acc-export-bar", `acc-export-bar--${variant}`)}>
@@ -40,6 +43,17 @@ export function AccountsExportBar({
         <Download size={12} aria-hidden />
         Paid CSV
       </a>
+      {hasPartial && (
+        <a
+          href="/api/accounts/export?mode=partial"
+          className="acc-export-bar__btn"
+          download
+          title="Download collabs with an outstanding balance (partial payments) as CSV"
+        >
+          <Download size={12} aria-hidden />
+          Partial Payment
+        </a>
+      )}
       <a
         href="/api/accounts/export?mode=all"
         className="acc-export-bar__btn acc-export-bar__btn--primary"

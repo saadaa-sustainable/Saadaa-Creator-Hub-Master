@@ -37,9 +37,17 @@ function collabIdOf(row: AccountsRow): string | null {
 export function AccountsTable({ rows }: { rows: AccountsRow[] }) {
   const postedRows = useMemo(
     () =>
-      rows.filter((r) =>
-        ["Posted", "Delivered"].includes(String(r.workflow_status ?? "")),
-      ),
+      rows.filter((r) => {
+        if (!["Posted", "Delivered"].includes(String(r.workflow_status ?? "")))
+          return false;
+        // Sole-barter collabs carry no payment — drop them from the payment
+        // list (they live in the INF Orders view), unless one somehow has a
+        // recorded payment (partial / paid).
+        const isBarter = (r.collab_type ?? "").trim().toLowerCase() === "barter";
+        if (isBarter && !r._isPartial && r.payment?.status !== "Done")
+          return false;
+        return true;
+      }),
     [rows],
   );
 

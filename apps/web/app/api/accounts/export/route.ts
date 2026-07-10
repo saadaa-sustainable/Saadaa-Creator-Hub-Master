@@ -4,12 +4,13 @@ import { isVoidedStatus } from "@/lib/workflow";
 import { fetchAccountsHubData } from "@/features/accounts-hub/queries";
 
 /**
- * GET /api/accounts/export?mode=due|paid|all
+ * GET /api/accounts/export?mode=due|paid|all|partial
  *
  * Streams a CSV download mirroring legacy `exportPayments`. Cols match the
- * legacy Accounts Hub sheet ordering for operator continuity.
+ * legacy Accounts Hub sheet ordering for operator continuity. `partial` = only
+ * collabs with an outstanding balance (an installment paid, agreed total unmet).
  */
-const MODES = new Set(["due", "paid", "all"]);
+const MODES = new Set(["due", "paid", "all", "partial"]);
 
 function csvEscape(value: unknown): string {
   if (value == null) return "";
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
   const mode = (url.searchParams.get("mode") ?? "all").toLowerCase();
   if (!MODES.has(mode)) {
     return NextResponse.json(
-      { error: "mode must be due | paid | all" },
+      { error: "mode must be due | paid | all | partial" },
       { status: 400 },
     );
   }
@@ -50,6 +51,9 @@ export async function GET(request: Request) {
         (status === "Due" || status === "Not Due" || status === "Partial")
       );
     if (mode === "paid") return status === "Done";
+    // "partial" = outstanding-balance collabs only (installment paid, total unmet).
+    if (mode === "partial")
+      return !isVoidedStatus(r.workflow_status) && r._isPartial === true;
     return true;
   });
 

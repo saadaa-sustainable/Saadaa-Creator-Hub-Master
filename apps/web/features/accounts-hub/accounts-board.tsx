@@ -24,12 +24,15 @@ export function AccountsBoard({
   initialView = "kanban",
 }: AccountsBoardProps) {
   const [view, setView] = useState<"kanban" | "list">(initialView);
+  // The "Partial Payment" export only appears when at least one collab carries
+  // an outstanding balance (an installment paid but the agreed total not met).
+  const hasPartial = rows.some((r) => r._isPartial);
 
   return (
     <>
       <div className="acc-toolbar">
-        <AccountsExportBar variant="desktop" />
-        <AccountsExportBar variant="mobile" />
+        <AccountsExportBar variant="desktop" hasPartial={hasPartial} />
+        <AccountsExportBar variant="mobile" hasPartial={hasPartial} />
         <div className="acc-toolbar__spacer" />
         <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
           <button

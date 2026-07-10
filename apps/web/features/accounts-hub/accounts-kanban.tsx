@@ -20,9 +20,10 @@ import {
 import { KANBAN_COLUMNS, type AccountsRow } from "./types";
 
 /**
- * Accounts Hub Kanban — 3-column board (Reach Out / On Board / Posted).
- * Mirrors legacy markup at Index.html:7001-7034 + card render
- * `_accKbCardHtml` (InfluencerBackend / handler script).
+ * Accounts Hub Kanban — Onboarded / Posted / Payments / Partial Payments.
+ * Buckets in priority order: outstanding-balance (partial) → fully paid
+ * (Payments) → workflow stage. Sole-barter collabs carry no payment and are
+ * excluded from Onboarded/Posted (they live in the INF Orders view).
  */
 export function AccountsKanban({ rows }: { rows: AccountsRow[] }) {
   const [openPostId, setOpenPostId] = useState<string | null>(null);
@@ -31,13 +32,19 @@ export function AccountsKanban({ rows }: { rows: AccountsRow[] }) {
     const map = new Map<string, AccountsRow[]>();
     for (const col of KANBAN_COLUMNS) map.set(col.id, []);
     for (const row of rows) {
-      // A fully-paid collab leaves its workflow lane and lands in Payment Done,
-      // so the Posted column only ever shows collabs still owed money. This is
-      // the same set the Paid CSV exports (payment.status === "Done").
-      if (row.payment?.status === "Done") {
-        map.get("payment-done")!.push(row);
+      // 1. Partial (outstanding balance) takes precedence over every other lane.
+      if (row._isPartial) {
+        map.get("partial")!.push(row);
         continue;
       }
+      // 2. Fully-paid collab → Payments lane (the Paid CSV's set).
+      if (row.payment?.status === "Done") {
+        map.get("payments")!.push(row);
+        continue;
+      }
+      // 3. Sole-barter collabs have no payment — never show them on the payment
+      //    board (Onboarded/Posted). They belong in the INF Orders view.
+      if ((row.collab_type ?? "").trim().toLowerCase() === "barter") continue;
       const status = String(row.workflow_status ?? "");
       const col = KANBAN_COLUMNS.find((c) =>
         (c.statuses as readonly string[]).includes(status),
@@ -66,9 +73,11 @@ export function AccountsKanban({ rows }: { rows: AccountsRow[] }) {
               <div className="acc-kb-col__body">
                 {items.length === 0 ? (
                   <div className="acc-kb-col__empty">
-                    {col.id === "payment-done"
+                    {col.id === "payments"
                       ? "No paid collabs yet."
-                      : "No posts in this stage."}
+                      : col.id === "partial"
+                        ? "No partial payments."
+                        : "No posts in this stage."}
                   </div>
                 ) : (
                   items.map((row) => {
