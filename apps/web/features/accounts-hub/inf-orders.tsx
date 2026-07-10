@@ -198,7 +198,7 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
     >
       <div
         className="modal-panel modal-panel--lg modal-panel--onboarding flex flex-col"
-        style={{ maxWidth: 1100, width: "96vw", maxHeight: "92dvh" }}
+        style={{ maxWidth: 1680, width: "97vw", maxHeight: "94dvh" }}
         onClick={(e) => e.stopPropagation()}
       >
         <header className="modal-head shrink-0">
@@ -306,7 +306,7 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
                 </button>
               </div>
               <div className="overflow-x-auto">
-              <table className="w-full text-[0.7rem] sm:text-xs min-w-[1200px]">
+              <table className="w-full text-[0.7rem] sm:text-xs min-w-[1200px] whitespace-nowrap">
                 <thead>
                   <tr className="text-text-tertiary uppercase tracking-[0.06em] text-[0.5rem] sm:text-[0.55rem] font-extrabold border-b border-border">
                     <th className="text-left pb-2 pr-2">Creator</th>
@@ -393,7 +393,7 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
                         {r.garment_qty ?? "—"}
                       </td>
                       <td
-                        className="py-1.5 px-1.5 text-text-secondary max-w-[220px] truncate"
+                        className="py-1.5 px-1.5 text-text-secondary max-w-[320px] truncate"
                         title={r.garments_sent ?? undefined}
                       >
                         {r.garments_sent ?? "—"}

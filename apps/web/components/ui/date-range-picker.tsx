@@ -325,8 +325,8 @@ function MonthGrid({
                 !inMonth && "text-text-tertiary/40",
                 inMonth && !inRange && !isEndpoint && "text-text-primary hover:bg-bg-muted",
                 inRange && !isEndpoint && "bg-[#F0EAD6] text-text-primary rounded-none",
-                isEndpoint && "bg-[--accent] text-text-primary font-extrabold",
-                isToday && !isEndpoint && "ring-1 ring-[--accent]",
+                isEndpoint && "bg-[#F0C61E] text-[#161513] font-extrabold",
+                isToday && !isEndpoint && "ring-1 ring-[#F0C61E]",
               )}
             >
               {format(d, "d")}
