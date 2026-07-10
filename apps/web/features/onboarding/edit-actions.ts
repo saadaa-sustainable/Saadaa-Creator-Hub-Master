@@ -200,7 +200,7 @@ export async function submitOnboardingEdit(input: {
     };
   }
 
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/onboarding");
 
   // Notify global admins (best-effort, after the response).
@@ -367,7 +367,7 @@ export async function decideOnboardingEdit(
     notes: note?.trim() || req.reason || null,
   });
 
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/onboarding");
   revalidateTag("posts");
   return { ok: true };

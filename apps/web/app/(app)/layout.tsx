@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/nav/sidebar";
 import { SidebarScrim } from "@/components/nav/sidebar-scrim";
 import { MobileTopbar } from "@/components/nav/mobile-topbar";
+import { TopBar } from "@/components/nav/top-bar";
+import { getPendingApprovalsCount } from "@/lib/approvals-count";
 import { KnowMoreModal } from "@/features/know-more/know-more-modal";
 import { TestModeBanner } from "@/components/ui/test-mode-banner";
 import { getTestModeScopes } from "@/features/settings/actions";
@@ -31,12 +33,16 @@ export default async function AppShell({
   const testScopes = await getTestModeScopes();
   const isAdmin = hasPermission(actor, "admin");
 
+  // Pending-approvals badge (bell + sidebar pill). Tag-cached — NOT a per-nav
+  // DB read; approval mutations revalidateTag("approvals-count").
+  const approvalsCount = isAdmin ? await getPendingApprovalsCount() : 0;
+
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
         Skip to workspace
       </a>
-      <Sidebar actor={actor} />
+      <Sidebar actor={actor} approvalsCount={approvalsCount} />
       <SidebarScrim />
       <div className="app-shell-main">
         <MobileTopbar />
@@ -48,6 +54,7 @@ export default async function AppShell({
           {children}
         </main>
       </div>
+      {isAdmin && <TopBar approvalsCount={approvalsCount} />}
       <KnowMoreModal />
     </div>
   );

@@ -394,7 +394,7 @@ export async function submitCampaign(
 
   revalidateTag("campaigns");
   revalidatePath("/campaigns");
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/reach-out/outbound");
   revalidatePath("/onboarding");
 
@@ -515,7 +515,7 @@ export async function editCampaign(
   revalidateTag("campaigns");
   revalidatePath("/campaigns");
   revalidatePath("/campaigns/new");
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/reach-out/outbound");
   revalidatePath("/onboarding");
 
@@ -643,7 +643,7 @@ export async function closeCampaign(
 
   revalidatePath("/campaigns");
   revalidatePath("/reach-out");
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   return { ok: true };
 }
 
@@ -676,7 +676,7 @@ export async function reopenCampaign(
   });
 
   revalidatePath("/campaigns");
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   return { ok: true };
 }
 
@@ -742,7 +742,7 @@ export async function approveCampaignEditRequest(
   });
 
   revalidateTag("campaigns");
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/campaigns");
   revalidatePath("/campaigns/new");
   revalidatePath("/dashboard");
@@ -788,7 +788,7 @@ export async function rejectCampaignEditRequest(
     notes: (notes ?? "").trim() || null,
   });
 
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/campaigns");
   revalidatePath("/campaigns/new");
   return { ok: true };
@@ -830,7 +830,7 @@ export async function approveCampaign(
     notes: "Campaign approved and activated.",
   });
 
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/campaigns");
   revalidatePath("/dashboard");
   revalidatePath("/reach-out");
@@ -869,7 +869,7 @@ export async function rejectCampaign(
     notes: (notes ?? "").trim() || null,
   });
 
-  revalidatePath("/approvals");
+  revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/campaigns");
   return { ok: true };
 }

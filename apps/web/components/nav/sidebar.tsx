@@ -150,7 +150,14 @@ const NAV: NavSection[] = [
   },
 ];
 
-export function Sidebar({ actor }: { actor: UserAccessRow }) {
+export function Sidebar({
+  actor,
+  approvalsCount = 0,
+}: {
+  actor: UserAccessRow;
+  /** Pending approvals — red pill on the Approvals item (tag-cached upstream). */
+  approvalsCount?: number;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const isOpen = useSidebar((s) => s.isOpen);
@@ -193,6 +200,7 @@ export function Sidebar({ actor }: { actor: UserAccessRow }) {
           key={section.label}
           section={section}
           actor={actor}
+          approvalsCount={approvalsCount}
           pathname={optimisticPath}
           onNavigate={(href) => {
             setOptimisticPath(href);
@@ -217,24 +225,35 @@ export function Sidebar({ actor }: { actor: UserAccessRow }) {
 function SidebarSection({
   section,
   actor,
+  approvalsCount = 0,
   pathname,
   onNavigate,
   prefetch,
 }: {
   section: NavSection;
   actor: UserAccessRow;
+  approvalsCount?: number;
   pathname: string;
   onNavigate: (href: string) => void;
   prefetch: (href: string) => void;
 }) {
+  // Inject live badge counts into their leaves (data flows from the layout —
+  // the NAV table itself stays a static module const).
+  const withBadge = (leaf: NavLeaf): NavLeaf =>
+    leaf.href === "/approvals" && approvalsCount > 0
+      ? { ...leaf, badge: approvalsCount }
+      : leaf;
+
   // Strip groups where every child is hidden by permission.
   const visible = section.items
     .map((it) => {
       if ("children" in it) {
-        const children = it.children.filter((c) => !c.show || c.show(actor));
+        const children = it.children
+          .filter((c) => !c.show || c.show(actor))
+          .map(withBadge);
         return children.length ? { ...it, children } : null;
       }
-      return !it.show || it.show(actor) ? it : null;
+      return !it.show || it.show(actor) ? withBadge(it) : null;
     })
     .filter((x): x is NavSection["items"][number] => x !== null);
 

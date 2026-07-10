@@ -30,6 +30,10 @@ import {
 } from "@/features/campaigns/actions";
 import { decideOnboardingEdit } from "@/features/onboarding/edit-actions";
 import type { OnboardingEditItem } from "@/features/onboarding/edit-fields";
+import {
+  getApprovalHistoryDetail,
+  type ApprovalHistoryDetail,
+} from "./actions";
 import type {
   ApprovalHistoryItem,
   ApprovalHistoryStatus,
@@ -441,7 +445,7 @@ function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
       </div>
 
       {rejecting ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 border-t border-border pt-2.5">
           <textarea
             className="ob-input"
             rows={2}
@@ -449,10 +453,10 @@ function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
             onChange={(ev) => setNote(ev.target.value)}
             placeholder="Reason for rejecting (optional)…"
           />
-          <div className="flex items-center justify-end gap-1.5">
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              className="btn btn-ghost h-8 px-3 text-xs"
+              className="inline-flex items-center whitespace-nowrap h-9 px-3.5 rounded-full text-[0.74rem] font-bold text-text-secondary border border-border bg-bg-white hover:bg-bg-muted transition-colors"
               onClick={() => setRejecting(false)}
               disabled={pending}
             >
@@ -460,7 +464,7 @@ function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
             </button>
             <button
               type="button"
-              className="btn h-8 px-3 text-xs"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap h-9 px-3.5 rounded-full text-[0.74rem] font-bold transition-colors"
               style={{
                 background: "var(--color-danger-bg)",
                 color: "var(--color-danger-text)",
@@ -470,34 +474,35 @@ function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
               disabled={pending}
             >
               {pending ? (
-                <Loader2 size={12} className="animate-spin" aria-hidden />
+                <Loader2 size={13} className="animate-spin shrink-0" aria-hidden />
               ) : (
-                <X size={12} aria-hidden />
+                <X size={13} className="shrink-0" aria-hidden />
               )}
               Confirm reject
             </button>
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-end gap-1.5 pt-0.5">
+        <div className="flex items-center justify-end gap-2 border-t border-border pt-2.5">
           <button
             type="button"
-            className="btn btn-ghost h-8 px-3 text-xs"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap h-9 px-3.5 rounded-full text-[0.74rem] font-bold text-text-secondary border border-border bg-bg-white hover:bg-bg-muted hover:text-danger-text transition-colors"
             onClick={() => setRejecting(true)}
             disabled={pending}
           >
-            <X size={12} aria-hidden /> Reject
+            <X size={13} className="shrink-0" aria-hidden />
+            Reject
           </button>
           <button
             type="button"
-            className="btn-primary-cta h-8 px-3 text-xs"
+            className="btn-primary-cta inline-flex items-center gap-1.5 whitespace-nowrap h-9 px-4 text-[0.74rem]"
             onClick={() => decide("approve")}
             disabled={pending}
           >
             {pending ? (
-              <Loader2 size={12} className="animate-spin" aria-hidden />
+              <Loader2 size={13} className="animate-spin shrink-0" aria-hidden />
             ) : (
-              <Check size={12} aria-hidden />
+              <Check size={13} className="shrink-0" aria-hidden />
             )}
             Approve &amp; apply
           </button>
@@ -556,44 +561,166 @@ function ApprovalHistory({
 
 function HistoryRow({ item }: { item: ApprovalHistoryItem }) {
   const style = historyBadgeStyles[item.status] ?? historyBadgeStyles.other;
-  const typeTone = item.actionType.toLowerCase().includes("edit")
+  const isEdit = item.actionType.toLowerCase().includes("edit");
+  const typeTone = isEdit
     ? "bg-[#EAF6EF] text-[#3F7B51]"
     : "bg-[#ECF1FB] text-[#3B6FD4]";
+  const [detail, setDetail] = useState<ApprovalHistoryDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const openDetail = () => {
+    if (!isEdit && !item.actionType.toLowerCase().includes("campaign")) {
+      toast.info("No stored detail for this entry.");
+      return;
+    }
+    setLoading(true);
+    getApprovalHistoryDetail({
+      actionType: item.actionType,
+      entityId: item.entityId,
+    }).then((res) => {
+      setLoading(false);
+      if (!res.ok) {
+        toast.info(res.error);
+        return;
+      }
+      setDetail(res.detail);
+    });
+  };
 
   return (
-    <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-3 px-3 py-2.5 text-[0.78rem] text-text-secondary">
-      <span
-        className={cn(
-          "inline-flex items-center justify-center gap-1 rounded-full px-2 py-1 text-[0.68rem] font-bold",
-          style,
-        )}
+    <>
+      <button
+        type="button"
+        onClick={openDetail}
+        className="grid w-full grid-cols-[auto_auto_1fr_auto] items-center gap-3 px-3 py-2.5 text-left text-[0.78rem] text-text-secondary transition-colors hover:bg-bg-muted/50"
+        title="View details"
       >
-        {item.status === "approved" ? <Check size={11} /> : null}
-        {item.status === "rejected" ? <X size={11} /> : null}
-        {item.action}
-      </span>
-      <span
-        className={cn(
-          "hidden rounded-full px-2 py-1 text-[0.66rem] font-bold uppercase sm:inline-flex",
-          typeTone,
-        )}
-      >
-        {item.actionType}
-      </span>
-      <div className="min-w-0">
-        <span className="font-mono font-semibold text-text-primary">
-          {item.entityId || "-"}
+        <span
+          className={cn(
+            "inline-flex items-center justify-center gap-1 rounded-full px-2 py-1 text-[0.68rem] font-bold",
+            style,
+          )}
+        >
+          {item.status === "approved" ? <Check size={11} /> : null}
+          {item.status === "rejected" ? <X size={11} /> : null}
+          {item.action}
         </span>
-        <span className="ml-2 text-text-tertiary">by {item.actor}</span>
-        {item.notes && (
-          <span className="ml-2 hidden truncate italic text-text-tertiary lg:inline">
-            {item.notes}
+        <span
+          className={cn(
+            "hidden rounded-full px-2 py-1 text-[0.66rem] font-bold uppercase sm:inline-flex",
+            typeTone,
+          )}
+        >
+          {item.actionType}
+        </span>
+        <div className="min-w-0">
+          <span className="font-mono font-semibold text-text-primary">
+            {item.entityId || "-"}
           </span>
-        )}
-      </div>
-      <div className="flex items-center gap-2 whitespace-nowrap text-right text-text-tertiary">
-        <span>{formatDate(item.at)}</span>
-        <Eye size={13} aria-hidden />
+          <span className="ml-2 text-text-tertiary">by {item.actor}</span>
+          {item.notes && (
+            <span className="ml-2 hidden truncate italic text-text-tertiary lg:inline">
+              {item.notes}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 whitespace-nowrap text-right text-text-tertiary">
+          <span>{formatDate(item.at)}</span>
+          {loading ? (
+            <Loader2 size={13} className="animate-spin" aria-hidden />
+          ) : (
+            <Eye size={13} aria-hidden />
+          )}
+        </div>
+      </button>
+      {detail && (
+        <HistoryDetailModal detail={detail} onClose={() => setDetail(null)} />
+      )}
+    </>
+  );
+}
+
+function HistoryDetailModal({
+  detail,
+  onClose,
+}: {
+  detail: ApprovalHistoryDetail;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="modal-backdrop modal-backdrop--onboarding"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Approval detail — ${detail.entityId}`}
+      style={{ zIndex: 1500 }}
+      onClick={onClose}
+    >
+      <div
+        className="modal-panel modal-panel--onboarding flex flex-col"
+        style={{ maxWidth: 560, width: "94vw", maxHeight: "88dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-head shrink-0">
+          <div className="min-w-0">
+            <h2 className="font-semibold">
+              {detail.kind === "onboarding_edit"
+                ? "Onboarding Edit"
+                : "Campaign Edit"}{" "}
+              — {detail.entityId}
+            </h2>
+            <p className="text-[0.66rem] text-text-secondary">
+              {detail.status ?? ""}
+              {detail.requestedBy ? ` · requested by ${detail.requestedBy}` : ""}
+              {detail.decidedBy ? ` · decided by ${detail.decidedBy}` : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+        <div className="modal-body flex-1 overflow-y-auto">
+          {detail.reason && (
+            <p className="mb-3 text-[0.74rem] italic text-text-secondary">
+              “{detail.reason}”
+            </p>
+          )}
+          {detail.changes.length === 0 ? (
+            <p className="py-6 text-center text-sm text-text-tertiary">
+              No field changes recorded.
+            </p>
+          ) : (
+            <table className="w-full text-[0.74rem]">
+              <thead>
+                <tr className="border-b border-border text-[0.56rem] font-extrabold uppercase text-text-tertiary">
+                  <th className="pb-1.5 pr-2 text-left">Field</th>
+                  <th className="px-1.5 pb-1.5 text-left">Before</th>
+                  <th className="pb-1.5 pl-1.5 text-left">After</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.changes.map((c) => (
+                  <tr key={c.label} className="border-t border-border">
+                    <td className="py-1.5 pr-2 font-bold text-text-primary">
+                      {c.label}
+                    </td>
+                    <td className="px-1.5 py-1.5 text-danger-text line-through">
+                      {c.before ?? "—"}
+                    </td>
+                    <td className="py-1.5 pl-1.5 font-semibold text-[#2E7145]">
+                      {c.after || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );
