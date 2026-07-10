@@ -1,4 +1,8 @@
 
+### Collab email — campaign name + barter hides payment terms (2026-07-10)
+- **Campaign Name in header** — the email header now shows `Campaign Name: <name>` directly below the Collab ID (from `campaigns.campaign_name`, threaded preview → send → resend).
+- **Pure Barter** — hides the ₹ amount line (already) AND the entire **Payment Terms** section (barter = product only, no cash), plus drops the "payment terms" mention from the intro + confirmation prose. Barter + Paid unchanged. Both server email + modal preview updated. Files: `features/onboarding/actions.ts`, `collab-email-modal.tsx`, `features/errors/actions.ts`.
+
 ### Creator-level offboarding + dashboard guidance (Codex, 2026-07-10)
 - **Atomic creator-level offboarding** — replaced the old collab-level offboarding with a **creator blacklist**: offboarding a creator now blocks them at reach-out AND onboarding, writes to a new `creator_audit_log`, and is enforced atomically (migrations `20260709191751_creator_level_offboarding`, `20260710023602_lock_creator_audit_log_privileges`, `20260710030153_atomic_creator_offboarding`). New `features/offboarding/rules.ts`; board/queries/kpi/types reworked; reach-out `guards.ts` + onboarding enforce the blacklist.
 - **Dashboard operational briefing redesign + plain-language KPI definitions** — `DashboardOverviewStrip` scope-statement briefing + shared `components/ui/info-tooltip.tsx` info dots across every analytics KPI/graph/queue (`features/dashboard/bento-kit.tsx`). Repaired Posting help; aligned overview modals. KB ch04/06/07/08 + Know More (dashboard/onboarding/posting/offboarding/reach-out/…) updated. Commit `cdffce0`.
