@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Avatar } from "@/components/ui";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { cn } from "@/lib/cn";
+import { isPaymentPendingStatus } from "@/lib/payment-eligibility";
 import {
   formatDate,
   formatFollowers,
@@ -90,18 +91,26 @@ function stagesForPost(post: MyPost): StageKey[] {
   if (status === "Posted" || status === "Delivered") {
     const isParent =
       post.deliverable_index === null || post.deliverable_index === 1;
+    const paymentStatus = (post.payment_status ?? "").trim().toLowerCase();
+    const paymentTracked =
+      isPaymentPendingStatus(paymentStatus) ||
+      paymentStatus === "done" ||
+      paymentStatus === "paid";
     // Posted column: all deliverables (parent + child).
-    // Payment column: parent only (paid or pending) — read-only overview.
-    return isParent ? ["posted", "payment"] : ["posted"];
+    // Payment column: parent only, after eligibility created a ledger state.
+    return isParent && paymentTracked ? ["posted", "payment"] : ["posted"];
   }
   return [];
 }
 
 function paymentPending(post: MyPost): boolean {
+  const isParent =
+    post.deliverable_index == null || Number(post.deliverable_index) === 1;
   return (
+    isParent &&
     (post.workflow_status === "Posted" ||
       post.workflow_status === "Delivered") &&
-    post.payment_status !== "Done"
+    isPaymentPendingStatus(post.payment_status)
   );
 }
 
@@ -135,7 +144,11 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
     const posted = posts.filter((p) =>
       ["Posted", "Delivered"].includes(p.workflow_status ?? ""),
     ).length;
-    const pendingPay = posts.filter(paymentPending).length;
+    const pendingPay = new Set(
+      posts
+        .filter(paymentPending)
+        .map((post) => collabId(post) ?? post.post_id ?? ""),
+    ).size;
     const overdue = posts.filter((p) => {
       if (
         !p.est_delivery ||
@@ -198,7 +211,7 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
             label="Pay pending"
             value={stats.pendingPay}
             tone="text-warning"
-            info="Your assigned collaborations still waiting for payment completion."
+            info="Your assigned payment-ready collabs whose posting forms are all complete and whose creator accepted the partnership, but settlement is still open."
           />
           <MiniStat
             label="Overdue"

@@ -288,8 +288,8 @@ export function DashboardOverviewStrip({
           icon={<CircleDollarSign size={15} aria-hidden />}
           label="Pending Payments"
           value={pipeline.paymentPending}
-          sub="Payment is due or not yet due"
-          info="Collabs that have not been marked paid. This includes both currently due and scheduled future payments."
+          sub="Eligible collabs awaiting settlement"
+          info="Parent collabs whose every posting form is complete and whose creator accepted the partnership, but whose payment is still Not Due, Due, or Partial."
         />
         <HeroKpi
           color={archival ? "#161513" : "#B57514"}

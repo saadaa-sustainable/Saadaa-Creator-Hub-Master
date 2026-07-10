@@ -17,15 +17,15 @@ import {
 } from "@/lib/instagram-shortcode";
 import { fetchPostByShortcode, isMetaGraphConfigured } from "@/lib/meta-graph";
 import { checkMetaGate, recordMetaUsage } from "@/lib/meta-rate-limit";
-import {
-  nextPayableCycleDate,
-  paymentDueDateFor,
-} from "@/lib/payable-cycle";
-import { partnershipApproved } from "@/lib/partnership";
 import { PostingSchema } from "./schema";
 
 export type PostingResult =
-  | { ok: true; postId: string; postDate: string; postDateSource: "form" | "shortcode" | "today" }
+  | {
+      ok: true;
+      postId: string;
+      postDate: string;
+      postDateSource: "form" | "shortcode" | "today";
+    }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 function todayIso(): string {
@@ -98,7 +98,9 @@ export async function fetchPostDetails(input: {
         return {
           ok: true,
           shortcode,
-          date: n.timestamp ? formatIstDate(new Date(n.timestamp)) : (bitshift ?? todayIso()),
+          date: n.timestamp
+            ? formatIstDate(new Date(n.timestamp))
+            : (bitshift ?? todayIso()),
           dateSource: n.timestamp ? "instagram" : "shortcode",
           ownerConfirmed: true,
           metaMatched: true,
@@ -193,7 +195,6 @@ export async function submitPosting(input: unknown) {
       download_link: downloadLink || null,
       raw_dump: rawDump || null,
       workflow_status: "Posted",
-      payment_status: "Not Due",
     })
     .eq("post_id", postId);
 
@@ -209,7 +210,7 @@ export async function submitPosting(input: unknown) {
   // §8.1 — auto-init draft payment row on every Posted transition. Idempotent
   // (skips when a non-Done row already exists for this post). Child
   // deliverables are skipped — payment lives on the parent collab only.
-  await autoInitDraftPayment(supabase, postId, resolvedDate);
+  await autoInitDraftPayment(supabase, postId);
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 
@@ -277,135 +278,37 @@ export async function submitPosting(input: unknown) {
 }
 
 /**
- * Spawn a Not-Due draft payment row when a post flips to Posted. Mirrors
- * legacy `_autoInitDraftPayment_` (InfluencerBackend.js:10256-10306).
- *
- * Idempotent: if any non-Done payment row already exists for this collab's
- * representative, we leave it alone. Collab ID model: one payment per collab_id
- * raised on the representative deliverable (lowest post_id in the collab).
+ * Reconcile payment eligibility after a posting transition. The database RPC
+ * locks each collab, validates every sibling, and creates at most one Not Due
+ * draft on the representative only when creator acceptance is already present.
  */
 async function autoInitDraftPayment(
   supabase: ReturnType<typeof createServiceClient>,
   postId: string,
-  postDate: string,
 ): Promise<void> {
-  const { data: postRow } = await (supabase as any)
+  const { data: postRow, error: postError } = await (supabase as any)
     .from("posts")
-    .select(
-      "post_id, deliverable_index, commercial_amount, inf_id, username, collab_number, collab_id, ads_usage_rights",
-    )
+    .select("inf_id, username, collab_number, collab_id")
     .eq("post_id", postId)
     .maybeSingle();
-  if (!postRow) return;
-
-  // collab_id grouping key (legacy fallback to inf_id||'-C'||collab_number).
-  const collabId: string =
-    postRow.collab_id ??
-    (postRow.inf_id
-      ? `${postRow.inf_id}-C${Number(postRow.collab_number ?? 1)}`
-      : postId);
-
-  // Resolve the collab's deliverables once: used both to gate eligibility and
-  // to pick the representative (lowest post_id) that owns the single payment.
-  let collabDeliverables: Array<{
-    post_id: string;
-    post_link: string | null;
-    post_date: string | null;
-    commercial_amount: number | null;
-    ads_usage_rights: string | null;
-    partnership_id: string | null;
-    partnership_status: string | null;
-    ad_partnership_valid: boolean | null;
-    collab_id: string | null;
-    inf_id: string | null;
-    collab_number: number | null;
-  }> = [];
-  if (postRow.inf_id) {
-    const { data: sibs } = await (supabase as any)
-      .from("posts")
-      .select(
-        "post_id, post_link, post_date, commercial_amount, ads_usage_rights, partnership_id, partnership_status, ad_partnership_valid, collab_id, inf_id, collab_number",
-      )
-      .eq("inf_id", postRow.inf_id);
-    collabDeliverables = ((sibs ?? []) as typeof collabDeliverables).filter(
-      (s) =>
-        (s.collab_id ??
-          (s.inf_id ? `${s.inf_id}-C${Number(s.collab_number ?? 1)}` : "")) ===
-        collabId,
-    );
-  } else {
-    collabDeliverables = [
-      {
-        post_id: postRow.post_id,
-        post_link: null,
-        post_date: postDate,
-        commercial_amount: postRow.commercial_amount ?? null,
-        ads_usage_rights: postRow.ads_usage_rights ?? null,
-        partnership_id: null,
-        partnership_status: null,
-        ad_partnership_valid: null,
-        collab_id: postRow.collab_id ?? null,
-        inf_id: postRow.inf_id ?? null,
-        collab_number: postRow.collab_number ?? null,
-      },
-    ];
-  }
-
-  // The representative deliverable owns the single payment row (lowest post_id).
-  const representativeId = collabDeliverables.reduce(
-    (lo, d) => (String(d.post_id) < lo ? String(d.post_id) : lo),
-    String(postRow.post_id),
-  );
-
-  // Idempotency: any existing non-Done payment row keyed on the representative.
-  const { data: existing } = await (supabase as any)
-    .from("payments")
-    .select("id, status")
-    .eq("post_id", representativeId)
-    .neq("status", "Done")
-    .limit(1);
-  if (existing && existing.length > 0) return;
-
-  // Collab-level eligibility: don't create a draft until the whole collab is
-  // payable. A collab is payable when EVERY deliverable has been posted (link +
-  // date) AND every deliverable with ads_usage_rights=Yes has the partnership
-  // APPROVED by the creator (partnershipApproved — status or admin override).
-  // Otherwise we'd leak a phantom UTR-less row that the operator can't act on.
-  const adsYes = (raw: string | null | undefined) => {
-    if (!raw) return false;
-    const v = String(raw).trim().toLowerCase();
-    return !["", "no", "n/a", "none", "0", "false"].includes(v);
-  };
-  for (const s of collabDeliverables) {
-    if (!s.post_link || !s.post_date) return;
-    if (adsYes(s.ads_usage_rights) && !partnershipApproved(s)) return;
-  }
-
-  // Full collab amount = sum of per-row splits across all deliverables.
-  const collabAmount = collabDeliverables.reduce(
-    (sum, d) => sum + Number(d.commercial_amount ?? 0),
-    0,
-  );
-
-  const dueDate = paymentDueDateFor(postDate);
-  const estPayable = nextPayableCycleDate(dueDate);
-
-  const { error: insErr } = await (supabase as any).from("payments").insert({
-    post_id: representativeId,
-    deliverable_post_id: representativeId,
-    collab_id: collabId,
-    inf_id: postRow.inf_id ?? null,
-    username: postRow.username ?? null,
-    collab_number: postRow.collab_number ?? null,
-    amount: collabAmount,
-    status: "Not Due",
-    due_date: dueDate,
-    estimated_payable_date: estPayable,
-    payment_advice_sent: false,
-  });
-  if (insErr) {
+  if (postError || !postRow) {
     console.error(
-      `[autoInitDraftPayment] insert failed for ${postId}: ${insErr.message}`,
+      `[autoInitDraftPayment] post lookup failed for ${postId}: ${postError?.message ?? "not found"}`,
+    );
+    return;
+  }
+  if (!postRow.collab_id && postRow.collab_number == null) return;
+
+  const { error: reconcileError } = await (supabase as any).rpc(
+    "reconcile_creator_payment_eligibility",
+    {
+      p_inf_id: postRow.inf_id ?? null,
+      p_username: postRow.username ?? null,
+    },
+  );
+  if (reconcileError) {
+    console.error(
+      `[autoInitDraftPayment] reconcile failed for ${postId}: ${reconcileError.message}`,
     );
   }
 }
@@ -415,9 +318,9 @@ async function autoInitDraftPayment(
  * Posting Overview modal, Accounts Hub kanban card, and list view.
  *
  * Since the auto-invite rollout this is the ADMIN OVERRIDE path: entering a
- * key also sets ad_partnership_valid=true so the payment/ads gates pass even
- * when Meta status isn't approved (escape hatch for API gaps). Clearing the
- * key withdraws the override.
+ * key also sets ad_partnership_valid=true so ads-only gates can pass when Meta
+ * status is unavailable. Payment still requires the creator's real accepted
+ * partnership_status. Clearing the key withdraws the ads override.
  */
 export async function savePartnershipKey(
   postId: string,
@@ -428,7 +331,10 @@ export async function savePartnershipKey(
   const key = partnershipId.trim();
   const { error } = await (supabase as any)
     .from("posts")
-    .update({ partnership_id: key || null, ad_partnership_valid: key.length > 0 })
+    .update({
+      partnership_id: key || null,
+      ad_partnership_valid: key.length > 0,
+    })
     .eq("post_id", postId);
   if (error) return { ok: false, error: error.message };
   revalidateTag("posts");

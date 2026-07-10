@@ -3,7 +3,7 @@ import { AlertTriangle, Handshake, ShieldCheck } from "lucide-react";
 import { Avatar, DeactivatedBadge } from "@/components/ui";
 import { PartnershipBadge } from "@/components/ui/status-pill";
 import { formatDate, formatRupees } from "@/lib/formatters";
-import { partnershipApproved } from "@/lib/partnership";
+import { creatorAcceptedPartnership } from "@/lib/payment-eligibility";
 import { computeMatchStatus, type MatchStatus } from "@/lib/payable-cycle";
 import type { AccountsRow } from "./types";
 
@@ -95,20 +95,15 @@ export function MatchStatusPill({ row }: { row: AccountsRow }) {
 }
 
 /**
- * Ads-rights pill — partnership state for ad-eligible collabs.
- * Shown only when ads_usage_rights ≠ none. Approved (creator accepted the
- * Meta request, or admin override) keeps the info pill; anything else renders
- * the shared PartnershipBadge so the exact state (invite pending / rejected /
- * no partnership yet) is visible while Done payments stay blocked.
+ * Payment partnership pill — creator acceptance is mandatory for every
+ * collab, regardless of ads rights. Admin overrides do not unlock payment.
  */
-export function AdsPartnershipPill({ row }: { row: AccountsRow }) {
-  const raw = String(row.ads_usage_rights ?? "").trim().toLowerCase();
-  if (!raw || ["no", "none", "n/a", "0", "false"].includes(raw)) return null;
-  if (partnershipApproved(row)) {
+export function PaymentPartnershipPill({ row }: { row: AccountsRow }) {
+  if (creatorAcceptedPartnership(row)) {
     return (
       <span
         className="kb-pill kb-pill--info"
-        title="Partnership approved by the creator — payments unblocked"
+        title="Partnership accepted by the creator — payments unlocked"
       >
         <ShieldCheck size={10} aria-hidden />
         Partnership approved
@@ -116,7 +111,7 @@ export function AdsPartnershipPill({ row }: { row: AccountsRow }) {
     );
   }
   return (
-    <span title="Done payments blocked until the creator approves">
+    <span title="Payments are locked until the creator accepts the partnership">
       <PartnershipBadge status={row.partnership_status} showEmpty />
     </span>
   );
@@ -155,7 +150,10 @@ export function CreatorCell({ row }: { row: AccountsRow }) {
         <div className="creator-name">{row.creator?.inf_name ?? "—"}</div>
         <div className="creator-handle">@{row.creator?.username ?? "—"}</div>
         {row.creator?.is_active === false && (
-          <DeactivatedBadge isActive={row.creator?.is_active} className="mt-1" />
+          <DeactivatedBadge
+            isActive={row.creator?.is_active}
+            className="mt-1"
+          />
         )}
       </div>
     </div>

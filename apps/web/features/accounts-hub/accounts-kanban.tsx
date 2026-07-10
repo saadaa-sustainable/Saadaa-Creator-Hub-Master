@@ -6,7 +6,7 @@ import { formatRupees } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import { AccountsOverviewModal } from "./accounts-overview-modal";
 import {
-  AdsPartnershipPill,
+  PaymentPartnershipPill,
   AmountCell,
   DueDateCell,
   EstPayableCell,
@@ -56,11 +56,7 @@ export function AccountsKanban({ rows }: { rows: AccountsRow[] }) {
         {KANBAN_COLUMNS.map((col) => {
           const items = bucketed.get(col.id) ?? [];
           return (
-            <section
-              key={col.id}
-              className="acc-kb-col"
-              aria-label={col.label}
-            >
+            <section key={col.id} className="acc-kb-col" aria-label={col.label}>
               <header className="acc-kb-col__head">
                 <span className="acc-kb-col__title">{col.label}</span>
                 <span className="acc-kb-col__count tabular">
@@ -150,9 +146,7 @@ function KanbanCard({
             {row.creator?.inf_name ?? row.creator?.username ?? "—"}
           </strong>
           {row.creator?.username && (
-            <span className="acc-kb-card__handle">
-              @{row.creator.username}
-            </span>
+            <span className="acc-kb-card__handle">@{row.creator.username}</span>
           )}
         </div>
         <PaymentStatusPill status={row.payment?.status} />
@@ -182,29 +176,28 @@ function KanbanCard({
             {totalDeliverables} delivs
           </span>
         )}
-        <AdsPartnershipPill row={row} />
+        <PaymentPartnershipPill row={row} />
         <PostedNotTestedPill row={row} />
         <RemainderPill row={row} />
         <MatchStatusPill row={row} />
       </div>
 
-      {isPostedStage &&
-        (row.ads_usage_rights ?? "").trim().length > 0 && (
-          <div
-            className="acc-kb-card__pk"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            <span className="acc-kb-card__pk-label">Partnership Key</span>
-            <PartnershipKeyEdit
-              postId={row.post_id!}
-              value={row.partnership_id}
-              stopPropagation
-              compact
-              readOnly
-            />
-          </div>
-        )}
+      {isPostedStage && (row.ads_usage_rights ?? "").trim().length > 0 && (
+        <div
+          className="acc-kb-card__pk"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <span className="acc-kb-card__pk-label">Partnership Key</span>
+          <PartnershipKeyEdit
+            postId={row.post_id!}
+            value={row.partnership_id}
+            stopPropagation
+            compact
+            readOnly
+          />
+        </div>
+      )}
 
       <dl className="acc-kb-card__meta">
         <div>

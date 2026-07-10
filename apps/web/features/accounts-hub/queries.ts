@@ -1,10 +1,11 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
-import { partnershipApproved } from "@/lib/partnership";
 import {
-  nextPayableCycleDate,
-  paymentDueDateFor,
-} from "@/lib/payable-cycle";
+  creatorAcceptedPartnership,
+  isCollabPaymentEligible,
+  postingFormCompleted,
+} from "@/lib/payment-eligibility";
+import { nextPayableCycleDate, paymentDueDateFor } from "@/lib/payable-cycle";
 import type { PaymentsRow } from "@/lib/supabase/types.gen";
 import type { AccountsFilters, AccountsKpi, AccountsRow } from "./types";
 
@@ -134,7 +135,8 @@ export async function fetchAccountsHubData(
     const cur = repByCollab.get(key);
     if (
       !cur ||
-      String(dAny.post_id ?? "") < String((cur as Record<string, unknown>).post_id ?? "")
+      String(dAny.post_id ?? "") <
+        String((cur as Record<string, unknown>).post_id ?? "")
     ) {
       repByCollab.set(key, d);
     }
@@ -190,10 +192,7 @@ export async function fetchAccountsHubData(
       .in("post_id", postIds)
       .order("created_at", { ascending: false });
     if (payErr) {
-      console.error(
-        "[accounts-hub] payments fetch failed:",
-        payErr.message,
-      );
+      console.error("[accounts-hub] payments fetch failed:", payErr.message);
     }
     for (const row of (paymentsRaw ?? []) as PaymentsRow[]) {
       // We want the LATEST row per post_id. Iterating in created_at desc, so
@@ -215,8 +214,7 @@ export async function fetchAccountsHubData(
   // that have no payment row yet, BUT only for collabs that are fully
   // payment-eligible. A collab is payment-eligible when:
   //   1. EVERY deliverable of the collab is posted (post_link + post_date), and
-  //   2. EVERY deliverable with ads_usage_rights=Yes has a creator-APPROVED
-  //      partnership (or the admin override) — see partnershipApproved.
+  //   2. the creator has ACCEPTED the partnership on every mirrored row.
   // If either condition fails, we skip the draft so the operator doesn't see
   // a phantom UTR-less row for a collab that can't be paid yet. Mirrors the
   // collab-level gate in `submitPayments`. Keyed on collab_id.
@@ -230,11 +228,6 @@ export async function fetchAccountsHubData(
 
   let backfillEligible: typeof candidates = [];
   if (candidates.length > 0) {
-    const adsYes = (raw: string | null | undefined) => {
-      if (!raw) return false;
-      const v = String(raw).trim().toLowerCase();
-      return !["", "no", "n/a", "none", "0", "false"].includes(v);
-    };
     const candidateInfIds = [
       ...new Set(
         candidates
@@ -250,7 +243,7 @@ export async function fetchAccountsHubData(
       const { data: sibs } = await (supabase as any)
         .from("posts")
         .select(
-          "inf_id, collab_number, collab_id, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status",
+          "inf_id, collab_number, collab_id, post_link, post_date, partnership_status",
         )
         .in("inf_id", candidateInfIds);
       for (const s of (sibs ?? []) as Array<{
@@ -259,26 +252,16 @@ export async function fetchAccountsHubData(
         collab_id: string | null;
         post_link: string | null;
         post_date: string | null;
-        ads_usage_rights: string | null;
-        partnership_id: string | null;
-        ad_partnership_valid: boolean | null;
         partnership_status: string | null;
       }>) {
+        if (!s.collab_id && s.collab_number == null) continue;
         const key = collabKeyOf(s as unknown as Record<string, unknown>);
         if (s.post_date) {
           const prev = collabPostDate.get(key);
           if (!prev || s.post_date > prev) collabPostDate.set(key, s.post_date);
         }
-        if (!s.post_link || !s.post_date) {
+        if (!postingFormCompleted(s) || !creatorAcceptedPartnership(s)) {
           collabLocked.add(key);
-          continue;
-        }
-        if (adsYes(s.ads_usage_rights)) {
-          // Gate: the creator must have APPROVED the partnership request (or
-          // an admin override via ad_partnership_valid) — a bare
-          // partnership_id no longer passes since the invite is auto-sent at
-          // posting time.
-          if (!partnershipApproved(s)) collabLocked.add(key);
         }
       }
     }
@@ -313,27 +296,44 @@ export async function fetchAccountsHubData(
           payment_advice_sent: false,
         };
       });
-    // Partial-payments model dropped UNIQUE(post_id) (swapped for
-    // UNIQUE(post_id, utr)), so onConflict:'post_id' is no longer valid. These
-    // candidates already have ZERO payment rows (filtered against
-    // paymentsByPostId above), so a plain insert is safe and preserves the
-    // at-most-one-null-utr-draft-per-collab invariant.
-    const { data: inserted, error: insErr } = await (supabase as any)
-      .from("payments")
-      .insert(drafts)
-      .select("*");
-    if (insErr)
-      console.error("[accounts-hub] backfill insert failed:", insErr.message);
+      // Partial-payments model dropped UNIQUE(post_id) (swapped for
+      // UNIQUE(post_id, utr)), so onConflict:'post_id' is no longer valid. These
+      // candidates already have ZERO payment rows (filtered against
+      // paymentsByPostId above), so a plain insert is safe and preserves the
+      // at-most-one-null-utr-draft-per-collab invariant.
+      const { data: inserted, error: insErr } = await (supabase as any)
+        .from("payments")
+        .insert(drafts)
+        .select("*");
+      if (insErr)
+        console.error("[accounts-hub] backfill insert failed:", insErr.message);
       for (const row of (inserted ?? []) as PaymentsRow[]) {
         if (!paymentsByPostId.has(row.post_id)) {
           paymentsByPostId.set(row.post_id, row);
+        }
+        const source = backfillEligible.find((p) => p.post_id === row.post_id);
+        if (!source) continue;
+        const sourceKey = collabKeyOf(source as Record<string, unknown>);
+        const siblingIds = allDeliverables
+          .filter(
+            (deliverable) =>
+              collabKeyOf(deliverable as Record<string, unknown>) === sourceKey,
+          )
+          .map((deliverable) => deliverable.post_id)
+          .filter((id): id is string => Boolean(id));
+        if (siblingIds.length > 0) {
+          await (supabase as any)
+            .from("posts")
+            .update({ payment_status: "Not Due" })
+            .in("post_id", siblingIds);
         }
       }
     }
   }
 
-  // Heal existing payment rows where due_date is null (created before payable-cycle
-  // helpers were wired up). Also sets status to Not Due when null.
+  // Heal dates on existing payment rows created before payable-cycle helpers
+  // were wired up. Never manufacture a status here: only the strict eligible
+  // draft paths above may create an open payment state.
   const needsHeal = posts.filter(
     (p) =>
       p.post_id &&
@@ -346,16 +346,20 @@ export async function fetchAccountsHubData(
     const pay = paymentsByPostId.get(p.post_id!)!;
     const due = paymentDueDateFor(p.post_date);
     const est = nextPayableCycleDate(due);
-    const patch: Record<string, unknown> = { due_date: due, estimated_payable_date: est };
-    if (!pay.status) patch.status = "Not Due";
+    const patch: Record<string, unknown> = {
+      due_date: due,
+      estimated_payable_date: est,
+    };
     const { error: healErr } = await (supabase as any)
       .from("payments")
       .update(patch)
       .eq("id", pay.id);
     if (healErr)
-      console.error(`[accounts-hub] heal failed for ${pay.id}:`, healErr.message);
-    else
-      paymentsByPostId.set(p.post_id!, { ...pay, ...patch } as PaymentsRow);
+      console.error(
+        `[accounts-hub] heal failed for ${pay.id}:`,
+        healErr.message,
+      );
+    else paymentsByPostId.set(p.post_id!, { ...pay, ...patch } as PaymentsRow);
   }
 
   // Decorate a representative row with the partial-payments rollup. The
@@ -369,8 +373,7 @@ export async function fetchAccountsHubData(
     const total = Number(p.commercial_amount ?? 0);
     const paidSoFar = paidSoFarByPostId.get(p.post_id ?? "") ?? 0;
     const remainder = Math.max(0, total - paidSoFar);
-    const isPartial =
-      paidSoFar > 0 && total > 0 && paidSoFar + 0.0001 < total;
+    const isPartial = paidSoFar > 0 && total > 0 && paidSoFar + 0.0001 < total;
     return {
       ...p,
       payment,
@@ -397,7 +400,9 @@ export async function fetchAccountsHubData(
         r.payment?.utr,
       ];
       return fields.some((f) =>
-        String(f ?? "").toLowerCase().includes(needle),
+        String(f ?? "")
+          .toLowerCase()
+          .includes(needle),
       );
     });
   }
@@ -430,21 +435,23 @@ function computeKpi(rows: AccountsRow[]): AccountsKpi {
   for (const r of rows) {
     if (!KPI_STAGES.has(String(r.workflow_status))) continue;
     postsDone++;
-    // totalPayable tracks the agreed collab total (commercial_amount), not the
-    // latest installment, so a partially-paid collab still contributes its full
-    // value to the payable corpus.
     const total = Number(r.commercial_amount ?? 0);
-    totalPayable += total;
 
     // Partial takes precedence: a collab with a balance outstanding belongs in
     // the Partial / Outstanding bucket regardless of the latest row's status.
     if (r._isPartial) {
+      totalPayable += total;
       partialCount++;
       partialOutstanding += Number(r._remainder ?? 0);
       continue;
     }
 
     const status = r.payment?.status ?? null;
+    // A posted collab with no payment row is not payment-pending. It enters
+    // the payable corpus only after every posting form is complete and the
+    // creator has accepted the partnership, at which point a draft exists.
+    if (!status) continue;
+    totalPayable += total;
     switch (status) {
       case "Not Due":
         notDueCount++;
@@ -465,8 +472,7 @@ function computeKpi(rows: AccountsRow[]): AccountsKpi {
         doneSum += total;
         break;
       default:
-        notDueCount++;
-        notDueSum += total;
+        totalPayable -= total;
     }
   }
 
@@ -509,8 +515,7 @@ const ADS_YES = (raw: string | null | undefined): boolean => {
 /**
  * Posts eligible for a new payment submit. Enforces collab-level readiness:
  *   1. Every deliverable in the collab must have a post_link (posting form submitted).
- *   2. If ANY deliverable has ads_usage_rights, ALL must have a creator-APPROVED
- *      partnership (partnership_status='approved', or the admin override).
+ *   2. The creator must have accepted the partnership (partnership_status='approved').
  *
  * Fetches all Posted/Delivered deliverables, groups by collab_id, and returns
  * ONE representative row per ready collab (payment is raised per collab_id).
@@ -533,20 +538,22 @@ export async function fetchPayableEligiblePosts(): Promise<
   }>
 > {
   const supabase = createServiceClient();
-  // Fetch ALL deliverables so we can gate + collapse per collab_id.
+  // Fetch every collab row, including unfinished siblings, so a partially
+  // posted collab cannot look ready merely because only Posted rows were read.
   const { data, error } = await (supabase as any)
     .from("posts")
     .select(
       `
       post_id, post_id_short, commercial_amount, campaign_id, workflow_status,
       ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status, deliverable_index,
-      post_link, inf_id, collab_number, collab_id,
+      post_link, post_date, inf_id, collab_number, collab_id,
       creator:creators ( username, inf_name, profile_pic )
     `,
     )
-    .in("workflow_status", ["Posted", "Delivered"])
+    .not("post_id", "is", null)
+    .not("collab_number", "is", null)
     .order("post_date", { ascending: false, nullsFirst: false })
-    .limit(2000);
+    .limit(50_000);
 
   if (error) throw error;
   const rows = (data ?? []) as any[];
@@ -565,16 +572,18 @@ export async function fetchPayableEligiblePosts(): Promise<
     collabMap.get(key)!.push(r);
   }
 
-  // Collab is payment-ready when every deliverable has post_link AND (if ads)
-  // the creator approved the partnership (or admin override) — a bare
-  // partnership_id no longer passes (invite is auto-sent at posting time).
+  // Collab is payment-ready only when every posting form is complete and the
+  // creator has accepted the partnership. Admin overrides do not count.
   const readyKeys = new Set<string>();
   for (const [key, deliverables] of collabMap) {
-    const allPosted = deliverables.every((d) => (d.post_link ?? "").trim().length > 0);
-    const adsRequired = deliverables.some((d) => ADS_YES(d.ads_usage_rights));
-    const allPartnershipped =
-      !adsRequired || deliverables.every((d) => partnershipApproved(d));
-    if (allPosted && allPartnershipped) readyKeys.add(key);
+    const allInPostedStage = deliverables.every(
+      (deliverable) =>
+        deliverable.workflow_status === "Posted" ||
+        deliverable.workflow_status === "Delivered",
+    );
+    if (allInPostedStage && isCollabPaymentEligible(deliverables)) {
+      readyKeys.add(key);
+    }
   }
 
   // Sum commercial_amount across all deliverables per collab_id — each row

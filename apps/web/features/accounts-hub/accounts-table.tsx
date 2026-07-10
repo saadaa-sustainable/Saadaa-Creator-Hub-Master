@@ -5,7 +5,7 @@ import { DataTable } from "@/components/data-table/data-table";
 import { Avatar, PartnershipKeyEdit } from "@/components/ui";
 import { formatDate } from "@/lib/formatters";
 import {
-  AdsPartnershipPill,
+  PaymentPartnershipPill,
   AmountCell,
   CreatorCell,
   DueDateCell,
@@ -121,7 +121,7 @@ export function AccountsTable({ rows }: { rows: AccountsRow[] }) {
             <PaymentStatusPill status={row.original.payment?.status} />
             <RemainderPill row={row.original} />
             <MatchStatusPill row={row.original} />
-            <AdsPartnershipPill row={row.original} />
+            <PaymentPartnershipPill row={row.original} />
             <PostedNotTestedPill row={row.original} />
           </span>
         ),
@@ -238,13 +238,20 @@ function AccountsListMobileCard({ row }: { row: AccountsRow }) {
       <div className="flex flex-wrap gap-0.5 mt-0.5">
         <RemainderPill row={row} />
         <MatchStatusPill row={row} />
-        <AdsPartnershipPill row={row} />
+        <PaymentPartnershipPill row={row} />
         <PostedNotTestedPill row={row} />
       </div>
       {(row.ads_usage_rights ?? "").trim() && (
         <div className="acc-list-mobile-card__pk">
-          <span className="acc-list-mobile-card__pk-label">Partnership Key</span>
-          <PartnershipKeyEdit postId={row.post_id!} value={row.partnership_id} compact readOnly />
+          <span className="acc-list-mobile-card__pk-label">
+            Partnership Key
+          </span>
+          <PartnershipKeyEdit
+            postId={row.post_id!}
+            value={row.partnership_id}
+            compact
+            readOnly
+          />
         </div>
       )}
     </div>

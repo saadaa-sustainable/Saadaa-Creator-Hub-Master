@@ -12,7 +12,7 @@ import {
   sendNotification,
 } from "@/lib/notifications";
 import { fetchMetaAdsCoveredPostIds } from "@/lib/supabase/meta-ads";
-import { partnershipApproved } from "@/lib/partnership";
+import { creatorAcceptedPartnership } from "@/lib/payment-eligibility";
 import { isAdTested, isPostedButNotTested } from "@/lib/ad-tested";
 import {
   nextPayableCycleDate,
@@ -69,6 +69,8 @@ interface PostContext {
   partnership_id: string | null;
   ad_partnership_valid: boolean | null;
   partnership_status: string | null;
+  post_link: string | null;
+  post_date: string | null;
   bank_name: string | null;
   bank_number: string | null;
   ifsc: string | null;
@@ -89,12 +91,6 @@ async function coveredPostIdsWithTimeout(): Promise<Set<string>> {
   ]);
 }
 
-const ADS_YES = (raw: string | null | undefined): boolean => {
-  if (!raw) return false;
-  const v = String(raw).trim().toLowerCase();
-  return !["", "no", "n/a", "none", "0", "false"].includes(v);
-};
-
 const POSTED_STATES = new Set(["Posted", "Delivered"]);
 
 /**
@@ -105,11 +101,10 @@ const POSTED_STATES = new Set(["Posted", "Delivered"]);
  * - Stage gate: post must be in Posted | Delivered.
  * - §7.2 Reel rule: per (inf_id, collab_number), at least one Reel deliverable
  *   must have BOTH post_link AND post_date.
- * - §8.2 Ad partnership gate: when ads_usage_rights = "yes" AND a UTR is
- *   present (Done attempt), the creator must have APPROVED the partnership
- *   request (partnership_status='approved') or an admin must have explicitly
- *   overridden (ad_partnership_valid=true). A bare partnership_id no longer
- *   passes — the invite is auto-sent at posting time.
+ * - Partnership gate: the creator must have accepted the partnership request
+ *   (partnership_status='approved'). It applies to every payment write,
+ *   regardless of ads rights or whether the row already has a UTR. Admin keys
+ *   do not bypass creator acceptance.
  *
  * Dedup key: (post_id, lower(utr)). Same UTR across multiple post_ids is
  * allowed (one bank transfer can cover multiple collabs).
@@ -150,7 +145,7 @@ export async function submitPayments(
   const { data: postRows, error: postsErr } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, collab_id, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, partnership_status, bank_name, bank_number, ifsc",
+      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, collab_id, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, partnership_status, post_link, post_date, bank_name, bank_number, ifsc",
     )
     .in("post_id", postIds);
   if (postsErr) return { ok: false, error: postsErr.message };
@@ -175,10 +170,15 @@ export async function submitPayments(
   // distinct UTR) keyed on the representative post_id, plus AT MOST one
   // null-utr draft row. We pull id/utr/status/amount so we can (a) find the
   // lone draft to update in place, (b) sum installments for paid-so-far.
-  const { data: existingRows } = await (supabase as any)
+  const { data: existingRows, error: existingRowsError } = await (
+    supabase as any
+  )
     .from("payments")
     .select("id, post_id, utr, status, amount")
     .in("post_id", postIds);
+  if (existingRowsError) {
+    return { ok: false, error: existingRowsError.message };
+  }
   type ExistingPay = {
     id: string;
     post_id: string;
@@ -187,8 +187,6 @@ export async function submitPayments(
     amount: number | null;
   };
   const existingAll = (existingRows ?? []) as ExistingPay[];
-  // Lone null-utr DRAFT row per post_id (the auto-init row to update in place).
-  const draftByPostId = new Map<string, ExistingPay>();
   // Sum of already-recorded installments (rows WITH a utr) per post_id — the
   // paid-so-far baseline. Drafts (null utr) never count toward paid.
   const paidSoFarByPostId = new Map<string, number>();
@@ -199,8 +197,6 @@ export async function submitPayments(
         r.post_id,
         (paidSoFarByPostId.get(r.post_id) ?? 0) + Number(r.amount ?? 0),
       );
-    } else if (!draftByPostId.has(r.post_id)) {
-      draftByPostId.set(r.post_id, r);
     }
   }
   // Same (post_id, lower(utr)) dedup key set — an installment with a UTR
@@ -211,8 +207,6 @@ export async function submitPayments(
       .map((r) => `${r.post_id}|${String(r.utr).trim().toLowerCase()}`),
   );
 
-  // §7.2 Reel rule pre-check — per collab_id, pull all deliverables to verify
-  // at least one has reel content with link.
   const collabKeys = new Set<string>();
   // inf_ids of the collabs we touch — used to fetch every deliverable of those
   // collabs in one query (deliverables of a collab share inf_id).
@@ -223,45 +217,11 @@ export async function submitPayments(
     collabKeys.add(collabKeyOf(p));
     if (p.inf_id) touchedInfIds.add(p.inf_id);
   }
-  const collabsWithReel = new Set<string>();
-  if (collabKeys.size > 0) {
-    const infIds = [...touchedInfIds];
-    if (infIds.length > 0) {
-      const { data: collabRows } = await (supabase as any)
-        .from("posts")
-        .select(
-          "post_id, inf_id, collab_number, collab_id, reels, deliverable_type, post_link, post_date",
-        )
-        .in("inf_id", infIds);
-      for (const cr of (collabRows ?? []) as Array<{
-        post_id: string;
-        inf_id: string | null;
-        collab_number: number | null;
-        collab_id: string | null;
-        reels: number | null;
-        deliverable_type: string | null;
-        post_link: string | null;
-        post_date: string | null;
-      }>) {
-        const key = collabKeyOf(cr);
-        const reelCount = Number(cr.reels ?? 0);
-        const isReelDeliverable =
-          reelCount > 0 || cr.deliverable_type === "reel";
-        const hasLink = !!cr.post_link;
-        const hasDate = !!cr.post_date;
-        if (isReelDeliverable && hasLink && hasDate) {
-          collabsWithReel.add(key);
-        }
-      }
-    }
-  }
-
   // Combined sibling scan — collab-level eligibility tracking. We track:
   //   (a) `collabUnpostedByKey` — siblings that are missing post_link or
   //       post_date. Any single unposted sibling locks the entire collab.
-  //   (b) `collabPartnershipMissingByKey` — siblings with ads_usage_rights=Yes
-  //       whose partnership the creator hasn't APPROVED (and no admin
-  //       override). Same collab-wide lock.
+  //   (b) `collabPartnershipMissingByKey` — siblings whose creator-level
+  //       partnership is not accepted. Same collab-wide lock.
   // Both maps store the offending sibling post_id_short so the toast can call
   // them out by name. Saadaa pays per-collab, not per-deliverable, so any
   // sibling deficiency blocks every payment in the collab.
@@ -272,51 +232,67 @@ export async function submitPayments(
   // Used to decide Partial vs Done against paid-so-far. Mirrors the
   // collabSumMap in queries.ts so submit + board agree on the total.
   const collabTotalByKey = new Map<string, number>();
+  const verifiedCollabKeys = new Set<string>();
   if (collabKeys.size > 0) {
     const infIds = [...touchedInfIds];
-    if (infIds.length > 0) {
-      const { data: collabRows } = await (supabase as any)
-        .from("posts")
-        .select(
-          "post_id, post_id_short, inf_id, collab_number, collab_id, commercial_amount, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status",
-        )
-        .in("inf_id", infIds);
-      for (const cr of (collabRows ?? []) as Array<{
-        post_id: string;
-        post_id_short: string | null;
-        inf_id: string | null;
-        collab_number: number | null;
-        collab_id: string | null;
-        commercial_amount: number | null;
-        post_link: string | null;
-        post_date: string | null;
-        ads_usage_rights: string | null;
-        partnership_id: string | null;
-        ad_partnership_valid: boolean | null;
-        partnership_status: string | null;
-      }>) {
-        const key = collabKeyOf(cr);
-        collabTotalByKey.set(
-          key,
-          (collabTotalByKey.get(key) ?? 0) + Number(cr.commercial_amount ?? 0),
-        );
-        const sibLabel = cr.post_id_short ?? cr.post_id ?? "?";
-        if (!cr.post_link || !cr.post_date) {
-          const arr = collabUnpostedByKey.get(key) ?? [];
-          arr.push(sibLabel);
-          collabUnpostedByKey.set(key, arr);
-        }
-        if (ADS_YES(cr.ads_usage_rights)) {
-          // Creator must have APPROVED the partnership (or admin override) —
-          // key presence alone no longer counts.
-          if (!partnershipApproved(cr)) {
-            const arr = collabPartnershipMissingByKey.get(key) ?? [];
-            arr.push(sibLabel);
-            collabPartnershipMissingByKey.set(key, arr);
-          }
-        }
+    if (infIds.length === 0) {
+      return {
+        ok: false,
+        error: "Unable to verify all deliverables for the selected collab",
+      };
+    }
+    const { data: collabRows, error: collabRowsError } = await (supabase as any)
+      .from("posts")
+      .select(
+        "post_id, post_id_short, inf_id, collab_number, collab_id, commercial_amount, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status",
+      )
+      .in("inf_id", infIds);
+    if (collabRowsError) {
+      return {
+        ok: false,
+        error: `Unable to verify all deliverables: ${collabRowsError.message}`,
+      };
+    }
+    for (const cr of (collabRows ?? []) as Array<{
+      post_id: string;
+      post_id_short: string | null;
+      inf_id: string | null;
+      collab_number: number | null;
+      collab_id: string | null;
+      commercial_amount: number | null;
+      post_link: string | null;
+      post_date: string | null;
+      ads_usage_rights: string | null;
+      partnership_id: string | null;
+      ad_partnership_valid: boolean | null;
+      partnership_status: string | null;
+    }>) {
+      if (!cr.collab_id && cr.collab_number == null) continue;
+      const key = collabKeyOf(cr);
+      verifiedCollabKeys.add(key);
+      collabTotalByKey.set(
+        key,
+        (collabTotalByKey.get(key) ?? 0) + Number(cr.commercial_amount ?? 0),
+      );
+      const sibLabel = cr.post_id_short ?? cr.post_id ?? "?";
+      if (!cr.post_link || !cr.post_date) {
+        const arr = collabUnpostedByKey.get(key) ?? [];
+        arr.push(sibLabel);
+        collabUnpostedByKey.set(key, arr);
+      }
+      if (!creatorAcceptedPartnership(cr)) {
+        const arr = collabPartnershipMissingByKey.get(key) ?? [];
+        arr.push(sibLabel);
+        collabPartnershipMissingByKey.set(key, arr);
       }
     }
+  }
+
+  if ([...collabKeys].some((key) => !verifiedCollabKeys.has(key))) {
+    return {
+      ok: false,
+      error: "Unable to verify every deliverable in the selected collab",
+    };
   }
 
   const blockedByStage: string[] = [];
@@ -347,7 +323,6 @@ export async function submitPayments(
       continue;
     }
 
-    const hasUtr = (r.utr ?? "").trim().length > 0;
     const collabKey = collabKeyOf(p);
     const unposted = collabUnpostedByKey.get(collabKey) ?? [];
     const partnershipMissing =
@@ -366,32 +341,25 @@ export async function submitPayments(
       continue;
     }
 
-    // §8.2 — collab-level partnership gate. ANY sibling with ads_usage_rights
-    // =Yes whose partnership the creator hasn't APPROVED (and no admin
-    // override) blocks all payments in the collab. Only fires for Done
-    // attempts (UTR provided); draft writes still pass.
-    if (hasUtr) {
-      const ownAdsRequired = ADS_YES(p.ads_usage_rights);
-      const ownHasPartnership = partnershipApproved(p);
-      if (
-        (ownAdsRequired && !ownHasPartnership) ||
-        partnershipMissing.length > 0
-      ) {
-        blockedByAdPartnership.push(r.postId);
-        blockedDetails.push({
-          postId: r.postId,
-          unpostedSiblings: unposted,
-          partnershipMissingSiblings: partnershipMissing,
-        });
-        continue;
-      }
+    // Creator acceptance is mandatory before even a pending/draft payment can
+    // exist. This applies with or without a UTR and cannot be bypassed by an
+    // admin Partnership Key.
+    if (!creatorAcceptedPartnership(p) || partnershipMissing.length > 0) {
+      blockedByAdPartnership.push(r.postId);
+      blockedDetails.push({
+        postId: r.postId,
+        unpostedSiblings: unposted,
+        partnershipMissingSiblings: partnershipMissing,
+      });
+      continue;
     }
 
     // Dedup — block only when the collab is ALREADY FULLY PAID (paid-so-far ≥
     // collab total). Partial-payments model: a partially-paid collab still
     // accepts further installments until the total is met. Draft rows
     // (null utr) never count toward paid, so a fresh collab is never blocked.
-    const collabTotal = collabTotalByKey.get(collabKey) ?? Number(p.commercial_amount ?? 0);
+    const collabTotal =
+      collabTotalByKey.get(collabKey) ?? Number(p.commercial_amount ?? 0);
     const paidSoFar = paidSoFarByPostId.get(r.postId) ?? 0;
     if (collabTotal > 0 && paidSoFar >= collabTotal) {
       duplicates.push(r.postId);
@@ -425,19 +393,12 @@ export async function submitPayments(
   let paid = 0;
   let due = 0;
   let partial = 0;
-  const skipped =
-    blockedByStage.length +
-    blockedByReelRule.length +
-    blockedByAdPartnership.length +
-    duplicates.length;
 
   // Fetch the Meta Ads warehouse covered set once for the whole batch so each
   // written row can be stamped with `posted_but_not_tested` (ad-eligible but
   // not yet tested). Never blocks payment — annotation only.
   const coveredSet =
-    accepted.length > 0
-      ? await coveredPostIdsWithTimeout()
-      : new Set<string>();
+    accepted.length > 0 ? await coveredPostIdsWithTimeout() : new Set<string>();
 
   // Posts that became status 'Done' in this batch — drives the
   // "payment processed" creator notification (Wave 7) fired after the loop.
@@ -449,17 +410,16 @@ export async function submitPayments(
     paymentDate: string | null;
   }> = [];
 
-  // Running paid-so-far per post across THIS batch (seeded with the DB
-  // baseline) so two installments for the same collab in one submission
-  // accumulate correctly when deciding Partial vs Done.
-  const runningPaidByPost = new Map<string, number>(paidSoFarByPostId);
+  type RecordedPayment = {
+    payment_id: number;
+    representative_post_id: string;
+    collab_status: "Due" | "Partial" | "Done";
+    paid_total: number;
+    collab_total: number;
+  };
 
   for (const r of accepted) {
     const post = postById.get(r.postId)!;
-    const hasUtr = (r.utr ?? "").trim().length > 0;
-    const collabKey = collabKeyOf(post);
-    const collabTotal =
-      collabTotalByKey.get(collabKey) ?? Number(post.commercial_amount ?? 0);
     const dueDate = paymentDueDateFor(r.paymentDate);
     const estPayable = nextPayableCycleDate(dueDate);
     const postedNotTested = isPostedButNotTested(
@@ -469,188 +429,29 @@ export async function submitPayments(
       coveredSet,
     );
 
-    // ── Installment (UTR present) ──────────────────────────────────────────
-    // Partial-payments model: a real installment is a NEW row carrying a
-    // distinct UTR. We never overwrite prior installments. After inserting,
-    // recompute paid-so-far for the collab and derive the collab-level state:
-    //   paid ≥ total → Done   ·   0 < paid < total → Partial
-    if (hasUtr) {
-      const priorPaid = runningPaidByPost.get(r.postId) ?? 0;
-      const newPaid = priorPaid + Number(r.amount ?? 0);
-      const fullyPaid = collabTotal > 0 && newPaid + 0.0001 >= collabTotal;
-      const collabStatus: "Done" | "Partial" = fullyPaid ? "Done" : "Partial";
-
-      // Insert the installment row (distinct UTR → distinct row).
-      const { data: insRow, error: insErr } = await (supabase as any)
-        .from("payments")
-        .insert({
-          post_id: r.postId,
-          deliverable_post_id: r.postId,
-          inf_id: post.inf_id || null,
-          username: post.username || null,
-          utr: r.utr,
-          amount: r.amount,
-          payment_date: r.paymentDate || null,
-          // The installment row itself carries the collab's current rollup
-          // status so the ledger overlay (latest row wins) reflects Partial/Done.
-          status: collabStatus,
-          due_date: dueDate,
-          estimated_payable_date: estPayable,
-          payment_advice_sent: false,
-          bank_name: r.bankName || post.bank_name || null,
-          bank_number: r.bankNumber || post.bank_number || null,
-          ifsc: r.ifsc || post.ifsc || null,
-          collab_id: collabKey,
-          collab_number: post.collab_number ?? null,
-          deliverable_index: post.deliverable_index ?? null,
-          posted_but_not_tested: postedNotTested,
-        })
-        .select("id")
-        .single();
-      if (insErr) {
-        console.error(`[submitPayments] insert ${r.postId}: ${insErr.message}`);
-        duplicates.push(r.postId);
-        blockedDetails.push({
-          postId: r.postId,
-          unpostedSiblings: [],
-          partnershipMissingSiblings: [],
-        });
-        continue;
-      }
-      runningPaidByPost.set(r.postId, newPaid);
-      if (insRow?.id != null) testPaymentIds.push(insRow.id as number);
-      saved++;
-
-      // Retire the lone null-utr DRAFT row for this post (if any) — it has been
-      // superseded by real installments. Stamp it to the rollup status so a
-      // stale "Not Due/Due" draft can't out-rank the installment in the
-      // latest-row overlay. Done in place (matched by id), never duplicated.
-      const draft = draftByPostId.get(r.postId);
-      if (draft) {
-        await (supabase as any)
-          .from("payments")
-          .update({ status: collabStatus })
-          .eq("id", draft.id);
-      }
-
-      // Mirror rollup status onto the representative post row.
-      const { error: updErr } = await (supabase as any)
-        .from("posts")
-        .update({
-          payment_status: collabStatus,
-          utr: r.utr,
-          payment_date: r.paymentDate,
-        })
-        .eq("post_id", r.postId);
-      if (updErr) {
-        console.error(
-          `[submitPayments] posts update ${r.postId}: ${updErr.message}`,
-        );
-      }
-
-      if (collabStatus === "Done") {
-        paid++;
-        paidPosts.push({
-          postId: r.postId,
-          infId: post.inf_id || null,
-          amount: newPaid,
-          utr: r.utr || null,
-          paymentDate: r.paymentDate || null,
-        });
-      } else partial++;
-
-      // Cascade the rollup status to every OTHER deliverable of the collab so
-      // the board shows the whole collab Partial/Done. We DELETE stray payment
-      // rows on the other deliverables only once the collab is fully Done, to
-      // keep spend one-per-collab; while Partial we leave them untouched (they
-      // carry no installment rows of their own under this model anyway).
-      if (post.inf_id) {
-        const { data: collabRows } = await (supabase as any)
-          .from("posts")
-          .select("post_id, inf_id, collab_number, collab_id")
-          .eq("inf_id", post.inf_id);
-
-        const otherIds = (
-          (collabRows ?? []) as Array<{
-            post_id: string;
-            inf_id: string | null;
-            collab_number: number | null;
-            collab_id: string | null;
-          }>
-        )
-          .filter(
-            (c) => collabKeyOf(c) === collabKey && c.post_id !== post.post_id,
-          )
-          .map((c) => c.post_id);
-
-        if (otherIds.length > 0) {
-          await (supabase as any)
-            .from("posts")
-            .update({
-              payment_status: collabStatus,
-              utr: r.utr,
-              payment_date: r.paymentDate,
-            })
-            .in("post_id", otherIds);
-
-          if (collabStatus === "Done") {
-            // Spend stays one-per-collab — remove stray rows on siblings.
-            await (supabase as any)
-              .from("payments")
-              .delete()
-              .in("post_id", otherIds);
-          }
-        }
-      }
-      continue;
-    }
-
-    // ── Draft write (no UTR) ───────────────────────────────────────────────
-    // No money moved — record/refresh the collab's draft row as Due. Match the
-    // existing lone draft in place (never create a second null-utr draft).
-    const draftPayload: Record<string, unknown> = {
-      utr: null,
-      amount: r.amount,
-      payment_date: r.paymentDate || null,
-      status: "Due",
-      due_date: dueDate,
-      estimated_payable_date: estPayable,
-      payment_advice_sent: false,
-      bank_name: r.bankName || post.bank_name || null,
-      bank_number: r.bankNumber || post.bank_number || null,
-      ifsc: r.ifsc || post.ifsc || null,
-      collab_id: collabKey,
-      collab_number: post.collab_number ?? null,
-      deliverable_index: post.deliverable_index ?? null,
-      posted_but_not_tested: postedNotTested,
-    };
-    const existingDraft = draftByPostId.get(r.postId);
-    let writeErr: { message: string } | null = null;
-    if (existingDraft) {
-      const { error } = await (supabase as any)
-        .from("payments")
-        .update(draftPayload)
-        .eq("id", existingDraft.id);
-      writeErr = error;
-    } else {
-      const { data: draftRow, error } = await (supabase as any)
-        .from("payments")
-        .insert({
-          ...draftPayload,
-          post_id: r.postId,
-          deliverable_post_id: r.postId,
-          inf_id: post.inf_id || null,
-          username: post.username || null,
-        })
-        .select("id")
-        .single();
-      writeErr = error;
-      if (!error && draftRow?.id != null) {
-        testPaymentIds.push(draftRow.id as number);
-      }
-    }
-    if (writeErr) {
-      console.error(`[submitPayments] draft ${r.postId}: ${writeErr.message}`);
+    // Final authority lives in Postgres: this RPC acquires a per-collab lock,
+    // canonicalizes child IDs to the representative, rechecks every posting
+    // form + partnership, writes the ledger, and mirrors the resulting state
+    // in one transaction. UTR-bearing history is never deleted.
+    const { data: paymentResult, error: paymentError } = await (
+      supabase as any
+    ).rpc("record_eligible_collab_payment", {
+      p_post_id: r.postId,
+      p_utr: r.utr || null,
+      p_amount: r.amount,
+      p_payment_date: r.paymentDate || null,
+      p_due_date: dueDate,
+      p_estimated_payable_date: estPayable,
+      p_bank_name: r.bankName || null,
+      p_bank_number: r.bankNumber || null,
+      p_ifsc: r.ifsc || null,
+      p_posted_but_not_tested: postedNotTested,
+    });
+    const recorded = ((paymentResult ?? []) as RecordedPayment[])[0];
+    if (paymentError || !recorded) {
+      console.error(
+        `[submitPayments] transactional write ${r.postId}: ${paymentError?.message ?? "No result returned"}`,
+      );
       duplicates.push(r.postId);
       blockedDetails.push({
         postId: r.postId,
@@ -659,18 +460,32 @@ export async function submitPayments(
       });
       continue;
     }
+
+    if (recorded.payment_id != null) {
+      testPaymentIds.push(Number(recorded.payment_id));
+    }
     saved++;
-    due++;
-    const { error: updErr } = await (supabase as any)
-      .from("posts")
-      .update({ payment_status: "Due" })
-      .eq("post_id", r.postId);
-    if (updErr) {
-      console.error(
-        `[submitPayments] posts update ${r.postId}: ${updErr.message}`,
-      );
+    if (recorded.collab_status === "Done") {
+      paid++;
+      paidPosts.push({
+        postId: recorded.representative_post_id,
+        infId: post.inf_id || null,
+        amount: Number(recorded.paid_total ?? r.amount ?? 0),
+        utr: r.utr || null,
+        paymentDate: r.paymentDate || null,
+      });
+    } else if (recorded.collab_status === "Partial") {
+      partial++;
+    } else {
+      due++;
     }
   }
+
+  const skipped =
+    blockedByStage.length +
+    blockedByReelRule.length +
+    blockedByAdPartnership.length +
+    duplicates.length;
 
   // ── Notification: Payment Processed (Wave 7) ─────────────────────────────
   // For each post that became status 'Done', email the influencer (creator) a
@@ -705,9 +520,7 @@ export async function submitPayments(
 
       const infIds = Array.from(
         new Set(
-          paidSnapshot
-            .map((p) => p.infId)
-            .filter((x): x is string => !!x),
+          paidSnapshot.map((p) => p.infId).filter((x): x is string => !!x),
         ),
       );
       const creatorByInf = new Map<
@@ -736,8 +549,7 @@ export async function submitPayments(
 
       for (const pp of paidSnapshot) {
         const creator = pp.infId ? creatorByInf.get(pp.infId) : undefined;
-        const to =
-          emailByPost.get(pp.postId) ?? creator?.email ?? null;
+        const to = emailByPost.get(pp.postId) ?? creator?.email ?? null;
         if (!to || !to.includes("@")) continue; // skip silently
         const greetName =
           creator?.inf_name ?? nameByPost.get(pp.postId) ?? "there";
@@ -798,9 +610,15 @@ export async function submitPayments(
         rows: [
           { label: "Records Logged", value: savedCount },
           { label: "Marked Paid", value: paidCount },
-          { label: "Marked Partial", value: partialCount > 0 ? partialCount : null },
+          {
+            label: "Marked Partial",
+            value: partialCount > 0 ? partialCount : null,
+          },
           { label: "Marked Due", value: dueCount },
-          { label: "Skipped / Blocked", value: skippedCount > 0 ? skippedCount : null },
+          {
+            label: "Skipped / Blocked",
+            value: skippedCount > 0 ? skippedCount : null,
+          },
         ],
         footnote:
           "Paid records also trigger a separate payment-processed email to each creator. Partial records leave a balance outstanding until the collab total is met.",
@@ -811,7 +629,12 @@ export async function submitPayments(
   // Test Mode: stamp the payment rows created in this submit when the Payment
   // scope is on. No-op when Test Mode is off.
   await stampTestRows([
-    { scope: "payment", table: "payments", idColumn: "id", ids: testPaymentIds },
+    {
+      scope: "payment",
+      table: "payments",
+      idColumn: "id",
+      ids: testPaymentIds,
+    },
   ]);
 
   // Cache invalidation — every Accounts read tag.
@@ -896,9 +719,7 @@ export async function recomputePaymentStates(): Promise<{
       .update({ status: "Due" })
       .eq("id", row.id);
     if (uErr) {
-      console.error(
-        `[recomputePaymentStates] ${row.id}: ${uErr.message}`,
-      );
+      console.error(`[recomputePaymentStates] ${row.id}: ${uErr.message}`);
       continue;
     }
     await (supabase as any)

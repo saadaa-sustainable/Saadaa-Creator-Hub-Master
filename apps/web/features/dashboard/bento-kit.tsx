@@ -101,13 +101,14 @@ const KPI_DEFINITIONS: Record<string, string> = {
   "Paid Collabs":
     "Collaborations marked paid with a payment reference recorded.",
   "Payment Pending":
-    "Collaborations waiting for a completed payment reference or final paid status.",
+    "Payment-ready collabs awaiting settlement: every posting form is complete, the creator accepted the partnership, and the ledger is Not Due, Due, or Partial.",
   "Payment Rate":
     "Paid collaborations as a share of collaborations ready for payment.",
   Pending: "Open collaborations still waiting for their next workflow action.",
   "Pending Content":
     "Onboarded deliverables whose posting form has not yet been completed.",
-  "Pending Payments": "Collaborations still waiting for payment completion.",
+  "Pending Payments":
+    "Payment-ready collabs awaiting settlement after all posting forms are complete and the creator accepts the partnership.",
   "Pending Post":
     "Your assigned collaborations currently waiting for a completed posting form.",
   Posted: "Deliverables whose posting form has been completed.",

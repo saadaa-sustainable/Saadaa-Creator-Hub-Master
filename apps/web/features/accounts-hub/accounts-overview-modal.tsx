@@ -18,7 +18,10 @@ import {
 import { Avatar, WorkflowStatusPill } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDate, formatRupees } from "@/lib/formatters";
-import { partnershipApproved } from "@/lib/partnership";
+import {
+  creatorAcceptedPartnership,
+  postingFormCompleted,
+} from "@/lib/payment-eligibility";
 import type { WorkflowStatus } from "@/lib/supabase/types.gen";
 import { PaymentStatusPill } from "./columns";
 
@@ -71,7 +74,10 @@ interface ApiPayload {
     bank_name: string | null;
     bank_number: string | null;
     ifsc: string | null;
-    campaign?: { campaign_id?: string | null; campaign_name?: string | null } | null;
+    campaign?: {
+      campaign_id?: string | null;
+      campaign_name?: string | null;
+    } | null;
     creator?: {
       username: string | null;
       inf_name: string | null;
@@ -159,16 +165,13 @@ export function AccountsOverviewModal({
     !data ||
     data.deliverables.every(
       (d) =>
-        (d.post_link ?? "").trim().length > 0 &&
+        postingFormCompleted(d) &&
         (d.workflow_status === "Posted" || d.workflow_status === "Delivered"),
     );
-  const adsRequired = data?.summary.hasAdsRights ?? false;
-  // Gate = creator approved the partnership (or admin override) — mirrors
-  // partnershipApproved() in submitPayments / autoInitDraftPayment.
+  // Creator acceptance is mandatory for every collab, regardless of ads
+  // rights. An admin Partnership Key is not a payment override.
   const allPartnershipped =
-    !adsRequired ||
-    !data ||
-    data.deliverables.every((d) => partnershipApproved(d));
+    !data || data.deliverables.every((d) => creatorAcceptedPartnership(d));
   const collabBlocked = isPostedStage && (!allPosted || !allPartnershipped);
 
   return createPortal(
@@ -242,7 +245,9 @@ export function AccountsOverviewModal({
                     </strong>
                     <span>@{data.parent.creator?.username ?? "—"}</span>
                   </div>
-                  <WorkflowStatusPill status={data.parent.workflow_status as WorkflowStatus} />
+                  <WorkflowStatusPill
+                    status={data.parent.workflow_status as WorkflowStatus}
+                  />
                 </div>
                 <div className="ob-overview-pills">
                   <span className="campaign-chip">
@@ -298,15 +303,27 @@ export function AccountsOverviewModal({
                   <dl className="acc-overview-bank__grid">
                     <div>
                       <dt>Bank Name</dt>
-                      <dd>{data.parent.bank_name?.trim() || <span className="acc-overview-bank__missing">—</span>}</dd>
+                      <dd>
+                        {data.parent.bank_name?.trim() || (
+                          <span className="acc-overview-bank__missing">—</span>
+                        )}
+                      </dd>
                     </div>
                     <div>
                       <dt>Account Number</dt>
-                      <dd className="tabular">{data.parent.bank_number?.trim() || <span className="acc-overview-bank__missing">—</span>}</dd>
+                      <dd className="tabular">
+                        {data.parent.bank_number?.trim() || (
+                          <span className="acc-overview-bank__missing">—</span>
+                        )}
+                      </dd>
                     </div>
                     <div>
                       <dt>IFSC</dt>
-                      <dd className="tabular">{data.parent.ifsc?.trim() || <span className="acc-overview-bank__missing">—</span>}</dd>
+                      <dd className="tabular">
+                        {data.parent.ifsc?.trim() || (
+                          <span className="acc-overview-bank__missing">—</span>
+                        )}
+                      </dd>
                     </div>
                   </dl>
                 </section>
@@ -318,7 +335,8 @@ export function AccountsOverviewModal({
                   <Lock size={14} aria-hidden />
                   <div>
                     <strong>Payment locked for this collab.</strong>{" "}
-                    {!allPosted && "Some deliverables haven't been posted yet. "}
+                    {!allPosted &&
+                      "Some deliverables haven't been posted yet. "}
                     {!allPartnershipped &&
                       "The creator hasn't approved the partnership request yet. "}
                     Complete all deliverables before logging payment.
@@ -350,7 +368,6 @@ export function AccountsOverviewModal({
                       <DeliverableCard
                         key={d.post_id}
                         deliverable={d}
-                        adsRights={data.parent.ads_usage_rights}
                         collabBlocked={collabBlocked}
                       />
                     ))}
@@ -374,23 +391,16 @@ export function AccountsOverviewModal({
 
 function DeliverableCard({
   deliverable: d,
-  adsRights,
   collabBlocked = false,
 }: {
   deliverable: DeliverableRow;
-  adsRights: string | null;
   collabBlocked?: boolean;
 }) {
   const paymentStatus = (d.payment?.status as string | undefined) ?? null;
   const paid = paymentStatus === "Done";
   const utr = (d.payment?.utr as string | undefined) ?? null;
   const paymentDate = (d.payment?.payment_date as string | undefined) ?? null;
-  const adsRequired =
-    !!adsRights &&
-    !["", "no", "n/a", "none", "0", "false"].includes(
-      adsRights.trim().toLowerCase(),
-    );
-  const blockedByPartnership = adsRequired && !partnershipApproved(d);
+  const blockedByPartnership = !creatorAcceptedPartnership(d);
 
   return (
     <article
@@ -496,7 +506,7 @@ function DeliverableCard({
         {blockedByPartnership && (
           <span
             className="acc-overview-deliverable__block"
-            title="Ads Usage Rights = Yes but the creator hasn't approved the partnership request. Payments are blocked at submit until it's accepted (or an admin override key is set)."
+            title="Payments stay locked until the creator accepts the partnership request. An admin Partnership Key does not bypass this requirement."
           >
             <Handshake size={11} aria-hidden />
             Partnership approval pending

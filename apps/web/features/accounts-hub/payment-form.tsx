@@ -259,10 +259,19 @@ export function PaymentEntryPanel() {
           "payment date",
         ].includes(c),
       );
-      const headers = hasHeader ? first : ["collab id", "utr", "date", "amount"];
+      const headers = hasHeader
+        ? first
+        : ["collab id", "utr", "date", "amount"];
       const idxOf = (...keys: string[]) =>
         headers.findIndex((h) => keys.includes(h));
-      const idIdx = idxOf("collab id", "collab_id", "post id", "post_id", "postid", "id");
+      const idIdx = idxOf(
+        "collab id",
+        "collab_id",
+        "post id",
+        "post_id",
+        "postid",
+        "id",
+      );
       const utrIdx = idxOf("utr", "reference", "ref", "utr / reference no.");
       const dateIdx = idxOf("date", "payment date", "payment_date");
       const amountIdx = idxOf("amount", "amount (₹)", "amount inr", "₹");
@@ -357,8 +366,7 @@ export function PaymentEntryPanel() {
       if (!r.postId.trim()) labels.add("Collab ID");
       if (!r.paymentDate) labels.add("Payment Date");
       const amt = Number(r.amount);
-      if (!r.amount || Number.isNaN(amt) || amt <= 0)
-        labels.add("Amount");
+      if (!r.amount || Number.isNaN(amt) || amt <= 0) labels.add("Amount");
     });
     return Array.from(labels);
   }, [submitAttempted, rows]);
@@ -374,10 +382,7 @@ export function PaymentEntryPanel() {
     }));
     const invalid = payload.find(
       (r) =>
-        !r.postId ||
-        !r.paymentDate ||
-        Number.isNaN(r.amount) ||
-        r.amount <= 0,
+        !r.postId || !r.paymentDate || Number.isNaN(r.amount) || r.amount <= 0,
     );
     if (invalid) {
       toast.error("Each row needs a collab, payment date and positive amount.");
@@ -420,9 +425,7 @@ export function PaymentEntryPanel() {
               )}`,
             );
           } else {
-            reasons.push(
-              "partnership not approved by the creator (required when Ads Usage Rights = Yes)",
-            );
+            reasons.push("partnership not accepted by the creator");
           }
         }
         if (dupBlocked.has(pid))
@@ -453,8 +456,7 @@ export function PaymentEntryPanel() {
             ? `Payment blocked. ${lines[0]}`
             : `${lines.length} payments blocked`,
           {
-            description:
-              lines.length === 1 ? undefined : lines.join("\n"),
+            description: lines.length === 1 ? undefined : lines.join("\n"),
             duration: 10000,
           },
         );
@@ -476,9 +478,7 @@ export function PaymentEntryPanel() {
           },
         );
       } else {
-        toast.success(
-          `${res.saved} saved (${res.paid} paid · ${res.due} due)`,
-        );
+        toast.success(`${res.saved} saved (${res.paid} paid · ${res.due} due)`);
       }
 
       setRows([newRow()]);
@@ -564,10 +564,7 @@ export function PaymentEntryPanel() {
 
                 <div className="acc-entry-row__fields">
                   <div className="acc-field acc-field--post">
-                    <label
-                      htmlFor={postFieldId}
-                      className="acc-field__label"
-                    >
+                    <label htmlFor={postFieldId} className="acc-field__label">
                       <Layers size={11} aria-hidden /> Collab ID
                       <span className="req">*</span>
                     </label>
@@ -580,8 +577,9 @@ export function PaymentEntryPanel() {
                           patchRow(row.key, {
                             postId: v,
                             amount:
-                              eligibleById.get(v)?.commercial_amount?.toString() ??
-                              row.amount,
+                              eligibleById
+                                .get(v)
+                                ?.commercial_amount?.toString() ?? row.amount,
                           })
                         }
                         options={eligible.map((p) => ({
@@ -598,7 +596,11 @@ export function PaymentEntryPanel() {
                           className="inline-flex items-center gap-1 whitespace-nowrap text-[0.72rem] font-semibold text-text-secondary"
                           title="Creator for this collab"
                         >
-                          <User size={11} aria-hidden className="text-text-tertiary" />
+                          <User
+                            size={11}
+                            aria-hidden
+                            className="text-text-tertiary"
+                          />
                           {linked.inf_name ?? linked.username ?? "—"}
                           {linked.username && (
                             <span className="text-text-tertiary font-normal">
@@ -650,10 +652,7 @@ export function PaymentEntryPanel() {
                   </div>
 
                   <div className="acc-field">
-                    <label
-                      htmlFor={amountFieldId}
-                      className="acc-field__label"
-                    >
+                    <label htmlFor={amountFieldId} className="acc-field__label">
                       <Link2 size={11} aria-hidden /> Amount ₹
                       <span className="req">*</span>
                     </label>
@@ -696,64 +695,67 @@ export function PaymentEntryPanel() {
           })}
         </div>
 
-          <div className="acc-entry-toolbar">
-            <button
-              type="button"
-              className="acc-entry-add"
-              onClick={addRow}
-              disabled={submitting || rows.length >= MAX_PAYMENT_ROWS}
-            >
-              <Plus size={13} aria-hidden />
-              {rows.length >= MAX_PAYMENT_ROWS
-                ? `Max ${MAX_PAYMENT_ROWS} rows`
-                : "Add another row"}
-            </button>
-            <button
-              type="button"
-              className="acc-entry-add"
-              onClick={downloadTemplate}
-              disabled={submitting}
-            >
-              <FileSpreadsheet size={13} aria-hidden />
-              Download CSV template
-            </button>
-            <button
-              type="button"
-              className="acc-entry-add"
-              onClick={() => csvInputRef.current?.click()}
-              disabled={submitting}
-            >
-              <Upload size={13} aria-hidden />
-              Upload CSV
-            </button>
-            <input
-              ref={csvInputRef}
-              type="file"
-              accept=".csv,.xlsx,.xls,text/csv"
-              className="hidden"
-              onChange={importFile}
-            />
-            <div className="acc-entry-toolbar__spacer" />
-            <MissingFieldsAlert fields={missingPaymentFields} className="w-full" />
-            <button
-              type="submit"
-              className={cn("btn-primary-cta", submitting && "is-loading")}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span className="hidden sm:inline">Saving…</span>
-                </>
-              ) : (
-                <>
-                  <Send size={14} aria-hidden />
-                  <span className="hidden sm:inline">Submit </span>
-                  {rows.length > 1 ? `${rows.length} Rows` : "Payment"}
-                </>
-              )}
-            </button>
-          </div>
+        <div className="acc-entry-toolbar">
+          <button
+            type="button"
+            className="acc-entry-add"
+            onClick={addRow}
+            disabled={submitting || rows.length >= MAX_PAYMENT_ROWS}
+          >
+            <Plus size={13} aria-hidden />
+            {rows.length >= MAX_PAYMENT_ROWS
+              ? `Max ${MAX_PAYMENT_ROWS} rows`
+              : "Add another row"}
+          </button>
+          <button
+            type="button"
+            className="acc-entry-add"
+            onClick={downloadTemplate}
+            disabled={submitting}
+          >
+            <FileSpreadsheet size={13} aria-hidden />
+            Download CSV template
+          </button>
+          <button
+            type="button"
+            className="acc-entry-add"
+            onClick={() => csvInputRef.current?.click()}
+            disabled={submitting}
+          >
+            <Upload size={13} aria-hidden />
+            Upload CSV
+          </button>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls,text/csv"
+            className="hidden"
+            onChange={importFile}
+          />
+          <div className="acc-entry-toolbar__spacer" />
+          <MissingFieldsAlert
+            fields={missingPaymentFields}
+            className="w-full"
+          />
+          <button
+            type="submit"
+            className={cn("btn-primary-cta", submitting && "is-loading")}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span className="hidden sm:inline">Saving…</span>
+              </>
+            ) : (
+              <>
+                <Send size={14} aria-hidden />
+                <span className="hidden sm:inline">Submit </span>
+                {rows.length > 1 ? `${rows.length} Rows` : "Payment"}
+              </>
+            )}
+          </button>
+        </div>
       </form>
     </section>
   );

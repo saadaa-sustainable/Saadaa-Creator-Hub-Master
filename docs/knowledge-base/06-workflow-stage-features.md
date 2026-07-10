@@ -158,17 +158,17 @@ Count COLLABS (grouped by `collab_id`): totalOnboarded, pendingOnboardings (Reac
 
 ### Purpose & route
 
-Records the live post (link, date, download/raw links), flips `workflow_status='Posted'`, auto-inits the draft payment, then hands over to the **blocking partnership popup** (auto-invite). Route `/posting`, gate `posting_submit`. **Counts are PER POST_ID** (one deliverable per row — no collab grouping).
+Records the live post (link, date, download/raw links), flips `workflow_status='Posted'`, attempts the eligibility-gated draft payment init, then hands over to the **blocking partnership popup** (auto-invite). Route `/posting`, gate `posting_submit`. **Counts are PER POST_ID** (one deliverable per row — no collab grouping).
 
 ### Server action
 
 | Action                                                     | Gate               | Notes                                                                                                                                                      |
 | ---------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `submitPosting`                                            | `posting_submit`   | Writes posting fields, `workflow_status='Posted'`, `payment_status='Not Due'`; calls `autoInitDraftPayment`. No partnership write — that's the popup's job |
+| `submitPosting`                                            | `posting_submit`   | Writes posting fields and `workflow_status='Posted'`; calls `autoInitDraftPayment`, which alone may stamp `payment_status='Not Due'` after the whole collab becomes eligible. No partnership write — that's the popup's job |
 | `syncPartnershipForPost`                                   | `posting_submit`   | Popup step: live Meta check + stamp; `{autoInvite:true}` sends the invite when NO record exists                                                            |
 | `resendPartnershipForPost` / `resendPartnershipForCreator` | `posting_submit`   | Explicit resend after a rejection (popup / kanban button) — never automatic                                                                                |
 | `refreshPartnershipForCreator`                             | `performance_view` | Kanban sweep: re-read Meta state, stamp approved_at/declined_at                                                                                            |
-| `savePartnershipKey`                                       | `posting_submit`   | Inline partnership_id patch = **admin override** — non-empty key also sets `ad_partnership_valid=true` (clearing withdraws it)                             |
+| `savePartnershipKey`                                       | `posting_submit`   | Inline partnership_id patch = **ads-only admin override** — non-empty key sets `ad_partnership_valid=true`, but it never bypasses creator acceptance for payment |
 
 ### Partnership auto-invite (2026-07-02)
 
@@ -186,7 +186,7 @@ Records the live post (link, date, download/raw links), flips `workflow_status='
 
 ### autoInitDraftPayment §8.1
 
-Spawns one Not-Due `payments` row per collab on the representative deliverable. Idempotent. Collab-level gate: every deliverable must have post_link + post_date, and every ads-rights deliverable must be `partnershipApproved()` (creator approved OR admin override — key presence alone no longer passes, 2026-07-02). Amount = sum of per-row split. Sets `due_date` + `estimated_payable_date` (15th/30th cycle).
+Spawns one Not-Due `payments` row per collab on the representative deliverable. Idempotent. The canonical collab-level gate lives in `lib/payment-eligibility.ts`: every deliverable must have `post_link` + `post_date`, and the creator must have actually accepted the partnership (`partnership_status='approved'`). Ads rights and `ad_partnership_valid` admin overrides do not bypass this payment rule. `reconcile_creator_payment_eligibility` runs after posting and every creator partnership transition: approval may create the draft; pending/rejected/revoked removes only empty open drafts, preserving Partial/Done and every UTR-bearing row. A partial unique index guarantees one NULL-UTR draft per representative. Only after the draft insert succeeds is `posts.payment_status='Not Due'` mirrored across the collab. Amount = sum of per-row split. Sets `due_date` + `estimated_payable_date` (15th/30th cycle).
 
 ### KPIs
 

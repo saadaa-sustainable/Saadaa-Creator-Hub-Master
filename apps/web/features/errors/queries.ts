@@ -94,10 +94,15 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
     await Promise.all([
       (supabase as any).from("posts").select(POSTS_SELECT).limit(10_000),
       (supabase as any).from("payments").select(PAYMENTS_SELECT).limit(10_000),
-      (supabase as any).from("shopify_orders").select(SHOPIFY_SELECT).limit(10_000),
+      (supabase as any)
+        .from("shopify_orders")
+        .select(SHOPIFY_SELECT)
+        .limit(10_000),
       (supabase as any)
         .from("system_errors")
-        .select("id, type, key, message, source, resolved, created_at, resolved_at")
+        .select(
+          "id, type, key, message, source, resolved, created_at, resolved_at",
+        )
         .eq("resolved", false)
         .order("created_at", { ascending: false })
         .limit(500),
@@ -130,7 +135,9 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
   for (const o of orders) {
     const oid = String(o.order_id ?? "").trim();
     if (!oid) continue;
-    const d = o.order_placed_date ? new Date(String(o.order_placed_date)) : null;
+    const d = o.order_placed_date
+      ? new Date(String(o.order_placed_date))
+      : null;
     orderPlacedById.set(oid, d && Number.isFinite(d.getTime()) ? d : null);
   }
 
@@ -202,7 +209,12 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
   };
 
   const missingEmails: MissingEmailRow[] = [];
-  const PARENT_STATUSES = new Set(["on board", "order sent", "posted", "delivered"]);
+  const PARENT_STATUSES = new Set([
+    "on board",
+    "order sent",
+    "posted",
+    "delivered",
+  ]);
   const now = Date.now();
 
   for (const p of posts) {
@@ -213,8 +225,16 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
     else if (wf === "delivered") health.delivered++;
 
     const paymentStatus = statusKey(p.payment_status);
-    if (paymentStatus === "due") health.paymentsDue++;
-    if (paymentStatus === "paid" || paymentStatus === "done")
+    const isParent =
+      p.deliverable_index == null || Number(p.deliverable_index) === 1;
+    if (
+      isParent &&
+      (wf === "posted" || wf === "delivered") &&
+      paymentStatus === "due"
+    ) {
+      health.paymentsDue++;
+    }
+    if (isParent && (paymentStatus === "paid" || paymentStatus === "done"))
       health.totalPaidOut++;
 
     if (!hasValue(p.email)) health.missingEmail++;
@@ -234,10 +254,7 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
         });
       }
     }
-    if (
-      (wf === "posted" || wf === "delivered") &&
-      !hasValue(p.post_link)
-    ) {
+    if ((wf === "posted" || wf === "delivered") && !hasValue(p.post_link)) {
       health.missingPostLink++;
     }
 
@@ -256,8 +273,6 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
 
     // MISSING_COLLAB_EMAIL — parent only, onboarded/posted/delivered,
     // collab_email_sent_at IS NULL.
-    const isParent =
-      p.deliverable_index == null || Number(p.deliverable_index) === 1;
     if (
       isParent &&
       PARENT_STATUSES.has(wf) &&
@@ -284,7 +299,10 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
   // the post_id, which drives the portal "Send again" retry.
   const blockedEmails: BlockedEmailRow[] = [];
   for (const e of sysErrors) {
-    if (e.type !== "collab_email_blocked" && e.type !== "collab_email_send_failed")
+    if (
+      e.type !== "collab_email_blocked" &&
+      e.type !== "collab_email_send_failed"
+    )
       continue;
     const pid = String(e.key ?? "").trim();
     if (!pid) continue;
@@ -335,7 +353,8 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
       if (m.inf_id) m.inf_name = nameMap.get(m.inf_id) ?? null;
     }
     for (const b of blockedEmails) {
-      const bInfId = (postByPostId.get(b.post_id)?.inf_id as string | null) ?? null;
+      const bInfId =
+        (postByPostId.get(b.post_id)?.inf_id as string | null) ?? null;
       if (bInfId) b.inf_name = nameMap.get(bInfId) ?? null;
     }
   }

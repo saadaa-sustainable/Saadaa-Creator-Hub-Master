@@ -6,6 +6,7 @@ import {
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { JourneyCard as JourneyCardType, JourneyColumnId } from "./types";
 import { cn } from "@/lib/cn";
+import { isPaymentPendingStatus } from "@/lib/payment-eligibility";
 import { journeyCollabId } from "./collab-id";
 
 /** Date field to show per column — mirrors legacy card_foot logic. */
@@ -77,6 +78,13 @@ function paymentChip(paymentStatus: string | null): {
       bg: "var(--success-bg)",
       text: "var(--success-text)",
       label: "Settled",
+    };
+  }
+  if (!isPaymentPendingStatus(s)) {
+    return {
+      bg: "var(--bg-surface)",
+      text: "var(--text-secondary)",
+      label: "Payment not ready",
     };
   }
   return {
@@ -220,7 +228,7 @@ export function JourneyCardItem({
         )}
       </dl>
 
-      {card.onboarded_by ?? card.logged_by ? (
+      {(card.onboarded_by ?? card.logged_by) ? (
         <footer className="pt-1.5 border-t border-border text-[0.62rem] font-semibold text-text-secondary truncate">
           {card.onboarded_by ?? card.logged_by}
         </footer>

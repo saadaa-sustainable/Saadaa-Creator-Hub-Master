@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isPaymentPendingStatus } from "@/lib/payment-eligibility";
 import { isOnboardedActive, isVoidedStatus } from "@/lib/workflow";
 import type {
   ActionCounts,
@@ -18,8 +19,28 @@ import type {
 } from "./types";
 
 // 6 brand-aligned slice colours for the donut. New project palette only.
-const SLICE_COLORS = ["#F0C61E", "#3B6FD4", "#4F7C4D", "#B57514", "#7B4FBF", "#C0392B"];
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SLICE_COLORS = [
+  "#F0C61E",
+  "#3B6FD4",
+  "#4F7C4D",
+  "#B57514",
+  "#7B4FBF",
+  "#C0392B",
+];
+const MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 function monthLabel(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})/);
   if (!m) return iso;
@@ -113,14 +134,23 @@ export const fetchDashboardFilterOptions = unstable_cache(
     ]);
     const contentSet = new Set<string>();
     const statusSet = new Set<string>();
-    for (const p of (posts ?? []) as Array<{ content_type?: string; workflow_status?: string }>) {
+    for (const p of (posts ?? []) as Array<{
+      content_type?: string;
+      workflow_status?: string;
+    }>) {
       if (p.content_type) contentSet.add(p.content_type);
       if (p.workflow_status) statusSet.add(p.workflow_status);
     }
     return {
-      campaigns: ((camps ?? []) as Array<{ campaign_id: string; campaign_name: string | null }>).map(
-        (c) => ({ id: c.campaign_id, name: c.campaign_name ?? c.campaign_id }),
-      ),
+      campaigns: (
+        (camps ?? []) as Array<{
+          campaign_id: string;
+          campaign_name: string | null;
+        }>
+      ).map((c) => ({
+        id: c.campaign_id,
+        name: c.campaign_name ?? c.campaign_id,
+      })),
       contentTypes: [...contentSet].sort(),
       statuses: [...statusSet].sort(),
     };
@@ -150,7 +180,10 @@ export async function fetchDashboardData(
     const ext = await buildPostsQuery(POSTS_COLS_EXTENDED);
     if (!ext.error) return ext;
     const code = String((ext.error as { code?: string }).code ?? "");
-    if (code === "42703" || /column .* does not exist/i.test(ext.error.message ?? "")) {
+    if (
+      code === "42703" ||
+      /column .* does not exist/i.test(ext.error.message ?? "")
+    ) {
       console.warn(
         "[dashboard] posts.ads_status missing on prod, falling back to base set. " +
           "Ad winners stays at 0 until that column is added.",
@@ -174,9 +207,9 @@ export async function fetchDashboardData(
   }
 
   // Voided (offboarded) collabs are removed from every dashboard metric + card.
-  const posts = ((postsRes.data ?? []) as Array<Record<string, unknown>>).filter(
-    (p) => !isVoidedStatus(p.workflow_status as string | null),
-  );
+  const posts = (
+    (postsRes.data ?? []) as Array<Record<string, unknown>>
+  ).filter((p) => !isVoidedStatus(p.workflow_status as string | null));
   const creators = (creatorsRes.data ?? []) as Array<Record<string, unknown>>;
 
   const categoryByUser = new Map<string, string>();
@@ -244,8 +277,22 @@ export async function fetchDashboardData(
   // only when set by the inbound roster; everything else (explicit 'outbound'
   // or legacy null) is treated as outbound, the default channel.
   const channelAgg = {
-    inbound: { reachOut: 0, onboarded: 0, posted: 0, delivered: 0, spend: 0, creators: new Set<string>() },
-    outbound: { reachOut: 0, onboarded: 0, posted: 0, delivered: 0, spend: 0, creators: new Set<string>() },
+    inbound: {
+      reachOut: 0,
+      onboarded: 0,
+      posted: 0,
+      delivered: 0,
+      spend: 0,
+      creators: new Set<string>(),
+    },
+    outbound: {
+      reachOut: 0,
+      onboarded: 0,
+      posted: 0,
+      delivered: 0,
+      spend: 0,
+      creators: new Set<string>(),
+    },
   };
 
   const actions: ActionCounts = {
@@ -257,21 +304,31 @@ export async function fetchDashboardData(
     overdue: 0,
   };
 
-  const filtersInfluencerType = (filters.influencerType ?? "").trim().toLowerCase();
+  const filtersInfluencerType = (filters.influencerType ?? "")
+    .trim()
+    .toLowerCase();
   const filterDateFrom = filters.dateFrom ?? "";
   const filterDateTo = filters.dateTo ?? "";
 
   for (const p of posts) {
-    const user = String(p.username ?? "").trim().toLowerCase();
+    const user = String(p.username ?? "")
+      .trim()
+      .toLowerCase();
     const camp = String(p.campaign_id ?? "").trim();
     const status = String(p.workflow_status ?? "").trim();
     const statusLow = status.toLowerCase();
     const commercials = Number(p.commercial_amount ?? 0);
-    const payStatus = String(p.payment_status ?? "").trim().toLowerCase();
+    const payStatus = String(p.payment_status ?? "")
+      .trim()
+      .toLowerCase();
     const category = (categoryByUser.get(user) ?? "").toLowerCase();
-    const reachOutDate = p.reach_out_date ? String(p.reach_out_date).slice(0, 10) : "";
+    const reachOutDate = p.reach_out_date
+      ? String(p.reach_out_date).slice(0, 10)
+      : "";
     const postDate = p.post_date ? String(p.post_date).slice(0, 10) : "";
-    const onboardDate = p.onboard_date ? String(p.onboard_date).slice(0, 10) : "";
+    const onboardDate = p.onboard_date
+      ? String(p.onboard_date).slice(0, 10)
+      : "";
 
     // Influencer-type (category substring) filter
     if (filtersInfluencerType) {
@@ -327,7 +384,10 @@ export async function fetchDashboardData(
       pendingContent++;
       const m = onboardDate ? onboardDate.slice(0, 7) : month;
       if (m && monthlyMap.has(m)) monthlyMap.get(m)!.onboarded++;
-    } else if (statusLow.includes("posted") || statusLow.includes("delivered")) {
+    } else if (
+      statusLow.includes("posted") ||
+      statusLow.includes("delivered")
+    ) {
       postedCount++;
       const m = postDate ? postDate.slice(0, 7) : month;
       if (m && monthlyMap.has(m)) monthlyMap.get(m)!.posted++;
@@ -348,11 +408,16 @@ export async function fetchDashboardData(
     if (user) chan.creators.add(user);
 
     // Payment lives on the parent post only — child deliverables share the
-     // parent's settlement. Counting children inflates Pending/Paid totals.
+    // parent's settlement. Counting children inflates Pending/Paid totals.
     const isChild =
       p.deliverable_index != null && Number(p.deliverable_index) > 1;
     if (!isChild) {
-      if (payStatus === "due" || payStatus === "not due") paymentPending++;
+      if (
+        (statusLow.includes("posted") || statusLow.includes("delivered")) &&
+        isPaymentPendingStatus(payStatus)
+      ) {
+        paymentPending++;
+      }
       if (payStatus === "done" || payStatus === "paid") paidCount++;
     }
     // Ad winners — once posts.ads_status exists on prod, the extended query
@@ -372,7 +437,8 @@ export async function fetchDashboardData(
     // Creator tier slice — count one creator per category (first time seen).
     if (user && !seenInfluencerByCategory.has(user)) {
       seenInfluencerByCategory.add(user);
-      const cat = (categoryByUser.get(user) ?? "").split("(")[0].trim() || "Unsorted";
+      const cat =
+        (categoryByUser.get(user) ?? "").split("(")[0].trim() || "Unsorted";
       categoryCounts.set(cat, (categoryCounts.get(cat) ?? 0) + 1);
     }
 
@@ -457,12 +523,14 @@ export async function fetchDashboardData(
 
   const contentBreakdown: BreakdownSlice[] = toSlices(contentCounts);
   const categoryBreakdown: BreakdownSlice[] = toSlices(categoryCounts);
-  const monthlyFunnel: MonthlyPoint[] = [...monthlyMap.entries()].map(([k, v]) => ({
-    month: monthLabel(k),
-    reachOut: v.reachOut,
-    onboarded: v.onboarded,
-    posted: v.posted,
-  }));
+  const monthlyFunnel: MonthlyPoint[] = [...monthlyMap.entries()].map(
+    ([k, v]) => ({
+      month: monthLabel(k),
+      reachOut: v.reachOut,
+      onboarded: v.onboarded,
+      posted: v.posted,
+    }),
+  );
   const activity30: ActivityPoint[] = [...activityByDay.entries()].map(
     ([date, v]) => ({ date, ...v }),
   );
@@ -511,10 +579,15 @@ export async function fetchDashboardData(
     if (!who) continue;
     const statusLow = String(p.workflow_status ?? "").toLowerCase();
     const cur = teamMap.get(who) ?? { onboardings: 0, posts: 0 };
-    if (statusLow.includes("on board") || statusLow.includes("posted") || statusLow.includes("delivered")) {
+    if (
+      statusLow.includes("on board") ||
+      statusLow.includes("posted") ||
+      statusLow.includes("delivered")
+    ) {
       cur.onboardings++;
     }
-    if (statusLow.includes("posted") || statusLow.includes("delivered")) cur.posts++;
+    if (statusLow.includes("posted") || statusLow.includes("delivered"))
+      cur.posts++;
     teamMap.set(who, cur);
   }
   const teamLeaderboard = [...teamMap.entries()]
@@ -584,14 +657,18 @@ export async function fetchDashboardData(
         ? `${inf}|${Number(p.collab_number)}`
         : null;
     const parentPay =
-      idx > 1 && collabKey ? (parentPaymentByCollab.get(collabKey) ?? "") : payLow;
+      idx > 1 && collabKey
+        ? (parentPaymentByCollab.get(collabKey) ?? "")
+        : payLow;
     const effectivePay = idx > 1 ? parentPay : payLow;
+    const isSettled = effectivePay === "done" || effectivePay === "paid";
+    const isPaymentPending = isPaymentPendingStatus(effectivePay);
     let stuckLabel: string;
     if (bucketKey === "reachOut") stuckLabel = "Not yet onboarded";
     else if (bucketKey === "onBoard") stuckLabel = "Not yet posted";
-    else if (bucketKey === "paid")
-      stuckLabel = effectivePay === "done" || effectivePay === "paid" ? "Settled" : "Payment pending";
-    else stuckLabel = effectivePay === "done" || effectivePay === "paid" ? "Settled" : "Payment pending";
+    else if (isSettled) stuckLabel = "Settled";
+    else if (isPaymentPending) stuckLabel = "Payment pending";
+    else stuckLabel = "Payment not ready";
     const stageDate = dateForStage[bucketKey];
     // Collab ID groups all deliverables of one collaboration. Legacy rows may
     // have a null collab_id — fall back to inf_id||'-C'||collab_number.
@@ -613,9 +690,7 @@ export async function fetchDashboardData(
           ? commercialTotalByCollab.get(collabKey)
           : undefined;
         if (typeof total === "number") return total;
-        return p.commercial_amount != null
-          ? Number(p.commercial_amount)
-          : null;
+        return p.commercial_amount != null ? Number(p.commercial_amount) : null;
       })(),
       // `posts.logged_by` doesn't exist on prod yet — once it does, fall back
       // chain becomes logged_by (for Reach Out) → onboarded_by (for OB+).
@@ -641,8 +716,12 @@ export async function fetchDashboardData(
         );
       })
       .sort((a, b) => {
-        const da = String(a.post_date ?? a.onboard_date ?? a.reach_out_date ?? "");
-        const db = String(b.post_date ?? b.onboard_date ?? b.reach_out_date ?? "");
+        const da = String(
+          a.post_date ?? a.onboard_date ?? a.reach_out_date ?? "",
+        );
+        const db = String(
+          b.post_date ?? b.onboard_date ?? b.reach_out_date ?? "",
+        );
         return db.localeCompare(da);
       })
       .slice(0, 10)
@@ -668,8 +747,10 @@ export async function fetchDashboardData(
     onBoard: bucketCount((s) => s.includes("on board")),
     posted: bucketCount((s) => s.includes("posted") || s.includes("delivered")),
     paid: bucketCount(
-      (s, _pay, isChild) =>
-        !isChild && (s.includes("posted") || s.includes("delivered")),
+      (s, pay, isChild) =>
+        !isChild &&
+        (s.includes("posted") || s.includes("delivered")) &&
+        (isPaymentPendingStatus(pay) || pay === "done" || pay === "paid"),
     ),
   };
 
@@ -683,12 +764,13 @@ export async function fetchDashboardData(
       (s) => s.includes("posted") || s.includes("delivered"),
       "posted",
     ),
-    // Payment column — every PARENT that's in posted/delivered (whether paid
-    // or pending). Card sub-label = "Payment pending" / "Settled". Children
-    // skipped here because payment lives on parent only.
+    // Payment column — only payment-ready or settled PARENT collabs. Posted
+    // collabs still waiting for completed forms or creator acceptance stay out.
     paid: bucket(
-      (s, _pay, isChild) =>
-        !isChild && (s.includes("posted") || s.includes("delivered")),
+      (s, pay, isChild) =>
+        !isChild &&
+        (s.includes("posted") || s.includes("delivered")) &&
+        (isPaymentPendingStatus(pay) || pay === "done" || pay === "paid"),
       "paid",
     ),
   };
@@ -715,7 +797,9 @@ export async function fetchDashboardData(
         .eq("campaign_id", cid)
         .maybeSingle(),
     ]);
-    const cap = ((budRes.data ?? []) as Array<{ num_influencers: number | null }>).reduce(
+    const cap = (
+      (budRes.data ?? []) as Array<{ num_influencers: number | null }>
+    ).reduce(
       (s: number, r: { num_influencers: number | null }) =>
         s + (Number(r.num_influencers ?? 0) || 0),
       0,

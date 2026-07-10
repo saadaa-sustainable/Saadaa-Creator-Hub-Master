@@ -48,7 +48,12 @@ export async function syncCreatorPartnership(opts: {
   const infId = (opts.infId ?? "").trim();
 
   if (!handle && !infId) {
-    return { ok: false, state: null, invited: false, error: "No creator handle" };
+    return {
+      ok: false,
+      state: null,
+      invited: false,
+      error: "No creator handle",
+    };
   }
   if (!isPartnershipConfigured()) {
     return {
@@ -77,7 +82,12 @@ export async function syncCreatorPartnership(opts: {
       .toLowerCase();
   }
   if (!resolvedHandle) {
-    return { ok: false, state: null, invited: false, error: "No creator handle" };
+    return {
+      ok: false,
+      state: null,
+      invited: false,
+      error: "No creator handle",
+    };
   }
 
   const read = await getPartnershipStatus(resolvedHandle);
@@ -174,8 +184,37 @@ export async function syncCreatorPartnership(opts: {
     sent: invited || read.status.exists,
     now,
   });
+  await reconcilePaymentEligibility(supabase, infId, resolvedHandle, source);
 
   return { ok: true, state, invited };
+}
+
+/**
+ * Keep the payment ledger synchronized with creator-level partnership changes.
+ * The RPC creates an eligible draft after approval and removes only empty open
+ * drafts after pending/rejection/revocation; financial history is preserved.
+ */
+async function reconcilePaymentEligibility(
+  supabase: any,
+  infId: string,
+  handle: string,
+  source: string,
+): Promise<void> {
+  const { error } = await (supabase as any).rpc(
+    "reconcile_creator_payment_eligibility",
+    {
+      p_inf_id: infId || null,
+      p_username: handle || null,
+    },
+  );
+  if (error) {
+    await logSystemError({
+      type: "payment_eligibility_reconcile",
+      key: infId || handle,
+      message: error.message,
+      source,
+    });
+  }
 }
 
 /**
@@ -247,7 +286,12 @@ export async function resendCreatorPartnershipInvite(opts: {
   const handle = (opts.username ?? "").trim().replace(/^@/, "").toLowerCase();
   const infId = (opts.infId ?? "").trim();
   if (!handle && !infId) {
-    return { ok: false, state: null, invited: false, error: "No creator handle" };
+    return {
+      ok: false,
+      state: null,
+      invited: false,
+      error: "No creator handle",
+    };
   }
   if (!isPartnershipConfigured()) {
     return {
@@ -274,7 +318,12 @@ export async function resendCreatorPartnershipInvite(opts: {
       .toLowerCase();
   }
   if (!resolvedHandle) {
-    return { ok: false, state: null, invited: false, error: "No creator handle" };
+    return {
+      ok: false,
+      state: null,
+      invited: false,
+      error: "No creator handle",
+    };
   }
 
   const sent = await sendPartnershipInvite(resolvedHandle);
@@ -306,7 +355,12 @@ export async function resendCreatorPartnershipInvite(opts: {
       message: `DB stamp failed after resend: ${updErr.message}`,
       source,
     });
-    return { ok: false, state: "pending", invited: true, error: updErr.message };
+    return {
+      ok: false,
+      state: "pending",
+      invited: true,
+      error: updErr.message,
+    };
   }
   // Creators mirror — a resend is a NEW request, so sent_at is overwritten.
   await stampCreatorRow(supabase, infId, resolvedHandle, "pending", {
@@ -314,5 +368,6 @@ export async function resendCreatorPartnershipInvite(opts: {
     now: String(payload.partnership_sent_at),
     overwriteSent: true,
   });
+  await reconcilePaymentEligibility(supabase, infId, resolvedHandle, source);
   return { ok: true, state: "pending", invited: true };
 }

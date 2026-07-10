@@ -102,7 +102,7 @@ export function DashboardPipelineKpis({
           label="Payment Pending"
           primary={<CountUpInt value={pipeline.paymentPending} />}
           secondary="Awaiting UTR"
-          info="Collaborations still waiting for payment completion or a payment reference."
+          info="Parent collabs whose every posting form is complete and whose creator accepted the partnership, but whose payment is still Not Due, Due, or Partial."
         />
         <Tile
           tone="muted"

@@ -24,7 +24,7 @@ export function AccountsKpiStrip({ kpi }: { kpi: AccountsKpi }) {
         secondary={
           kpi.totalPayable > 0
             ? `${formatRupees(kpi.totalPayable)} payable`
-            : "Pending payments"
+            : "No eligible payments"
         }
       />
       <KpiCard

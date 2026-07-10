@@ -6,6 +6,7 @@ import {
   type JourneyFunnel,
   type JourneyKpi,
 } from "./types";
+import { isPaymentPendingStatus } from "@/lib/payment-eligibility";
 
 /**
  * Bucket a flat card list into the four journey columns and derive the KPI +
@@ -41,7 +42,9 @@ export function computeJourney(cards: JourneyCard[]): {
   let paidCount = 0;
 
   for (const card of cards) {
-    const statusKey = String(card.workflow_status ?? "").trim().toLowerCase();
+    const statusKey = String(card.workflow_status ?? "")
+      .trim()
+      .toLowerCase();
 
     // KPI counts.
     if (statusKey.includes("reach out") || statusKey.includes("on board")) {
@@ -73,7 +76,9 @@ export function computeJourney(cards: JourneyCard[]): {
       const reachedPost =
         statusKey.includes("posted") || statusKey.includes("delivered");
       const reachedPaid =
-        String(card.payment_status ?? "").trim().toLowerCase() === "done";
+        String(card.payment_status ?? "")
+          .trim()
+          .toLowerCase() === "done";
 
       reachedCount++;
       if (reachedOnboard) onboardedCount++;
@@ -95,7 +100,12 @@ export function computeJourney(cards: JourneyCard[]): {
       postedBucket.push(card);
       const isChild =
         card.deliverable_index != null && Number(card.deliverable_index) > 1;
-      if (!isChild) paymentBucket.push(card);
+      const paymentStatus = (card.payment_status ?? "").trim().toLowerCase();
+      const paymentTracked =
+        isPaymentPendingStatus(paymentStatus) ||
+        paymentStatus === "done" ||
+        paymentStatus === "paid";
+      if (!isChild && paymentTracked) paymentBucket.push(card);
     }
   }
 

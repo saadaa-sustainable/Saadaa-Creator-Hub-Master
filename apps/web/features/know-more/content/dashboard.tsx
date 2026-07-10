@@ -231,9 +231,10 @@ export default function DashboardKM() {
             count (= rows On Board but not Posted).
           </li>
           <li>
-            <strong>Payment Pending</strong> · count of PARENT rows
-            (deliverable_index null or 1) whose <KMCode>payment_status</KMCode>{" "}
-            is Due or Not Due. Children skip.
+            <strong>Payment Pending</strong> · count of PARENT collabs in Posted
+            or Delivered whose every posting form is complete, whose creator
+            accepted the partnership, and whose payment is Not Due, Due, or
+            Partial. Children and payment-ineligible collabs skip.
           </li>
           <li>
             <strong>Paid Collabs</strong> · count of PARENT rows with{" "}
@@ -265,12 +266,13 @@ export default function DashboardKM() {
         <p>
           Payment Pending + Paid Collabs counters skip child deliverables (
           <KMCode>deliverable_index &gt; 1</KMCode>) because payment lives on
-          the parent post in Accounts Hub. A 3-deliverable collab paid once
-          counts as 1 paid, not 3. The Stage Snapshot kanban also resolves each
-          child card&apos;s sub-status from its PARENT row via an{" "}
-          <KMCode>(inf_id, collab_number)</KMCode> lookup, so a child of a paid
-          collab shows the green <KMCode>SETTLED</KMCode> pill instead of a
-          stale <KMCode>PAYMENT PENDING</KMCode>.
+          the parent post in Accounts Hub. Pending starts only after all
+          deliverables are posted and the creator accepts the partnership. A
+          3-deliverable collab paid once counts as 1 paid, not 3. The Stage
+          Snapshot kanban also resolves each child card&apos;s sub-status from
+          its PARENT row via an <KMCode>(inf_id, collab_number)</KMCode> lookup,
+          so a child of a paid collab shows the green <KMCode>SETTLED</KMCode>{" "}
+          pill instead of a stale <KMCode>PAYMENT PENDING</KMCode>.
         </p>
       </KMSection>
 
@@ -287,12 +289,13 @@ export default function DashboardKM() {
           <li>
             <strong>Posted</strong> · every deliverable (parent + children) in
             Posted or Delivered status. Sub-label = &quot;Settled&quot; when
-            parent payment is Done/Paid, else &quot;Payment pending&quot;.
+            parent payment is Done/Paid, &quot;Payment pending&quot; when the
+            eligible ledger is open, otherwise &quot;Payment not ready&quot;.
           </li>
           <li>
-            <strong>Payment</strong> · every PARENT in Posted/Delivered (settled
-            or pending). Same Settled/Pending sub-label split. Overlaps Posted
-            by design — managerial view wants both angles.
+            <strong>Payment</strong> · only payment-ready or settled PARENT
+            collabs. A posted collab does not enter this column until every
+            posting form is complete and the creator accepts the partnership.
           </li>
         </KMList>
         <p>

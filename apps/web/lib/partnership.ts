@@ -70,11 +70,9 @@ export const PARTNERSHIP_STATE_LABELS_SHORT: Record<PartnershipState, string> =
   };
 
 /**
- * Payment / ads gate — a deliverable's partnership counts as valid ONLY when
- * the creator has APPROVED the request (or an admin explicitly validated via
- * the inline Partnership Key override, which sets ad_partnership_valid).
- * A pending invite or a bare partnership_id no longer passes — the invite is
- * auto-sent at posting time, so key presence stopped meaning "approved".
+ * Ads/admin-override gate. Payment eligibility deliberately does not use this
+ * helper: payments require the creator's real accepted state through
+ * `creatorAcceptedPartnership` in payment-eligibility.ts.
  */
 export function partnershipApproved(row: {
   partnership_status?: string | null;
