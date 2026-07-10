@@ -2,19 +2,35 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle2, Loader2, Pencil, X } from "lucide-react";
-import { toast } from "sonner";
-import { getOnboardingEditForm, submitOnboardingEdit } from "./edit-actions";
 import {
-  ONBOARDING_EDIT_FIELD_LABELS,
+  AlertTriangle,
+  CheckCircle2,
+  Landmark,
+  Loader2,
+  Package,
+  Pencil,
+  RefreshCw,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  fetchOrderForEdit,
+  getOnboardingEditForm,
+  submitOnboardingEdit,
+  type EditOrderPreview,
+} from "./edit-actions";
+import {
+  EDIT_ADS_USAGE_OPTIONS,
   type OnboardingEditForm,
   type OnboardingEditField,
 } from "./edit-fields";
 
 /**
- * Edit a submitted onboarding — the change is HELD for Global-Admin approval
- * (before/after diff + email), and posting for the collab is blocked until it is
- * approved. No fields are written until an admin approves.
+ * Edit a submitted onboarding — mirrors the onboarding form (collab, Shopify
+ * order with Fetch, bank details for Barter + Paid, deliverables). The change is
+ * HELD for Global-Admin approval; posting for the collab is blocked until then.
+ * On approval, changing the order id re-derives every order detail (email,
+ * tracking, products, address) across all deliverables.
  */
 export function OnboardingEditModal({
   collabId,
@@ -30,12 +46,20 @@ export function OnboardingEditModal({
     order_id: "",
     collab_type: "",
     commercial_amount: "",
-    garment_qty: "",
     ads_usage_rights: "",
     est_delivery: "",
+    reels: "0",
+    static_posts: "0",
+    stories: "0",
+    bank_name: "",
+    bank_number: "",
+    ifsc: "",
   });
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
+  const [order, setOrder] = useState<EditOrderPreview | null>(null);
+  const [fetching, setFetching] = useState(false);
+  const [orderErr, setOrderErr] = useState<string | null>(null);
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -61,12 +85,42 @@ export function OnboardingEditModal({
     };
   }, [collabId]);
 
+  const set = (k: OnboardingEditField, v: string) =>
+    setValues((prev) => ({ ...prev, [k]: v }));
+
   const isBarter = (values.collab_type ?? "").trim().toLowerCase() === "barter";
+  const isBarterPaid =
+    (values.collab_type ?? "").trim().toLowerCase() === "barter + paid";
+  const orderChanged =
+    !!form && values.order_id.trim() !== (form.values.order_id ?? "").trim();
+
+  const runFetch = () => {
+    const id = values.order_id.trim();
+    if (!id) {
+      setOrderErr("Enter an order id first");
+      return;
+    }
+    setFetching(true);
+    setOrderErr(null);
+    setOrder(null);
+    fetchOrderForEdit(id).then((res) => {
+      setFetching(false);
+      if (!res.ok) {
+        setOrderErr(res.error);
+        return;
+      }
+      setOrder(res.order);
+    });
+  };
 
   const submit = () => {
     if (!form) return;
     if (reason.trim().length < 5) {
       toast.error("Add a short reason for the edit (min 5 chars).");
+      return;
+    }
+    if (orderChanged && !order) {
+      toast.error("Fetch the new order to confirm its details before submitting.");
       return;
     }
     setSaving(true);
@@ -92,11 +146,10 @@ export function OnboardingEditModal({
       onClick={onClose}
     >
       <div
-        className="modal-panel modal-panel--onboarding flex flex-col"
-        style={{ maxWidth: 560, width: "94vw", maxHeight: "92dvh" }}
+        className="modal-panel modal-panel--lg modal-panel--onboarding"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="modal-head shrink-0">
+        <header className="modal-head">
           <div className="flex items-center gap-2 min-w-0">
             <Pencil size={16} aria-hidden />
             <div className="min-w-0">
@@ -117,7 +170,7 @@ export function OnboardingEditModal({
           </button>
         </header>
 
-        <div className="modal-body flex-1 overflow-y-auto">
+        <div className="modal-body">
           {loadErr ? (
             <div className="ob-form-error-banner">
               <AlertTriangle size={14} aria-hidden />
@@ -129,7 +182,7 @@ export function OnboardingEditModal({
               <span className="text-sm">Loading onboarding…</span>
             </div>
           ) : (
-            <>
+            <div className="flex flex-col gap-3.5">
               <div
                 className="alert"
                 style={{
@@ -140,122 +193,204 @@ export function OnboardingEditModal({
                     ? "var(--color-warning-text)"
                     : "var(--color-text-secondary)",
                   border: "1px solid var(--color-border)",
-                  marginBottom: "0.85rem",
                   fontSize: "0.72rem",
                 }}
               >
                 {form.pending ? (
                   <>
                     <AlertTriangle size={13} aria-hidden /> This collab already has
-                    an edit awaiting approval. Resolve it in Approvals before
-                    submitting another.
+                    an edit awaiting approval. Resolve it in Approvals first.
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 size={13} aria-hidden /> Changes are HELD for
-                    admin approval. Posting for this collab is blocked until an
-                    admin approves — no fields change until then. Applies to all{" "}
-                    {form.deliverables} deliverable
-                    {form.deliverables === 1 ? "" : "s"}.
+                    <CheckCircle2 size={13} aria-hidden /> Changes are held for
+                    admin approval and applied to all {form.deliverables}{" "}
+                    deliverable{form.deliverables === 1 ? "" : "s"} on approve.
+                    Posting stays blocked until then. Changing the Order ID
+                    re-pulls every order detail.
                   </>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label={ONBOARDING_EDIT_FIELD_LABELS.order_id}>
-                  <input
-                    className="ob-input"
-                    value={values.order_id}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, order_id: e.target.value }))
-                    }
-                    placeholder="Shopify order number"
-                  />
-                </Field>
-                <Field label={ONBOARDING_EDIT_FIELD_LABELS.collab_type}>
-                  <select
-                    className="ob-input onboarding-filter-select"
-                    value={values.collab_type}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, collab_type: e.target.value }))
-                    }
+              {/* Collaboration */}
+              <section className="ob-form-section flex flex-col gap-3">
+                <SectionHead icon={Pencil} title="Collaboration" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label="Collab Type">
+                    <select
+                      className="onboarding-filter-select"
+                      value={values.collab_type}
+                      onChange={(e) => set("collab_type", e.target.value)}
+                    >
+                      <option value="">—</option>
+                      <option value="Barter">Barter</option>
+                      <option value="Barter + Paid">Barter + Paid</option>
+                    </select>
+                  </Field>
+                  <Field
+                    label="Commercials (₹)"
+                    hint={isBarter ? "Barter ₹0" : undefined}
                   >
-                    <option value="">—</option>
-                    <option value="Barter">Barter</option>
-                    <option value="Barter + Paid">Barter + Paid</option>
-                  </select>
-                </Field>
-                <Field label={ONBOARDING_EDIT_FIELD_LABELS.commercial_amount}>
-                  <input
-                    className="ob-input"
-                    inputMode="numeric"
-                    value={isBarter ? "0" : values.commercial_amount}
-                    disabled={isBarter}
-                    onChange={(e) =>
-                      setValues((v) => ({
-                        ...v,
-                        commercial_amount: e.target.value,
-                      }))
-                    }
-                  />
-                </Field>
-                <Field label={ONBOARDING_EDIT_FIELD_LABELS.garment_qty}>
-                  <input
-                    className="ob-input"
-                    inputMode="numeric"
-                    value={values.garment_qty}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, garment_qty: e.target.value }))
-                    }
-                  />
-                </Field>
-                <Field label={ONBOARDING_EDIT_FIELD_LABELS.ads_usage_rights}>
-                  <input
-                    className="ob-input"
-                    value={values.ads_usage_rights}
-                    onChange={(e) =>
-                      setValues((v) => ({
-                        ...v,
-                        ads_usage_rights: e.target.value,
-                      }))
-                    }
-                    placeholder="e.g. 12 Months"
-                  />
-                </Field>
-                <Field label={ONBOARDING_EDIT_FIELD_LABELS.est_delivery}>
-                  <input
-                    type="date"
-                    className="ob-input onboarding-filter-select"
-                    value={values.est_delivery}
-                    onChange={(e) =>
-                      setValues((v) => ({ ...v, est_delivery: e.target.value }))
-                    }
-                  />
-                </Field>
-              </div>
+                    <input
+                      className="ob-input"
+                      inputMode="numeric"
+                      value={isBarter ? "0" : values.commercial_amount}
+                      disabled={isBarter}
+                      onChange={(e) => set("commercial_amount", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Est. Content Delivery">
+                    <input
+                      type="date"
+                      className="ob-input onboarding-filter-select"
+                      value={values.est_delivery}
+                      onChange={(e) => set("est_delivery", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Ads Usage Rights">
+                    <select
+                      className="onboarding-filter-select"
+                      value={values.ads_usage_rights}
+                      onChange={(e) => set("ads_usage_rights", e.target.value)}
+                    >
+                      {EDIT_ADS_USAGE_OPTIONS.map((a) => (
+                        <option key={a || "none"} value={a}>
+                          {a || "None"}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Reels">
+                    <input
+                      className="ob-input"
+                      inputMode="numeric"
+                      value={values.reels}
+                      onChange={(e) => set("reels", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Static Posts">
+                    <input
+                      className="ob-input"
+                      inputMode="numeric"
+                      value={values.static_posts}
+                      onChange={(e) => set("static_posts", e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Stories">
+                    <input
+                      className="ob-input"
+                      inputMode="numeric"
+                      value={values.stories}
+                      onChange={(e) => set("stories", e.target.value)}
+                    />
+                  </Field>
+                </div>
+              </section>
 
-              <div className="mt-3">
-                <label className="ob-form-label">
-                  Reason for the edit{" "}
-                  <span style={{ color: "var(--color-danger-text)" }}>*</span>
-                </label>
+              {/* Shopify order */}
+              <section className="ob-form-section flex flex-col gap-3">
+                <SectionHead icon={Package} title="Shopify Order" />
+                <div className="flex items-end gap-2">
+                  <Field label="Order ID" className="flex-1">
+                    <input
+                      className="ob-input"
+                      value={values.order_id}
+                      onChange={(e) => {
+                        set("order_id", e.target.value);
+                        setOrder(null);
+                        setOrderErr(null);
+                      }}
+                      placeholder="Shopify order number"
+                    />
+                  </Field>
+                  <button
+                    type="button"
+                    className="action-btn shrink-0"
+                    onClick={runFetch}
+                    disabled={fetching}
+                  >
+                    {fetching ? (
+                      <Loader2 size={12} className="animate-spin" aria-hidden />
+                    ) : (
+                      <RefreshCw size={12} aria-hidden />
+                    )}
+                    Fetch
+                  </button>
+                </div>
+                {orderChanged && !order && !orderErr && (
+                  <p className="text-[0.66rem] text-warning inline-flex items-center gap-1">
+                    <AlertTriangle size={11} aria-hidden /> Order changed — Fetch
+                    to confirm the new order&apos;s details before submitting.
+                  </p>
+                )}
+                {orderErr && (
+                  <p className="text-[0.66rem] text-danger inline-flex items-center gap-1">
+                    <AlertTriangle size={11} aria-hidden /> {orderErr}
+                  </p>
+                )}
+                {order && (
+                  <div className="rounded-xl border border-border bg-bg-muted/40 p-2.5 text-[0.68rem] grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-3">
+                    <PreviewRow label="Customer" value={order.customer_name} />
+                    <PreviewRow label="Email" value={order.email} />
+                    <PreviewRow label="Status" value={order.order_status} />
+                    <PreviewRow label="Tracking" value={order.tracking_id} />
+                    <PreviewRow
+                      label="Products"
+                      value={order.garments_sent}
+                      full
+                    />
+                    <PreviewRow label="Address" value={order.address} full />
+                  </div>
+                )}
+              </section>
+
+              {/* Bank — Barter + Paid only */}
+              {isBarterPaid && (
+                <section className="ob-form-section flex flex-col gap-3">
+                  <SectionHead icon={Landmark} title="Bank Details" />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Field label="Bank Name">
+                      <input
+                        className="ob-input"
+                        value={values.bank_name}
+                        onChange={(e) => set("bank_name", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="Account Number">
+                      <input
+                        className="ob-input"
+                        value={values.bank_number}
+                        onChange={(e) => set("bank_number", e.target.value)}
+                      />
+                    </Field>
+                    <Field label="IFSC Code">
+                      <input
+                        className="ob-input"
+                        value={values.ifsc}
+                        onChange={(e) => set("ifsc", e.target.value)}
+                      />
+                    </Field>
+                  </div>
+                </section>
+              )}
+
+              <Field label="Reason for the edit" required>
                 <textarea
                   className="ob-input"
                   rows={2}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. Wrong order ID was entered at onboarding — correcting to 1444778."
+                  placeholder="e.g. Wrong order ID entered at onboarding, correcting to the right order."
                 />
-              </div>
-            </>
+              </Field>
+            </div>
           )}
         </div>
 
-        <footer className="modal-foot shrink-0">
+        <footer className="modal-foot">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <span style={{ flex: 1 }} />
           <button
             type="button"
             className="btn-primary-cta"
@@ -276,17 +411,67 @@ export function OnboardingEditModal({
   );
 }
 
+function SectionHead({
+  icon: Icon,
+  title,
+}: {
+  icon: typeof Pencil;
+  title: string;
+}) {
+  return (
+    <div className="inline-flex items-center gap-1.5 text-[0.7rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary">
+      <Icon size={12} aria-hidden />
+      {title}
+    </div>
+  );
+}
+
 function Field({
   label,
+  hint,
+  required,
+  className,
   children,
 }: {
   label: string;
+  hint?: string;
+  required?: boolean;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="ob-form-label">{label}</span>
+    <label className={`flex flex-col gap-1 ${className ?? ""}`}>
+      <span className="ob-form-label flex items-center justify-between">
+        <span>
+          {label}
+          {required && <span style={{ color: "var(--color-danger-text)" }}> *</span>}
+        </span>
+        {hint && (
+          <span className="text-[0.58rem] font-bold text-success normal-case tracking-normal">
+            {hint}
+          </span>
+        )}
+      </span>
       {children}
     </label>
+  );
+}
+
+function PreviewRow({
+  label,
+  value,
+  full,
+}: {
+  label: string;
+  value: string | null;
+  full?: boolean;
+}) {
+  return (
+    <div className={full ? "sm:col-span-2 min-w-0" : "min-w-0"}>
+      <span className="text-text-tertiary">{label}: </span>
+      <span className="text-text-primary font-medium break-words">
+        {value || "—"}
+      </span>
+    </div>
   );
 }

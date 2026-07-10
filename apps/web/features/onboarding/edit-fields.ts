@@ -8,9 +8,14 @@ export const EDITABLE_FIELDS = [
   "order_id",
   "collab_type",
   "commercial_amount",
-  "garment_qty",
   "ads_usage_rights",
   "est_delivery",
+  "reels",
+  "static_posts",
+  "stories",
+  "bank_name",
+  "bank_number",
+  "ifsc",
 ] as const;
 export type OnboardingEditField = (typeof EDITABLE_FIELDS)[number];
 
@@ -18,11 +23,25 @@ export const ONBOARDING_EDIT_FIELD_LABELS: Record<OnboardingEditField, string> =
   {
     order_id: "Order ID",
     collab_type: "Collab Type",
-    commercial_amount: "Commercial (₹, collab total)",
-    garment_qty: "Barter (No. of Products)",
+    commercial_amount: "Commercials (₹)",
     ads_usage_rights: "Ads Usage Rights",
     est_delivery: "Est. Content Delivery",
+    reels: "Reels",
+    static_posts: "Static Posts",
+    stories: "Stories",
+    bank_name: "Bank Name",
+    bank_number: "Account Number",
+    ifsc: "IFSC Code",
   };
+
+/** Ads-usage-rights options, mirroring the onboarding form. */
+export const EDIT_ADS_USAGE_OPTIONS = [
+  "",
+  "3 Months",
+  "6 Months",
+  "12 Months",
+  "Perpetual",
+] as const;
 
 export interface OnboardingEditForm {
   collabId: string;

@@ -40,7 +40,7 @@ export async function getOnboardingEditForm(
   const { data: rows, error } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, inf_id, username, campaign_id, order_id, collab_type, commercial_amount, garment_qty, ads_usage_rights, est_delivery, collab_id, collab_number",
+      "post_id, inf_id, username, campaign_id, order_id, collab_type, commercial_amount, ads_usage_rights, est_delivery, reels, static_posts, stories, bank_name, bank_number, ifsc, collab_id, collab_number",
     )
     .eq("collab_id", cid)
     .order("post_id", { ascending: true });
@@ -84,11 +84,63 @@ export async function getOnboardingEditForm(
         order_id: String(rep.order_id ?? ""),
         collab_type: String(rep.collab_type ?? ""),
         commercial_amount: String(total),
-        garment_qty: String(rep.garment_qty ?? ""),
         ads_usage_rights: String(rep.ads_usage_rights ?? ""),
         est_delivery: String(rep.est_delivery ?? "").slice(0, 10),
+        reels: String(rep.reels ?? 0),
+        static_posts: String(rep.static_posts ?? 0),
+        stories: String(rep.stories ?? 0),
+        bank_name: String(rep.bank_name ?? ""),
+        bank_number: String(rep.bank_number ?? ""),
+        ifsc: String(rep.ifsc ?? ""),
       },
       pending: Boolean(pendingReq),
+    },
+  };
+}
+
+export interface EditOrderPreview {
+  order_id: string;
+  customer_name: string | null;
+  email: string | null;
+  address: string | null;
+  garments_sent: string | null;
+  tracking_id: string | null;
+  order_status: string | null;
+  total_price: number | null;
+}
+
+/** Fetch a Shopify order's details for the Edit modal's Fetch button preview. */
+export async function fetchOrderForEdit(
+  orderId: string,
+): Promise<{ ok: true; order: EditOrderPreview } | { ok: false; error: string }> {
+  await assertPermission("onboarding_write");
+  const id = orderId.trim();
+  if (!id) return { ok: false, error: "Enter an order id" };
+  const supabase = createServiceClient();
+  const { data, error } = await (supabase as any)
+    .from("shopify_orders")
+    .select(
+      "order_id, customer_name, email, address, garments_sent, tracking_id, order_status, total_price",
+    )
+    .eq("order_id", id)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!data)
+    return {
+      ok: false,
+      error: `Order ${id} not found in synced Shopify orders.`,
+    };
+  return {
+    ok: true,
+    order: {
+      order_id: String(data.order_id ?? id),
+      customer_name: data.customer_name ?? null,
+      email: data.email ?? null,
+      address: data.address ?? null,
+      garments_sent: data.garments_sent ?? null,
+      tracking_id: data.tracking_id ?? null,
+      order_status: data.order_status ?? null,
+      total_price: data.total_price != null ? Number(data.total_price) : null,
     },
   };
 }
@@ -215,33 +267,83 @@ async function applyOnboardingEdit(
 ): Promise<void> {
   const cid = String(req.collab_id);
   const after = (req.after ?? {}) as Record<string, string>;
+  const before = (req.before ?? {}) as Record<string, string>;
 
   const { data: sibs } = await supabase
     .from("posts")
     .select("post_id")
     .eq("collab_id", cid);
-  const count = ((sibs ?? []) as unknown[]).length || 1;
+  const sibList = (sibs ?? []) as Array<{ post_id: string }>;
+  const count = sibList.length || 1;
   const total = Number(after.commercial_amount ?? 0);
   const split = count > 0 ? total / count : total;
+  const repPostId =
+    sibList
+      .map((s) => String(s.post_id ?? ""))
+      .filter(Boolean)
+      .sort()[0] ?? null;
 
+  // Collab-level fields — applied to EVERY deliverable of the collab.
   const patch: Record<string, unknown> = {
     order_id: after.order_id || null,
     collab_type: after.collab_type || null,
-    garment_qty: after.garment_qty || null,
     ads_usage_rights: after.ads_usage_rights || null,
     est_delivery: after.est_delivery || null,
+    bank_name: after.bank_name || null,
+    bank_number: after.bank_number || null,
+    ifsc: after.ifsc || null,
     commercial_amount: split,
   };
-  // If the order changed, re-resolve the creator email from the new order.
-  if (after.order_id) {
+
+  // If the order id changed, re-derive ALL order details from the new order and
+  // apply them to every deliverable (email, tracking, products, state/city).
+  if (after.order_id && after.order_id !== (before.order_id ?? "")) {
     const { data: ord } = await supabase
       .from("shopify_orders")
-      .select("email")
+      .select("email, tracking_id, garments_sent, address, order_status")
       .eq("order_id", after.order_id)
       .maybeSingle();
-    if (ord?.email) patch.email = ord.email;
+    if (ord) {
+      if (ord.email != null) patch.email = ord.email;
+      if (ord.tracking_id != null) patch.tracking_id = ord.tracking_id;
+      if (ord.garments_sent != null) patch.garments_sent = ord.garments_sent;
+      if (ord.order_status != null) patch.order_status = ord.order_status;
+      const parsed = deriveStateCity(String(ord.address ?? ""));
+      if (parsed.state) patch.state = parsed.state;
+      if (parsed.city) patch.city = parsed.city;
+    }
   }
+
   await supabase.from("posts").update(patch).eq("collab_id", cid);
+
+  // Deliverable counts are metadata (not restructured): apply to the collab
+  // representative only, never re-spawn/delete child deliverable rows.
+  if (repPostId) {
+    await supabase
+      .from("posts")
+      .update({
+        reels: Number(after.reels ?? 0) || 0,
+        static_posts: Number(after.static_posts ?? 0) || 0,
+        stories: Number(after.stories ?? 0) || 0,
+      })
+      .eq("post_id", repPostId);
+  }
+}
+
+/** Light state/city extraction from a Shopify India address tail "…, City, State, Pincode, Country". */
+function deriveStateCity(addr: string): { state: string | null; city: string | null } {
+  const parts = addr
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length < 3) return { state: null, city: null };
+  // Drop trailing country + 6-digit pincode, then state is next, city before it.
+  let tail = [...parts];
+  if (/^[A-Za-z\s]+$/.test(tail.at(-1) ?? "")) tail = tail.slice(0, -1);
+  if (/^\d{6}$/.test(tail.at(-1) ?? "")) tail = tail.slice(0, -1);
+  const state = tail.at(-1) ?? null;
+  const city = tail.length >= 2 ? (tail.at(-2) ?? null) : null;
+  return { state, city };
 }
 
 export async function decideOnboardingEdit(
