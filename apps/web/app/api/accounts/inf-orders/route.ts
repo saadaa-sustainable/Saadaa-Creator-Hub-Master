@@ -26,7 +26,7 @@ export async function GET() {
     .select(
       `
       post_id, inf_id, collab_id, collab_number, campaign_id, collab_type,
-      commercial_amount, garment_qty, order_id, order_status, onboard_date,
+      commercial_amount, garment_qty, garments_sent, order_id, order_status, onboard_date,
       creator:creators ( inf_name, username, profile_pic ),
       campaign:campaigns ( campaign_id, campaign_name )
     `,
@@ -73,7 +73,9 @@ export async function GET() {
   if (orderIds.length > 0) {
     const { data: orders } = await (supabase as any)
       .from("shopify_orders")
-      .select("order_id, order_date, order_placed_date, tracking_status, total_price")
+      .select(
+        "order_id, order_date, order_placed_date, tracking_status, total_price, address, customer_name, phone, garments_sent",
+      )
       .in("order_id", orderIds)
       .limit(10_000);
     for (const o of (orders ?? []) as Array<Record<string, any>>) {
@@ -96,12 +98,16 @@ export async function GET() {
       collab_type: r.collab_type ?? null,
       commercial: e.total,
       garment_qty: r.garment_qty ?? null,
+      garments_sent: r.garments_sent ?? order?.garments_sent ?? null,
       onboard_date: r.onboard_date ?? null,
       order_id: r.order_id ?? null,
       order_date: order?.order_date ?? order?.order_placed_date ?? null,
       order_status: r.order_status ?? null,
       tracking_status: order?.tracking_status ?? null,
       order_total: order?.total_price != null ? Number(order.total_price) : null,
+      customer_name: order?.customer_name ?? null,
+      phone: order?.phone ?? null,
+      address: order?.address ?? null,
       deliverables: e.count,
     };
   });

@@ -26,11 +26,16 @@ const CSV_HEADERS = [
   "Campaign Name",
   "Collab Type",
   "Commercial (finalized)",
-  "Garments",
+  "Garment Qty",
+  "Products Sent",
   "Order ID",
   "Order Date",
   "Order Status",
+  "Order Total",
   "Tracking",
+  "Customer",
+  "Phone",
+  "Address",
   "Onboarded",
   "Deliverables",
 ] as const;
@@ -57,10 +62,15 @@ function downloadInfOrdersCsv(rows: InfOrderRow[]): void {
         r.collab_type,
         r.commercial,
         r.garment_qty,
+        r.garments_sent,
         r.order_id,
         r.order_date,
         r.order_status,
+        r.order_total,
         r.tracking_status,
+        r.customer_name,
+        r.phone,
+        r.address,
         r.onboard_date,
         r.deliverables,
       ]
@@ -191,26 +201,14 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              className="acc-export-bar__btn"
-              onClick={() => downloadInfOrdersCsv(filtered)}
-              disabled={!filtered.length}
-              title="Download the rows shown (filters applied) as CSV"
-            >
-              <Download size={12} aria-hidden />
-              Export CSV
-            </button>
-            <button
-              type="button"
-              className="icon-btn"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              <X size={14} aria-hidden />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="icon-btn shrink-0"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
         </header>
 
         {/* Filters */}
@@ -272,8 +270,24 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
               No orders match these filters.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[0.7rem] sm:text-xs min-w-[900px]">
+            <>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="text-[0.6rem] text-text-tertiary">
+                  {filtered.length} order{filtered.length === 1 ? "" : "s"}
+                </span>
+                <button
+                  type="button"
+                  className="acc-export-bar__btn"
+                  onClick={() => downloadInfOrdersCsv(filtered)}
+                  disabled={!filtered.length}
+                  title="Download the rows shown (filters applied) as CSV"
+                >
+                  <Download size={12} aria-hidden />
+                  Export CSV
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+              <table className="w-full text-[0.7rem] sm:text-xs min-w-[1200px]">
                 <thead>
                   <tr className="text-text-tertiary uppercase tracking-[0.06em] text-[0.5rem] sm:text-[0.55rem] font-extrabold border-b border-border">
                     <th className="text-left pb-2 pr-2">Creator</th>
@@ -283,10 +297,16 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
                     <th className="text-left pb-2 px-1.5">Campaign</th>
                     <th className="text-left pb-2 px-1.5">Collab Type</th>
                     <th className="text-right pb-2 px-1.5">Commercial</th>
-                    <th className="text-right pb-2 px-1.5">Garments</th>
+                    <th className="text-right pb-2 px-1.5">Qty</th>
+                    <th className="text-left pb-2 px-1.5">Products Sent</th>
                     <th className="text-left pb-2 px-1.5">Order ID</th>
                     <th className="text-left pb-2 px-1.5">Order Date</th>
-                    <th className="text-left pb-2 pl-1.5">Tracking</th>
+                    <th className="text-left pb-2 px-1.5">Order Status</th>
+                    <th className="text-right pb-2 px-1.5">Order Total</th>
+                    <th className="text-left pb-2 px-1.5">Tracking</th>
+                    <th className="text-left pb-2 px-1.5">Customer</th>
+                    <th className="text-left pb-2 px-1.5">Phone</th>
+                    <th className="text-left pb-2 pl-1.5">Address</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -352,20 +372,45 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
                       <td className="py-1.5 px-1.5 text-right tabular text-text-secondary">
                         {r.garment_qty ?? "—"}
                       </td>
+                      <td
+                        className="py-1.5 px-1.5 text-text-secondary max-w-[220px] truncate"
+                        title={r.garments_sent ?? undefined}
+                      >
+                        {r.garments_sent ?? "—"}
+                      </td>
                       <td className="py-1.5 px-1.5 tabular text-text-secondary">
                         {r.order_id ?? "—"}
                       </td>
                       <td className="py-1.5 px-1.5 tabular text-text-tertiary">
                         {formatDate(r.order_date) ?? "—"}
                       </td>
-                      <td className="py-1.5 pl-1.5 text-text-tertiary">
+                      <td className="py-1.5 px-1.5 text-text-tertiary">
+                        {r.order_status ?? "—"}
+                      </td>
+                      <td className="py-1.5 px-1.5 text-right tabular text-text-secondary">
+                        {r.order_total != null ? formatRupees(r.order_total) : "—"}
+                      </td>
+                      <td className="py-1.5 px-1.5 text-text-tertiary">
                         {r.tracking_status ?? "—"}
+                      </td>
+                      <td className="py-1.5 px-1.5 text-text-secondary max-w-[140px] truncate">
+                        {r.customer_name ?? "—"}
+                      </td>
+                      <td className="py-1.5 px-1.5 tabular text-text-tertiary">
+                        {r.phone ?? "—"}
+                      </td>
+                      <td
+                        className="py-1.5 pl-1.5 text-text-tertiary max-w-[240px] truncate"
+                        title={r.address ?? undefined}
+                      >
+                        {r.address ?? "—"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </div>
       </div>

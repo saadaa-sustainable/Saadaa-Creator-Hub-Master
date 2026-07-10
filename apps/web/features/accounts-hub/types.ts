@@ -99,12 +99,17 @@ export interface InfOrderRow {
   collab_type: string | null;
   commercial: number;
   garment_qty: string | null;
+  /** Product names sent (comma-separated), from posts.garments_sent / order. */
+  garments_sent: string | null;
   onboard_date: string | null;
   order_id: string | null;
   order_date: string | null;
   order_status: string | null;
   tracking_status: string | null;
   order_total: number | null;
+  customer_name: string | null;
+  phone: string | null;
+  address: string | null;
   deliverables: number;
 }
 
