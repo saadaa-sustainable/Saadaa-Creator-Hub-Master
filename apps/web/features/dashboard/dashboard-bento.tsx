@@ -1,4 +1,4 @@
-import { Activity, Image, Layers } from "lucide-react";
+import { Activity, Image as ImageIcon, Layers } from "lucide-react";
 import { DashboardActionStrip } from "./action-strip";
 import { DashboardCampaignKpis } from "./campaign-kpis";
 import { DashboardPipelineKpis } from "./pipeline-kpis";
@@ -135,7 +135,9 @@ export function DashboardBento({
               },
               { name: "Paid", value: data.stageCounts.paid, color: "#B57514" },
             ]}
-            emptyHint={archival ? "No collabs in scope" : "No live collabs in scope"}
+            emptyHint={
+              archival ? "No collabs in scope" : "No live collabs in scope"
+            }
           />
         </div>
       </div>
@@ -184,8 +186,9 @@ export function DashboardBento({
       {/* Row F */}
       <div className="lg:col-span-6">
         <DonutTile
-          icon={<Image size={13} aria-hidden />}
+          icon={<ImageIcon size={13} aria-hidden />}
           title="Content Type Split"
+          info="How the collaborations in the current filter scope are divided by content type, such as UGC or influencer content."
           segs={data.contentBreakdown.map((s) => ({
             name: s.label,
             value: s.value,
@@ -199,6 +202,7 @@ export function DashboardBento({
         <DonutTile
           icon={<Layers size={13} aria-hidden />}
           title="Creator Tier Split"
+          info="How creators in the current filter scope are divided by follower tier, from Nano through Mega."
           segs={data.categoryBreakdown.map((s) => ({
             name: s.label,
             value: s.value,

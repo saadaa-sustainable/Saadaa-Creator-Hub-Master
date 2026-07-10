@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { InfoDot } from "./bento-kit";
 import { ACTION_HREFS, type ActionCounts } from "./types";
 
 interface ChipDef {
@@ -22,9 +23,19 @@ interface ChipDef {
 const CHIPS: ChipDef[] = [
   { key: "needsEmail", label: "Missing Email", icon: Mail, tone: "warning" },
   { key: "needsOrder", label: "Pending Order", icon: PackageX, tone: "info" },
-  { key: "awaitingPost", label: "Awaiting Post", icon: HourglassIcon, tone: "warning" },
+  {
+    key: "awaitingPost",
+    label: "Awaiting Post",
+    icon: HourglassIcon,
+    tone: "warning",
+  },
   { key: "noTracking", label: "No Tracking", icon: TruckIcon, tone: "info" },
-  { key: "noPartnership", label: "No Partnership", icon: HandCoins, tone: "success" },
+  {
+    key: "noPartnership",
+    label: "No Partnership",
+    icon: HandCoins,
+    tone: "success",
+  },
   { key: "overdue", label: "Overdue", icon: AlertTriangle, tone: "danger" },
 ];
 
@@ -41,6 +52,10 @@ export function DashboardActionStrip({ actions }: { actions: ActionCounts }) {
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Zap size={12} aria-hidden /> What needs the team today
+          <InfoDot
+            title="What needs the team today"
+            text="A live count of work that still needs attention, such as pending outreach, onboarding, posting, payments, or delivery follow-up."
+          />
         </span>
       </header>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

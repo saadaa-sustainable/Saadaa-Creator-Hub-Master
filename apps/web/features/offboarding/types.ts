@@ -1,51 +1,41 @@
+export type OffboardingCreatorState = "candidate" | "offboarded";
+
 /**
- * Offboarding types — terminal-stage ledger (Wave 9, req #7 / D11).
- *
- * One row per `posts` record whose `workflow_status` = 'Offboarding'. This is
- * a manual terminal state set by an authorized operator (offboarding_write).
- * The collab is out of the active pipeline but stays visible in Accounts Hub
- * until the creator is fully paid.
+ * One creator-level offboarding row. Candidate rows are grouped from overdue,
+ * unposted deliverables; offboarded rows come from the creator blacklist.
  */
-export interface OffboardingRow {
-  postId: string;
-  collabId?: string | null;
-  collabNumber?: number | null;
-  infId: string | null;
+export interface OffboardingCreator {
+  state: OffboardingCreatorState;
+  infId: string;
   name: string;
   username: string;
+  instagramLink: string | null;
   profilePicUrl: string | null;
-  campaign: string;
   category: string | null;
   followers: number | null;
-  collabType: string | null;
-  commercials: number;
-  orderId: string;
-  orderStatus: string | null;
-  trackingId: string | null;
-  paymentStatus: string;
-  workflowStatus: string;
-  reachoutDate: string | null;
-  onboardDate: string | null;
-  estDelivery: string | null;
-  postLink: string | null;
-  adsUsageRights: string | null;
-  /** Collab-level deliverable totals (summed across siblings). */
-  reels: number;
-  staticPosts: number;
-  stories: number;
+  overdueDeliverables: number;
+  overdueCollabs: number;
+  oldestDeadline: string | null;
+  daysOverdue: number;
+  campaigns: string[];
+  postIds: string[];
+  teamMembers: string[];
+  lastOnboardDate: string | null;
+  blacklistReason: string | null;
+  blacklistedAt: string | null;
+  blacklistedBy: string | null;
 }
 
 export interface OffboardingKpi {
-  total: number;
-  paid: number;
-  awaitingPayment: number;
-  totalCommercials: number;
+  candidates: number;
+  overdueDeliverables: number;
+  offboardedCreators: number;
+  longestOverdueDays: number;
 }
 
 export interface OffboardingFilters {
   search?: string;
   campaign?: string;
-  paymentStatus?: "Done" | "Due" | "Not Due" | "";
 }
 
 export interface OffboardingFilterOptions {

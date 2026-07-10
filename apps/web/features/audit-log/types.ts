@@ -12,7 +12,7 @@
  *  added here too.)
  */
 
-export type AuditSource = "Sheet" | "User" | "System" | "Approval";
+export type AuditSource = "Sheet" | "User" | "Creator" | "System" | "Approval";
 
 /** Drives the small coloured icon on the action line. */
 export type AuditTone = "create" | "delete" | "change" | "resolve" | "neutral";

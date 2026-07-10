@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -143,11 +136,14 @@ function lookupStatusText(lookup?: RowLookup): string {
         return "Live";
       case "historic":
         return "Last known";
+      case "blacklisted":
+        return "Offboarded";
       default:
         return "Fetched";
     }
   }
   if (lookup.status === "error") {
+    if (lookup.source === "blacklisted") return "Offboarded";
     return lookup.source === "deactivated" ? "Not fetchable" : "Fetch failed";
   }
   return "Waiting";
@@ -274,7 +270,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               username: result.username,
               source: result.source,
               status:
-                result.source === "deactivated" || result.source === "error"
+                result.source === "deactivated" ||
+                result.source === "error" ||
+                result.source === "blacklisted"
                   ? "error"
                   : "found",
               name: result.inf_name,
@@ -284,6 +282,12 @@ export function InboundForm({ campaigns }: InboundFormProps) {
               category: result.category,
               profilePic: result.profile_pic,
               verification: result.verification,
+              error:
+                result.source === "blacklisted" ||
+                result.source === "deactivated" ||
+                result.source === "error"
+                  ? (result.note ?? undefined)
+                  : undefined,
             },
           };
         }),
@@ -357,7 +361,8 @@ export function InboundForm({ campaigns }: InboundFormProps) {
       (r) =>
         igUrlRe.test(r.instagramLink.trim()) &&
         r.lookup?.status !== "found" &&
-        r.lookup?.status !== "loading",
+        r.lookup?.status !== "loading" &&
+        r.lookup?.source !== "blacklisted",
     );
     if (targets.length === 0) {
       toast.info("Nothing to fetch — add Instagram profile URLs first.");
@@ -378,15 +383,26 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           chunk.map((r) => r.instagramLink),
           "reachout_inbound",
         );
-        if (res.fetched > 0) {
-          chunk.forEach((r) => {
+        const applyableRows =
+          res.fetched > 0
+            ? chunk
+            : chunk.filter((row) => {
+                const username = inboundUsernameFromUrl(row.instagramLink);
+                const hit = res.hits[username];
+                return (
+                  hit?.source === "creator" || hit?.source === "blacklisted"
+                );
+              });
+        if (applyableRows.length > 0) {
+          applyableRows.forEach((r) => {
             const u = inboundUsernameFromUrl(r.instagramLink);
             const hit = res.hits[u] ?? null;
             lookupCache.current[u] = hit;
             applyLookupResult(r.id, u, hit);
           });
-          done += res.fetched;
-          remaining = remaining.slice(chunk.length);
+          const appliedIds = new Set(applyableRows.map((row) => row.id));
+          done += applyableRows.length;
+          remaining = remaining.filter((row) => !appliedIds.has(row.id));
           setFetchProgress({ done, total });
         }
         // More to go AND the gate opened a cooldown → wait it out, then continue
@@ -601,6 +617,11 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           `Row ${originalIndex + 1}: fetch the profile before submitting.`,
         );
       }
+      if (row.lookup?.source === "blacklisted") {
+        messages.push(
+          `Row ${originalIndex + 1}: this creator is offboarded and cannot be reached out again.`,
+        );
+      }
     });
 
     if (messages.length > 0) {
@@ -627,7 +648,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           gender: v.gender,
           contentCode: v.contentCode,
           collabType: v.collabType,
-          commercials: v.collabType === "Barter" ? 0 : v.commercials ?? 0,
+          commercials: v.collabType === "Barter" ? 0 : (v.commercials ?? 0),
           profileId: v.lookup?.profileId ?? undefined,
         })),
       });
@@ -652,9 +673,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
       });
       if (res.created > 0) {
         setSubmitAttempted(false);
-        toast.success(
-          `${res.created} inbound reach out(s) created.`,
-        );
+        toast.success(`${res.created} inbound reach out(s) created.`);
         if (res.failures.length === 0) {
           setCampaignId("");
         }
@@ -808,8 +827,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
             </h5>
             <small className="text-muted">
               Profile URL, Gender, Content Type are mandatory. Click{" "}
-              <strong>Fetch</strong> to pull name + followers live from Instagram
-              (required before submit). Email auto-fills from the Shopify order.
+              <strong>Fetch</strong> to pull name + followers live from
+              Instagram (required before submit). Email auto-fills from the
+              Shopify order.
             </small>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
@@ -1071,6 +1091,12 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                           {rowErrors.instagramLink}
                         </small>
                       )}
+                      {r.lookup?.source === "blacklisted" && (
+                        <small className="field-error inbound-blacklist-error">
+                          {r.lookup.error ??
+                            "Creator is offboarded and blocked from future reach-out."}
+                        </small>
+                      )}
                     </td>
                     <td>
                       <SearchableSelect
@@ -1095,9 +1121,7 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                           rowErrors.contentCode && "is-invalid-control",
                         )}
                         value={r.contentCode}
-                        onChange={(v) =>
-                          updateRow(r.id, { contentCode: v })
-                        }
+                        onChange={(v) => updateRow(r.id, { contentCode: v })}
                         options={[
                           { value: "", label: "Choose code…" },
                           ...CONTENT_CODES.map((c) => ({
@@ -1221,6 +1245,12 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                   {rowErrors.instagramLink && (
                     <small className="field-error">
                       {rowErrors.instagramLink}
+                    </small>
+                  )}
+                  {r.lookup?.source === "blacklisted" && (
+                    <small className="field-error inbound-blacklist-error">
+                      {r.lookup.error ??
+                        "Creator is offboarded and blocked from future reach-out."}
                     </small>
                   )}
                 </label>

@@ -1,216 +1,276 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  daysOverdue,
+  isOffboardingCandidateRow,
+  OFFBOARDING_PENDING_STATUSES,
+  todayIsoInIndia,
+} from "./rules";
 import type {
+  OffboardingCreator,
   OffboardingFilterOptions,
   OffboardingFilters,
   OffboardingKpi,
-  OffboardingRow,
 } from "./types";
 
-/**
- * Offboarding ledger — every `posts` row in the terminal 'Offboarding' stage,
- * enriched with creator metadata (avatar + tier) and the per-collab agreed
- * commercial total. Supabase-only (no Sheet fallback). Mirrors the
- * accumulate-then-filter pattern used by Order Status / Onboarding: KPIs are
- * computed over the campaign-filtered scope; search + payment filters only
- * trim the table client-side.
- */
-const POSTS_COLS = [
-  "post_id",
-  "collab_id",
+type Raw = Record<string, unknown>;
+
+const CREATOR_SELECT = [
   "inf_id",
   "username",
-  "campaign_id",
-  "workflow_status",
-  "collab_type",
-  "collab_number",
-  "commercial_amount",
-  "order_id",
-  "order_status",
-  "tracking_id",
-  "payment_status",
-  "reach_out_date",
-  "onboard_date",
-  "est_delivery",
-  "post_link",
-  "ads_usage_rights",
-  "reels",
-  "static_posts",
-  "stories",
-  "deliverable_index",
+  "inf_name",
+  "instagram_link",
+  "profile_pic",
+  "category",
+  "followers",
+  "is_blacklisted",
+  "blacklist_reason",
+  "blacklisted_at",
+  "blacklisted_by",
+  "blacklist_evidence",
 ].join(",");
 
-const CREATOR_COLS = ["username", "inf_name", "profile_pic", "category", "followers"].join(",");
-
-export interface OffboardCollabOption {
-  /** Representative post_id — fed to moveToOffboarding (it moves the whole collab). */
-  postId: string;
-  collabId: string;
-  label: string;
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
 }
 
-/**
- * Active collabs eligible to be moved to Offboarding — one option per collab
- * (anything not already Offboarding/Cancelled). The dropdown value is the
- * collab's representative post_id (lowest), which moveToOffboarding resolves
- * back to the whole collab episode.
- */
-export async function fetchOffboardableCollabs(): Promise<OffboardCollabOption[]> {
-  const supabase = createServiceClient();
-  const { data, error } = await (supabase as any)
-    .from("posts")
-    .select("post_id, collab_id, inf_id, collab_number, username, workflow_status")
-    .not("workflow_status", "in", "(Offboarded,Offboarding,Cancelled)")
-    .order("post_id", { ascending: true })
-    .limit(20000);
-  if (error) return [];
-  const byCollab = new Map<string, OffboardCollabOption>();
-  for (const p of (data ?? []) as Array<Record<string, unknown>>) {
-    const collabId =
-      (p.collab_id as string | null) ??
-      (p.inf_id
-        ? `${p.inf_id}-C${Number((p.collab_number as number | null) ?? 1)}`
-        : (p.post_id as string));
-    if (!collabId || byCollab.has(collabId)) continue; // first = lowest post_id = representative
-    const handle = p.username ? `@${p.username}` : "";
-    byCollab.set(collabId, {
-      postId: String(p.post_id),
-      collabId,
-      label: handle ? `${collabId} · ${handle}` : collabId,
-    });
-  }
-  return [...byCollab.values()].sort((a, b) =>
-    a.collabId.localeCompare(b.collabId, undefined, { numeric: true }),
+function matchesSearch(row: OffboardingCreator, search: string): boolean {
+  if (!search) return true;
+  const haystack = [
+    row.infId,
+    row.name,
+    row.username,
+    row.blacklistReason ?? "",
+    ...row.campaigns,
+    ...row.postIds,
+    ...row.teamMembers,
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(search);
+}
+
+function sortedDates(rows: Raw[], key: string): string[] {
+  return rows
+    .map((row) => String(row[key] ?? "").slice(0, 10))
+    .filter(Boolean)
+    .sort();
+}
+
+function uniqueValues(rows: Raw[], value: (row: Raw) => unknown): string[] {
+  return Array.from(
+    new Set(rows.map((row) => String(value(row) ?? "").trim()).filter(Boolean)),
   );
 }
 
+function groupCandidateRows(rows: Raw[], today: string): Map<string, Raw[]> {
+  const grouped = new Map<string, Raw[]>();
+  for (const row of rows) {
+    if (!isOffboardingCandidateRow(row, today)) continue;
+    const infId = String(row.inf_id ?? "").trim();
+    if (!infId) continue;
+    grouped.set(infId, [...(grouped.get(infId) ?? []), row]);
+  }
+  return grouped;
+}
+
+function candidateFromRows(
+  infId: string,
+  rows: Raw[],
+  creator: Raw,
+  today: string,
+): OffboardingCreator | null {
+  if (creator.is_blacklisted === true) return null;
+
+  const deadlines = sortedDates(rows, "est_delivery");
+  const onboardDates = sortedDates(rows, "onboard_date");
+  const campaigns = uniqueValues(rows, (row) => row.campaign_id);
+  const postIds = rows
+    .map((row) => String(row.post_id ?? "").trim())
+    .filter(Boolean);
+  const collabIds = uniqueValues(rows, (row) => row.collab_id ?? row.post_id);
+  const teamMembers = uniqueValues(
+    rows,
+    (row) => row.onboarded_by ?? row.logged_by,
+  );
+  const username = String(creator.username ?? rows[0]?.username ?? "").trim();
+  const oldestDeadline = deadlines[0] ?? null;
+
+  return {
+    state: "candidate",
+    infId,
+    name: String(creator.inf_name ?? username),
+    username,
+    instagramLink:
+      String(creator.instagram_link ?? "").trim() ||
+      (username ? `https://www.instagram.com/${username}/` : null),
+    profilePicUrl: String(creator.profile_pic ?? "").trim() || null,
+    category: String(creator.category ?? "").trim() || null,
+    followers: Number(creator.followers ?? 0) || null,
+    overdueDeliverables: rows.length,
+    overdueCollabs: collabIds.length,
+    oldestDeadline,
+    daysOverdue: daysOverdue(oldestDeadline, today),
+    campaigns,
+    postIds,
+    teamMembers,
+    lastOnboardDate: onboardDates.at(-1) ?? null,
+    blacklistReason: null,
+    blacklistedAt: null,
+    blacklistedBy: null,
+  };
+}
+
+function offboardedFromCreator(
+  creator: Raw,
+  today: string,
+): OffboardingCreator {
+  const evidence =
+    creator.blacklist_evidence && typeof creator.blacklist_evidence === "object"
+      ? (creator.blacklist_evidence as Raw)
+      : {};
+  const oldestDeadline =
+    String(evidence.oldestDeadline ?? "").slice(0, 10) || null;
+  const username = String(creator.username ?? "").trim();
+
+  return {
+    state: "offboarded",
+    infId: String(creator.inf_id ?? ""),
+    name: String(creator.inf_name ?? username),
+    username,
+    instagramLink:
+      String(creator.instagram_link ?? "").trim() ||
+      (username ? `https://www.instagram.com/${username}/` : null),
+    profilePicUrl: String(creator.profile_pic ?? "").trim() || null,
+    category: String(creator.category ?? "").trim() || null,
+    followers: Number(creator.followers ?? 0) || null,
+    overdueDeliverables: Number(evidence.overdueDeliverables ?? 0) || 0,
+    overdueCollabs: Number(evidence.overdueCollabs ?? 0) || 0,
+    oldestDeadline,
+    daysOverdue: daysOverdue(oldestDeadline, today),
+    campaigns: stringList(evidence.campaigns),
+    postIds: stringList(evidence.postIds),
+    teamMembers: stringList(evidence.teamMembers),
+    lastOnboardDate: null,
+    blacklistReason: String(creator.blacklist_reason ?? "").trim() || null,
+    blacklistedAt: String(creator.blacklisted_at ?? "").trim() || null,
+    blacklistedBy: String(creator.blacklisted_by ?? "").trim() || null,
+  };
+}
+
+/**
+ * Creator-level offboarding data.
+ *
+ * Candidate rule: estimated delivery is before today and the deliverable is
+ * still in the unsubmitted Posting queue (`On Board` / `Order Sent`). Posting
+ * submission moves it to `Posted`, so the workflow status is the authoritative
+ * "form filled" signal. Rows are grouped by creator before reaching the UI.
+ */
 export async function fetchOffboardingData(
   filters: OffboardingFilters,
-): Promise<{ rows: OffboardingRow[]; kpi: OffboardingKpi }> {
+): Promise<{
+  candidates: OffboardingCreator[];
+  offboarded: OffboardingCreator[];
+  kpi: OffboardingKpi;
+}> {
   const supabase = createServiceClient();
+  const today = todayIsoInIndia();
 
-  const [postsRes, siblingRes, creatorsRes, igCacheRes] = await Promise.all([
+  const [
+    { data: overdueRows, error: overdueError },
+    { data: blacklistedRows, error: blacklistError },
+  ] = await Promise.all([
     (supabase as any)
       .from("posts")
-      .select(POSTS_COLS)
-      .in("workflow_status", ["Offboarded", "Offboarding"])
-      .or("deliverable_index.is.null,deliverable_index.eq.1")
-      .limit(5000),
-    (supabase as any)
-      .from("posts")
-      .select("inf_id, collab_number, commercial_amount, reels, static_posts, stories")
+      .select(
+        "post_id, collab_id, inf_id, username, campaign_id, workflow_status, est_delivery, onboard_date, onboarded_by, logged_by",
+      )
+      .in("workflow_status", [...OFFBOARDING_PENDING_STATUSES])
+      .lt("est_delivery", today)
       .not("inf_id", "is", null)
-      .not("collab_number", "is", null)
-      .limit(20000),
-    (supabase as any).from("creators").select(CREATOR_COLS).limit(5000),
+      .order("est_delivery", { ascending: true })
+      .limit(50000),
     (supabase as any)
-      .from("instagram_cache")
-      .select("username, profile_pic")
-      .limit(5000),
+      .from("creators")
+      .select(CREATOR_SELECT)
+      .eq("is_blacklisted", true)
+      .order("blacklisted_at", { ascending: false })
+      .limit(10000),
   ]);
 
-  if (postsRes.error) {
-    console.error("[offboarding] posts query failed:", postsRes.error);
-    throw postsRes.error;
+  if (overdueError) {
+    console.error("[offboarding] overdue query failed:", overdueError);
+    throw overdueError;
+  }
+  if (blacklistError) {
+    console.error("[offboarding] blacklist query failed:", blacklistError);
+    throw blacklistError;
   }
 
-  const siblingSumMap = new Map<string, number>();
-  const deliverableSumMap = new Map<
-    string,
-    { reels: number; posts: number; stories: number }
-  >();
-  for (const s of (siblingRes.data ?? []) as Array<Record<string, unknown>>) {
-    const key = `${s.inf_id}::${s.collab_number}`;
-    siblingSumMap.set(
-      key,
-      (siblingSumMap.get(key) ?? 0) + Number(s.commercial_amount ?? 0),
-    );
-    const d = deliverableSumMap.get(key) ?? { reels: 0, posts: 0, stories: 0 };
-    d.reels += Number(s.reels ?? 0) || 0;
-    d.posts += Number(s.static_posts ?? 0) || 0;
-    d.stories += Number(s.stories ?? 0) || 0;
-    deliverableSumMap.set(key, d);
+  const grouped = groupCandidateRows((overdueRows ?? []) as Raw[], today);
+
+  const candidateIds = [...grouped.keys()];
+  const { data: candidateCreators, error: candidateCreatorError } =
+    candidateIds.length > 0
+      ? await (supabase as any)
+          .from("creators")
+          .select(CREATOR_SELECT)
+          .in("inf_id", candidateIds)
+          .limit(50000)
+      : { data: [], error: null };
+  if (candidateCreatorError) throw candidateCreatorError;
+
+  const creatorById = new Map<string, Raw>();
+  for (const creator of (candidateCreators ?? []) as Raw[]) {
+    creatorById.set(String(creator.inf_id ?? ""), creator);
   }
 
-  const creatorMap = new Map<string, Record<string, unknown>>();
-  for (const c of (creatorsRes.data ?? []) as Array<Record<string, unknown>>) {
-    const u = String(c.username ?? "").toLowerCase();
-    if (u) creatorMap.set(u, c);
-  }
-  const igCacheMap = new Map<string, string>();
-  for (const ic of (igCacheRes.data ?? []) as Array<Record<string, unknown>>) {
-    const u = String(ic.username ?? "").toLowerCase();
-    const pic = String(ic.profile_pic ?? "").trim();
-    if (u && pic) igCacheMap.set(u, pic);
+  let candidates = [...grouped.entries()]
+    .map(([infId, rows]) =>
+      candidateFromRows(infId, rows, creatorById.get(infId) ?? {}, today),
+    )
+    .filter((row): row is OffboardingCreator => row !== null);
+
+  let offboarded = ((blacklistedRows ?? []) as Raw[]).map((creator) =>
+    offboardedFromCreator(creator, today),
+  );
+
+  const campaign = String(filters.campaign ?? "").trim();
+  if (campaign) {
+    candidates = candidates.filter((row) => row.campaigns.includes(campaign));
+    offboarded = offboarded.filter((row) => row.campaigns.includes(campaign));
   }
 
-  const posts = (postsRes.data ?? []) as Array<Record<string, unknown>>;
+  candidates.sort(
+    (a, b) =>
+      b.daysOverdue - a.daysOverdue || a.username.localeCompare(b.username),
+  );
+  offboarded.sort((a, b) =>
+    String(b.blacklistedAt ?? "").localeCompare(String(a.blacklistedAt ?? "")),
+  );
 
-  const rows: OffboardingRow[] = [];
   const kpi: OffboardingKpi = {
-    total: 0,
-    paid: 0,
-    awaitingPayment: 0,
-    totalCommercials: 0,
+    candidates: candidates.length,
+    overdueDeliverables: candidates.reduce(
+      (sum, row) => sum + row.overdueDeliverables,
+      0,
+    ),
+    offboardedCreators: offboarded.length,
+    longestOverdueDays: candidates.reduce(
+      (max, row) => Math.max(max, row.daysOverdue),
+      0,
+    ),
   };
 
-  for (const p of posts) {
-    if (p.deliverable_index != null && Number(p.deliverable_index) > 1) continue;
-
-    const camp = String(p.campaign_id ?? "").trim();
-    if (filters.campaign && camp !== filters.campaign) continue;
-
-    const cRow =
-      creatorMap.get(String(p.username ?? "").toLowerCase()) ??
-      ({} as Record<string, unknown>);
-    const commercials =
-      siblingSumMap.get(`${p.inf_id}::${p.collab_number}`) ??
-      Number(p.commercial_amount ?? 0);
-    const paymentStatus = String(p.payment_status ?? "").trim();
-
-    rows.push({
-      postId: String(p.post_id ?? ""),
-      collabId: (p.collab_id as string | null) ?? null,
-      collabNumber: Number(p.collab_number ?? 0) || null,
-      infId: (p.inf_id as string | null) ?? null,
-      name: String(cRow.inf_name ?? p.username ?? ""),
-      username: String(p.username ?? ""),
-      profilePicUrl:
-        String(cRow.profile_pic ?? "") ||
-        igCacheMap.get(String(p.username ?? "").toLowerCase()) ||
-        null,
-      campaign: camp,
-      category: (cRow.category as string | null) ?? null,
-      followers: Number(cRow.followers ?? 0) || null,
-      collabType: (p.collab_type as string | null) ?? null,
-      commercials,
-      orderId: String(p.order_id ?? "").trim(),
-      orderStatus: (p.order_status as string | null) ?? null,
-      trackingId: (p.tracking_id as string | null) ?? null,
-      paymentStatus,
-      workflowStatus: String(p.workflow_status ?? ""),
-      reachoutDate: p.reach_out_date ? String(p.reach_out_date).slice(0, 10) : null,
-      onboardDate: p.onboard_date ? String(p.onboard_date).slice(0, 10) : null,
-      estDelivery: p.est_delivery ? String(p.est_delivery).slice(0, 10) : null,
-      postLink: (p.post_link as string | null) ?? null,
-      adsUsageRights: (p.ads_usage_rights as string | null) ?? null,
-      reels:
-        deliverableSumMap.get(`${p.inf_id}::${p.collab_number}`)?.reels ??
-        (Number(p.reels ?? 0) || 0),
-      staticPosts:
-        deliverableSumMap.get(`${p.inf_id}::${p.collab_number}`)?.posts ??
-        (Number(p.static_posts ?? 0) || 0),
-      stories:
-        deliverableSumMap.get(`${p.inf_id}::${p.collab_number}`)?.stories ??
-        (Number(p.stories ?? 0) || 0),
-    });
-
-    kpi.total++;
-    kpi.totalCommercials += commercials;
-    if (paymentStatus.toLowerCase() === "done") kpi.paid++;
-    else kpi.awaitingPayment++;
+  const search = String(filters.search ?? "")
+    .trim()
+    .toLowerCase();
+  if (search) {
+    candidates = candidates.filter((row) => matchesSearch(row, search));
+    offboarded = offboarded.filter((row) => matchesSearch(row, search));
   }
 
-  return { rows, kpi };
+  return { candidates, offboarded, kpi };
 }
 
 export async function fetchOffboardingFilterOptions(): Promise<OffboardingFilterOptions> {
@@ -221,8 +281,14 @@ export async function fetchOffboardingFilterOptions(): Promise<OffboardingFilter
     .order("campaign_id", { ascending: false })
     .limit(500);
   return {
-    campaigns: ((data ?? []) as Array<{ campaign_id: string; campaign_name: string | null }>).map(
-      (c) => ({ id: c.campaign_id, name: c.campaign_name ?? c.campaign_id }),
-    ),
+    campaigns: (
+      (data ?? []) as Array<{
+        campaign_id: string;
+        campaign_name: string | null;
+      }>
+    ).map((campaign) => ({
+      id: campaign.campaign_id,
+      name: campaign.campaign_name ?? campaign.campaign_id,
+    })),
   };
 }

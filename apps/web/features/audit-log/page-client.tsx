@@ -12,15 +12,11 @@ import {
   Table2,
   Trash2,
   UserCog,
+  UserMinus,
   type LucideProps,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import type {
-  AuditEntry,
-  AuditLogData,
-  AuditSource,
-  AuditTone,
-} from "./types";
+import type { AuditEntry, AuditLogData, AuditSource, AuditTone } from "./types";
 
 type Icon = ComponentType<LucideProps>;
 
@@ -29,18 +25,40 @@ const SOURCE_META: Record<
   { label: string; icon: Icon; color: string; bg: string }
 > = {
   Sheet: { label: "Sheet View", icon: Table2, color: "#3B6FD4", bg: "#ECF1FB" },
-  User: { label: "Users & Access", icon: UserCog, color: "#7B4FBF", bg: "#F3EDFB" },
-  System: { label: "System", icon: ShieldAlert, color: "#C0392B", bg: "#FDECEA" },
-  Approval: { label: "Approvals", icon: ShieldCheck, color: "#B57514", bg: "#FAF1DC" },
+  User: {
+    label: "Users & Access",
+    icon: UserCog,
+    color: "#7B4FBF",
+    bg: "#F3EDFB",
+  },
+  Creator: {
+    label: "Creator Offboarding",
+    icon: UserMinus,
+    color: "#C0392B",
+    bg: "#FDECEA",
+  },
+  System: {
+    label: "System",
+    icon: ShieldAlert,
+    color: "#C0392B",
+    bg: "#FDECEA",
+  },
+  Approval: {
+    label: "Approvals",
+    icon: ShieldCheck,
+    color: "#B57514",
+    bg: "#FAF1DC",
+  },
 };
 
-const TONE_META: Record<AuditTone, { icon: Icon; color: string; bg: string }> = {
-  create: { icon: CheckCircle2, color: "#4F7C4D", bg: "#ECF1E9" },
-  delete: { icon: Trash2, color: "#C0392B", bg: "#FDECEA" },
-  change: { icon: Pencil, color: "#B57514", bg: "#FAF1DC" },
-  resolve: { icon: CheckCircle2, color: "#4F7C4D", bg: "#ECF1E9" },
-  neutral: { icon: RotateCcw, color: "#6E695E", bg: "#F0EDE6" },
-};
+const TONE_META: Record<AuditTone, { icon: Icon; color: string; bg: string }> =
+  {
+    create: { icon: CheckCircle2, color: "#4F7C4D", bg: "#ECF1E9" },
+    delete: { icon: Trash2, color: "#C0392B", bg: "#FDECEA" },
+    change: { icon: Pencil, color: "#B57514", bg: "#FAF1DC" },
+    resolve: { icon: CheckCircle2, color: "#4F7C4D", bg: "#ECF1E9" },
+    neutral: { icon: RotateCcw, color: "#6E695E", bg: "#F0EDE6" },
+  };
 
 /** Compact "DD MMM YYYY · HH:MM" in IST. */
 function formatWhen(iso: string | null): string {

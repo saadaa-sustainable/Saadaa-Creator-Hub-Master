@@ -145,6 +145,11 @@ export interface CreatorsRow {
   is_active?: boolean | null;
   deactivated_reason?: string | null;
   deactivated_at?: string | null;
+  is_blacklisted: boolean;
+  blacklist_reason: string | null;
+  blacklisted_at: string | null;
+  blacklisted_by: string | null;
+  blacklist_evidence: Json | null;
   username: string;
   inf_name: string | null;
   instagram_link: string | null;
@@ -858,12 +863,49 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_audit_log: {
+        Row: {
+          action: string
+          actor_email: string
+          created_at: string
+          creator_inf_id: string
+          id: number
+          metadata: Json | null
+          reason: string
+          username: string
+        }
+        Insert: {
+          action: string
+          actor_email: string
+          created_at?: string
+          creator_inf_id: string
+          id?: number
+          metadata?: Json | null
+          reason: string
+          username: string
+        }
+        Update: {
+          action?: string
+          actor_email?: string
+          created_at?: string
+          creator_inf_id?: string
+          id?: number
+          metadata?: Json | null
+          reason?: string
+          username?: string
+        }
+        Relationships: []
+      }
       creators: {
         Row: {
           agency_name: string | null
           avg_likes: number | null
           bank_name: string | null
           bank_number: string | null
+          blacklist_evidence: Json | null
+          blacklist_reason: string | null
+          blacklisted_at: string | null
+          blacklisted_by: string | null
           category: string | null
           collab_counter: number
           created_at: string | null
@@ -876,6 +918,7 @@ export type Database = {
           inf_id: string
           inf_name: string | null
           instagram_link: string | null
+          is_blacklisted: boolean
           is_test: boolean
           language: string | null
           profile_id: string | null
@@ -891,6 +934,10 @@ export type Database = {
           avg_likes?: number | null
           bank_name?: string | null
           bank_number?: string | null
+          blacklist_evidence?: Json | null
+          blacklist_reason?: string | null
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
           category?: string | null
           collab_counter?: number
           created_at?: string | null
@@ -903,6 +950,7 @@ export type Database = {
           inf_id: string
           inf_name?: string | null
           instagram_link?: string | null
+          is_blacklisted?: boolean
           is_test?: boolean
           language?: string | null
           profile_id?: string | null
@@ -918,6 +966,10 @@ export type Database = {
           avg_likes?: number | null
           bank_name?: string | null
           bank_number?: string | null
+          blacklist_evidence?: Json | null
+          blacklist_reason?: string | null
+          blacklisted_at?: string | null
+          blacklisted_by?: string | null
           category?: string | null
           collab_counter?: number
           created_at?: string | null
@@ -930,6 +982,7 @@ export type Database = {
           inf_id?: string
           inf_name?: string | null
           instagram_link?: string | null
+          is_blacklisted?: boolean
           is_test?: boolean
           language?: string | null
           profile_id?: string | null
@@ -1948,6 +2001,16 @@ export type Database = {
           post_id: string
           post_id_short: string
           post_number: number
+        }[]
+      }
+      offboard_creator_if_eligible: {
+        Args: {
+          p_actor_email: string
+          p_inf_id: string
+          p_reason: string
+        }
+        Returns: {
+          creator_username: string
         }[]
       }
       generate_post_id: { Args: { p_inf_id: string }; Returns: string }

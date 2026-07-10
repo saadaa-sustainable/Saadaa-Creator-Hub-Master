@@ -122,7 +122,9 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
     .select("status")
     .eq("campaign_id", v.campaignId)
     .maybeSingle();
-  const campStatus = String(campRow?.status ?? "").trim().toLowerCase();
+  const campStatus = String(campRow?.status ?? "")
+    .trim()
+    .toLowerCase();
   if (campStatus !== "active") {
     return {
       ok: false,
@@ -198,7 +200,12 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
   // Test Mode: stamp the new creator (creator scope) + reach-out post (collab
   // scope) when those scopes are on. No-op when Test Mode is off.
   await stampTestRows([
-    { scope: "creator", table: "creators", idColumn: "inf_id", ids: row.inf_id ? [row.inf_id] : [] },
+    {
+      scope: "creator",
+      table: "creators",
+      idColumn: "inf_id",
+      ids: row.inf_id ? [row.inf_id] : [],
+    },
     // Reach-out rows have NULL post_id (minted at onboarding) — stamp by id.
     { scope: "collab", table: "posts", idColumn: "id", ids: [row.id] },
   ]);
@@ -352,8 +359,7 @@ export async function editReachOut(
     const frozenViolations: string[] = [];
     if (
       v.username != null &&
-      v.username.toLowerCase() !==
-        String(post.username ?? "").toLowerCase()
+      v.username.toLowerCase() !== String(post.username ?? "").toLowerCase()
     ) {
       frozenViolations.push("username");
     }
@@ -450,16 +456,22 @@ export async function editReachOut(
 
 export interface CreatorLookupHit {
   /**
-   * creator     — row already in `creators` (existing relationship → submit blocked,
-   *               guided to Onboarding for a repeat collab)
+   * creator     — eligible existing row in `creators`; its identity is reused
    * meta        — live Meta business_discovery hit (instant; the normal new-creator path)
    * historic    — Meta failed but we have the handle in ig_data_historic (cached metrics)
+   * blacklisted — creator was permanently offboarded; all reach-out is blocked
    * deactivated — Meta says "Cannot find User" (personal/dead) and no historic data;
    *               not fetchable → label deactivated, manual entry still allowed
    * error       — transient Meta failure (rate-block/token/network) with no historic
    *               fallback; let the user retry or enter manually
    */
-  source: "creator" | "meta" | "historic" | "deactivated" | "error";
+  source:
+    | "creator"
+    | "meta"
+    | "historic"
+    | "blacklisted"
+    | "deactivated"
+    | "error";
   username: string;
   inf_id?: string;
   /** historic_creator (from the archive) vs new_creator (added in the new project). */
@@ -482,6 +494,8 @@ export interface CreatorLookupHit {
   verification: "Yes" | "No" | null;
   /** Optional human note for non-data tiers (deactivated/error). */
   note?: string | null;
+  blacklisted_at?: string | null;
+  blacklisted_by?: string | null;
   /**
    * True when this is an existing creator whose metrics were just refreshed from
    * a live Meta fetch (re-reach flow). The identity (inf_id, profile_id) is
@@ -519,8 +533,10 @@ function creatorLookupFromRow(
   const followers = num("followers");
 
   const ctypeRaw = str("creator_type");
+  const blacklisted = creatorRow.is_blacklisted === true;
+  const blacklistReason = str("blacklist_reason");
   return {
-    source: "creator",
+    source: blacklisted ? "blacklisted" : "creator",
     username: String(creatorRow.username ?? username),
     inf_id:
       typeof creatorRow.inf_id === "string" ? creatorRow.inf_id : undefined,
@@ -546,6 +562,11 @@ function creatorLookupFromRow(
         : verRaw === "No" || verRaw === "Non-Verified"
           ? "No"
           : null,
+    blacklisted_at: str("blacklisted_at"),
+    blacklisted_by: str("blacklisted_by"),
+    note: blacklisted
+      ? `This creator was offboarded and is blocked from future reach-out and onboarding.${blacklistReason ? ` Reason: ${blacklistReason}` : ""}`
+      : null,
   };
 }
 
@@ -558,7 +579,6 @@ function creatorLookupFromRow(
  * when Meta is cooling down / failed, so a hiccup never wipes known data.
  */
 async function refreshExistingCreator(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   username: string,
   creatorRow: Record<string, unknown>,
@@ -836,7 +856,17 @@ export async function lookupCreator(
     console.error("[lookupCreator] creators select error:", creatorErr.message);
   }
 
-  // NOTE: an existing creator no longer short-circuits here. Reach-Out now allows
+  // Blacklisted creators short-circuit BEFORE Meta. The lookup must return an
+  // immediate error and must not spend a Meta request refreshing blocked data.
+  if (creatorRow) {
+    const storedHit = creatorLookupFromRow(
+      username,
+      creatorRow as Record<string, unknown>,
+    );
+    if (storedHit.source === "blacklisted") return storedHit;
+  }
+
+  // NOTE: an eligible existing creator no longer short-circuits here. Reach-Out now allows
   // re-reaching an existing creator, and the re-reach must pull FRESH Instagram
   // data — so we still run the live Meta fetch below and refresh the stored row
   // in place (same SIF/profile_id) via refreshExistingCreator.
@@ -871,8 +901,6 @@ export async function lookupCreator(
     profile_id: string | null;
     profile_status: string | null;
   } | null;
-  const historicSif = clean?.sif_id ?? null;
-  const historicGender = clean?.gender ?? null;
 
   // 2. Meta business_discovery — INSTANT live fetch (replaces the Apify 3-hr path),
   //    gated by the rolling batch-of-50 cooldown. When cooling down we DON'T hit
@@ -920,6 +948,11 @@ export async function lookupCreator(
       .maybeSingle();
     if (byPid) {
       const r = byPid as Record<string, unknown>;
+      const storedHit = creatorLookupFromRow(
+        typeof r.username === "string" ? r.username : username,
+        r,
+      );
+      if (storedHit.source === "blacklisted") return storedHit;
       return refreshExistingCreator(
         supabase,
         typeof r.username === "string" ? r.username : username,

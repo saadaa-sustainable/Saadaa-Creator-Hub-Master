@@ -1,4 +1,5 @@
 import { Users } from "lucide-react";
+import { InfoDot } from "../bento-kit";
 import type { DashboardData } from "../types";
 
 function initials(name: string): string {
@@ -20,7 +21,12 @@ export function DashboardTeamLeaderboard({
     <article className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
-          <Users size={12} className="text-[#B54F7A]" aria-hidden /> Team Leaderboard
+          <Users size={12} className="text-[#B54F7A]" aria-hidden /> Team
+          Leaderboard
+          <InfoDot
+            title="Team Leaderboard"
+            text="Team members ranked by the number of creators they onboarded in the current filter scope."
+          />
         </span>
         <span className="text-[0.6rem] text-text-tertiary">By onboardings</span>
       </header>
@@ -49,8 +55,12 @@ export function DashboardTeamLeaderboard({
                       {t.name}
                     </span>
                     <span className="tabular text-text-secondary text-[0.72rem]">
-                      <strong className="text-text-primary">{t.onboardings}</strong>{" "}
-                      <span className="text-text-tertiary">· {t.posts} posts</span>
+                      <strong className="text-text-primary">
+                        {t.onboardings}
+                      </strong>{" "}
+                      <span className="text-text-tertiary">
+                        · {t.posts} posts
+                      </span>
                     </span>
                   </div>
                   <div className="mt-1 relative h-1.5 rounded-full bg-bg-ecru overflow-hidden">

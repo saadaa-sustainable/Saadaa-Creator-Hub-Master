@@ -1,11 +1,7 @@
 import "server-only";
 import { isVoidedStatus } from "@/lib/workflow";
 
-/**
- * A prior reach-out only blocks if it is still ACTIVE. Cancelled or
- * voided/Offboarded collabs are dead — they free the creator for
- * re-engagement (same as today's campaign guard: voiding frees the slot).
- */
+/** A prior collab blocks only while its reach-out is still active. */
 function isActiveReachout(status: string | null): boolean {
   return String(status ?? "") !== "Cancelled" && !isVoidedStatus(status);
 }
@@ -28,16 +24,40 @@ export type ReachoutBlock = {
  *                 {@link REACHOUT_COOLDOWN_DAYS} days (across ALL campaigns).
  *   • Campaign  — never a second ACTIVE reach-out for the SAME campaign; the
  *                 creator is free to map to a different campaign next cycle.
- * Cancelled/voided reach-outs are ignored by both. Matches by handle (the key
- * `submit_reachout` resolves the creator on). Returns a {@link ReachoutBlock}
- * describing why it is blocked, or `null` when the reach-out is allowed.
+ * Cancelled/voided reach-outs are ignored by both cooldown rules. A creator-level
+ * blacklist is checked first and is always terminal regardless of old collab
+ * status. Matches by handle (the key `submit_reachout` resolves the creator on).
+ * Returns a {@link ReachoutBlock} describing why it is blocked, or `null` when
+ * the reach-out is allowed.
  */
 export async function checkReachoutAllowed(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   username: string,
   campaignId: string,
 ): Promise<ReachoutBlock | null> {
+  // Creator-level terminal rule. This is checked again at submission time so
+  // client state, stale lookup results, and direct server-action calls cannot
+  // re-enter an offboarded creator into the pipeline.
+  const { data: creator, error: creatorError } = await supabase
+    .from("creators")
+    .select("is_blacklisted, blacklist_reason")
+    .ilike("username", username)
+    .maybeSingle();
+  if (creatorError) {
+    console.error("[reach-out] blacklist lookup failed:", creatorError.message);
+    return {
+      error: "Creator eligibility could not be verified. Try again.",
+      hint: "Could not verify creator eligibility",
+    };
+  }
+  if (creator?.is_blacklisted === true) {
+    const reason = String(creator.blacklist_reason ?? "").trim();
+    return {
+      error: `@${username} is offboarded and cannot be reached out or onboarded again.${reason ? ` Reason: ${reason}` : ""}`,
+      hint: "Creator is offboarded and blacklisted",
+    };
+  }
+
   const since = new Date(Date.now() - REACHOUT_COOLDOWN_DAYS * 86_400_000)
     .toISOString()
     .slice(0, 10);
@@ -58,7 +78,8 @@ export async function checkReachoutAllowed(
   // Campaign rule — already mapped to this campaign (active).
   if (
     rows.some(
-      (p) => p.campaign_id === campaignId && isActiveReachout(p.workflow_status),
+      (p) =>
+        p.campaign_id === campaignId && isActiveReachout(p.workflow_status),
     )
   ) {
     return {

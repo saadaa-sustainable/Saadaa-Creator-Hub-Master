@@ -16,8 +16,8 @@ export default function ReachOutInboundKM() {
           </li>
           <li>
             <strong>Manual Entry Cap card</strong> · live counter shows{" "}
-            <KMCode>N / 10</KMCode>. Add row button disables at the cap;
-            switch to CSV upload past that.
+            <KMCode>N / 10</KMCode>. Add row button disables at the cap; switch
+            to CSV upload past that.
           </li>
           <li>
             <strong>Step 02 — Inbound Roster</strong> · per-row form with
@@ -32,14 +32,14 @@ export default function ReachOutInboundKM() {
           <li>
             <strong>XLSX template</strong> · click to download a pre-formatted
             workbook with columns{" "}
-            <KMCode>instaLink, gender, contentCode</KMCode>{" "}
-            + dropdown enums for gender + content type. (Collab Type +
-            Commercials columns removed 2026-06-10.)
+            <KMCode>instaLink, gender, contentCode</KMCode> + dropdown enums for
+            gender + content type. (Collab Type + Commercials columns removed
+            2026-06-10.)
           </li>
           <li>
             <strong>Upload CSV/XLSX</strong> · accepts <KMCode>.csv</KMCode>,{" "}
-            <KMCode>.xlsx</KMCode>, <KMCode>.xls</KMCode>. Parsed rows skip
-            the 10-row manual cap. SheetJS handles both formats client-side.
+            <KMCode>.xlsx</KMCode>, <KMCode>.xls</KMCode>. Parsed rows skip the
+            10-row manual cap. SheetJS handles both formats client-side.
           </li>
           <li>
             Header row auto-detected; legacy aliases for the rate columns no
@@ -51,8 +51,8 @@ export default function ReachOutInboundKM() {
       <KMSection tag="Per-row fields">
         <KMList>
           <li>
-            <strong>Profile URL</strong> · required. Derives the username
-            (any <KMCode>instagram.com/handle</KMCode> shape works).
+            <strong>Profile URL</strong> · required. Derives the username (any{" "}
+            <KMCode>instagram.com/handle</KMCode> shape works).
           </li>
           <li>
             <strong>Gender</strong> · required. Female / Male / Other.
@@ -63,23 +63,22 @@ export default function ReachOutInboundKM() {
           </li>
           <li>
             <strong>Collab Type + Commercials</strong> · removed from inbound
-            (2026-06-10). Inbound reach-outs leave{" "}
-            <KMCode>collab_type</KMCode> <strong>unset</strong> (null, NOT
-            auto-Barter) and commercial 0 — both are decided in{" "}
-            <strong>Onboarding</strong>, same as outbound. (Leaving it null keeps
-            inbound out of the Barter funnel bucket until a collab type is
-            actually chosen.)
+            (2026-06-10). Inbound reach-outs leave <KMCode>collab_type</KMCode>{" "}
+            <strong>unset</strong> (null, NOT auto-Barter) and commercial 0 —
+            both are decided in <strong>Onboarding</strong>, same as outbound.
+            (Leaving it null keeps inbound out of the Barter funnel bucket until
+            a collab type is actually chosen.)
           </li>
         </KMList>
       </KMSection>
 
       <KMSection tag="Equal-split rule (handoff to Onboarding)">
         <KMCallout tone="info">
-          The commercial figure here is stored as the agreed total on the
-          parent post. Once Onboarding expands the collab into per-deliverable
-          rows, the total gets divided by the deliverable count so every row
-          (parent + children) holds the same per-row split share. The Onboarding
-          form locks Collab Type + Commercials read-only on rows that came from
+          The commercial figure here is stored as the agreed total on the parent
+          post. Once Onboarding expands the collab into per-deliverable rows,
+          the total gets divided by the deliverable count so every row (parent +
+          children) holds the same per-row split share. The Onboarding form
+          locks Collab Type + Commercials read-only on rows that came from
           Inbound to prevent accidental drift.
         </KMCallout>
       </KMSection>
@@ -87,8 +86,8 @@ export default function ReachOutInboundKM() {
       <KMSection tag="Fields written (submit)">
         <KMList>
           <li>
-            <strong>creators</strong> · same columns as Outbound. Existing
-            rows update enrichment fields only.
+            <strong>creators</strong> · same columns as Outbound. Existing rows
+            update enrichment fields only.
           </li>
           <li>
             <strong>posts</strong> · workflow_status <KMCode>Reach Out</KMCode>,
@@ -109,11 +108,11 @@ export default function ReachOutInboundKM() {
           <li>
             <strong>Fetch button</strong> pulls every unresolved row live from
             Instagram via Meta Batch calls (≤50 sub-requests each — the{" "}
-            <KMCode>ig_fetching.py</KMCode> model). It <strong>auto-loops</strong>{" "}
-            in batches of 50: e.g. 70 rows → fetch 50, cool down, fetch 20 — no
-            re-click. A live progress chip shows{" "}
-            <KMCode>Fetching done/total</KMCode> + the cooldown countdown, with a{" "}
-            <strong>Stop</strong> button. Each row shows its own spinner →
+            <KMCode>ig_fetching.py</KMCode> model). It{" "}
+            <strong>auto-loops</strong> in batches of 50: e.g. 70 rows → fetch
+            50, cool down, fetch 20 — no re-click. A live progress chip shows{" "}
+            <KMCode>Fetching done/total</KMCode> + the cooldown countdown, with
+            a <strong>Stop</strong> button. Each row shows its own spinner →
             Live / Last known / Not fetchable.
           </li>
           <li>
@@ -140,24 +139,30 @@ export default function ReachOutInboundKM() {
       <KMSection tag="Validation + alerts">
         <KMList>
           <li>
-            Per-row errors highlight inline (red border on the cell, helper
-            text below).
+            Per-row errors highlight inline (red border on the cell, helper text
+            below).
           </li>
           <li>
-            <strong>Live Instagram URL validation</strong> — each Profile URL
-            is checked against the shared Instagram-profile regex in{" "}
+            <strong>Live Instagram URL validation</strong> — each Profile URL is
+            checked against the shared Instagram-profile regex in{" "}
             <KMCode>lib/validators.ts</KMCode>. An invalid URL flags the row
             live (red border) on type and on blur, not only at submit.
           </li>
           <li>
             <strong>Duplicate-creator guard</strong> — a row for a creator
             already in the same campaign fails on submit, while the other rows
-            still commit. The block lifts if the prior collab was{" "}
-            <KMCode>Cancelled</KMCode> or <KMCode>Offboarded</KMCode> (voided).
+            still commit. A cancelled legacy collab can free the campaign rule,
+            but a creator-level blacklist never does.
           </li>
           <li>
-            Red <KMCode>MissingFieldsAlert</KMCode> renders above the Submit
-            All button listing every distinct missing column across the batch
+            <strong>Offboarded creator guard</strong> — Fetch All marks the row
+            red immediately with the recorded reason. Submit All checks again on
+            the server, so the blocked creator cannot be re-added through a
+            stale batch.
+          </li>
+          <li>
+            Red <KMCode>MissingFieldsAlert</KMCode> renders above the Submit All
+            button listing every distinct missing column across the batch
             (Campaign ID, Profile URL, Gender, Content Type, Collab Type,
             Commercials).
           </li>

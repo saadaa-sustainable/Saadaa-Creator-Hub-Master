@@ -195,10 +195,7 @@ export function InternalDashboardBody({
         </div>
 
         <div className="lg:col-span-6 min-w-0">
-          <TeamMatrix
-            rows={scoped.teamRollup}
-            colors={TEAM_COLORS}
-          />
+          <TeamMatrix rows={scoped.teamRollup} colors={TEAM_COLORS} />
         </div>
         <div className="lg:col-span-6 min-w-0">
           <CampaignPerformance rows={scoped.campaignRollup} />
@@ -314,7 +311,11 @@ function FilterRow({
             type="button"
             onClick={onViewRows}
             disabled={!team}
-            title={team ? `View ${team}'s row-level data` : "Select a team member first"}
+            title={
+              team
+                ? `View ${team}'s row-level data`
+                : "Select a team member first"
+            }
             className={cn(
               "inline-flex items-center justify-center gap-1.5 px-3.5 h-9 rounded-full text-[0.72rem] font-extrabold border transition-all",
               team
@@ -446,8 +447,12 @@ function ActivityMix({ totals }: { totals: FunnelMetrics }) {
   return (
     <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header>
-        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
+        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           Activity Mix
+          <InfoDot
+            title="Activity Mix"
+            text="Shows the current pipeline share in each workflow stage. Each segment is the stage count divided by the combined stage total."
+          />
         </h3>
         <p className="text-[0.6rem] text-text-tertiary">
           Share of pipeline across stages
@@ -542,7 +547,9 @@ function StageHealth({ totals }: { totals: FunnelMetrics }) {
         {stages.map((s) => {
           const ratio = s.den > 0 ? s.num / s.den : 0;
           const widthPct = Math.min(100, Math.round(ratio * 100));
-          const tone = s.invert ? toneInverse(widthPct) : toneStandard(widthPct);
+          const tone = s.invert
+            ? toneInverse(widthPct)
+            : toneStandard(widthPct);
           const barCls = {
             success: "bg-success",
             warning: "bg-warning",
@@ -554,10 +561,7 @@ function StageHealth({ totals }: { totals: FunnelMetrics }) {
             danger: "text-danger",
           }[tone];
           return (
-            <li
-              key={s.label}
-              className="flex flex-col gap-1 text-[0.7rem]"
-            >
+            <li key={s.label} className="flex flex-col gap-1 text-[0.7rem]">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-extrabold text-text-secondary uppercase tracking-[0.05em] text-[0.6rem]">
                   {s.label}
@@ -668,10 +672,7 @@ function TeamLeaderboard({
                 </div>
               </div>
               <span className="text-[0.62rem] tabular text-text-secondary whitespace-nowrap">
-                <strong className="text-text-primary">
-                  {row.metrics.o}
-                </strong>{" "}
-                /{" "}
+                <strong className="text-text-primary">{row.metrics.o}</strong> /{" "}
                 <strong className="text-success">{row.metrics.p}</strong> ·{" "}
                 <strong className="text-danger">{row.metrics.overdue}</strong>
               </span>
@@ -692,8 +693,12 @@ function TeamMatrix({
   if (rows.length === 0) {
     return (
       <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
-        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
+        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           Team Workload
+          <InfoDot
+            title="Team Workload"
+            text="One row per team member, showing their attributed reach-outs, onboarded work, posts, deliveries, ghosted rows, pending work, and overdue work."
+          />
         </h3>
         <p className="mt-2 text-[0.65rem] text-text-tertiary">
           No team data yet.
@@ -704,8 +709,12 @@ function TeamMatrix({
   return (
     <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
-        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
+        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           Team Workload
+          <InfoDot
+            title="Team Workload"
+            text="One row per team member, showing their attributed reach-outs, onboarded work, posts, deliveries, ghosted rows, pending work, and overdue work."
+          />
         </h3>
         <span className="text-[0.6rem] text-text-tertiary">
           {rows.length} members
@@ -769,8 +778,12 @@ function CampaignPerformance({
   if (rows.length === 0) {
     return (
       <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
-        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
+        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           Campaign Performance
+          <InfoDot
+            title="Campaign Performance"
+            text="One row per campaign with counts at each key stage. It helps compare volume and progress, not ad performance."
+          />
         </h3>
         <p className="mt-2 text-[0.65rem] text-text-tertiary">
           No campaign data yet.
@@ -781,8 +794,12 @@ function CampaignPerformance({
   return (
     <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
-        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
+        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           Campaign Performance
+          <InfoDot
+            title="Campaign Performance"
+            text="One row per campaign with counts at each key stage. It helps compare volume and progress, not ad performance."
+          />
         </h3>
         <span className="text-[0.6rem] text-text-tertiary">
           {rows.length} campaigns
@@ -837,8 +854,12 @@ function PeriodPerformanceTable({
   if (buckets.length === 0) {
     return (
       <section className="bento-tile rounded-2xl bg-bg-white border border-border p-3 sm:p-4">
-        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
+        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           {mode === "month" ? "Monthly" : "Weekly"} Performance
+          <InfoDot
+            title={`${mode === "month" ? "Monthly" : "Weekly"} Performance`}
+            text="Groups workflow activity by the selected month or week so changes in team output and overdue workload can be compared over time."
+          />
         </h3>
         <p className="mt-2 text-[0.65rem] text-text-tertiary">
           No data in this period.
@@ -849,8 +870,12 @@ function PeriodPerformanceTable({
   return (
     <section className="bento-tile rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
-        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary">
+        <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           {mode === "month" ? "Monthly" : "Weekly"} Performance
+          <InfoDot
+            title={`${mode === "month" ? "Monthly" : "Weekly"} Performance`}
+            text="Groups workflow activity by the selected month or week so changes in team output and overdue workload can be compared over time."
+          />
         </h3>
         <span className="text-[0.6rem] text-text-tertiary">
           {month || week

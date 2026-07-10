@@ -11,25 +11,29 @@
 
 **Tab registry** (`features/dashboard/tab-config.ts`): `DASHBOARD_TABS` = `overview, creators, partnerships, journey, tat, ad-status, compliance, cost, funnel, internal`; `TAB_LABELS`; `TAB_KM_SLUGS` (per-tab Know More); `resolveTab()`. Pill tab bar (`tabs.tsx`) uses Next `<Link prefetch>` per tab (not buttons) for instant RSC switching, ARIA tablist + roving Arrow/Home/End nav.
 
-**Bento kit (2026-07-02)** — `features/dashboard/bento-kit.tsx`, DAM (Workflow Optimizer) port: `HeroKpi` (top accent + tinted corner + CountUp + InfoDot), interactive `DonutTile` (hover→centre swap, legend %), `ActivityTrendTile` (stacked 30-day area chart, legend chip toggles; fed by additive `activity30` in `fetchDashboardData`), glass `ChartTip`. recharts scoped to dashboard routes (shared bundle unchanged); CSS motion only. Overview KPI strips + both split donuts + My Dashboard KPIs use it. Historic Analytics hides the trend (empty on archive), centres the stage donut with archive wording.
+**Bento kit and explanations (2026-07-10)** — `features/dashboard/bento-kit.tsx` provides `HeroKpi`, `TileHead`, `InfoDot`, and the plain-language KPI definition registry. `components/ui/info-tooltip.tsx` is the shared Radix popover used by every KPI, graph, queue, and table across all Main Dashboard tabs, My Dashboard, and Historic Analytics. It supports hover/focus/tap, collision padding, portal rendering, Escape/outside close, and reduced motion. Chart-bearing routes keep recharts in `bento-charts.tsx`.
 
 **Tab bodies** (`tab-bodies.tsx`): each non-Overview body re-creates its standalone route below the title — same outer `<div className="onboarding-stage <name>-stage">` wrapper (load-bearing; scoped CSS keys off it) holding the same filter bar + KPI strips + boards in the same order, reusing the same feature components & fetchers:
 
-| Tab | Reuses |
-|-----|--------|
-| overview | `fetchDashboardData` → `DashboardFiltersBar` + `DashboardOverviewStrip` + `DashboardBento` |
-| creators | `fetchCreatorAnalyticsPage` → filters + `CreatorAnalyticsView` (see Creator Analytics below) |
-| partnerships | `fetchPartnershipBoard` → `PartnershipBoard` (see Partnership Status below) |
-| journey | `fetchJourneyData` → `JourneyPageClient` |
-| tat | `fetchTatData` → `TatFiltersBar` + `TatPageClient` |
-| ad-status | `fetchAdStatusData` → filters + KPI strip + `AdStatusBoard` |
-| compliance | `fetchComplianceData` → `ComplianceBody` |
-| cost | `fetchCostAnalyticsData` → `CostAnalyticsBody` |
-| funnel | `fetchFunnelData` → `FunnelBody` |
-| internal | `fetchInternalDashboardData` → `InternalDashboardBody` |
+| Tab          | Reuses                                                                                       |
+| ------------ | -------------------------------------------------------------------------------------------- |
+| overview     | `fetchDashboardData` → `DashboardFiltersBar` + `DashboardOverviewStrip` + `DashboardBento`   |
+| creators     | `fetchCreatorAnalyticsPage` → filters + `CreatorAnalyticsView` (see Creator Analytics below) |
+| partnerships | `fetchPartnershipBoard` → `PartnershipBoard` (see Partnership Status below)                  |
+| journey      | `fetchJourneyData` → `JourneyPageClient`                                                     |
+| tat          | `fetchTatData` → `TatFiltersBar` + `TatPageClient`                                           |
+| ad-status    | `fetchAdStatusData` → filters + KPI strip + `AdStatusBoard`                                  |
+| compliance   | `fetchComplianceData` → `ComplianceBody`                                                     |
+| cost         | `fetchCostAnalyticsData` → `CostAnalyticsBody`                                               |
+| funnel       | `fetchFunnelData` → `FunnelBody`                                                             |
+| internal     | `fetchInternalDashboardData` → `InternalDashboardBody`                                       |
 
 ### `fetchDashboardData` (Overview aggregate)
+
 `features/dashboard/queries.ts` — single parallel fetch (posts ≤5000 + creators ≤5000), mirrors legacy `getDashboardStatsFiltered` plus new sparkline + action chips + channel split.
+
+**Operational briefing redesign (2026-07-10):** `DashboardOverviewStrip` opens with a filter-aware scope statement, posting/conversion signals, and three animated segmented rails: Scope Mix, Pipeline Movement, and Attention Pressure (Outcome Mix in Historic mode). Eight priority KPI cards sit below. The full bento remains available for deeper trends, queues, and comparisons. Motion is one-shot and disabled under `prefers-reduced-motion`.
+
 - **Defensive column fallback:** tries `POSTS_COLS_EXTENDED` (base + `ads_status`); on PostgREST `42703` retries `POSTS_COLS_BASE` (adWinners stays 0).
 - **Server filters:** campaign, content_type (eq), workflow_status (ilike). **Client filters:** influencerType (category substring), dateFrom/dateTo.
 - **Pulse:** today vs yesterday + delta for reachOut/onboarded/posted/delivered.
@@ -44,35 +48,46 @@
 - Action chip → href routing in `ACTION_HREFS` (needsEmail/needsOrder/awaitingPost/noTracking/noPartnership/overdue).
 
 ### Bento layout (`dashboard-bento.tsx`)
+
 12-col mosaic, rows A–J: Hero+Spotlight → Pulse → StageBoard → Action+PostingGoal → WorkflowFunnel+MonthlyTrend → **ChannelSplit (Row E2, full-width)** → Content+Tier donuts → PipelineKpis → TopCreators+TeamLeaderboard → SpendsPerCampaign → CampaignKpis. The **channel-split widget** (`widgets/channel-split.tsx`) renders two `ChannelCard`s (Inbound indigo `#3B6FD4`, Outbound purple `#7B4FBF` — DS "detail panel" accents, off-nav), each with headline conversion %, Creators/Spend/Posted chips, and a 3-step mini funnel sized to the channel's own max bucket.
+
 - **Per-campaign focus (2026-06-10):** when exactly one campaign is filtered, `fetchDashboardData` populates `campaignFocus` (a dedicated per-campaign query, independent of date/tier/content filters) and `widgets/campaign-focus.tsx` renders a Row-0 strip: **Reached Out** · **Onboarded Y/cap** (slots-left) · **Un-onboarded** (reached out, never onboarded-active) · **Posted**. Surfaces the onboarding-cap funnel. `null` when no single campaign is selected.
 
 ---
 
 ## My Dashboard — Personal Workload Board
+
 **Route:** `/my-dashboard`, scoped to `posts.onboarded_by = actor.name || actor.email`. Pulls my posts (≤500), joins creators, reconstructs collab totals from equal-split siblings.
+
 - **KPIs:** myActive, pendingPost, posted, rtos, totalCampaigns, activeCampaigns, totalReachouts.
 - **Pending actions:** "Overdue delivery" (On Board/Order Sent + est_delivery<today) and "Awaiting post" (Delivered + no post_date), sorted by daysOverdue, top-15.
 - **Team leaderboard:** global, score = `posted*5 + paid*8 + active*2`, top-5.
 
 ## Internal Dashboard
+
 **Route:** `/internal-dashboard`. Mirrors legacy `getDashboardMetrics`. `InternalDashboardData extends FunnelData` + per-campaign axis. 8 metrics per bucket: r/o/b/d/p/g/pend/overdue. **Dual-bucketing rule:** reach-cohort metrics are PARENT-ONLY bucketed by `reach_out_date`; `p` (posted) is per-deliverable bucketed by `post_date`. `overdue` = pend & reach >15 days old. Buckets by month + ISO-week + team + campaign.
 
 ## Cost Analytics
+
 **Route:** `/cost-analytics`. Mirrors legacy `getBudgetVsActuals`. Budget from `campaign_budget` (+ `campaigns.total_budget`), actuals from `posts.commercial_amount` (status ∈ on board/order sent/posted/delivered). `actualCost` sums across ALL rows (equal-split); `actualCreators` counts parents only. Rollups keyed `month||campaignId||tier`. `variance = actual−budget`, `utilPct = actual/budget`. Alerts: top-5 overBudget + top-5 underUtilised (<50%).
 
 ## Compliance KPIs
+
 **Route:** `/compliance`. Mirrors legacy `getComplianceKPIs` 1:1, no date filtering. Pipeline (parent-only mutually-exclusive buckets). Conversion rates verbatim: onboardConvRate, postingRate, deliveryRate, paymentRate, rtoRate (each `{pct,num,den}`). TAT averages (roToOb/obToPost/roToPost). Coverage: withOrder/withTracking/withPostLink/withEmail/withBank + email & bank coverage %. Per-campaign + per-team breakdown.
 
 ## Funnel View
+
 **Route:** `/funnel`. Mirrors legacy `getDashboardMetrics`. Same `FunnelMetrics` 8-metric shape + dual-bucketing as Internal Dashboard (Internal = Funnel + campaign axis). `byMonth`/`byWeek` desc + per-team. `isoWeekKey` is a port of legacy `_isoWeek`.
+
 - **Posted needs a real URL (2026-07-08):** `hasLink` on both Funnel + Internal Dashboard now uses shared **`isContentLink(post_link)`** (`lib/workflow.ts`) — http(s) or scheme-less instagram.com/youtube. The migrated LINK TO POST column is free text: ghosted creators carry the literal word `Ghosted` (74 rows) and some rows hold notes; the old `trim() !== ""` counted those 77 as Posted and dropped them from Ghosted. Keeps all 1,326 real IG/YouTube links. After the fix Sakshi/Anshika/Pranjal posted counts match the live sheet exactly; small residual (Vijaydeep 171 vs 170, Lakshita 43 vs 41, Diya 153 vs 150) = one reel duplicated across deliverable rows (also present in the sheet). The sheet's own "N displayed" over-counts because its filter accepts any non-empty cell (`inghai`, `Ghosted`).
 - **Team-member rows popup (2026-07-08 UI):** the per-team "View rows" surface shared by Funnel/Internal Dashboard/Historic Analytics now uses the Ad Status overview modal shell instead of a right-side drawer: centered `campaign-detail-modal` + `ob-overview-modal` + `ad-detail-modal`, search/stage filters in the scroll body, row pagination in the sticky footer, and row detail modals with the same overview/stat-grid/footer rhythm. Data semantics are unchanged.
 
 ## TAT Analytics
+
 **Route:** `/tat`. Posts limited to Posted/Delivered (≤2000) + `shopify_orders` for `order_placed_date`. **7 TAT pairs** (each `{avg,min,max,count}`): ro_to_onboard, ro_to_posting, ro_to_order_created, ob_to_delivered, ob_to_posting, order_to_delivered, delivered_to_posting. `daysBetween` floors, rejects negatives/pre-2020. Filters campaign/tier/status/reach-out range (JS). KPI: totalPosts, postsWithOrder, avgEndToEnd, delivered/rto/cancelled (order metrics deduped per order_id). Campaign benchmark chart = per-campaign avg reach→posting days.
 
 ## Influencer Journey
+
 **Route:** `/journey`. 4-stage read-only kanban (Reach Out → Onboard → Posted → Payment) + funnel conversion strip. Columns: Reach Out, Onboard (On Board+Order Sent), Posted (every deliverable), Payment (parent rows only). KPI: inPipeline/active/posted/closed. Funnel is cumulative parent-only (counts each collab at every stage reached, so rates are monotonic): reached→onboarded→posted→paid + the three conversion %.
 
 **Team Member filter matches either owner (2026-07-08):** the client Team Member filter matches `onboarded_by === X OR logged_by === X`, and the dropdown options list both columns. Needed because `onboarded_by` was corrected to be non-null only on actually-onboarded rows (onboarding ⟺ order/onboard_date/collab_number; see [[project_sheet_ingest_and_posts_insert_gotchas]]) — a reach-out row now carries only `logged_by`, so matching onboarded_by alone would hide a person's reach-outs. `JourneyCard` + `POSTS_SELECT` gained `logged_by`.
@@ -80,7 +95,9 @@
 **Single-source aggregation (2026-07-08 fix):** columns, KPI strip and funnel are ALL derived by one pure function `computeJourney(cards)` (`features/journey/compute.ts`). `fetchJourneyData` builds the flat creator-joined `cards[]` (campaign-filtered + non-void), runs `computeJourney` for first paint, and ships `cards` to `JourneyPageClient`. The client re-runs `applyClientFilters(cards)` → `computeJourney` on every filter change, so **In Pipeline / Active / funnel now honour the client-side filters (Team Member, Tier, Order Status, Collab Type, Influencer, Search)** — previously those were computed server-side over the whole pipeline and never re-derived, so a Team Member filter left the KPI cards showing whole-pipeline totals while the board showed the filtered subset. `JOURNEY_COLUMNS` moved to `types.ts` (client-safe) since `compute.ts` is imported by both server and client.
 
 ## Ad Status — Creative Testing Dashboard mirror + Warehouse Reconciliation
+
 **Routes:** `/performance/ad-run-status` (full build) + `/performance/untested-ads` (still a placeholder); also the dashboard `ad-status` tab. Posts in Posted/Delivered (≤2000) + creators + `instagram_cache` + Meta Ads warehouse (covered-set AND per-ad rows).
+
 - **Warehouse reconciliation (covered set):** `lib/supabase/meta-ads.ts#fetchMetaAdsCoveredPostIds()` (separate Supabase project, `primary_table` `ad_name ILIKE %IFAD%`, regex-extract `post_id_short`), wrapped in a **5s `Promise.race` timeout**. DO NOT touch — accounts-hub `posted_but_not_tested` stamping depends on it.
 - **Warehouse mirror (2026-07-03 hotfix — READ PATH):** every cross-project warehouse scan TIMES OUT from Vercel (both ae_table_view and the legacy covered-set — the latter was silently no-op in prod since launch). Fix: `meta_ads_cache` table in OUR Supabase (`token` pk → `ads` jsonb with thumbnails embedded, read via `readWarehouseAdMap`). `fetchWarehouseAdRows` + `fetchMetaAdsCoveredPostIds` are **mirror-first**; the live cross-project scan survives only as a local-dev fallback. Freshness: daily cron `/api/cron/warehouse-sync` (05:00 UTC = 10:30 IST, after the warehouse's nightly refresh; maxDuration 300; auth x-vercel-cron/CRON_SECRET) + manual seeder `apps/web/scripts/sync-warehouse-cache.mjs` (reads .env.local). Seeded 825 tokens / 986 thumbnails.
 - **Per-ad rows (2026-07-03):** `fetchWarehouseAdRows()` reads `ae_table_view` (one row per ad: `category` [precomputed, source of truth — never recompute], f1–f4_pass, impressions, amount_spent, roas_ma, ftewv/ncp counts+costs, conv_value, purchases, shopify_orders/sales, preview_link [fb.me real ad preview], ad_link [landing]) — paged 1000, spend desc, 20k cap, limit-1 live-column probe pre-select, **6s fail-soft timeout** (internal + call-site race). Returns `Map<SIF-token, WarehouseAd[]>` (token regex `/([A-Z]+-\d+-P\d+)/i` on ad_name, uppercased, buckets spend-desc). Helpers: `rankCategory` (Incremental Winner > Winner > P0 > P1 > P2 > Discarded), `pickFirstAd`/`compareAdOccurrence` (earliest ad_created, null last, adId asc tiebreak), `pickPrimaryAd` (max spend — covered-set/legacy only), `bestCategory`. `fetchAdThumbnailsFor()` — `ad_thumbnails` chunked `.in()` 150, 5s fail-soft, only for matched ads; merged as new copies post-build.
@@ -97,10 +114,12 @@
 - **CTD row anatomy (Ad Run list+cards):** 44px creative thumb (plain lazy img, no-referrer, image_url→thumbnail_url→Avatar; click → preview_link) | ad_name+@handle | Created | Spend ₹ | ROAS 2dp | FTEWV | NCP | Shop. Orders | category chip | Landing+Preview chips; "+N more ads" expander rows for multi-ad posts. New table = `.ad-run-table` (78rem min) with `ad-col-thumb/ad-name/created/spend/metric` width rules in globals.css.
 - **Badges:** `WhCategoryBadge` — Incremental Winner (filled green #4F7C4D/white), Winner (soft green), P0 (indigo), P1/P2 (amber), Discarded (red); no-warehouse-match → neutral (legacy `adsResults` text or "In Meta Ads"). Legacy `AsClassBadge` retained for Untested + modal fallback. Classification filter matches BOTH vocabularies.
 - Shared classification source: `lib/ad-tested.ts` (used by both Ad Status + Accounts Hub `posted_but_not_tested` flag so both surfaces agree) — unchanged.
-> Classification LOGIC + thresholds (F1 impr≥50k mandatory · F2 roas≥3.2 · F3 0<cost_per_ncp≤525 · F4 0<cost_per_ftewv≤12; IW=F1&&(F2||F3)&&F4, W=F1&&(F2||F3), P0=F1&&F4, P1=F1, P2=F2, else Discarded) are owned by Anmol's warehouse — this app reads the `category` column, never re-scores. `posts.ads_results`/`ads_status` stay read-only.
+  > Classification LOGIC + thresholds (F1 impr≥50k mandatory · F2 roas≥3.2 · F3 0<cost_per_ncp≤525 · F4 0<cost_per_ftewv≤12; IW=F1&&(F2||F3)&&F4, W=F1&&(F2||F3), P0=F1&&F4, P1=F1, P2=F2, else Discarded) are owned by Anmol's warehouse — this app reads the `category` column, never re-scores. `posts.ads_results`/`ads_status` stay read-only.
 
 ## Accounts Hub — Payment Ledger
+
 **Route:** `/accounts-hub`. Mirrors legacy `getAccountsHubData` + `submitPayments`.
+
 - **Collab-ID model:** fetches ALL deliverables in stages {Reach Out, On Board, Order Sent, Posted, Delivered}, collapses to ONE representative row per `collab_id` (lowest post_id), summing `commercial_amount` across equal-split siblings. Payment raised per collab_id.
 - **Partial-payments rollup:** `paidSoFar` = sum of UTR-bearing installments, `_remainder` = total − paid, `_isPartial` = 0<paid<total.
 - **Draft backfill:** for Posted/Delivered collabs with no payment row, inserts a "Not Due" draft — only if fully payment-eligible. Sets `due_date = post_date + 30d`, `estimated_payable_date = nextPayableCycleDate(due)`.
@@ -115,26 +134,33 @@
 - **`submitPayments`** (`actions.ts`): 3-gate pipeline (stage gate Posted/Delivered; §7.2 collab posting completeness; §8.2 ad-partnership gate — since 2026-07-02 requires `partnershipApproved()`, i.e. creator-approved status or admin override, not bare key presence). Dedup key `(post_id, lower(utr))`. **Partial-payments engine:** each distinct UTR = a new installment row; Done cascades status to all collab deliverables + deletes stray sibling rows. Stamps `posted_but_not_tested` (warehouse-aware, 5s timeout). Fires per-creator "Payment Processed" emails + actor confirmation. `recomputePaymentStates` is the daily reconciliation cron.
 
 ## Creators — `[username]` Overview
+
 **Route:** `/creators/[username]` (currently a placeholder; full tabbed drill-down pending).
 **API (built):** `GET /api/creators/[username]/overview` (`requireActor`): creator row + last-12 posts + payments. **Backfills** missing creator fields (email/agency/bank/ifsc/state) from the most recent post, and contact/address from `shopify_orders`. Stats: postCount, onboardedCount, paidTotal, payableTotal, paymentCount.
 
 ## Sheets — Sheet View Grid
+
 **Route:** `/sheets?tab=<id>` (`canEdit = hasPermission(actor,"admin")`). Google-Sheets-style read/edit grid over 10 Supabase tables, one tab each.
+
 - **Catalogue:** `features/sheets/types.ts` `SHEET_TABLES` (posts, creators, campaigns, campaign_budget [special month-block `variant:"budget"`], payments, shopify_orders, system_errors, instagram_cache, inbound_reachout_queue, user_access). Each `ColDef` flags editable/type/options.
 - **Fetch (hybrid, 2026-07-03):** `fetchTabCounts` (parallel head counts, unstable_cache 60s). Tabs ≤2000 rows: `fetchSheetData` full-fetch (loops past PostgREST's 1000-row cap up to 50k) + client search/sort + 100-row render pagination. Tabs >2000 (creators): **server mode** `fetchSheetPage` — one 100-row page; search = injection-safe `.or()` ilike fan-out (terms embedded as double-quoted PostgREST literals so dots/underscores match; quotes/backslashes/wildcards stripped; URL-ish cols excluded), sort whitelisted + pk tiebreaker, count exact, PGRST103 self-heals to page 0. **Gotcha:** curated ColDefs may list columns absent on the live table — one missing col 400s the whole `.or()`/`.order()`, so both whitelist and fan-out intersect a cached 1-row live-schema probe (`getLiveColumnKeys`, 5min). URL-driven q/sort/dir/p with tab-only Suspense key (input keeps focus; grid dims via transition). Server-mode CSV = `exportSheetCsv` admin action (full filtered walk, 50k cap).
 - **Actions** (all `assertPermission("admin")`): `updateSheetCell` (type-coerces, snapshots old value), **edited badge** (`recordCellEdit` → `cell_edits`, fails soft on missing table; `fetchRecentCellEdits` returns latest edit per cell within N days), **revised-details email** (`sendRevisedDetailsEmail` fires only for `CRITICAL_COLUMNS` that changed — order_status, est_delivery, delivered_date, commercial_amount, email, bank fields, order_id — to creator + onboarded_by, old→new diff, logs `email_logs`), **cell comments** (`cell_comments` threads with @-mention extraction + validation + fanout).
 - **Row delete + restore (Global-Admin only, added 2026-06-09):** `canDelete = hasPermission(actor,"admin")` — its own prop, decoupled from `canEdit`. Enabled per-tab via `deletable:true` in `SHEET_TABLES` — operational tabs only (posts, creators, campaigns, campaign_budget, payments, inbound_reachout_queue, system_errors); **never** user_access (RBAC) or cron-synced shopify_orders/instagram_cache. Grid renders per-row checkboxes + header select-all; the Delete button opens a confirm dialog (≥10 rows requires typing `DELETE`). `deleteSheetRows` snapshots each row's full JSON to `row_deletions` then hard-deletes; FK violations (Postgres `23503`) are caught per-row and surfaced as friendly "still referenced by …" messages (batch never aborts). A toast offers **Undo**; the toolbar **Trash** button (`fetchRecentDeletions`, last 30d) lists deletions with per-row **Restore**. `restoreDeletedRows` re-`upsert`s the snapshot, stripping generated columns (`NON_RESTORABLE_COLUMNS` — campaign_budget's `total_cost`/`est_garment_cost`/`total_with_garments`) and preserving the original PK. Deleting a campaign cascade-removes its budget blocks and nulls `posts.campaign_id` (DB FK rules).
 
 ## Errors — Error Portal (`system_errors`)
+
 **Route:** `/errors`. Mirrors legacy `runErrorAudit` + the `logSystemError_` sink. Parallel pulls posts/payments/shopify_orders/unresolved system_errors/creators-count.
+
 - **5 audit rules:** INVALID_POST_ID (HIGH), DUPLICATE_UTR (HIGH), PAYMENT_BEFORE_POSTING (MEDIUM), MISSING_BANK_DETAILS (MEDIUM), MISSING_TRACKING (LOW, order >2 days old).
 - **Data health:** stage counts + missing bank/email/tracking/order/postLink + paymentsDue + totalPaidOut + totalCreators.
 - **MISSING_COLLAB_EMAIL** worklist: parent + onboarded/posted/delivered + `collab_email_sent_at IS NULL`.
-- **EMAIL BLOCKED card + KPI (2026-07-09):** `sendCollabEmail` is now **hard-gated** — it resolves BOTH required attachments (campaign brief via `fetchDriveFileAsAttachment` + T&C via `readTermsAttachmentFile`) **and** confirms the sender CC *before* sending; if any is missing it does NOT send, does NOT stamp `collab_email_sent_at`, and logs `system_errors` type `collab_email_blocked` (key = post_id, source `sendCollabEmail`). SMTP failures log `collab_email_send_failed`. Both surface in the **Collab Emails Blocked** card (`features/errors/page-client.tsx` `BlockedEmailsCard`) enriched from posts (creator/campaign/status/reason) + a clickable **Email Blocked** KPI that scrolls to it. Each card has a **Send again** button → `resendBlockedCollabEmail(post_id)` (`features/errors/actions.ts`) rebuilds the payload from `getCollabEmailPreview` and re-runs the gated send; on success `resolveSystemError` clears the row. Guarantees **no incomplete email ever reaches a creator**.
+- **EMAIL BLOCKED card + KPI (2026-07-09):** `sendCollabEmail` is now **hard-gated** — it resolves BOTH required attachments (campaign brief via `fetchDriveFileAsAttachment` + T&C via `readTermsAttachmentFile`) **and** confirms the sender CC _before_ sending; if any is missing it does NOT send, does NOT stamp `collab_email_sent_at`, and logs `system_errors` type `collab_email_blocked` (key = post_id, source `sendCollabEmail`). SMTP failures log `collab_email_send_failed`. Both surface in the **Collab Emails Blocked** card (`features/errors/page-client.tsx` `BlockedEmailsCard`) enriched from posts (creator/campaign/status/reason) + a clickable **Email Blocked** KPI that scrolls to it. Each card has a **Send again** button → `resendBlockedCollabEmail(post_id)` (`features/errors/actions.ts`) rebuilds the payload from `getCollabEmailPreview` and re-runs the gated send; on success `resolveSystemError` clears the row. Guarantees **no incomplete email ever reaches a creator**.
 - **Summary:** HIGH/MEDIUM/LOW + apiFails (`system_errors` type ig_fetch/apify_fail) + missingEmail + blockedEmails.
 
 ## User Panel / Admin Users — Invite, Roles, Audit, CSV
+
 **Routes:** `/admin/users` + `/admin/users/[email]` — both redirect unless `hasPermission(actor,"admin")`.
+
 - **Fetch:** `fetchUserPanelData` reads `user_access` + a 30-day activity sparkline (posts.onboarded_by / payments.logged_by / cell_comments.author_email). KPIs: total/active/admins/accounts/pendingInvites/lastActiveToday. `fetchUserAuditLog` reads `user_audit_log`.
 - **Actions** (all `assertPermission("admin")`): **invite flow** (`saveUser` upserts `user_access`; new+active users get a branded **Google-OAuth-only** invite email linking to `/login` — passwordless, no accept token); **audit log** (every mutation writes `user_audit_log`); `deleteUser`/`toggleUserActive`/`recordUserActivity`; **CSV invite** (`bulkInviteUsers` — role-alias map, parallel sends, one `csv_invite_batch` audit).
 - **Roles + RBAC:** `roles-actions.ts` CRUD over `access_roles` + `access_role_permissions` (reads `access_role_summary`). `listRoles`/`createRole`/`updateRole` (renames propagate to `user_access.role` + audit each affected user)/`deleteRole` (blocked while users assigned; system roles immutable). Permission model → chapter 08.
@@ -142,15 +168,19 @@
 ---
 
 ## Settings — Account, Admin Shortcuts, Workflow Prefs, Test Mode (`/settings`)
+
 **Route:** `/settings` (sidebar System group, admin-gated via `hasPermission(actor,"admin")`; page renders for any actor but the admin controls are isolated). Know More slug `settings`. Ported from Workflow Optimizer's Settings tab, adapted to Saadaa's 4 entities + data-derived IDs.
+
 - **Layout:** Account card (read-only identity from `user_access` — name/email/role/department) + Administration shortcuts (User Panel / Sheet View / Error Portal, each permission-gated). Admin-only below: Workflow Preferences + Test Mode danger zone.
 - **Feature dir:** `features/settings/` — `test-scopes.ts` (plain module: 4 scopes + labels + `SCOPE_PREVIEW` + keys), `actions.ts` (`'use server'`), `test-mode-settings.tsx` + `campaign-auto-close-card.tsx` (client). KM content `features/know-more/content/settings.tsx`.
 
 ### Campaign auto-close switch
+
 - `getCampaignAutoCloseEnabled()` (default **ON** — only explicit `'false'` disables) / `setCampaignAutoCloseEnabled(bool)` (admin). Stored in `app_settings.campaign_auto_close_enabled` (TEXT `'true'`/`'false'`).
 - **Honored in 3 places** (all skip close when OFF = backlog mode): cron `#7` date-based auto-close + cron `#9` completion close (`app/api/cron/notifications/route.ts`), and the real-time completion close in `submitPosting` (`features/posting/actions.ts`).
 
 ### Test Mode (danger zone)
+
 - **4 independent scopes** → table: `campaign`→`campaigns`, `creator`→`creators`, `collab`→`posts`, `payment`→`payments`. Each table has `is_test boolean default false` + a partial index.
 - **Scope ON** → new rows in that entity are stamped `is_test=true` via `stampTestRows()` (service-client `update`, no-op when off; called from `submitCampaign`, `submitReachOut`, `submitInboundBatch`, `submitOnboarding` (parent+children), repeat-collab via delegation, `submitPayments` (captures inserted ids)). Each entity stamped by **its own** scope.
 - **Scope OFF = destructive**: itemised preview (`previewTestEntries`) then archive→delete via `purge_test_rows(p_source_table,p_scope,p_deleted_by)` RPC (SECURITY DEFINER, allowlist 4 tables, archives `to_jsonb(row)` into `test_mode_archive` then `delete where is_test`). Purge runs in **FK-safe order** `PURGE_ORDER = payment→collab→creator→campaign`.
@@ -159,10 +189,11 @@
 ---
 
 ## Cross-cutting notes
+
 - **No SQL views/RPCs for analytics** — every fetcher pulls raw rows (`.limit()` 2k–10k) and aggregates in JS; `access_role_summary` is the only DB view used.
 - **Parent/child collab rule is pervasive:** payment lives on the representative; `commercial_amount` is equal-split and re-summed across siblings for any display/KPI.
 - **Defensive EXTENDED→BASE column fallback** (`42703`) in dashboard, tat, ad-status, order-status fetchers — missing prod columns degrade gracefully.
-- **Legacy parity** cited per fetcher header (getDashboardStatsFiltered, getDashboardMetrics, getComplianceKPIs, getBudgetVsActuals, getAccountsHubData/submitPayments, runErrorAudit, getAdStatusData, _isoWeek, _nextPayableCycleDate_).
+- **Legacy parity** cited per fetcher header (getDashboardStatsFiltered, getDashboardMetrics, getComplianceKPIs, getBudgetVsActuals, getAccountsHubData/submitPayments, runErrorAudit, getAdStatusData, _isoWeek, \_nextPayableCycleDate_).
 
 ## Historic Analytics + Creator Analytics (2026-06-25)
 
@@ -173,6 +204,7 @@
 **Prior-collab badge** (onboarding board): reach-out rows show a ↻ chip with prior collab count + ids + next C, via RPC `prior_collab_summary(p_inf_ids[])` — next_collab matches `mint_onboarding_block` (incl reach-out-only-historic → C2). See [[project_collab_deliverable_numbering_rule]].
 
 **Team-member roster filters + per-collab history cards (2026-07-08)** —
+
 - **Reach Out By / Onboard By filters** (`CreatorAnalyticsFilters.reachOutBy`/`onboardBy`): resolve to an `inf_id` allow-list via `resolveInfIdsByTeam(logged_by|onboarded_by, value)` over posts ∪ historic_posts, **intersected** with the ads allow-list and pushed into `creator_analytics_page` as `p_inf_ids` (pagination + total_count stay server-side; empty intersection → `['__none__']`). Options come from `fetchCreatorAnalyticsFilterOptions.teamMembers` (distinct onboarded_by ∪ logged_by across both tables). Team names were canonicalized to the User Panel set on 2026-07-08 — see [[project_sheet_ingest_and_posts_insert_gotchas]] — so the dropdown is clean.
 - **`creator_collab_history` v2** (migration `creator_collab_history_per_collab_v2`, DROP+CREATE — return signature changed; SECURITY DEFINER, EXECUTE service-role-only): returns one row PER POST with `collab_key` (= collab_id / inf_id-C{n} / `RO-{id}` for un-onboarded reach-outs), collab_id, campaign_id, content_type, reach_out/onboard/post dates, reach_out_by (logged_by), onboard_by (onboarded_by), collab_type, commercial_amount, payment_status, workflow_status, post_link, post_id, is_reachout, source. Unlike v1 it **includes reach-out-only rows** (v1 filtered `collab_id/collab_number NOT NULL`, so a creator in Reach Out showed "0 collaborations").
 - **`fetchCreatorCollabHistory` groups per `collab_key`** into `CreatorCollabEpisode[]` — deliverable rows of one collab fold into one card (P1/P2/P3 → one), summing commercial, min reach-out/onboard date, max post date, distinct content types + post links, most-advanced stage (STAGE_RANK). Rendered by `CollabEpisodeCard`: collab-id/Reach-Out title, campaign chip, stage pill, collab type, content-type pills, deliverable count, a row-level stat grid (dates · commercial · reach-out-by · onboard-by), Live/Historic badge, per-link Post buttons. Addresses the founder ask: two reach-outs for two campaigns = two differentiated cards, keyed on the collab_id minted at onboarding.
@@ -180,6 +212,7 @@
 **Meta Ads in the history modal (2026-07-04)** — the collab-history modal also loads the creator's Meta Ads rollups in parallel (`loadCreatorAdsInfo` action → `fetchCreatorAdsInfo(infId, username)`), from the local `meta_ads_cache` mirror only (never the cross-project warehouse). Two passes mirroring the Ad Status board: (1) direct — cache tokens `ILIKE '{inf_id}-P%'`; (2) retired — `historic_creator_data` post_ids for the username with a different SIF prefix, checked against `posts`/`historic_posts` `post_id_short` so a token only wears **Retired ID** when no real post row exists (board rule; without the check ~7 tokens platform-wide would mislabel). One entry per token = the board's per-POST counting unit, wearing its **first-occurrence** ad (`pickFirstAd`): category badge (shared `WhCategoryBadge`, now exported from `ad-status/ad-board.tsx`), spend, ROAS, variant count, ad-created date, newest first. Each line's **Ads** button deep-links `/dashboard?tab=ad-status&search={token}`. Section renders only when ads exist; fail-soft to hidden. Types: `CreatorAdInfo` in `creator-analytics/types.ts`.
 
 **Ads across the roster — filter, KPI tiles, per-ad modal cards (2026-07-04)** —
+
 - **`creator_ads_rollup()` RPC** (SECURITY DEFINER, service-role-only EXECUTE): per-creator rollup over `meta_ads_cache` — token→creator via current-SIF prefix, then archive fallback (`historic_creator_data` post_id → lower(username) → creators) for renumbered/retired tokens; first-occurrence classification (earliest `adCreated`, nulls last, adId asc) done in SQL over the ads jsonb. Returns tokens/ads/winners/best_rank/spend(ALL creatives)/live_collab_count. ⚠️ First cut used a correlated LATERAL — PostgREST's generic plan turned it into per-token seq scans of the 11k-row archive → 57014 statement timeout (SQL-console-fast, REST-dead: the standing RPC gotcha). Fixed with set-based hash-join CTEs + expression indexes `idx_hcd_post_id_upper` and `idx_creators_username_lower` → ~330ms. Live: 744 creators in ads, 69 winner creators (matches the board's Winners KPI).
 - **`creator_analytics_page` gained `p_inf_ids text[]`** (old signature DROPped first — CREATE OR REPLACE would have made an ambiguous overload). NULL = no filter; the ads filter passes the rollup-derived allow-list so pagination + total_count stay server-side; empty match set sends the `['__none__']` sentinel (0 rows, not "no filter").
 - **Web:** `fetchCreatorAdsRollup` (unstable_cache 300s) feeds (a) the `ads` URL filter (`in-ads` / `winners` / `winners-idle` = winner ads + 0 live collabs, the re-engagement list), (b) `CreatorAdsKpiStrip` — clickable `.acc-kpi--clickable` tiles between filter bar and roster (filter-above-KPI rule): In Meta Ads / Winner Creators / Winners·Not Working (+ Ad Spend info tile); click toggles the param, active tile highlighted, `cpage` reset, (c) row/card enrichment — `adsSummary` on `CreatorAnalyticsRow`: best-category `WhCategoryBadge` in the chip line + "N in ads · ₹X" stat cell (replaced the Followers stat cell in list rows — followers already sit in the subline; cards swapped the Reach Out cell).
@@ -188,6 +221,7 @@
 ## Partnership Status (2026-07-02, 5-lane refactor 2026-07-06)
 
 **Partnership Status** — dashboard tab `?tab=partnerships` (`features/dashboard/partnership-queries.ts` + `partnership-board.tsx`), Know More `partnership-status`. Per-CREATOR rollup of the Meta branded-content permission mirrored on `posts.partnership_status` (+ `partnership_sent_at/_approved_at/_declined_at`, stamped by `lib/partnership-sync.ts`).
+
 - **Lanes (5, business chronology since 2026-07-06):** Requested (pending) / Rejected (rejected+revoked, Resend button) / **Accepted · Not Tested** (approved, no `creator_ads_rollup` entry) / **Accepted & Tested** (approved + creator in the Meta Ads warehouse mirror — card wears best `WhCategoryBadge`, tokens·spend chip, "View on Ad Status" deep-link) / **Failure on Sending** (unresolved `system_errors` type=`partnership_sync` message ilike `%invite failed%`/`%Resend failed%` keyed by handle, skipped when the creator meanwhile has an active request; card shows the error + **Retry send**). One card per `inf_id`. ⚠️ PostgREST `.or()` values with spaces must be double-quoted (`message.ilike."%invite failed%"`) — verified with a seeded row.
 - **Filters (2026-07-06):** q / campaign / status (raw state) / testStatus (warehouse category, ANY-token match via rollup `categories[]`) / sentFrom-To / postedFrom-To + onboardFrom-To (match ANY of the creator's stamped posts) / adId + adName (substring over rollup `ad_ids[]`/`ad_names[]`). All URL-synced. KPI strip = 5 acc-kpi tiles; kanban = `.partnership-kanban` (5 explicit columns ≥1440px, 300px scroll-snap columns below — never auto-fit).
 - **Creators mirror (2026-07-06):** `creators.partnership_status/_sent_at/_accepted_at/_declined_at` added + backfilled from posts; `partnership-sync.ts` `stampCreatorRow()` mirrors every sync/resend (first-transition timestamps; resend overwrites sent_at; fail-soft). Creator Analytics roster reads badges + dates from creators now (not a posts scan); history modal shows a "Partnership" DetailItem (state · accepted/declined date). `creator_ads_rollup()` v2 returns `categories text[]`, `ad_ids text[]`, `ad_names text[]` (~450ms via REST).

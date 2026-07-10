@@ -11,26 +11,34 @@ export default function HistoricAnalyticsKM() {
       <KMSection tag="What this is">
         <p>
           Historic Analytics reuses the entire Dashboard{" "}
-          <strong>Overview</strong> bento, but points every posts-driven query at
-          the migrated archive (<KMCode>historic_posts</KMCode>, read through the{" "}
-          <KMCode>historic_posts_dash</KMCode> view) instead of the live{" "}
-          <KMCode>posts</KMCode> table. Creators and campaigns are still read from
-          the live tables, so tiers, names and campaign labels resolve normally.
+          <strong>Overview</strong> bento, but points every posts-driven query
+          at the migrated archive (<KMCode>historic_posts</KMCode>, read through
+          the <KMCode>historic_posts_dash</KMCode> view) instead of the live{" "}
+          <KMCode>posts</KMCode> table. Creators and campaigns are still read
+          from the live tables, so tiers, names and campaign labels resolve
+          normally.
         </p>
         <KMList>
           <li>
-            <strong>Same controls</strong> — campaign · date range · content type
-            · tier · status, identical to the live Overview filter bar.
+            <strong>Same controls</strong> — campaign · date range · content
+            type · tier · status, identical to the live Overview filter bar.
           </li>
           <li>
             <strong>Same body</strong> — headline KPI strip, content + tier
-            donuts, monthly funnel trend, spends-per-campaign, top creators, team
-            leaderboard and the 4-stage mini board.
+            donuts, monthly funnel trend, spends-per-campaign, top creators,
+            team leaderboard and the 4-stage mini board.
           </li>
           <li>
-            <strong>Team rows</strong> — Funnel and Internal team selections open
-            the same centered overview popup pattern used by Ad Status, with
-            search, stage filters, row pagination and row-level Tracker details.
+            <strong>Team rows</strong> — Funnel and Internal team selections
+            open the same centered overview popup pattern used by Ad Status,
+            with search, stage filters, row pagination and row-level Tracker
+            details.
+          </li>
+          <li>
+            <strong>Definitions everywhere</strong> — every KPI, chart, and
+            table has the same plain-language info popover as the live
+            Dashboard. Overview popups wrap long values instead of hiding them
+            behind ellipses.
           </li>
         </KMList>
       </KMSection>
@@ -38,9 +46,9 @@ export default function HistoricAnalyticsKM() {
       <KMSection tag="Source table">
         <KMCallout tone="info">
           Reads <KMCode>historic_posts</KMCode> via the{" "}
-          <KMCode>historic_posts_dash</KMCode> view. The view mirrors the columns
-          the dashboard expects, NULL-aliasing the fields the legacy sheet never
-          stored (reels / static_posts / stories / partnership_id /
+          <KMCode>historic_posts_dash</KMCode> view. The view mirrors the
+          columns the dashboard expects, NULL-aliasing the fields the legacy
+          sheet never stored (reels / static_posts / stories / partnership_id /
           ad_partnership_valid / ads_usage_rights / collab_email_sent_at /
           collab_email_skipped / ads_status). Nothing here is editable — the
           archive is read-only.
@@ -52,8 +60,8 @@ export default function HistoricAnalyticsKM() {
           <li>
             <strong>Deliverable counts read 0</strong> — the legacy sheet never
             stored a structured reels / static / stories split, so the view
-            NULL-aliases them. Avg-deliverable KPIs and the deliverable donut are
-            therefore 0 / empty for historic rows by design, not a bug.
+            NULL-aliases them. Avg-deliverable KPIs and the deliverable donut
+            are therefore 0 / empty for historic rows by design, not a bug.
           </li>
           <li>
             <strong>Ad Winners = 0</strong> — there is no{" "}
@@ -62,8 +70,8 @@ export default function HistoricAnalyticsKM() {
           </li>
           <li>
             <strong>No partnership / collab-email signals</strong> — those
-            columns are NULL-aliased too, so the related action chips never light
-            up for historic data.
+            columns are NULL-aliased too, so the related action chips never
+            light up for historic data.
           </li>
         </KMList>
       </KMSection>
@@ -71,9 +79,9 @@ export default function HistoricAnalyticsKM() {
       <KMSection tag="Only three stages">
         <KMCallout tone="warning">
           The migrated archive only ever reaches{" "}
-          <strong>Reach Out → On Board → Posted</strong>. There is no Order
-          Sent / Delivered / RTO / payment lifecycle in the legacy data, so the
-          later bands of the stage board and any post-Posted metric are{" "}
+          <strong>Reach Out → On Board → Posted</strong>. There is no Order Sent
+          / Delivered / RTO / payment lifecycle in the legacy data, so the later
+          bands of the stage board and any post-Posted metric are{" "}
           <strong>empty by design</strong>. Read the trend and stage board as a
           three-stage funnel.
         </KMCallout>

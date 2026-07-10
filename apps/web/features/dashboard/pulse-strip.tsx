@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, Minus, type LucideIcon } from "lucide-react";
 import { Box, Instagram, Send, UserCheck } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { InfoDot } from "./bento-kit";
 import { CountUpInt } from "./count-up-stats";
 import type { PulseStat } from "./types";
 
@@ -9,6 +10,7 @@ interface PulseCardProps {
   icon: LucideIcon;
   tone: "info" | "success" | "accent" | "violet";
   stat: PulseStat;
+  info: string;
 }
 
 const ICON_BG: Record<PulseCardProps["tone"], string> = {
@@ -24,7 +26,7 @@ const ACCENT_BAR: Record<PulseCardProps["tone"], string> = {
   violet: "from-[#7B4FBF]/0 via-[#7B4FBF]/0 to-[#7B4FBF]/35",
 };
 
-function PulseCard({ title, icon: Icon, tone, stat }: PulseCardProps) {
+function PulseCard({ title, icon: Icon, tone, stat, info }: PulseCardProps) {
   const up = stat.delta > 0;
   const down = stat.delta < 0;
   const DeltaIcon = up ? ArrowUp : down ? ArrowDown : Minus;
@@ -42,8 +44,9 @@ function PulseCard({ title, icon: Icon, tone, stat }: PulseCardProps) {
         )}
       />
       <header className="flex items-center justify-between gap-2">
-        <span className="text-[0.62rem] font-bold uppercase tracking-[0.07em] text-text-secondary">
+        <span className="inline-flex items-center gap-1 text-[0.62rem] font-bold uppercase tracking-[0.07em] text-text-secondary">
           {title}
+          <InfoDot title={title} text={info} />
         </span>
         <span
           className={cn(
@@ -86,10 +89,34 @@ export function DashboardPulseStrip({
 }) {
   return (
     <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 bento-stagger">
-      <PulseCard title="Reach-outs Today" icon={Send} tone="info" stat={pulse.reachOut} />
-      <PulseCard title="Onboarded Today" icon={UserCheck} tone="success" stat={pulse.onboarded} />
-      <PulseCard title="Posts Live Today" icon={Instagram} tone="accent" stat={pulse.posted} />
-      <PulseCard title="Delivered Today" icon={Box} tone="violet" stat={pulse.delivered} />
+      <PulseCard
+        title="Reach-outs Today"
+        icon={Send}
+        tone="info"
+        stat={pulse.reachOut}
+        info="Creators first contacted today. The comparison shows how many more or fewer were contacted than yesterday."
+      />
+      <PulseCard
+        title="Onboarded Today"
+        icon={UserCheck}
+        tone="success"
+        stat={pulse.onboarded}
+        info="Creators whose onboarding was completed today, compared with yesterday."
+      />
+      <PulseCard
+        title="Posts Live Today"
+        icon={Instagram}
+        tone="accent"
+        stat={pulse.posted}
+        info="Deliverables whose posting form was completed today, compared with yesterday."
+      />
+      <PulseCard
+        title="Delivered Today"
+        icon={Box}
+        tone="violet"
+        stat={pulse.delivered}
+        info="Creator orders marked delivered today, compared with yesterday."
+      />
     </section>
   );
 }

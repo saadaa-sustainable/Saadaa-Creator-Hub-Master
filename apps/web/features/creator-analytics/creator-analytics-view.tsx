@@ -1,10 +1,5 @@
 "use client";
-import {
-  useEffect,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -24,6 +19,7 @@ import {
 import {
   Avatar,
   DeactivatedBadge,
+  InfoTooltip,
   StatusPill,
   WorkflowStatusPill,
 } from "@/components/ui";
@@ -120,27 +116,38 @@ export function CreatorAnalyticsView({
       )}
 
       {/* View toggle (legacy `.ob-viewtoggle`) */}
-      <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "list"}
-          className={cn(view === "list" && "active")}
-          onClick={() => setView("list")}
-        >
-          <ListIcon size={12} aria-hidden />
-          List
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === "cards"}
-          className={cn(view === "cards" && "active")}
-          onClick={() => setView("cards")}
-        >
-          <Grid3X3 size={12} aria-hidden />
-          Cards
-        </button>
+      <div className="flex items-center justify-between gap-3">
+        <div className="inline-flex items-center gap-1.5 text-[0.72rem] font-bold text-text-secondary">
+          Creator roster
+          <InfoTooltip
+            title="Creator roster"
+            content="One row per unique creator. Collab totals combine live and historic records; the current stage is the creator's latest known workflow position."
+            side="bottom"
+            align="start"
+          />
+        </div>
+        <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "list"}
+            className={cn(view === "list" && "active")}
+            onClick={() => setView("list")}
+          >
+            <ListIcon size={12} aria-hidden />
+            List
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "cards"}
+            className={cn(view === "cards" && "active")}
+            onClick={() => setView("cards")}
+          >
+            <Grid3X3 size={12} aria-hidden />
+            Cards
+          </button>
+        </div>
       </div>
 
       {isEmpty ? (
@@ -295,7 +302,13 @@ function creatorTone(r: CreatorAnalyticsRow) {
 
 function creatorProgress(r: CreatorAnalyticsRow) {
   if (r.total_collab_count <= 0) return 12;
-  return Math.min(100, Math.max(18, Math.round(r.live_collab_count * 100 / r.total_collab_count)));
+  return Math.min(
+    100,
+    Math.max(
+      18,
+      Math.round((r.live_collab_count * 100) / r.total_collab_count),
+    ),
+  );
 }
 
 function creatorStyle(r: CreatorAnalyticsRow, index: number) {
@@ -356,7 +369,13 @@ function CreatorListRow({
           <span />
         </span>
         <div className="campaign-list-row__reachouts">
-          <span>{r.current_stage ? <StageCell stage={r.current_stage} /> : "No stage"}</span>
+          <span>
+            {r.current_stage ? (
+              <StageCell stage={r.current_stage} />
+            ) : (
+              "No stage"
+            )}
+          </span>
           <strong>{r.live_collab_count}</strong>
         </div>
       </div>
@@ -474,11 +493,7 @@ function CreatorCard({
       </dl>
 
       <div className="ob-card-actions">
-        <button
-          type="button"
-          className="action-view"
-          onClick={onOpen}
-        >
+        <button type="button" className="action-view" onClick={onOpen}>
           <History size={12} aria-hidden />
           History
         </button>
@@ -551,7 +566,10 @@ function CreatorHistoryModal({
   const loading = collabs === null;
 
   return createPortal(
-    <div className="modal-backdrop modal-backdrop--onboarding" onClick={onClose}>
+    <div
+      className="modal-backdrop modal-backdrop--onboarding"
+      onClick={onClose}
+    >
       <div
         className="modal-panel modal-panel--lg modal-panel--onboarding ob-overview-modal creator-history-modal"
         onClick={(e) => e.stopPropagation()}
@@ -790,7 +808,9 @@ function CollabEpisodeCard({ c }: { c: CreatorCollabEpisode }) {
         <span className="post-id tabular">{title}</span>
         {c.campaign && <span className="campaign-chip">{c.campaign}</span>}
         {c.stage && <WorkflowStatusPill status={c.stage as WorkflowStatus} />}
-        {c.collabType && <span className="pill pill--muted">{c.collabType}</span>}
+        {c.collabType && (
+          <span className="pill pill--muted">{c.collabType}</span>
+        )}
         {c.contentTypes.map((ct) => (
           <span key={ct} className="pill pill--muted">
             {ct}
@@ -815,7 +835,10 @@ function CollabEpisodeCard({ c }: { c: CreatorCollabEpisode }) {
             Historic
           </span>
         ) : (
-          <span className="pill pill--info ml-auto" title="From the live system">
+          <span
+            className="pill pill--info ml-auto"
+            title="From the live system"
+          >
             <Sparkles size={9} aria-hidden />
             Live
           </span>

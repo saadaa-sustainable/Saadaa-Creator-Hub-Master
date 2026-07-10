@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Layers,
   Users,
+  Ban,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
@@ -121,6 +122,7 @@ export function OutboundForm({
   // is allowed; nothing is locked and a note is shown.
   const isNotFetchable =
     hit?.source === "deactivated" || hit?.source === "error";
+  const isBlacklisted = hit?.source === "blacklisted";
   // Existing creator (by username OR legacy profile_id) — submit is blocked and
   // the user is guided to Onboarding for a repeat collab.
   const isExistingCreator = hit?.source === "creator";
@@ -143,7 +145,8 @@ export function OutboundForm({
     if (lookupState === "loading") {
       setFetchPct(8);
       const t = setInterval(
-        () => setFetchPct((p) => (p < 95 ? p + Math.max(1, (95 - p) * 0.12) : p)),
+        () =>
+          setFetchPct((p) => (p < 95 ? p + Math.max(1, (95 - p) * 0.12) : p)),
         180,
       );
       return () => clearInterval(t);
@@ -218,17 +221,24 @@ export function OutboundForm({
       // creators row stores it. Always set (clears stale value on a fresh fetch).
       setValue("profileId", result.profile_id ?? "", { shouldDirty: false });
 
-      if (result.source === "deactivated" || result.source === "error") {
+      if (
+        result.source === "deactivated" ||
+        result.source === "error" ||
+        result.source === "blacklisted"
+      ) {
         // Personal/deactivated or a transient error — seed name with the handle
         // so the form is usable; the user fills the rest manually.
-        setValue("influencerName", result.username ?? "", { shouldDirty: true });
+        setValue("influencerName", result.username ?? "", {
+          shouldDirty: true,
+        });
         if (result.gender) {
           const g = result.gender as ReachOutInput["gender"];
           if (GENDERS.includes(g)) set("gender", g);
         }
       } else {
         set("influencerName", result.inf_name);
-        if (result.followers != null) set("followers", result.followers as never);
+        if (result.followers != null)
+          set("followers", result.followers as never);
         if (result.gender) {
           const g = result.gender as ReachOutInput["gender"];
           if (GENDERS.includes(g)) set("gender", g);
@@ -239,7 +249,8 @@ export function OutboundForm({
             set("language", lang);
         }
         if (result.er != null) set("er", result.er as never);
-        if (result.avg_likes != null) set("avgLikes", result.avg_likes as never);
+        if (result.avg_likes != null)
+          set("avgLikes", result.avg_likes as never);
       }
 
       if (result.verification === "Yes")
@@ -248,7 +259,9 @@ export function OutboundForm({
         setValue("verification", "Non-Verified", { shouldDirty: true });
       else setValue("verification", "Pending", { shouldDirty: true });
 
-      if (result.source === "creator")
+      if (result.source === "blacklisted")
+        toast.error(result.note ?? "Creator is offboarded and blacklisted");
+      else if (result.source === "creator")
         toast.success(
           result.refreshed
             ? "Existing creator — refreshed live from Instagram"
@@ -302,6 +315,14 @@ export function OutboundForm({
 
   const onSubmit = (event: React.FormEvent) => {
     setSubmitAttempted(true);
+    if (isBlacklisted) {
+      event.preventDefault();
+      toast.error(
+        hit?.note ??
+          "This creator is offboarded and cannot be reached out again.",
+      );
+      return;
+    }
     // Existing creators may now be re-reached (server enforces the 30-day cooldown
     // + per-campaign rule and refreshes their data). No client-side block.
     handleSubmit(
@@ -535,6 +556,18 @@ export function OutboundForm({
                     "Couldn’t fetch this profile (private, personal, or deactivated). Fill the fields below manually to continue."}
                 </p>
               )}
+              {isBlacklisted && (
+                <div className="reachout-blacklist-alert" role="alert">
+                  <Ban size={15} aria-hidden />
+                  <div>
+                    <strong>Creator offboarded</strong>
+                    <p>
+                      {hit?.note ??
+                        "This creator is blacklisted and cannot be reached out or onboarded again."}
+                    </p>
+                  </div>
+                </div>
+              )}
               {errors.instagramLink && (
                 <p className="mt-2 text-[0.75rem] text-danger">
                   {errors.instagramLink.message}
@@ -570,7 +603,9 @@ export function OutboundForm({
                 <label htmlFor="ro_followers">
                   Followers <span className="req">*</span>
                 </label>
-                {lockFollowers && <span className="autofill-badge">"AUTO"</span>}
+                {lockFollowers && (
+                  <span className="autofill-badge">"AUTO"</span>
+                )}
               </div>
 
               <div className="form-floating sm:col-span-2">
@@ -635,14 +670,18 @@ export function OutboundForm({
                     <span
                       className={cn(
                         "ig-source-badge",
-                        hit.source === "creator"
-                          ? "ig-source-creator"
-                          : hit.source === "meta" || hit.source === "historic"
-                            ? "ig-source-cache"
-                            : "ig-source-queued",
+                        hit.source === "blacklisted"
+                          ? "ig-source-blacklisted"
+                          : hit.source === "creator"
+                            ? "ig-source-creator"
+                            : hit.source === "meta" || hit.source === "historic"
+                              ? "ig-source-cache"
+                              : "ig-source-queued",
                       )}
                     >
-                      {hit.source === "creator" ? (
+                      {hit.source === "blacklisted" ? (
+                        <Ban className="h-3 w-3" />
+                      ) : hit.source === "creator" ? (
                         <Layers className="h-3 w-3" />
                       ) : hit.source === "meta" ? (
                         <InstagramIcon className="h-3 w-3" />
@@ -651,21 +690,23 @@ export function OutboundForm({
                       ) : (
                         <AlertCircle className="h-3 w-3" />
                       )}
-                      {hit.source === "creator"
-                        ? hit.refreshed
-                          ? "Existing · Refreshed"
-                          : hit.creator_type === "historic_creator"
-                            ? "From Records · Historic"
-                            : hit.creator_type === "new_creator"
-                              ? "From Records · New"
-                              : "From Records"
-                        : hit.source === "meta"
-                          ? "Live"
-                          : hit.source === "historic"
-                            ? "Last known"
-                            : hit.source === "deactivated"
-                              ? "Not fetchable"
-                              : "Fetch failed"}
+                      {hit.source === "blacklisted"
+                        ? "Offboarded · Blocked"
+                        : hit.source === "creator"
+                          ? hit.refreshed
+                            ? "Existing · Refreshed"
+                            : hit.creator_type === "historic_creator"
+                              ? "From Records · Historic"
+                              : hit.creator_type === "new_creator"
+                                ? "From Records · New"
+                                : "From Records"
+                          : hit.source === "meta"
+                            ? "Live"
+                            : hit.source === "historic"
+                              ? "Last known"
+                              : hit.source === "deactivated"
+                                ? "Not fetchable"
+                                : "Fetch failed"}
                     </span>
                     <div className="ig-card-name">
                       {hit.inf_name ?? hit.username}
@@ -818,9 +859,7 @@ export function OutboundForm({
                     </span>
                     <div className="label-stack">
                       <div className="primary">Verification Pending</div>
-                      <div className="meta">
-                        Set manually or mark verified
-                      </div>
+                      <div className="meta">Set manually or mark verified</div>
                     </div>
                     <button
                       type="button"
@@ -953,7 +992,16 @@ export function OutboundForm({
       <div className="space-y-3">
         <MissingFieldsAlert fields={missingFieldLabels} />
         <div className="text-end">
-          <button type="submit" className="btn-submit" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn-submit"
+            disabled={submitting || isBlacklisted}
+            title={
+              isBlacklisted
+                ? "This creator is offboarded and cannot be reached out again."
+                : undefined
+            }
+          >
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -961,9 +1009,11 @@ export function OutboundForm({
             )}
             {submitting
               ? "Submitting…"
-              : isExistingCreator
-                ? "Re-Reach Out"
-                : "Create Reach Out"}
+              : isBlacklisted
+                ? "Creator blocked"
+                : isExistingCreator
+                  ? "Re-Reach Out"
+                  : "Create Reach Out"}
           </button>
         </div>
       </div>

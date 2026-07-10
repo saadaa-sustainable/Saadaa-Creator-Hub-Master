@@ -11,6 +11,7 @@ export {
 export { EmptyState } from "./empty-state";
 export { GlassCard } from "./glass-card";
 export { Input } from "./input";
+export { InfoTooltip } from "./info-tooltip";
 export { KpiCard, KpiStrip } from "./kpi-card";
 export { Label } from "./label";
 export { MissingFieldsAlert } from "./missing-fields-alert";

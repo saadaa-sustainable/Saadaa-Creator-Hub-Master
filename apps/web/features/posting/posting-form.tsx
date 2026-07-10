@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,7 +16,6 @@ import {
   CalendarCheck,
   ShieldCheck,
   CheckCircle2,
-  Info,
   Film,
   ExternalLink,
   Eye,
@@ -28,6 +27,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import {
   extractShortcode,
   postDateFromUrl,
@@ -35,7 +35,11 @@ import {
 } from "@/lib/instagram-shortcode";
 import { PartnershipBadge } from "@/components/ui/status-pill";
 import { PostingSchema, type PostingInput } from "./schema";
-import { fetchPostDetails, submitPosting, type PostDetailsResult } from "./actions";
+import {
+  fetchPostDetails,
+  submitPosting,
+  type PostDetailsResult,
+} from "./actions";
 import { checkCreatorPartnership } from "./partnership-actions";
 import { PartnershipFlowModal } from "./partnership-flow-modal";
 
@@ -69,7 +73,6 @@ export function PostingModal({
   const router = useRouter();
   const [submitting, startSubmit] = useTransition();
   const [mounted, setMounted] = useState(false);
-  const [showDriveInfo, setShowDriveInfo] = useState(false);
   const [postUrlWarning, setPostUrlWarning] = useState<string | null>(null);
   const [postUrlError, setPostUrlError] = useState<string | null>(null);
   const [decodedDate, setDecodedDate] = useState<string | null>(null);
@@ -87,7 +90,6 @@ export function PostingModal({
   // Partnership: live per-creator status chip + the post-submit blocking popup.
   const [partnershipState, setPartnershipState] = useState<string | null>(null);
   const [flowActive, setFlowActive] = useState(false);
-  const driveBtnRef = useRef<HTMLButtonElement>(null);
 
   const requiresDownload = adsUsageRights === "Yes";
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -283,27 +285,6 @@ export function PostingModal({
     };
   }, [watchedPostLink, username, setValue]);
 
-  // Close Drive info popover on Escape / outside click.
-  useEffect(() => {
-    if (!showDriveInfo) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setShowDriveInfo(false);
-    };
-    const onClick = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (driveBtnRef.current && !driveBtnRef.current.contains(t)) {
-        const pop = document.getElementById("pt-drive-popover");
-        if (pop && !pop.contains(t)) setShowDriveInfo(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onClick);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onClick);
-    };
-  }, [showDriveInfo]);
-
   // Instagram-verified = authoritative: the post was matched in THIS creator's
   // media, so both the date and ownership are confirmed without manual ticks.
   const apiVerified = dateSource === "instagram";
@@ -324,9 +305,7 @@ export function PostingModal({
       return;
     }
     if (!dateOk) {
-      toast.error(
-        "Confirm the post date matches Instagram before submitting.",
-      );
+      toast.error("Confirm the post date matches Instagram before submitting.");
       return;
     }
     startSubmit(async () => {
@@ -381,320 +360,311 @@ export function PostingModal({
         <div className="modal-backdrop modal-backdrop--onboarding">
           <div className="modal-panel modal-panel--lg modal-panel--onboarding">
             <header className="modal-head">
-          <div className="flex items-center gap-2 min-w-0">
-            <Send size={16} />
-            <h2 className="font-semibold">Submit Posting</h2>
-            <span className="chip text-[10px] tabular">
-              {postIdShort ?? postId}
-            </span>
-            {collabId && (
-              <span className="text-[0.7rem] text-text-tertiary tabular">
-                · {collabId}
-              </span>
-            )}
-            <PartnershipBadge status={partnershipState} />
-          </div>
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={14} />
-          </button>
-        </header>
-
-        <form
-          onSubmit={(e) => {
-            setSubmitAttempted(true);
-            handleSubmit(onSubmit)(e);
-          }}
-          className="modal-body pt-modal-body"
-        >
-          <input type="hidden" {...register("adsUsageRights")} />
-
-          {/* Compact context strip */}
-          <div className="pt-context-strip">
-            <span>
-              Mark{" "}
-              <strong>@{username ?? creatorName ?? "creator"}</strong> as
-              Posted
-            </span>
-            {!!adsUsageRights && (
-              <span
-                className="pt-context-chip"
-                title="Ads Usage Rights window"
-              >
-                <ShieldCheck size={11} aria-hidden />
-                Ads: {adsUsageRights}
-              </span>
-            )}
-          </div>
-
-          {/* Fields — denser 2-col grid, no card wrapper */}
-          <div className="pt-grid">
-            <div className="form-floating">
-              <input
-                type="date"
-                className="form-control"
-                id="pt_postDate"
-                placeholder=" "
-                {...register("postDate")}
-              />
-              <label htmlFor="pt_postDate">
-                <CalendarCheck size={11} className="inline mr-1" />
-                Post Date <span className="req">*</span>
-              </label>
-              {errors.postDate && (
-                <small className="field-error">
-                  {errors.postDate.message}
-                </small>
-              )}
-            </div>
-
-            <div className="form-floating relative">
-              <input
-                type="url"
-                className="form-control"
-                id="pt_postLink"
-                placeholder=" "
-                {...register("postLink")}
-              />
-              <label htmlFor="pt_postLink">
-                <LinkIcon size={11} className="inline mr-1" />
-                Live Post URL <span className="req">*</span>
-              </label>
-              {errors.postLink && (
-                <small className="field-error">
-                  {errors.postLink.message}
-                </small>
-              )}
-            </div>
-
-            {/* Verify strip — collapsed into 2 inline rows when possible */}
-            {decodedDate && (
-              <div className="pt-grid-full pt-verify-strip">
-                <div className="pt-verify-strip__head">
-                  <span className="pt-verify-pill pt-verify-pill--date">
-                    <CalendarCheck size={11} aria-hidden />
-                    <strong className="tabular">{decodedDate}</strong>
-                    {!apiVerified && (
-                      <span className="pt-verify-pill__note">±1d</span>
-                    )}
+              <div className="flex items-center gap-2 min-w-0">
+                <Send size={16} />
+                <h2 className="font-semibold">Submit Posting</h2>
+                <span className="chip text-[10px] tabular">
+                  {postIdShort ?? postId}
+                </span>
+                {collabId && (
+                  <span className="text-[0.7rem] text-text-tertiary tabular">
+                    · {collabId}
                   </span>
-                  {fetchingDate && (
-                    <span className="pt-verify-pill">
-                      <Loader2 size={11} className="animate-spin" aria-hidden />
-                      Fetching from Instagram…
-                    </span>
-                  )}
-                  {apiVerified && (
-                    <span className="pt-verify-pill pt-verify-pill--ok">
-                      <Instagram size={11} aria-hidden />
-                      Verified on Instagram
-                    </span>
-                  )}
-                  {!apiVerified && ownerAutoConfirmed && (
-                    <span className="pt-verify-pill pt-verify-pill--ok">
-                      <CheckCircle2 size={11} aria-hidden />
-                      @{username} verified
-                    </span>
-                  )}
-                  {previewShortcode && (
-                    <button
-                      type="button"
-                      className="pt-verify-strip__open ml-auto"
-                      onClick={() => setShowPreview(true)}
-                    >
-                      <Eye size={11} aria-hidden />
-                      View Post
-                    </button>
-                  )}
-                  {watchedPostLink && (
-                    <a
-                      href={watchedPostLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="pt-verify-strip__open"
-                    >
-                      <ExternalLink size={11} aria-hidden />
-                      Open IG
-                    </a>
-                  )}
-                </div>
-
-                {!ownerAutoConfirmed && !apiVerified && (
-                  <label className="pt-verify-check pt-verify-check--danger">
-                    <input
-                      type="checkbox"
-                      checked={ownerVerified}
-                      onChange={(e) => setOwnerVerified(e.target.checked)}
-                    />
-                    <span>
-                      I confirm the live post belongs to{" "}
-                      <strong>@{username ?? "this creator"}</strong>{" "}
-                      (couldn&apos;t auto-verify ownership from Instagram).
-                    </span>
-                  </label>
                 )}
-
-                {!apiVerified && (
-                  <label className="pt-verify-check">
-                    <input
-                      type="checkbox"
-                      checked={dateVerified}
-                      onChange={(e) => setDateVerified(e.target.checked)}
-                    />
-                    <span>
-                      I checked the live post and the Post Date matches what
-                      Instagram shows.
-                    </span>
-                  </label>
-                )}
+                <PartnershipBadge status={partnershipState} />
               </div>
-            )}
-
-            {postUrlError && (
-              <div className="alert alert-danger pt-grid-full pt-alert-tight">
-                <AlertTriangle size={13} />
-                {postUrlError}
-              </div>
-            )}
-            {postUrlWarning && (
-              <div className="alert alert-warning pt-grid-full pt-alert-tight">
-                <AlertTriangle size={13} />
-                {postUrlWarning}
-              </div>
-            )}
-            {requiresDownload && (
-              <div className="alert alert-warning pt-grid-full pt-alert-tight">
-                <AlertCircle size={13} />
-                Ads Rights = <strong>Yes</strong>. Drive link required.
-              </div>
-            )}
-
-            <div className="form-floating relative">
-              <input
-                type="url"
-                className="form-control"
-                id="pt_downloadLink"
-                placeholder=" "
-                {...register("downloadLink")}
-              />
-              <label htmlFor="pt_downloadLink">
-                <Download size={11} className="inline mr-1" />
-                Drive Link <span className="req">*</span>
-              </label>
               <button
-                ref={driveBtnRef}
                 type="button"
-                className="drive-info-icon"
-                aria-label="How to fill the Drive Download Link"
-                aria-expanded={showDriveInfo}
-                onClick={() => setShowDriveInfo((s) => !s)}
+                className="icon-btn"
+                onClick={onClose}
+                aria-label="Close"
               >
-                <Info size={14} aria-hidden />
+                <X size={14} />
               </button>
-              {showDriveInfo && (
-                <div
-                  id="pt-drive-popover"
-                  role="dialog"
-                  aria-label="How to fill the Drive Download Link"
-                  className="drive-popover"
-                >
-                  <div className="drive-popover__head">
-                    <span>How to fill this</span>
-                    <button
-                      type="button"
-                      className="drive-popover__close"
-                      onClick={() => setShowDriveInfo(false)}
-                      aria-label="Close"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                  <ol className="drive-popover__list">
-                    <li>Download the post video / Reel from Instagram.</li>
-                    <li>
-                      Upload it to the brand <strong>Google Drive</strong>{" "}
-                      folder.
-                    </li>
-                    <li>
-                      Set sharing to <em>Anyone with the link</em>.
-                    </li>
-                    <li>Paste the shareable Drive link here.</li>
-                  </ol>
-                  <div className="drive-popover__warn">
-                    <AlertTriangle size={11} aria-hidden />
-                    <strong>Mandatory</strong> for every post.
-                  </div>
+            </header>
+
+            <form
+              onSubmit={(e) => {
+                setSubmitAttempted(true);
+                handleSubmit(onSubmit)(e);
+              }}
+              className="modal-body pt-modal-body"
+            >
+              <input type="hidden" {...register("adsUsageRights")} />
+
+              {/* Compact context strip */}
+              <div className="pt-context-strip">
+                <span>
+                  Mark <strong>@{username ?? creatorName ?? "creator"}</strong>{" "}
+                  as Posted
+                </span>
+                {!!adsUsageRights && (
+                  <span
+                    className="pt-context-chip"
+                    title="Ads Usage Rights window"
+                  >
+                    <ShieldCheck size={11} aria-hidden />
+                    Ads: {adsUsageRights}
+                  </span>
+                )}
+              </div>
+
+              {/* Fields — denser 2-col grid, no card wrapper */}
+              <div className="pt-grid">
+                <div className="form-floating">
+                  <input
+                    type="date"
+                    className="form-control"
+                    id="pt_postDate"
+                    placeholder=" "
+                    {...register("postDate")}
+                  />
+                  <label htmlFor="pt_postDate">
+                    <CalendarCheck size={11} className="inline mr-1" />
+                    Post Date <span className="req">*</span>
+                  </label>
+                  {errors.postDate && (
+                    <small className="field-error">
+                      {errors.postDate.message}
+                    </small>
+                  )}
                 </div>
-              )}
-              {errors.downloadLink && (
-                <small className="field-error">
-                  {errors.downloadLink.message}
-                </small>
-              )}
-            </div>
 
-            <div className="form-floating">
-              <input
-                type="url"
-                className="form-control"
-                id="pt_rawDump"
-                placeholder=" "
-                {...register("rawDump")}
-              />
-              <label htmlFor="pt_rawDump">
-                <Film size={11} className="inline mr-1" />
-                Raw Footage Dump
-              </label>
-            </div>
+                <div className="form-floating relative">
+                  <input
+                    type="url"
+                    className="form-control"
+                    id="pt_postLink"
+                    placeholder=" "
+                    {...register("postLink")}
+                  />
+                  <label htmlFor="pt_postLink">
+                    <LinkIcon size={11} className="inline mr-1" />
+                    Live Post URL <span className="req">*</span>
+                  </label>
+                  {errors.postLink && (
+                    <small className="field-error">
+                      {errors.postLink.message}
+                    </small>
+                  )}
+                </div>
 
-            {/* Partnership Key input removed (2026-07-02): the partnership-ad
+                {/* Verify strip — collapsed into 2 inline rows when possible */}
+                {decodedDate && (
+                  <div className="pt-grid-full pt-verify-strip">
+                    <div className="pt-verify-strip__head">
+                      <span className="pt-verify-pill pt-verify-pill--date">
+                        <CalendarCheck size={11} aria-hidden />
+                        <strong className="tabular">{decodedDate}</strong>
+                        {!apiVerified && (
+                          <span className="pt-verify-pill__note">±1d</span>
+                        )}
+                      </span>
+                      {fetchingDate && (
+                        <span className="pt-verify-pill">
+                          <Loader2
+                            size={11}
+                            className="animate-spin"
+                            aria-hidden
+                          />
+                          Fetching from Instagram…
+                        </span>
+                      )}
+                      {apiVerified && (
+                        <span className="pt-verify-pill pt-verify-pill--ok">
+                          <Instagram size={11} aria-hidden />
+                          Verified on Instagram
+                        </span>
+                      )}
+                      {!apiVerified && ownerAutoConfirmed && (
+                        <span className="pt-verify-pill pt-verify-pill--ok">
+                          <CheckCircle2 size={11} aria-hidden />@{username}{" "}
+                          verified
+                        </span>
+                      )}
+                      {previewShortcode && (
+                        <button
+                          type="button"
+                          className="pt-verify-strip__open ml-auto"
+                          onClick={() => setShowPreview(true)}
+                        >
+                          <Eye size={11} aria-hidden />
+                          View Post
+                        </button>
+                      )}
+                      {watchedPostLink && (
+                        <a
+                          href={watchedPostLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pt-verify-strip__open"
+                        >
+                          <ExternalLink size={11} aria-hidden />
+                          Open IG
+                        </a>
+                      )}
+                    </div>
+
+                    {!ownerAutoConfirmed && !apiVerified && (
+                      <label className="pt-verify-check pt-verify-check--danger">
+                        <input
+                          type="checkbox"
+                          checked={ownerVerified}
+                          onChange={(e) => setOwnerVerified(e.target.checked)}
+                        />
+                        <span>
+                          I confirm the live post belongs to{" "}
+                          <strong>@{username ?? "this creator"}</strong>{" "}
+                          (couldn&apos;t auto-verify ownership from Instagram).
+                        </span>
+                      </label>
+                    )}
+
+                    {!apiVerified && (
+                      <label className="pt-verify-check">
+                        <input
+                          type="checkbox"
+                          checked={dateVerified}
+                          onChange={(e) => setDateVerified(e.target.checked)}
+                        />
+                        <span>
+                          I checked the live post and the Post Date matches what
+                          Instagram shows.
+                        </span>
+                      </label>
+                    )}
+                  </div>
+                )}
+
+                {postUrlError && (
+                  <div className="alert alert-danger pt-grid-full pt-alert-tight">
+                    <AlertTriangle size={13} />
+                    {postUrlError}
+                  </div>
+                )}
+                {postUrlWarning && (
+                  <div className="alert alert-warning pt-grid-full pt-alert-tight">
+                    <AlertTriangle size={13} />
+                    {postUrlWarning}
+                  </div>
+                )}
+                {requiresDownload && (
+                  <div className="alert alert-warning pt-grid-full pt-alert-tight">
+                    <AlertCircle size={13} />
+                    Ads Rights = <strong>Yes</strong>. Drive link required.
+                  </div>
+                )}
+
+                <div className="form-floating relative">
+                  <input
+                    type="url"
+                    className="form-control"
+                    id="pt_downloadLink"
+                    placeholder=" "
+                    {...register("downloadLink")}
+                  />
+                  <label htmlFor="pt_downloadLink">
+                    <Download size={11} className="inline mr-1" />
+                    Drive Link <span className="req">*</span>
+                  </label>
+                  <InfoTooltip
+                    title="Drive link checklist"
+                    label="How to fill the Drive Link"
+                    side="top"
+                    align="end"
+                    className="drive-info-icon"
+                    contentClassName="drive-help-popover"
+                    content={
+                      <>
+                        <ol className="drive-popover__list">
+                          <li>
+                            Download the post video / Reel from Instagram.
+                          </li>
+                          <li>
+                            Upload it to the brand <strong>Google Drive</strong>{" "}
+                            folder.
+                          </li>
+                          <li>
+                            Set sharing to <em>Anyone with the link</em>.
+                          </li>
+                          <li>Paste the shareable Drive link here.</li>
+                        </ol>
+                        <div className="drive-popover__warn">
+                          <AlertTriangle size={11} aria-hidden />
+                          <strong>Mandatory</strong> for every post.
+                        </div>
+                      </>
+                    }
+                  />
+                  {errors.downloadLink && (
+                    <small className="field-error">
+                      {errors.downloadLink.message}
+                    </small>
+                  )}
+                </div>
+
+                <div className="form-floating">
+                  <input
+                    type="url"
+                    className="form-control"
+                    id="pt_rawDump"
+                    placeholder=" "
+                    {...register("rawDump")}
+                  />
+                  <label htmlFor="pt_rawDump">
+                    <Film size={11} className="inline mr-1" />
+                    Raw Footage Dump
+                  </label>
+                </div>
+
+                {/* Partnership Key input removed (2026-07-02): the partnership-ad
                 invite is auto-sent right after submit via the blocking status
                 popup, and the status chip in the header shows the live state. */}
-          </div>
+              </div>
 
-          <MissingFieldsAlert
-            className="mx-4 sm:mx-6 mb-2"
-            fields={postingMissingFields}
-          />
+              <MissingFieldsAlert
+                className="mx-4 sm:mx-6 mb-2"
+                fields={postingMissingFields}
+              />
 
-          <footer className="modal-foot">
-            <button type="button" className="btn btn-ghost" onClick={onClose}>
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={cn("btn-primary-cta", submitting && "is-loading")}
-              disabled={
-                submitting ||
-                !!postUrlError ||
-                (!!decodedDate && (!dateOk || !ownershipOk))
-              }
-              title={
-                postUrlError ??
-                (!!decodedDate && !ownershipOk
-                  ? "Confirm post belongs to this creator."
-                  : !!decodedDate && !dateOk
-                    ? "Tick the date-match checkbox to enable submit."
-                    : undefined)
-              }
-            >
-              {submitting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  <span className="hidden sm:inline">Saving…</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 size={14} />
-                  <span className="hidden sm:inline">Finalize </span>Posting
-                </>
-              )}
-            </button>
-          </footer>
+              <footer className="modal-foot">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={onClose}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={cn("btn-primary-cta", submitting && "is-loading")}
+                  disabled={
+                    submitting ||
+                    !!postUrlError ||
+                    (!!decodedDate && (!dateOk || !ownershipOk))
+                  }
+                  title={
+                    postUrlError ??
+                    (!!decodedDate && !ownershipOk
+                      ? "Confirm post belongs to this creator."
+                      : !!decodedDate && !dateOk
+                        ? "Tick the date-match checkbox to enable submit."
+                        : undefined)
+                  }
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span className="hidden sm:inline">Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} />
+                      <span className="hidden sm:inline">Finalize </span>Posting
+                    </>
+                  )}
+                </button>
+              </footer>
             </form>
           </div>
         </div>,

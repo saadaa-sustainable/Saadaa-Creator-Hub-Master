@@ -1,4 +1,5 @@
 import { LineChart } from "lucide-react";
+import { InfoDot } from "../bento-kit";
 import type { MonthlyPoint } from "../types";
 
 type TrendKey = "reachOut" | "onboarded" | "posted";
@@ -34,9 +35,7 @@ export function DashboardMonthlyTrend({ data }: { data: MonthlyPoint[] }) {
   };
 
   const toPoints = (key: TrendKey): string =>
-    data
-      .map((d, i) => toPoint(d, i, key))
-      .join(" ");
+    data.map((d, i) => toPoint(d, i, key)).join(" ");
 
   const toArea = (key: TrendKey): string =>
     `${padX},${h - padY} ${toPoints(key)} ${w - padX},${h - padY}`;
@@ -49,6 +48,10 @@ export function DashboardMonthlyTrend({ data }: { data: MonthlyPoint[] }) {
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <LineChart size={12} aria-hidden /> 6-month Trend
+          <InfoDot
+            title="6-month Trend"
+            text="Monthly counts of reach-outs, onboardings, and completed posting forms across the latest six months."
+          />
         </span>
         <div className="flex items-center gap-2 text-[0.62rem] font-semibold text-text-tertiary">
           {series.map((s) => (

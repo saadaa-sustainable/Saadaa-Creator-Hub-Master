@@ -11,13 +11,13 @@ export default function OnboardingKM() {
       <KMSection tag="Page layout">
         <KMList>
           <li>
-            <strong>Submission toggle</strong> · two-state segment at the top
-            of the filter bar. <KMCode>Not Submitted</KMCode> (the default on
-            load) shows the work queue — rows whose onboarding form is not yet
-            filled (workflow_status <KMCode>Reach Out</KMCode>).{" "}
-            <KMCode>Submitted</KMCode> shows already-onboarded rows
-            (<KMCode>On Board</KMCode> onward). The Stage dropdown narrows
-            within the chosen side.
+            <strong>Submission toggle</strong> · two-state segment at the top of
+            the filter bar. <KMCode>Not Submitted</KMCode> (the default on load)
+            shows the work queue — rows whose onboarding form is not yet filled
+            (workflow_status <KMCode>Reach Out</KMCode>).{" "}
+            <KMCode>Submitted</KMCode> shows already-onboarded rows (
+            <KMCode>On Board</KMCode> onward). The Stage dropdown narrows within
+            the chosen side.
           </li>
           <li>
             <strong>List + cards</strong> · default to canonical onboarding
@@ -30,22 +30,27 @@ export default function OnboardingKM() {
             below the filters to that member&apos;s metrics.
           </li>
           <li>
-            <strong>IDs are minted HERE — both post_id (P) and collab (C)</strong>{" "}
+            <strong>
+              IDs are minted HERE — both post_id (P) and collab (C)
+            </strong>{" "}
             · a reach-out row arrives with NULL <KMCode>post_id</KMCode> /{" "}
-            <KMCode>collab_id</KMCode> (identified by its bigserial id). On submit,{" "}
-            <KMCode>mint_onboarding_block</KMCode> reserves, in one advisory-locked
-            call: the <strong>collab</strong> (reuse the C already on that exact
-            Order ID, else the creator&apos;s next{" "}
+            <KMCode>collab_id</KMCode> (identified by its bigserial id). On
+            submit, <KMCode>mint_onboarding_block</KMCode> reserves, in one
+            advisory-locked call: the <strong>collab</strong> (reuse the C
+            already on that exact Order ID, else the creator&apos;s next{" "}
             <KMCode>SIF-1-C{"{n}"}</KMCode>) and the <strong>P-block</strong> —
-            one <KMCode>post_id</KMCode> per deliverable{" "}
-            (<KMCode>P{"{maxP+1}"}</KMCode> … <KMCode>P{"{maxP+N}"}</KMCode>), all
-            sharing the collab_id. <strong>maxP and maxC continue over{" "}
-            <KMCode>posts</KMCode> ∪ <KMCode>historic_posts</KMCode></strong> — a
-            historic creator with C2/P2 onboarded with 3 deliverables yields C3 +
-            P3/P4/P5. <strong>Reach-out rows have no collab yet</strong> — the
-            board shows <KMCode>Pending</KMCode> until onboarded. The board groups
-            by <KMCode>collab_id</KMCode> and renders ONE representative row per
-            collab (lowest <KMCode>post_id</KMCode>). A dedicated{" "}
+            one <KMCode>post_id</KMCode> per deliverable (
+            <KMCode>P{"{maxP+1}"}</KMCode> … <KMCode>P{"{maxP+N}"}</KMCode>),
+            all sharing the collab_id.{" "}
+            <strong>
+              maxP and maxC continue over <KMCode>posts</KMCode> ∪{" "}
+              <KMCode>historic_posts</KMCode>
+            </strong>{" "}
+            — a historic creator with C2/P2 onboarded with 3 deliverables yields
+            C3 + P3/P4/P5. <strong>Reach-out rows have no collab yet</strong> —
+            the board shows <KMCode>Pending</KMCode> until onboarded. The board
+            groups by <KMCode>collab_id</KMCode> and renders ONE representative
+            row per collab (lowest <KMCode>post_id</KMCode>). A dedicated{" "}
             <strong>Collab ID</strong> column / chip shows it on the row, card,
             and overview.
           </li>
@@ -54,25 +59,30 @@ export default function OnboardingKM() {
             <KMCode>Reach Out</KMCode> row a small ↻ chip appears under the{" "}
             <KMCode>Pending</KMCode> collab label showing the creator&apos;s
             collaboration history. A repeat collaborator reads{" "}
-            <KMCode>{"{N}"} prior · C1, C2 · next C{"{n}"}</KMCode> (prior collab
-            count, their existing C numbers, and the C the next onboard will
-            mint); a creator we only reached out to before reads{" "}
+            <KMCode>
+              {"{N}"} prior · C1, C2 · next C{"{n}"}
+            </KMCode>{" "}
+            (prior collab count, their existing C numbers, and the C the next
+            onboard will mint); a creator we only reached out to before reads{" "}
             <KMCode>Reached out before · next C2</KMCode>; a brand-new creator
             shows nothing. Sourced server-side from the{" "}
             <KMCode>prior_collab_summary</KMCode> RPC (counts{" "}
-            <KMCode>posts</KMCode> ∪ <KMCode>historic_posts</KMCode>), so the C it
-            predicts matches exactly what <KMCode>mint_onboarding_block</KMCode>{" "}
-            reserves on submit. The same chip renders on the row and the card.
+            <KMCode>posts</KMCode> ∪ <KMCode>historic_posts</KMCode>), so the C
+            it predicts matches exactly what{" "}
+            <KMCode>mint_onboarding_block</KMCode> reserves on submit. The same
+            chip renders on the row and the card.
           </li>
           <li>
             <strong>Deliverables chip</strong> · a <KMCode>Layers</KMCode> chip
             shows the human count (<KMCode>1 deliverable</KMCode>,{" "}
             <KMCode>3 deliverables</KMCode> …) with the{" "}
             <KMCode>NR + NP + NS</KMCode> breakdown as its tooltip / sub-label.
-            <strong> Single-deliverable collabs still read
-            &ldquo;1 deliverable&rdquo;</strong> — the count is never hidden.
-            This replaces the old Parent / Child N / Single lineage badges,
-            which are gone entirely.
+            <strong>
+              {" "}
+              Single-deliverable collabs still read &ldquo;1 deliverable&rdquo;
+            </strong>{" "}
+            — the count is never hidden. This replaces the old Parent / Child N
+            / Single lineage badges, which are gone entirely.
           </li>
           <li>
             <strong>See every deliverable</strong> · on a multi-deliverable
@@ -95,10 +105,11 @@ export default function OnboardingKM() {
             <strong>Unified Save &amp; Review Email</strong> · the form&apos;s
             single primary button saves the onboarding, then opens the collab
             email preview inline in the same modal — edit, then{" "}
-            <KMCode>Send Email</KMCode> or <KMCode>Save &amp; Skip Email</KMCode>.
-            If SMTP fails the pane stays open to retry (the attempt is logged to{" "}
-            <KMCode>email_logs</KMCode>); the saved onboarding is never lost. A
-            standalone send still lives on each onboarded row.
+            <KMCode>Send Email</KMCode> or{" "}
+            <KMCode>Save &amp; Skip Email</KMCode>. If SMTP fails the pane stays
+            open to retry (the attempt is logged to <KMCode>email_logs</KMCode>
+            ); the saved onboarding is never lost. A standalone send still lives
+            on each onboarded row.
           </li>
         </KMList>
       </KMSection>
@@ -147,8 +158,8 @@ export default function OnboardingKM() {
         <KMList>
           <li>
             <strong>Onboarding Configuration</strong> — Agency Name, Collab
-            Type, Commercials ₹, Est. Delivery, Ads Usage Rights, Reels /
-            Static Posts / Stories.
+            Type, Commercials ₹, Est. Delivery, Ads Usage Rights, Reels / Static
+            Posts / Stories.
           </li>
           <li>
             <strong>Order Linkage</strong> — Order ID (Shopify), Order Status,
@@ -175,12 +186,11 @@ export default function OnboardingKM() {
 
       <KMSection tag="Auto-populate from Reach Out">
         <KMCallout tone="info">
-          If the Reach Out row already carries{" "}
-          <KMCode>collab_type</KMCode> + <KMCode>commercial_amount</KMCode>{" "}
-          (typical for Inbound batches where the creator quoted upfront), the
-          Collab Type select + Commercials input mount in read-only mode with
-          a <strong>FROM REACH OUT</strong> badge. Outbound rows that left
-          commercials blank stay fully editable.
+          If the Reach Out row already carries <KMCode>collab_type</KMCode> +{" "}
+          <KMCode>commercial_amount</KMCode> (typical for Inbound batches where
+          the creator quoted upfront), the Collab Type select + Commercials
+          input mount in read-only mode with a <strong>FROM REACH OUT</strong>{" "}
+          badge. Outbound rows that left commercials blank stay fully editable.
         </KMCallout>
       </KMSection>
 
@@ -188,34 +198,35 @@ export default function OnboardingKM() {
         <KMList>
           <li>
             A campaign can ONBOARD at most its allocated creator count — the sum
-            of <KMCode>num_influencers</KMCode> across its budget tiers. Reach-out
-            is unlimited; <strong>this is where the cap bites</strong>. Once the
-            cap is reached, onboarding a new creator is blocked with an{" "}
-            <KMCode>X/cap</KMCode> message.
+            of <KMCode>num_influencers</KMCode> across its budget tiers.
+            Reach-out is unlimited; <strong>this is where the cap bites</strong>
+            . Once the cap is reached, onboarding a new creator is blocked with
+            an <KMCode>X/cap</KMCode> message.
           </li>
           <li>
-            The count is of creators <strong>currently onboarded and active</strong>{" "}
-            (On Board / Order Sent / Posted / Delivered). If an onboarded creator
-            is later <strong>offboarded</strong> (voided), they leave the count
-            and a <strong>slot frees</strong> — a creator who reached out but
+            The count is of creators{" "}
+            <strong>currently onboarded and active</strong> (On Board / Order
+            Sent / Posted / Delivered). If an onboarded creator is later{" "}
+            <strong>offboarded</strong> (voided), they leave the count and a{" "}
+            <strong>slot frees</strong> — a creator who reached out but
             wasn&apos;t onboarded can then be onboarded in their place.
           </li>
           <li>
             <KMCode>cap = 0</KMCode> (no budget rows) ⇒ no cap. Raise the
-            allocation in <strong>Edit Campaign</strong> (Campaign Owner / Global
-            Admin) to onboard more. Un-onboarded reach-outs are voided
-            (→ Cancelled) when the campaign closes; their data is kept.
+            allocation in <strong>Edit Campaign</strong> (Campaign Owner /
+            Global Admin) to onboard more. Un-onboarded reach-outs are voided (→
+            Cancelled) when the campaign closes; their data is kept.
           </li>
         </KMList>
       </KMSection>
 
       <KMSection tag="Equal-split commercial rule">
         <KMCallout tone="warning">
-          <strong>Single agreed total ÷ deliverable count.</strong> The
-          operator enters one total commercial figure. On submit, every
-          deliverable row of the collab gets{" "}
-          <KMCode>commercial_amount = total / (reels + static_posts)</KMCode>
-          . Example: ₹10,000 across 3 deliverables = ₹3,333.33 per row, summing
+          <strong>Single agreed total ÷ deliverable count.</strong> The operator
+          enters one total commercial figure. On submit, every deliverable row
+          of the collab gets{" "}
+          <KMCode>commercial_amount = total / (reels + static_posts)</KMCode>.
+          Example: ₹10,000 across 3 deliverables = ₹3,333.33 per row, summing
           back to ₹9,999.99 ≈ ₹10,000. Cost Analytics, Accounts Hub, Order
           Status, My Dashboard and the Dashboard stage board all sum the
           deliverables of a <KMCode>collab_id</KMCode> to display the
@@ -237,13 +248,13 @@ export default function OnboardingKM() {
             <strong>posts (additional deliverables)</strong> · auto-inserted
             when reels + posts &gt; 1. Each gets its own SHORT post_id{" "}
             <KMCode>SIF-&#123;N&#125;-P&#123;M&#125;</KMCode> (no{" "}
-            <KMCode>-C</KMCode> suffix), the SAME{" "}
-            <KMCode>collab_id</KMCode> as the rest of the collab, and{" "}
-            <KMCode>commercial_amount</KMCode> = the same split share. Payment is
-            raised once per collab_id on the representative. On the Onboarding
-            board these rows fold into the representative (see &ldquo;Collab ID
-            model&rdquo; above) — they remain full rows in the database and
-            surface individually in the Posting stage.
+            <KMCode>-C</KMCode> suffix), the SAME <KMCode>collab_id</KMCode> as
+            the rest of the collab, and <KMCode>commercial_amount</KMCode> = the
+            same split share. Payment is raised once per collab_id on the
+            representative. On the Onboarding board these rows fold into the
+            representative (see &ldquo;Collab ID model&rdquo; above) — they
+            remain full rows in the database and surface individually in the
+            Posting stage.
           </li>
           <li>
             <strong>creators</strong> · email, address fields (state, city,
@@ -254,8 +265,8 @@ export default function OnboardingKM() {
             status, subject, send timestamp.
           </li>
           <li>
-            posts.collab_email_sent_at + collab_email_skipped flags so the
-            UI can render a clean state per row.
+            posts.collab_email_sent_at + collab_email_skipped flags so the UI
+            can render a clean state per row.
           </li>
         </KMList>
       </KMSection>
@@ -269,8 +280,8 @@ export default function OnboardingKM() {
           </li>
           <li>
             <strong>Barter + Paid</strong> — Commercials required and &gt; 0.
-            Bank Name + Account Number + IFSC required. Equal-split applies
-            on insert.
+            Bank Name + Account Number + IFSC required. Equal-split applies on
+            insert.
           </li>
         </KMList>
       </KMSection>
@@ -278,13 +289,18 @@ export default function OnboardingKM() {
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>
-            payment_status is left <KMCode>null</KMCode> at onboarding — only
-            Posting flips it via auto-init draft, and only when the whole
-            collab is payment-eligible.
+            A creator-level blacklist is terminal. Onboarding checks the creator
+            by SIF and username before campaign-cap or Shopify work and rejects
+            an offboarded creator with the recorded reason.
           </li>
           <li>
-            Email must be present before Send. Missing email = red action
-            chip on the card.
+            payment_status is left <KMCode>null</KMCode> at onboarding — only
+            Posting flips it via auto-init draft, and only when the whole collab
+            is payment-eligible.
+          </li>
+          <li>
+            Email must be present before Send. Missing email = red action chip
+            on the card.
           </li>
           <li>
             Re-submitting overwrites the commercial split on the parent +
@@ -292,10 +308,9 @@ export default function OnboardingKM() {
           </li>
           <li>
             Red <KMCode>MissingFieldsAlert</KMCode> renders above the submit
-            button listing every empty required column when the form is
-            invalid. Uses Zod{" "}
-            <KMCode>safeParse(watch())</KMCode> so all blockers surface at
-            once, not one-at-a-time.
+            button listing every empty required column when the form is invalid.
+            Uses Zod <KMCode>safeParse(watch())</KMCode> so all blockers surface
+            at once, not one-at-a-time.
           </li>
         </KMList>
       </KMSection>
@@ -303,8 +318,8 @@ export default function OnboardingKM() {
       <KMCallout tone="warning">
         Multi-deliverable expansion is destructive on re-submit. If you change
         reels / posts counts after the initial onboarding, child rows are
-        re-created from scratch and any per-child posting data on prior
-        children is lost.
+        re-created from scratch and any per-child posting data on prior children
+        is lost.
       </KMCallout>
     </>
   );

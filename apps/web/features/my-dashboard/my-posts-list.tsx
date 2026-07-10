@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Grid3X3, Inbox, List as ListIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatDate, workflowStatusLabel } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import type { MyPost } from "./types";
@@ -55,15 +56,21 @@ export function MyPostsList({ posts }: MyPostsListProps) {
   return (
     <section aria-labelledby="my-posts-heading">
       <div className="flex items-center justify-between gap-2 mb-3 mt-6 flex-wrap">
-        <h2
-          id="my-posts-heading"
-          className="text-[0.875rem] font-semibold text-[--text-primary]"
-        >
-          My Posts
-          <span className="ml-2 text-[0.75rem] font-normal text-[--text-tertiary] tabular">
-            ({posts.length})
-          </span>
-        </h2>
+        <div className="metric-section-heading">
+          <h2
+            id="my-posts-heading"
+            className="text-[0.875rem] font-semibold text-[--text-primary]"
+          >
+            My Posts
+            <span className="ml-2 text-[0.75rem] font-normal text-[--text-tertiary] tabular">
+              ({posts.length})
+            </span>
+          </h2>
+          <InfoTooltip
+            title="My Posts"
+            content="All collaboration records assigned to you in the current filter scope. List and card views show the same records."
+          />
+        </div>
 
         <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
           <button

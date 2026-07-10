@@ -1,5 +1,6 @@
 import { Megaphone } from "lucide-react";
 import { formatRupees } from "@/lib/formatters";
+import { InfoDot } from "../bento-kit";
 import type { RankedRow } from "../types";
 
 /**
@@ -13,6 +14,10 @@ export function DashboardSpendsPerCampaign({ data }: { data: RankedRow[] }) {
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Megaphone size={12} aria-hidden /> Spend per Campaign
+          <InfoDot
+            title="Spend per Campaign"
+            text="Campaigns ranked by the total commercial amount recorded for their collaborations in the current filter scope."
+          />
         </span>
       </header>
       {data.length === 0 ? (
@@ -26,7 +31,9 @@ export function DashboardSpendsPerCampaign({ data }: { data: RankedRow[] }) {
             return (
               <li key={d.label} className="flex flex-col gap-0.5">
                 <div className="flex justify-between text-[0.72rem]">
-                  <span className="font-bold text-text-primary truncate">{d.label}</span>
+                  <span className="font-bold text-text-primary truncate">
+                    {d.label}
+                  </span>
                   <span className="tabular text-text-secondary flex-shrink-0">
                     {formatRupees(d.value)}
                   </span>

@@ -1,6 +1,7 @@
 import { TriangleAlert } from "lucide-react";
 import { formatDate, workflowStatusLabel } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import type { PendingAction } from "./types";
 
 export function PendingActionsSection({
@@ -22,6 +23,12 @@ export function PendingActionsSection({
         >
           Needs Attention
         </h2>
+        <InfoTooltip
+          title="Needs Attention"
+          content="My assigned collabs that need follow-up, including overdue delivery dates and other pending workflow actions. Days overdue starts after the estimated delivery date passes."
+          side="bottom"
+          align="start"
+        />
         {actions.length > 0 && (
           <span className="ml-1 inline-flex items-center justify-center rounded-full bg-[--danger-bg] text-[--danger-text] text-[0.7rem] font-bold px-2 py-0.5 tabular-nums">
             {actions.length}

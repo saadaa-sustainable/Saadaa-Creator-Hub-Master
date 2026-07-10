@@ -1,4 +1,5 @@
 import { Camera, Megaphone, Send, UserCheck, UserX } from "lucide-react";
+import { InfoDot } from "../bento-kit";
 import type { CampaignFocus } from "../types";
 
 /**
@@ -9,8 +10,11 @@ import type { CampaignFocus } from "../types";
  */
 export function DashboardCampaignFocus({ focus }: { focus: CampaignFocus }) {
   const onboardedValue =
-    focus.cap > 0 ? `${focus.onboarded} / ${focus.cap}` : String(focus.onboarded);
-  const slotsLeft = focus.cap > 0 ? Math.max(0, focus.cap - focus.onboarded) : null;
+    focus.cap > 0
+      ? `${focus.onboarded} / ${focus.cap}`
+      : String(focus.onboarded);
+  const slotsLeft =
+    focus.cap > 0 ? Math.max(0, focus.cap - focus.onboarded) : null;
 
   const stats: Array<{
     label: string;
@@ -19,7 +23,12 @@ export function DashboardCampaignFocus({ focus }: { focus: CampaignFocus }) {
     icon: typeof Send;
     tone: string;
   }> = [
-    { label: "Reached Out", value: focus.reachedOut, icon: Send, tone: "#3B6FD4" },
+    {
+      label: "Reached Out",
+      value: focus.reachedOut,
+      icon: Send,
+      tone: "#3B6FD4",
+    },
     {
       label: "Onboarded",
       value: onboardedValue,
@@ -52,8 +61,12 @@ export function DashboardCampaignFocus({ focus }: { focus: CampaignFocus }) {
           <h3 className="text-sm font-extrabold text-text-primary truncate">
             {focus.campaignName ?? focus.campaignId}
           </h3>
-          <p className="text-[0.6rem] text-text-tertiary uppercase tracking-[0.06em] font-bold">
+          <p className="inline-flex items-center gap-1 text-[0.6rem] text-text-tertiary uppercase tracking-[0.06em] font-bold">
             {focus.campaignId} · campaign funnel
+            <InfoDot
+              title="Campaign funnel"
+              text="Counts how many collaborations in this campaign are at Reach Out, Onboard, Offboarded, and Posted."
+            />
           </p>
         </div>
       </header>
@@ -79,7 +92,9 @@ export function DashboardCampaignFocus({ focus }: { focus: CampaignFocus }) {
                 {s.value}
               </div>
               {s.sub && (
-                <div className="mt-1 text-[0.6rem] text-text-tertiary">{s.sub}</div>
+                <div className="mt-1 text-[0.6rem] text-text-tertiary">
+                  {s.sub}
+                </div>
               )}
             </div>
           );

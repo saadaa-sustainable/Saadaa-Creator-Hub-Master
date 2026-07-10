@@ -1,4 +1,5 @@
 import { Target } from "lucide-react";
+import { InfoDot } from "../bento-kit";
 import { CountUpInt } from "../count-up-stats";
 
 /**
@@ -30,6 +31,10 @@ export function DashboardPostingGoal({
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Target size={12} aria-hidden /> Posting Goal
+          <InfoDot
+            title="Posting Goal"
+            text="Progress toward the current posting target. Achieved counts deliverables whose posting form has been completed."
+          />
         </span>
         <span className="text-[0.62rem] font-semibold text-text-tertiary tabular">
           <CountUpInt value={achieved} /> / <CountUpInt value={target} />

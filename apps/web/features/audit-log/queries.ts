@@ -33,51 +33,65 @@ function humanize(action: string): string {
 export async function fetchAuditLogData(): Promise<AuditLogData> {
   const svc = createServiceClient() as any;
 
-  const [cellEdits, comments, deletions, userLog, sysErrors, approvalLogs] =
-    await Promise.all([
-      svc
-        .from("cell_edits")
-        .select(
-          "id, table_name, row_pk, column_key, old_value, new_value, edited_by, edited_at",
-        )
-        .order("edited_at", { ascending: false })
-        .limit(PER_SOURCE),
-      svc
-        .from("cell_comments")
-        .select(
-          "id, table_id, row_pk, column_key, body, author_email, resolved, resolved_by, resolved_at, created_at",
-        )
-        .order("created_at", { ascending: false })
-        .limit(PER_SOURCE),
-      svc
-        .from("row_deletions")
-        .select(
-          "id, table_name, row_pk, deleted_by, deleted_at, restored_at, restored_by",
-        )
-        .order("deleted_at", { ascending: false })
-        .limit(PER_SOURCE),
-      svc
-        .from("user_audit_log")
-        .select(
-          "id, actor_email, target_email, action, before_json, after_json, notes, created_at",
-        )
-        .order("created_at", { ascending: false })
-        .limit(PER_SOURCE),
-      svc
-        .from("system_errors")
-        .select(
-          "id, type, key, message, source, resolved, resolved_at, resolved_by, created_at",
-        )
-        .order("created_at", { ascending: false })
-        .limit(PER_SOURCE),
-      svc
-        .from("approval_logs")
-        .select(
-          "id, action_type, action, entity_id, version_id, admin_email, admin_name, notes, timestamp",
-        )
-        .order("timestamp", { ascending: false })
-        .limit(PER_SOURCE),
-    ]);
+  const [
+    cellEdits,
+    comments,
+    deletions,
+    userLog,
+    creatorLog,
+    sysErrors,
+    approvalLogs,
+  ] = await Promise.all([
+    svc
+      .from("cell_edits")
+      .select(
+        "id, table_name, row_pk, column_key, old_value, new_value, edited_by, edited_at",
+      )
+      .order("edited_at", { ascending: false })
+      .limit(PER_SOURCE),
+    svc
+      .from("cell_comments")
+      .select(
+        "id, table_id, row_pk, column_key, body, author_email, resolved, resolved_by, resolved_at, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(PER_SOURCE),
+    svc
+      .from("row_deletions")
+      .select(
+        "id, table_name, row_pk, deleted_by, deleted_at, restored_at, restored_by",
+      )
+      .order("deleted_at", { ascending: false })
+      .limit(PER_SOURCE),
+    svc
+      .from("user_audit_log")
+      .select(
+        "id, actor_email, target_email, action, before_json, after_json, notes, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(PER_SOURCE),
+    svc
+      .from("creator_audit_log")
+      .select(
+        "id, creator_inf_id, username, action, reason, actor_email, metadata, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(PER_SOURCE),
+    svc
+      .from("system_errors")
+      .select(
+        "id, type, key, message, source, resolved, resolved_at, resolved_by, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(PER_SOURCE),
+    svc
+      .from("approval_logs")
+      .select(
+        "id, action_type, action, entity_id, version_id, admin_email, admin_name, notes, timestamp",
+      )
+      .order("timestamp", { ascending: false })
+      .limit(PER_SOURCE),
+  ]);
 
   const entries: AuditEntry[] = [];
 
@@ -143,6 +157,19 @@ export async function fetchAuditLogData(): Promise<AuditLogData> {
     });
   }
 
+  for (const r of (creatorLog.data ?? []) as Raw[]) {
+    entries.push({
+      id: `creator-${str(r.id)}`,
+      source: "Creator",
+      at: (r.created_at as string | null) ?? null,
+      actor: str(r.actor_email) || "Admin",
+      action: "Offboarded creator",
+      target: `${str(r.creator_inf_id)} · @${str(r.username)}`,
+      detail: trim(r.reason, 240),
+      tone: "delete",
+    });
+  }
+
   for (const r of (sysErrors.data ?? []) as Raw[]) {
     const resolved = r.resolved === true;
     const type = str(r.type).toLowerCase();
@@ -194,6 +221,7 @@ export async function fetchAuditLogData(): Promise<AuditLogData> {
   const counts: Record<AuditSource, number> = {
     Sheet: 0,
     User: 0,
+    Creator: 0,
     System: 0,
     Approval: 0,
   };

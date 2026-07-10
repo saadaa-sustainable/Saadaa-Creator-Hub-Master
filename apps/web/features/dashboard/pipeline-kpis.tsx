@@ -8,6 +8,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { CountUpInt } from "./count-up-stats";
 import type { DashboardData } from "./types";
 
@@ -28,12 +29,14 @@ function Tile({
   label,
   primary,
   secondary,
+  info,
 }: {
   tone: Tone;
   icon: LucideIcon;
   label: string;
   primary: React.ReactNode;
   secondary: string;
+  info: string;
 }) {
   return (
     <div className={cn("acc-kpi bento-tile", TONE[tone])}>
@@ -42,6 +45,7 @@ function Tile({
           <Icon size={16} />
         </span>
         <span className="acc-kpi__label">{label}</span>
+        <InfoTooltip title={label} content={info} />
       </div>
       <div className="acc-kpi__primary tabular">{primary}</div>
       <div className="acc-kpi__secondary tabular">{secondary}</div>
@@ -66,6 +70,7 @@ export function DashboardPipelineKpis({
           label="Reach Outs"
           primary={<CountUpInt value={pipeline.reachOut} />}
           secondary="First contacts"
+          info="First-contact records in the current filter scope."
         />
         <Tile
           tone="accent"
@@ -73,6 +78,7 @@ export function DashboardPipelineKpis({
           label="Onboarded"
           primary={<CountUpInt value={pipeline.onboarded} />}
           secondary={`Conversion ${pipeline.conversionPct}%`}
+          info="Collaborations whose onboarding form is complete. Conversion compares onboarded collaborations with reach-outs."
         />
         <Tile
           tone="success"
@@ -80,6 +86,7 @@ export function DashboardPipelineKpis({
           label="Posted"
           primary={<CountUpInt value={pipeline.posted} />}
           secondary={`Post rate ${pipeline.postRatePct}%`}
+          info="Deliverables whose posting form is complete. Post rate compares posted deliverables with onboarded collaborations."
         />
         <Tile
           tone="warning"
@@ -87,6 +94,7 @@ export function DashboardPipelineKpis({
           label="Pending Content"
           primary={<CountUpInt value={pipeline.pendingContent} />}
           secondary="Onboarded · no post yet"
+          info="Onboarded deliverables whose posting form has not yet been completed."
         />
         <Tile
           tone="danger"
@@ -94,6 +102,7 @@ export function DashboardPipelineKpis({
           label="Payment Pending"
           primary={<CountUpInt value={pipeline.paymentPending} />}
           secondary="Awaiting UTR"
+          info="Collaborations still waiting for payment completion or a payment reference."
         />
         <Tile
           tone="muted"
@@ -101,6 +110,7 @@ export function DashboardPipelineKpis({
           label="Ad Winners"
           primary={<CountUpInt value={pipeline.adWinners} />}
           secondary="≥ 50K · ROAS ≥ 3"
+          info="Creatives with at least 50,000 impressions and a return on ad spend of 3 or more."
         />
       </div>
     </section>

@@ -21,28 +21,28 @@ export default function MyDashboardKM() {
       <KMSection tag="KPI formulas">
         <KMList>
           <li>
-            <strong>My Active</strong> ·{" "}
-            <KMCode>count(posts)</KMCode> where{" "}
-            <KMCode>workflow_status ∈ &#123;Reach Out, On Board, Order
-            Sent&#125;</KMCode>. Anything still in the active pipeline under
-            your name.
+            <strong>My Active</strong> · <KMCode>count(posts)</KMCode> where{" "}
+            <KMCode>
+              workflow_status ∈ &#123;Reach Out, On Board, Order Sent&#125;
+            </KMCode>
+            . Anything still in the active pipeline under your name.
           </li>
           <li>
-            <strong>Pending Post</strong> ·{" "}
-            <KMCode>count(posts)</KMCode> where workflow_status is On Board or
-            Order Sent. Onboarded creators who have not posted yet. Use this
-            as your daily chase list.
+            <strong>Pending Post</strong> · <KMCode>count(posts)</KMCode> where
+            workflow_status is On Board or Order Sent. Onboarded creators who
+            have not posted yet. Use this as your daily chase list.
           </li>
           <li>
-            <strong>Posted</strong> ·{" "}
-            <KMCode>count(posts)</KMCode> where workflow_status is Posted or
-            Delivered.
+            <strong>Posted</strong> · <KMCode>count(posts)</KMCode> where
+            workflow_status is Posted or Delivered.
           </li>
           <li>
-            <strong>RTOs</strong> ·{" "}
-            <KMCode>count(posts)</KMCode> where workflow_status ∈{" "}
-            <KMCode>&#123;RTO, Cancelled, RTO - Reverse Picked, RTO -
-            Delivered&#125;</KMCode>.
+            <strong>RTOs</strong> · <KMCode>count(posts)</KMCode> where
+            workflow_status ∈{" "}
+            <KMCode>
+              &#123;RTO, Cancelled, RTO - Reverse Picked, RTO - Delivered&#125;
+            </KMCode>
+            .
           </li>
         </KMList>
       </KMSection>
@@ -60,8 +60,8 @@ export default function MyDashboardKM() {
 
       <KMSection tag="Activity sparkline (footer)">
         <p>
-          Each card has a tiny 30-day sparkline tracking your touches across
-          the last 30 calendar days. A &quot;touch&quot; counts when:
+          Each card has a tiny 30-day sparkline tracking your touches across the
+          last 30 calendar days. A &quot;touch&quot; counts when:
         </p>
         <KMList>
           <li>
@@ -91,13 +91,12 @@ export default function MyDashboardKM() {
           <li>
             <strong>Overdue delivery</strong> — post is in On Board or Order
             Sent AND <KMCode>est_delivery</KMCode> is set AND that date is
-            before today. Days overdue ={" "}
-            <KMCode>today − est_delivery</KMCode>.
+            before today. Days overdue = <KMCode>today − est_delivery</KMCode>.
           </li>
           <li>
             <strong>Awaiting post</strong> — post is in Delivered status AND{" "}
-            <KMCode>post_date</KMCode> is null. The creator received the
-            product but has not submitted a live post link yet.
+            <KMCode>post_date</KMCode> is null. The creator received the product
+            but has not submitted a live post link yet.
           </li>
         </KMList>
         <p>
@@ -109,14 +108,12 @@ export default function MyDashboardKM() {
 
       <KMSection tag="Quick payment modal">
         <p>
-          Click the Payment quick-modal on any posted card (parent rows only)
-          to log a payment without leaving this stage. The Amount field
-          defaults to the <strong>collab total</strong>. On submit:
+          Click the Payment quick-modal on any posted card (parent rows only) to
+          log a payment without leaving this stage. The Amount field defaults to
+          the <strong>collab total</strong>. On submit:
         </p>
         <KMList>
-          <li>
-            One payment row inserts against the parent post_id.
-          </li>
+          <li>One payment row inserts against the parent post_id.</li>
           <li>
             <KMCode>posts.payment_status</KMCode> cascades to{" "}
             <KMCode>Done</KMCode> on every sibling deliverable.
@@ -136,10 +133,19 @@ export default function MyDashboardKM() {
         </p>
       </KMSection>
 
+      <KMSection tag="Info controls">
+        <p>
+          Every KPI, workload summary, stage chart, leaderboard, kanban, Needs
+          Attention table, and My Posts table has an info icon. Open it for a
+          plain-language explanation of what is counted and how filters affect
+          the result.
+        </p>
+      </KMSection>
+
       <KMCallout tone="info">
         This page shows only YOUR collabs (filtered by{" "}
-        <KMCode>onboarded_by</KMCode>). If a collab was onboarded by a
-        colleague it will not appear here even if you later worked on it.
+        <KMCode>onboarded_by</KMCode>). If a collab was onboarded by a colleague
+        it will not appear here even if you later worked on it.
       </KMCallout>
     </>
   );

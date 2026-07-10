@@ -28,6 +28,7 @@ import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DeactivatedBadge } from "@/components/ui/status-pill";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatFollowers, formatRupees } from "@/lib/formatters";
 import { WhCategoryBadge } from "@/features/ad-status/ad-board";
 import {
@@ -476,18 +477,34 @@ export function PartnershipBoard({
         />
       </div>
 
+      <div className="metric-section-heading">
+        <strong>Partnership permission queue</strong>
+        <InfoTooltip
+          title="Partnership permission queue"
+          content="One creator per card, grouped by their latest Instagram partnership-ad permission state. Accepted and tested means at least one matched ad has already run."
+          side="bottom"
+          align="start"
+        />
+      </div>
+
       {/* Kanban — 5 lanes on the shared Accounts Hub lane shell. */}
       <div className="acc-kanban partnership-kanban bento-stagger">
         {LANES.map((lane) => {
           const items = lanes.get(lane.id) ?? [];
           return (
-            <section key={lane.id} className="acc-kb-col" aria-label={lane.label}>
+            <section
+              key={lane.id}
+              className="acc-kb-col"
+              aria-label={lane.label}
+            >
               <header className="acc-kb-col__head">
                 <span className="acc-kb-col__title inline-flex items-center gap-1.5">
                   <lane.icon size={13} className={lane.toneClass} aria-hidden />
                   {lane.label}
                 </span>
-                <span className="acc-kb-col__count tabular">{items.length}</span>
+                <span className="acc-kb-col__count tabular">
+                  {items.length}
+                </span>
               </header>
               <div className="acc-kb-col__body">
                 {items.length === 0 ? (
@@ -599,7 +616,9 @@ function PartnershipCardTile({
           </div>
         )}
         <div className="flex justify-between gap-2">
-          <dt className="text-text-tertiary">{hasInfId ? "INF ID" : "Creator"}</dt>
+          <dt className="text-text-tertiary">
+            {hasInfId ? "INF ID" : "Creator"}
+          </dt>
           <dd className="tabular text-text-secondary">
             {hasInfId ? card.infId : "—"}
             {card.postCount > 1 ? ` · ${card.postCount} posts` : ""}
@@ -662,12 +681,14 @@ function PartnershipKpi({
   label,
   value,
   secondary,
+  info,
 }: {
   tone: "accent" | "muted" | "warning" | "success" | "info" | "danger";
   icon: React.ReactNode;
   label: string;
   value: number;
   secondary: string;
+  info?: string;
 }) {
   return (
     <div className={cn("acc-kpi", `acc-kpi--${tone}`)}>
@@ -676,6 +697,13 @@ function PartnershipKpi({
           {icon}
         </span>
         <span className="acc-kpi__label">{label}</span>
+        <InfoTooltip
+          title={label}
+          content={
+            info ??
+            `${secondary}. Each creator is counted once in their latest partnership status.`
+          }
+        />
       </div>
       <div className="acc-kpi__primary tabular">{value}</div>
       <div className="acc-kpi__secondary tabular">{secondary}</div>

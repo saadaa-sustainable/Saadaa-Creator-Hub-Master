@@ -22,6 +22,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Avatar } from "@/components/ui";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { PartnershipKeyEdit } from "@/components/ui/partnership-key-edit";
 import {
   ViewModeToggle,
@@ -771,6 +772,16 @@ function SectionHead({
       <span className="text-[0.84rem] font-bold text-text-primary">
         {title}
       </span>
+      <InfoTooltip
+        title={title}
+        content={
+          title === "Untested Ads"
+            ? "Posted deliverables that are eligible for ad review but do not yet have a matched Meta ad classification."
+            : "Posted deliverables matched to Meta ads. The displayed status uses the primary matched ad and the classification follows the Ad Status rules."
+        }
+        side="bottom"
+        align="start"
+      />
       <span className="text-[0.74rem] text-text-tertiary">
         {count} post{count !== 1 ? "s" : ""}
       </span>
@@ -1069,7 +1080,9 @@ function AdStatusOverviewModal({
               <RowStatusBadge row={row} />
               {row.source === "historic" && <HistoricChip />}
               {row.retiredId && <RetiredIdChip />}
-              {row.retiredId && row.infId && <CurrentIdChip infId={row.infId} />}
+              {row.retiredId && row.infId && (
+                <CurrentIdChip infId={row.infId} />
+              )}
             </div>
             <h2>{row.name || row.username || row.postIdShort}</h2>
             <p className="campaign-detail-subtitle">
@@ -1147,10 +1160,7 @@ function AdStatusOverviewModal({
             </div>
 
             <dl className="campaign-detail-stat-grid ad-detail-stat-grid">
-              <AdDetailMetric
-                label="Campaign"
-                value={row.campaign || "—"}
-              />
+              <AdDetailMetric label="Campaign" value={row.campaign || "—"} />
               <AdDetailMetric
                 label="Post Date"
                 value={formatDate(row.postDate) || "—"}

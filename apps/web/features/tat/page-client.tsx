@@ -1,17 +1,11 @@
 "use client";
 
-import {
-  Clock,
-  Instagram,
-  PackageCheck,
-  UserCheck,
-  Send,
-  Truck,
-} from "lucide-react";
+import { Instagram, PackageCheck, UserCheck, Send, Truck } from "lucide-react";
 import type { CampaignTat, TatData, TatKpi } from "./types";
 import { TatCard } from "./tat-card";
 import { TatKpiStrip } from "./kpi-strip";
 import { CampaignTatChart } from "./campaign-chart";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 function SectionLabel({
   bg,
@@ -36,6 +30,7 @@ function SectionLabel({
         {title}
       </span>
       <span className="text-[0.78rem] text-text-tertiary">{subtitle}</span>
+      <InfoTooltip title={title} content={subtitle} />
     </div>
   );
 }

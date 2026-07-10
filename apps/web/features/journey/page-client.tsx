@@ -13,6 +13,7 @@ import { JourneyKpiStrip } from "./kpi-strip";
 import { JourneyFunnelStrip } from "./funnel-strip";
 import { JourneyBoard } from "./journey-board";
 import { JourneyFiltersBar } from "./filters";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 /** Derive unique sorted options from the fetched cards. */
 function deriveOptions(cards: JourneyCard[]): {
@@ -60,7 +61,9 @@ function applyClientFilters(
       const handleMatch = (card.username ?? "")
         .toLowerCase()
         .includes(searchLower);
-      const postMatch = (card.post_id ?? "").toLowerCase().includes(searchLower);
+      const postMatch = (card.post_id ?? "")
+        .toLowerCase()
+        .includes(searchLower);
       if (!nameMatch && !handleMatch && !postMatch) return false;
     }
 
@@ -138,6 +141,15 @@ export function JourneyPageClient({
       />
       <JourneyKpiStrip kpi={kpi} />
       <JourneyFunnelStrip funnel={funnel} />
+      <div className="metric-section-heading">
+        <strong>Creator journey board</strong>
+        <InfoTooltip
+          title="Creator journey board"
+          content="Each card is a collab placed in its current workflow stage. Moving left to right shows progress from reach-out through payment; cancelled and RTO work stays visible in its terminal lane."
+          side="bottom"
+          align="start"
+        />
+      </div>
       <JourneyBoard columns={columns} />
     </>
   );

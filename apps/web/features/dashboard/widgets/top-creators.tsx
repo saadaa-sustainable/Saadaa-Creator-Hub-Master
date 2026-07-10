@@ -1,5 +1,6 @@
 import { Trophy } from "lucide-react";
 import { Avatar } from "@/components/ui";
+import { InfoDot } from "../bento-kit";
 import type { DashboardData } from "../types";
 
 function compactFollowers(n: number | null): string {
@@ -19,6 +20,10 @@ export function DashboardTopCreators({
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Trophy size={12} className="text-accent" aria-hidden /> Top Creators
+          <InfoDot
+            title="Top Creators"
+            text="Creators in the current filter scope ranked by follower count. This is a reach comparison, not a performance score."
+          />
         </span>
         <span className="text-[0.6rem] text-text-tertiary">By followers</span>
       </header>

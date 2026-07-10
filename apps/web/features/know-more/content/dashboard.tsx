@@ -5,7 +5,7 @@ export default function DashboardKM() {
     <>
       <KMHeader
         title="Dashboard"
-        subtitle="Tabbed command centre — an Overview tab of cross-system headline KPIs plus the full bento grid, followed by one tab per SYSTEM-section view, mirroring the sidebar order: Influencer Journey · TAT Analytics · Ad Status · Compliance KPIs · Cost Analytics · Funnel View · Internal Dashboard. Each view tab reuses that feature's FULL page view (same data + KPI strips + boards / charts) — not a reduced summary. Only the active tab fetches data."
+        subtitle="Tabbed command centre with an operational briefing, animated distribution charts, priority KPIs, and the full bento grid. Every KPI, graph, queue, and table has a plain-language info control. The remaining tabs reuse each feature's full view, and only the active tab fetches data."
       />
 
       <KMSection tag="Tabbed layout">
@@ -13,33 +13,32 @@ export default function DashboardKM() {
           <li>
             <strong>Underline-active tab bar</strong> · horizontal, scrolls on
             mobile, keyboard-navigable (Arrow / Home / End). The active tab is
-            stored in the <KMCode>?tab=</KMCode> URL param so a tab is
-            linkable + server-rendered (default <KMCode>overview</KMCode>).
+            stored in the <KMCode>?tab=</KMCode> URL param so a tab is linkable
+            + server-rendered (default <KMCode>overview</KMCode>).
           </li>
           <li>
             <strong>Streaming</strong> · each tab body is its own async server
-            component inside a keyed <KMCode>&lt;Suspense&gt;</KMCode>. Only
-            the selected tab runs its query — inactive tabs cost nothing.
+            component inside a keyed <KMCode>&lt;Suspense&gt;</KMCode>. Only the
+            selected tab runs its query — inactive tabs cost nothing.
           </li>
           <li>
-            <strong>Overview tab</strong> · cross-system headline strip
-            (Active Campaigns · Creators in Pipeline · Total Collabs · Total
-            Spend · per-stage counts · pending onboardings / posts / payments /
-            paid) on top of the full bento command centre described below.
+            <strong>Overview tab</strong> · an operational briefing combines the
+            headline scope, two action signals, three animated distribution
+            rails, and eight priority KPIs before the full bento command centre.
           </li>
           <li>
             <strong>View tabs</strong> · each tab renders the SAME full view as
             the matching SYSTEM-section route, not a reduced KPI summary —
             Influencer Journey (<KMCode>JourneyPageClient</KMCode>: filter bar +
-            KPI strip + funnel strip + kanban board), TAT Analytics
-            (<KMCode>TatFiltersBar</KMCode> + <KMCode>TatPageClient</KMCode>:
-            KPI strip + three TAT grids + campaign benchmark chart), Ad Status
-            (<KMCode>AdStatusFiltersBar</KMCode> + <KMCode>AdStatusKpiStrip</KMCode>{" "}
-            + <KMCode>AdStatusBoard</KMCode>), Compliance KPIs
-            (<KMCode>ComplianceBody</KMCode>), Cost Analytics
-            (<KMCode>CostAnalyticsBody</KMCode>), Funnel View
-            (<KMCode>FunnelBody</KMCode>), Internal Dashboard
-            (<KMCode>InternalDashboardBody</KMCode>). The component + data fetch
+            KPI strip + funnel strip + kanban board), TAT Analytics (
+            <KMCode>TatFiltersBar</KMCode> + <KMCode>TatPageClient</KMCode>: KPI
+            strip + three TAT grids + campaign benchmark chart), Ad Status (
+            <KMCode>AdStatusFiltersBar</KMCode> +{" "}
+            <KMCode>AdStatusKpiStrip</KMCode> + <KMCode>AdStatusBoard</KMCode>),
+            Compliance KPIs (<KMCode>ComplianceBody</KMCode>), Cost Analytics (
+            <KMCode>CostAnalyticsBody</KMCode>), Funnel View (
+            <KMCode>FunnelBody</KMCode>), Internal Dashboard (
+            <KMCode>InternalDashboardBody</KMCode>). The component + data fetch
             are reused verbatim; only the duplicate per-page header is dropped
             (the Dashboard shell already shows one).
           </li>
@@ -69,7 +68,7 @@ export default function DashboardKM() {
         </KMList>
       </KMSection>
 
-      <KMSection tag="Overview bento layout (top → bottom)">
+      <KMSection tag="Overview layout (top → bottom)">
         <KMList>
           <li>
             <strong>1. PageHeader</strong> — Dashboard icon · title · Know More.
@@ -80,7 +79,13 @@ export default function DashboardKM() {
             re-renders on change.
           </li>
           <li>
-            <strong>3. Row A — Hero + Spotlight</strong> · 8/4 split. Hero card
+            <strong>3. Operational briefing</strong> · campaign/creator scope,
+            posting and conversion signals, Scope Mix, Pipeline Movement, and
+            Attention Pressure rails, then eight priority KPI cards. Historic
+            mode changes the live pressure rail to an archive outcome mix.
+          </li>
+          <li>
+            <strong>4. Row A — Hero + Spotlight</strong> · 8/4 split. Hero card
             says &quot;Pipeline pulse is thriving / warming up / ramping&quot;
             (dynamic by post-rate) with reach-outs → posts summary, conversion
             %, post-rate %, and CTA buttons to Posting + Accounts Hub. Spotlight
@@ -88,14 +93,14 @@ export default function DashboardKM() {
             % chip.
           </li>
           <li>
-            <strong>4. Row B — Today&apos;s Pulse</strong> · 4 cards (Reach-outs
+            <strong>5. Row B — Today&apos;s Pulse</strong> · 4 cards (Reach-outs
             Today · Onboarded Today · Posts Live Today · Delivered Today). Each
             shows today + delta-vs-yesterday with green/red/flat tone.
           </li>
           <li>
-            <strong>5. Row C — Stage Snapshot kanban</strong> · 4 horizontal-
-            scroll columns (Reach Out · Onboarding · Posted · Payment). Shows the{" "}
-            <strong>latest 10</strong> cards per stage with a{" "}
+            <strong>6. Row C — Stage Snapshot kanban</strong> · 4 horizontal-
+            scroll columns (Reach Out · Onboarding · Posted · Payment). Shows
+            the <strong>latest 10</strong> cards per stage with a{" "}
             <KMCode>+N more →</KMCode> drill-in link; the column-header{" "}
             <strong>badge shows the full bucket total</strong> (not the 10
             shown). Each column has a tinted body bg + top gradient band +
@@ -104,51 +109,63 @@ export default function DashboardKM() {
             and an assignee initials roundel + name in the footer.
           </li>
           <li>
-            <strong>6. Row D — Action Strip + Posting Goal</strong> · 8/4
-            split. 6 deep-link chips (Missing Email · Pending Order · Awaiting
-            Post · No Tracking · No Partnership · Overdue). Goal card = radial
-            progress of posted ÷ total scope.
+            <strong>7. Row D — Action Strip + Posting Goal</strong> · 8/4 split.
+            6 deep-link chips (Missing Email · Pending Order · Awaiting Post ·
+            No Tracking · No Partnership · Overdue). Goal card = radial progress
+            of posted ÷ total scope.
           </li>
           <li>
-            <strong>7. Row E — Workflow Funnel + 6-month Trend</strong> · 5/7.
-            Horizontal bars (Reach Out → On Board → Posted) sized vs the
-            largest bucket + 3-line SVG trend (RO / OB / Posted) per month.
+            <strong>8. Row E — Workflow Funnel + 6-month Trend</strong> · 5/7.
+            Horizontal bars (Reach Out → On Board → Posted) sized vs the largest
+            bucket + 3-line SVG trend (RO / OB / Posted) per month.
           </li>
           <li>
-            <strong>7b. Row E2 — Reach-Out Channels (Inbound vs Outbound)</strong>{" "}
-            · two side-by-side cards split off <KMCode>reachout_direction</KMCode>{" "}
-            (inbound = creators approached us via the inbound roster; outbound =
-            our cold reach-outs, incl. legacy null). Each card shows its
-            conversion %, Creators / Spend / Posted chips, and a 3-step mini
-            funnel sized to its own largest bucket. Respects the dashboard
-            filters (campaign / date / tier).
+            <strong>
+              8b. Row E2 — Reach-Out Channels (Inbound vs Outbound)
+            </strong>{" "}
+            · two side-by-side cards split off{" "}
+            <KMCode>reachout_direction</KMCode> (inbound = creators approached
+            us via the inbound roster; outbound = our cold reach-outs, incl.
+            legacy null). Each card shows its conversion %, Creators / Spend /
+            Posted chips, and a 3-step mini funnel sized to its own largest
+            bucket. Respects the dashboard filters (campaign / date / tier).
           </li>
           <li>
-            <strong>8. Row F — Content Type donut + Creator Tier donut</strong>{" "}
+            <strong>9. Row F — Content Type donut + Creator Tier donut</strong>{" "}
             · 6/6. Inline SVG donuts with center total + legend (brand colour
             palette).
           </li>
           <li>
-            <strong>9. Row G — Pipeline KPIs</strong> · 6-card strip (Reach
+            <strong>10. Row G — Pipeline KPIs</strong> · 6-card strip (Reach
             Outs · Onboarded with conversion % · Posted with post-rate % ·
             Pending Content · Payment Pending · Ad Winners). Reuses
             <KMCode>.acc-kpi</KMCode> chrome from Accounts Hub.
           </li>
           <li>
-            <strong>10. Row H — Top Creators + Team Leaderboard</strong> · 6/6.
-            Top 6 creators by followers + post count, then onboardings per
-            team member (sorted with progress bars).
+            <strong>11. Row H — Top Creators + Team Leaderboard</strong> · 6/6.
+            Top 6 creators by followers + post count, then onboardings per team
+            member (sorted with progress bars).
           </li>
           <li>
-            <strong>11. Row I — Spends per Campaign</strong> · horizontal-bar
+            <strong>12. Row I — Spends per Campaign</strong> · horizontal-bar
             rank, top 8 campaigns by commercial spend.
           </li>
           <li>
-            <strong>12. Row J — Campaign &amp; Spend KPIs</strong> · 4-card
+            <strong>13. Row J — Campaign &amp; Spend KPIs</strong> · 4-card
             strip (Total Creators · Active Campaigns · Total Spend · Paid
             Collabs).
           </li>
         </KMList>
+      </KMSection>
+
+      <KMSection tag="Info controls">
+        <p>
+          The small info icon beside each KPI, graph, queue, and table opens a
+          collision-aware popover with its everyday definition and counting
+          logic. The same control is used across every main Dashboard tab, My
+          Dashboard, and Historic Analytics. It works with hover, keyboard
+          focus, and tap, and closes on Escape or outside click.
+        </p>
       </KMSection>
 
       <KMSection tag="Per-campaign focus (when filtered)">
@@ -156,15 +173,15 @@ export default function DashboardKM() {
           Select a single campaign in the filter and a{" "}
           <strong>campaign funnel strip</strong> appears at the top of the
           Overview: <strong>Reached Out</strong> (distinct creators reached out)
-          · <strong>Onboarded</strong> <KMCode>Y / cap</KMCode> (with slots-left)
-          · <strong>Un-onboarded</strong> (reached out but never onboarded) ·{" "}
-          <strong>Posted</strong>. This makes the onboarding-cap story explicit:
-          a campaign can have many reach-outs but only <KMCode>cap</KMCode>{" "}
-          (Σ <KMCode>num_influencers</KMCode>) onboarded. Computed from a
-          dedicated per-campaign query (<KMCode>campaignFocus</KMCode>) so the
-          numbers reflect the whole campaign regardless of the date / tier /
-          content filters. Un-onboarded leftovers are voided (→ Cancelled) when
-          the campaign closes.
+          · <strong>Onboarded</strong> <KMCode>Y / cap</KMCode> (with
+          slots-left) · <strong>Un-onboarded</strong> (reached out but never
+          onboarded) · <strong>Posted</strong>. This makes the onboarding-cap
+          story explicit: a campaign can have many reach-outs but only{" "}
+          <KMCode>cap</KMCode> (Σ <KMCode>num_influencers</KMCode>) onboarded.
+          Computed from a dedicated per-campaign query (
+          <KMCode>campaignFocus</KMCode>) so the numbers reflect the whole
+          campaign regardless of the date / tier / content filters. Un-onboarded
+          leftovers are voided (→ Cancelled) when the campaign closes.
         </p>
       </KMSection>
 
@@ -178,12 +195,12 @@ export default function DashboardKM() {
             partnership_id, ad_partnership_valid, ads_usage_rights,
             est_delivery, email, collab_email_sent_at, collab_email_skipped,
             deliverable_index, collab_number. Plus extended set adding{" "}
-            <KMCode>ads_status</KMCode> with graceful 42703 fallback for
-            schemas that haven&apos;t added the column yet.
+            <KMCode>ads_status</KMCode> with graceful 42703 fallback for schemas
+            that haven&apos;t added the column yet.
           </li>
           <li>
-            <strong>creators</strong> · username, inf_name, category,
-            followers, profile_pic.
+            <strong>creators</strong> · username, inf_name, category, followers,
+            profile_pic.
           </li>
           <li>
             Server-side filters: campaign · content_type · workflow_status.
@@ -196,19 +213,18 @@ export default function DashboardKM() {
       <KMSection tag="KPI formulas (Row G + Row J)">
         <KMList>
           <li>
-            <strong>Reach Outs</strong> ·{" "}
-            <KMCode>count(posts)</KMCode> where workflow_status contains
-            &quot;reach out&quot; or is blank.
+            <strong>Reach Outs</strong> · <KMCode>count(posts)</KMCode> where
+            workflow_status contains &quot;reach out&quot; or is blank.
           </li>
           <li>
-            <strong>Onboarded</strong> ·{" "}
-            <KMCode>count(posts)</KMCode> with workflow_status &quot;on
-            board&quot;. Conversion % = onboarded ÷ reachOut.
+            <strong>Onboarded</strong> · <KMCode>count(posts)</KMCode> with
+            workflow_status &quot;on board&quot;. Conversion % = onboarded ÷
+            reachOut.
           </li>
           <li>
-            <strong>Posted</strong> ·{" "}
-            <KMCode>count(posts)</KMCode> where workflow_status is Posted or
-            Delivered. Post-rate % = posted ÷ onboarded.
+            <strong>Posted</strong> · <KMCode>count(posts)</KMCode> where
+            workflow_status is Posted or Delivered. Post-rate % = posted ÷
+            onboarded.
           </li>
           <li>
             <strong>Pending Content</strong> · onboarded count minus posted
@@ -216,8 +232,8 @@ export default function DashboardKM() {
           </li>
           <li>
             <strong>Payment Pending</strong> · count of PARENT rows
-            (deliverable_index null or 1) whose{" "}
-            <KMCode>payment_status</KMCode> is Due or Not Due. Children skip.
+            (deliverable_index null or 1) whose <KMCode>payment_status</KMCode>{" "}
+            is Due or Not Due. Children skip.
           </li>
           <li>
             <strong>Paid Collabs</strong> · count of PARENT rows with{" "}
@@ -225,13 +241,13 @@ export default function DashboardKM() {
           </li>
           <li>
             <strong>Ad Winners</strong> · count of rows where{" "}
-            <KMCode>ads_status</KMCode> = <KMCode>Winner</KMCode>. Stays at 0
-            on prod schemas where the column hasn&apos;t shipped (graceful
-            42703 fallback to BASE columns).
+            <KMCode>ads_status</KMCode> = <KMCode>Winner</KMCode>. Stays at 0 on
+            prod schemas where the column hasn&apos;t shipped (graceful 42703
+            fallback to BASE columns).
           </li>
           <li>
-            <strong>Total Creators</strong> · unique{" "}
-            <KMCode>inf_id</KMCode> count in the filter scope.
+            <strong>Total Creators</strong> · unique <KMCode>inf_id</KMCode>{" "}
+            count in the filter scope.
           </li>
           <li>
             <strong>Active Campaigns</strong> · unique campaign_id touched
@@ -239,22 +255,22 @@ export default function DashboardKM() {
           </li>
           <li>
             <strong>Total Spend</strong> ·{" "}
-            <KMCode>Σ posts.commercial_amount</KMCode> across all rows
-            (parent + children, since each row holds the equal-split share).
+            <KMCode>Σ posts.commercial_amount</KMCode> across all rows (parent +
+            children, since each row holds the equal-split share).
           </li>
         </KMList>
       </KMSection>
 
       <KMSection tag="Parent-only payment math">
         <p>
-          Payment Pending + Paid Collabs counters skip child deliverables
-          (<KMCode>deliverable_index &gt; 1</KMCode>) because payment lives on
+          Payment Pending + Paid Collabs counters skip child deliverables (
+          <KMCode>deliverable_index &gt; 1</KMCode>) because payment lives on
           the parent post in Accounts Hub. A 3-deliverable collab paid once
-          counts as 1 paid, not 3. The Stage Snapshot kanban also resolves
-          each child card&apos;s sub-status from its PARENT row via an{" "}
-          <KMCode>(inf_id, collab_number)</KMCode> lookup, so a child of a
-          paid collab shows the green <KMCode>SETTLED</KMCode> pill instead
-          of a stale <KMCode>PAYMENT PENDING</KMCode>.
+          counts as 1 paid, not 3. The Stage Snapshot kanban also resolves each
+          child card&apos;s sub-status from its PARENT row via an{" "}
+          <KMCode>(inf_id, collab_number)</KMCode> lookup, so a child of a paid
+          collab shows the green <KMCode>SETTLED</KMCode> pill instead of a
+          stale <KMCode>PAYMENT PENDING</KMCode>.
         </p>
       </KMSection>
 
@@ -275,24 +291,24 @@ export default function DashboardKM() {
           </li>
           <li>
             <strong>Payment</strong> · every PARENT in Posted/Delivered (settled
-            or pending). Same Settled/Pending sub-label split. Overlaps
-            Posted by design — managerial view wants both angles.
+            or pending). Same Settled/Pending sub-label split. Overlaps Posted
+            by design — managerial view wants both angles.
           </li>
         </KMList>
         <p>
           Each card surfaces creator avatar + name + handle, post_id_short,
           campaign_id, the relevant stage date + days-waiting counter, and the
           assignee initials roundel (<KMCode>onboarded_by</KMCode> for
-          Onboarding/Posted/Payment; Reach Out cards show Unassigned because
-          the logged-by column for reach-out has not been wired yet).
+          Onboarding/Posted/Payment; Reach Out cards show Unassigned because the
+          logged-by column for reach-out has not been wired yet).
         </p>
       </KMSection>
 
       <KMSection tag="Action chip routing">
         <KMList>
           <li>
-            <strong>Missing Email</strong> · On Board / Reach Out with no
-            email → <KMCode>/onboarding?missingEmail=1</KMCode>.
+            <strong>Missing Email</strong> · On Board / Reach Out with no email
+            → <KMCode>/onboarding?missingEmail=1</KMCode>.
           </li>
           <li>
             <strong>Pending Order</strong> · no order_id → onboarding stage.
@@ -327,9 +343,9 @@ export default function DashboardKM() {
           </li>
           <li>
             <strong>Stage Snapshot amount</strong> · per-card amount uses{" "}
-            <KMCode>Σ commercial_amount per (inf_id, collab_number)</KMCode>{" "}
-            so the parent card surfaces the originally-agreed collab total,
-            not the per-row split share.
+            <KMCode>Σ commercial_amount per (inf_id, collab_number)</KMCode> so
+            the parent card surfaces the originally-agreed collab total, not the
+            per-row split share.
           </li>
           <li>
             <strong>Posting Goal radial</strong> · stroke-dasharray trick on a
@@ -341,8 +357,8 @@ export default function DashboardKM() {
           </li>
           <li>
             <strong>6-month Trend</strong> · 3 polylines on a single SVG (RO
-            blue · OB violet · Posted green). Pre-seeded with 6 zero buckets
-            so the chart renders even with sparse data.
+            blue · OB violet · Posted green). Pre-seeded with 6 zero buckets so
+            the chart renders even with sparse data.
           </li>
           <li>
             <strong>Donuts</strong> · inline SVG stroke-dasharray rings with
@@ -368,9 +384,9 @@ export default function DashboardKM() {
       <KMSection tag="Rules + edge cases">
         <KMList>
           <li>
-            KPI counts accumulate over the FULL scope of the campaign +
-            content + status filters (server-side). Tier + date filters narrow
-            in memory.
+            KPI counts accumulate over the FULL scope of the campaign + content
+            + status filters (server-side). Tier + date filters narrow in
+            memory.
           </li>
           <li>
             Delta vs yesterday only counts events whose primary date column
@@ -378,9 +394,9 @@ export default function DashboardKM() {
             yesterday.
           </li>
           <li>
-            Stage Snapshot columns scroll horizontally on every viewport (desktop
-            + mobile) so managerial users always see all 4 stages without
-            stacking.
+            Stage Snapshot columns scroll horizontally on every viewport
+            (desktop + mobile) so managerial users always see all 4 stages
+            without stacking.
           </li>
           <li>
             Dashboard never writes to Supabase — pure read + in-memory

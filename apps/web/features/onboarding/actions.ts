@@ -191,11 +191,34 @@ export async function submitOnboarding(
   {
     const { data: thisPost } = await (supabase as any)
       .from("posts")
-      .select("campaign_id, username, workflow_status")
+      .select("campaign_id, username, inf_id, workflow_status")
       .eq(v.id != null ? "id" : "post_id", v.id ?? v.postId)
       .maybeSingle();
     const campaignId = (thisPost?.campaign_id ?? "").trim();
     const thisUser = (thisPost?.username ?? "").trim().toLowerCase();
+    if (thisPost?.inf_id || thisUser) {
+      let creatorQuery = (supabase as any)
+        .from("creators")
+        .select("username, is_blacklisted, blacklist_reason");
+      creatorQuery = thisPost?.inf_id
+        ? creatorQuery.eq("inf_id", thisPost.inf_id)
+        : creatorQuery.ilike("username", thisUser);
+      const { data: creator, error: creatorError } =
+        await creatorQuery.maybeSingle();
+      if (creatorError) {
+        return {
+          ok: false,
+          error: "Creator eligibility could not be verified. Try again.",
+        };
+      }
+      if (creator?.is_blacklisted === true) {
+        const reason = String(creator.blacklist_reason ?? "").trim();
+        return {
+          ok: false,
+          error: `@${creator.username ?? thisUser} is offboarded and cannot be onboarded again.${reason ? ` Reason: ${reason}` : ""}`,
+        };
+      }
+    }
     // Skip the gate if this collab is already onboarded (re-submit / edit) — it
     // already holds its slot — or if it carries no campaign.
     if (campaignId && !isOnboardedActive(thisPost?.workflow_status)) {
@@ -210,16 +233,17 @@ export async function submitOnboarding(
           .eq("campaign_id", campaignId)
           .limit(5000),
       ]);
-      const cap = ((capRes.data ?? []) as Array<{ num_influencers: number | null }>).reduce(
-        (s, r) => s + (Number(r.num_influencers ?? 0) || 0),
-        0,
-      );
+      const cap = (
+        (capRes.data ?? []) as Array<{ num_influencers: number | null }>
+      ).reduce((s, r) => s + (Number(r.num_influencers ?? 0) || 0), 0);
       if (cap > 0) {
         const onboarded = new Set(
-          ((onbRes.data ?? []) as Array<{
-            username: string | null;
-            workflow_status: string | null;
-          }>)
+          (
+            (onbRes.data ?? []) as Array<{
+              username: string | null;
+              workflow_status: string | null;
+            }>
+          )
             .filter((p) => isOnboardedActive(p.workflow_status))
             .map((p) => (p.username ?? "").trim().toLowerCase())
             .filter(Boolean),
@@ -502,7 +526,8 @@ export async function submitOnboarding(
         .update(creatorPatch)
         .eq("inf_id", parent.inf_id)
         .then(({ error }: { error: { message: string } | null }) => {
-          if (error) console.error("[onboarding] creator sync failed:", error.message);
+          if (error)
+            console.error("[onboarding] creator sync failed:", error.message);
         });
     }
   }
@@ -577,10 +602,10 @@ export async function submitOnboarding(
         creator_brief_link: parent.creator_brief_link ?? null,
         notes: v.remarks || null,
         // Onboarding does not create a payment row yet; the post flips to a
-    // payment-tracked state only when posting flips it to Posted. Leaving
-    // payment_status null keeps the PaymentStatus enum (Not Due | Due | Done)
-    // intact for downstream Accounts Hub queries.
-    payment_status: null,
+        // payment-tracked state only when posting flips it to Posted. Leaving
+        // payment_status null keeps the PaymentStatus enum (Not Due | Due | Done)
+        // intact for downstream Accounts Hub queries.
+        payment_status: null,
         parent_post_id: postIdBase,
         deliverable_role: "child",
         deliverable_type: kind,
@@ -722,7 +747,10 @@ export async function listOpenCampaigns(): Promise<
     .filter(
       (c) => c.campaign_id && String(c.status ?? "").toLowerCase() === "active",
     )
-    .map((c) => ({ campaign_id: c.campaign_id, campaign_name: c.campaign_name }));
+    .map((c) => ({
+      campaign_id: c.campaign_id,
+      campaign_name: c.campaign_name,
+    }));
 }
 
 /**
@@ -753,8 +781,12 @@ export async function submitRepeatCollab(
       fieldErrors: { campaignId: "Campaign required" },
     };
 
-  const { infId: _i, campaignId: _c, contentType: _ct, ...onboardingFields } =
-    obj;
+  const {
+    infId: _i,
+    campaignId: _c,
+    contentType: _ct,
+    ...onboardingFields
+  } = obj;
 
   // Pre-validate onboarding fields (dummy postId) so we never create an orphan
   // C2 post when the form data is invalid.
@@ -1055,7 +1087,7 @@ function buildCollabEmailHtml(opts: {
     : `<li>Total Agreed Amount: <strong>₹${agreedAmount}</strong></li><li>Barter Quantity: <strong>${barterText}</strong></li>`;
 
   const H3 =
-    'color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:22px 0 10px;';
+    "color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:22px 0 10px;";
   const UL = "padding-left:20px;margin:0 0 8px;color:#161513;";
 
   return `<div style="font-family:Arial,sans-serif;color:#161513;max-width:600px;margin:0 auto;line-height:1.65;background:#FAF8F5;">
@@ -1305,9 +1337,10 @@ export async function lookupShopifyOrder(orderId: string) {
       );
       // A live order that exists but lacks the `inf` tag is a deliberate
       // rejection, not a miss — surface why so the team can fix the tag.
-      const body = (await res.json().catch(() => null)) as
-        | { found?: boolean; tagged?: boolean }
-        | null;
+      const body = (await res.json().catch(() => null)) as {
+        found?: boolean;
+        tagged?: boolean;
+      } | null;
       if (body?.found && body.tagged === false) untagged = true;
     } catch (err) {
       console.error("[onboarding] preview on-demand Shopify pull failed:", err);
@@ -1321,7 +1354,8 @@ export async function lookupShopifyOrder(orderId: string) {
     if (untagged) {
       return {
         found: false,
-        error: "Order found in Shopify but not tagged “inf” — add the influencer tag, then fetch again.",
+        error:
+          "Order found in Shopify but not tagged “inf” — add the influencer tag, then fetch again.",
       } as const;
     }
   }

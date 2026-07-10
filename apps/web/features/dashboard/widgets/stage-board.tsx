@@ -11,6 +11,7 @@ import {
 import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { formatDate, formatRupees } from "@/lib/formatters";
+import { InfoDot } from "../bento-kit";
 import type { DashboardData, StageCard } from "../types";
 
 interface StageDef {
@@ -84,8 +85,14 @@ const STAGES: StageDef[] = [
 ];
 
 function initials(name: string): string {
-  const parts = name.replace(/@.*$/, "").split(/[\s._-]+/).filter(Boolean);
-  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("");
+  const parts = name
+    .replace(/@.*$/, "")
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
 }
 
 function AssigneeRoundel({ name, label }: { name: string; label: string }) {
@@ -219,8 +226,12 @@ export function DashboardStageBoard({
   return (
     <article className="bento-tile rounded-2xl bg-bg-white border border-border p-4 flex flex-col gap-3">
       <header className="flex items-center justify-between gap-2 flex-wrap">
-        <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
+        <span className="inline-flex items-center gap-1 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           Stage Snapshot · Where every collab is stuck
+          <InfoDot
+            title="Stage Snapshot"
+            text="A quick queue of active collaborations grouped by their current workflow stage. Each column previews the latest ten records; its badge shows the full count."
+          />
         </span>
         <span className="text-[0.6rem] text-text-tertiary">
           Latest 10 per stage · the badge shows the full count · tap a column
@@ -251,7 +262,10 @@ export function DashboardStageBoard({
                     className="inline-flex items-center gap-2 text-[0.78rem] font-extrabold uppercase tracking-[0.06em] text-text-primary hover:text-accent"
                   >
                     <span
-                      className={cn("inline-block w-2.5 h-2.5 rounded-full", s.dot)}
+                      className={cn(
+                        "inline-block w-2.5 h-2.5 rounded-full",
+                        s.dot,
+                      )}
                     />
                     {s.title}
                     <ArrowRight size={11} className="opacity-50" aria-hidden />
@@ -268,7 +282,11 @@ export function DashboardStageBoard({
                   ) : (
                     <>
                       {items.map((card) => (
-                        <StageCardItem key={card.postId} card={card} stage={s} />
+                        <StageCardItem
+                          key={card.postId}
+                          card={card}
+                          stage={s}
+                        />
                       ))}
                       {moreCount > 0 && (
                         <Link

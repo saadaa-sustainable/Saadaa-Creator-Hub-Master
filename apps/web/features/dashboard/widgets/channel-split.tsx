@@ -1,5 +1,6 @@
 import { ArrowDownLeft, ArrowUpRight, Radio } from "lucide-react";
 import { CountUpInt } from "../count-up-stats";
+import { InfoDot } from "../bento-kit";
 import type { ChannelStats } from "../types";
 
 /**
@@ -56,7 +57,9 @@ function ChannelCard({
           >
             <Icon size={13} aria-hidden /> {theme.label}
           </span>
-          <span className="text-[0.66rem] text-text-tertiary">{theme.hint}</span>
+          <span className="text-[0.66rem] text-text-tertiary">
+            {theme.hint}
+          </span>
         </div>
         <div className="text-right leading-none">
           <div
@@ -137,6 +140,10 @@ export function DashboardChannelSplit({
       <header className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
           <Radio size={12} aria-hidden /> Reach-Out Channels
+          <InfoDot
+            title="Reach-Out Channels"
+            text="Compares creators found by the team through outbound outreach with creators who contacted Saadaa through inbound channels, including their onboarding and posting progress."
+          />
         </span>
         <span className="text-[0.62rem] text-text-tertiary">
           Inbound vs Outbound

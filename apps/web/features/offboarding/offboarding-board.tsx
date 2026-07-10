@@ -1,519 +1,569 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Eye, Grid3X3, List as ListIcon, UserMinus, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  AlarmClock,
+  AlertTriangle,
+  Ban,
+  CalendarClock,
+  ExternalLink,
+  Eye,
+  FileWarning,
+  ShieldAlert,
+  UserMinus,
+  Users,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 import { Avatar } from "@/components/ui";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { formatDate, formatRupees } from "@/lib/formatters";
-import type { OffboardingFilters, OffboardingRow } from "./types";
+import { formatDate } from "@/lib/formatters";
+import { offboardCreator } from "./actions";
+import { OFFBOARDING_REASON_MAX, OFFBOARDING_REASON_MIN } from "./rules";
+import type { OffboardingCreator, OffboardingFilters } from "./types";
 
-/** "1P : 1R" — Static Posts : Reels (: Stories only when present). */
-function deliverablesLabel(r: OffboardingRow): string {
-  return `${r.staticPosts}P : ${r.reels}R${r.stories > 0 ? ` : ${r.stories}S` : ""}`;
-}
+const OVERVIEW_MODAL_CLASSES =
+  "modal-panel modal-panel--lg modal-panel--onboarding campaign-detail-modal ob-overview-modal ad-overview-modal ad-detail-modal offboarding-creator-modal";
 
-/**
- * Offboarding board — view toggle + List / Cards. Reuses the shared
- * `.ob-viewtoggle` / `.ob-list-*` / `.ob-card-*` primitives so the terminal
- * stage matches Onboarding / Order Status visually. Read-only ledger; the
- * "Move to Offboarding" entry point lives in its own panel above the board.
- */
 export function OffboardingBoard({
-  rows,
-  initialView = "cards",
+  candidates,
+  offboarded,
   filters,
 }: {
-  rows: OffboardingRow[];
-  initialView?: "list" | "cards";
+  candidates: OffboardingCreator[];
+  offboarded: OffboardingCreator[];
   filters: OffboardingFilters;
 }) {
-  const [view, setView] = useState<"list" | "cards">(initialView);
-  const [selected, setSelected] = useState<OffboardingRow | null>(null);
-
-  useEffect(() => {
-    const mobileQuery = window.matchMedia("(max-width: 767px)");
-    const forceCardsOnMobile = () => {
-      if (mobileQuery.matches) setView("cards");
-    };
-    forceCardsOnMobile();
-    mobileQuery.addEventListener("change", forceCardsOnMobile);
-    return () => mobileQuery.removeEventListener("change", forceCardsOnMobile);
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = (filters.search ?? "").trim().toLowerCase();
-    return rows.filter((r) => {
-      if (filters.paymentStatus && r.paymentStatus !== filters.paymentStatus)
-        return false;
-      if (q) {
-        const hay = `${r.name} ${r.username} ${r.orderId} ${r.campaign}`.toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [rows, filters]);
+  const [view, setView] = useState<"candidates" | "offboarded">(
+    candidates.length > 0 ? "candidates" : "offboarded",
+  );
+  const [selected, setSelected] = useState<OffboardingCreator | null>(null);
+  const [confirming, setConfirming] = useState<OffboardingCreator | null>(null);
+  const rows = view === "candidates" ? candidates : offboarded;
+  const hasFilters = Boolean(filters.search || filters.campaign);
 
   return (
-    <section className="mt-4">
-      <div className="order-status-board-toolbar">
-        <span className="text-xs font-bold tabular text-text-secondary bg-bg-ecru border border-border rounded-full px-3 py-1">
-          {filtered.length} collab{filtered.length === 1 ? "" : "s"}
-        </span>
-        <div className="ob-viewtoggle" role="tablist" aria-label="View">
+    <section
+      className="offboarding-workspace"
+      aria-label="Creator offboarding tray"
+    >
+      <div className="offboarding-workspace__head">
+        <div>
+          <span className="offboarding-workspace__eyebrow">
+            {view === "candidates" ? "Action tray" : "Creator blacklist"}
+          </span>
+          <h2>
+            {view === "candidates"
+              ? "Overdue creators awaiting review"
+              : "Offboarded creators"}
+          </h2>
+          <p>
+            {view === "candidates"
+              ? "Each card is one creator, grouped across every overdue unsubmitted deliverable."
+              : "These creators are blocked from future reach-out and onboarding."}
+          </p>
+        </div>
+
+        <div
+          className="ob-viewtoggle offboarding-workspace__tabs"
+          role="tablist"
+          aria-label="Offboarding lists"
+        >
           <button
             type="button"
             role="tab"
-            aria-selected={view === "list"}
-            className={cn(view === "list" && "active")}
-            onClick={() => setView("list")}
+            aria-selected={view === "candidates"}
+            className={cn(view === "candidates" && "active")}
+            onClick={() => setView("candidates")}
           >
-            <ListIcon size={12} aria-hidden />
-            List
+            <AlarmClock size={13} aria-hidden /> Needs review
+            <span>{candidates.length}</span>
           </button>
           <button
             type="button"
             role="tab"
-            aria-selected={view === "cards"}
-            className={cn(view === "cards" && "active")}
-            onClick={() => setView("cards")}
+            aria-selected={view === "offboarded"}
+            className={cn(view === "offboarded" && "active")}
+            onClick={() => setView("offboarded")}
           >
-            <Grid3X3 size={12} aria-hidden />
-            Cards
+            <Ban size={13} aria-hidden /> Offboarded
+            <span>{offboarded.length}</span>
           </button>
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="ob-empty">
-          <UserMinus size={28} aria-hidden />
-          <p>No collabs in the Offboarding stage.</p>
-        </div>
-      ) : view === "list" ? (
-        <div className="order-status-list-panel">
-          <OffboardingListTable rows={filtered} onOpen={setSelected} />
+      {rows.length === 0 ? (
+        <div className="ob-empty offboarding-workspace__empty">
+          {view === "candidates" ? (
+            <CalendarClock size={30} aria-hidden />
+          ) : (
+            <ShieldAlert size={30} aria-hidden />
+          )}
+          <strong>
+            {hasFilters
+              ? "No creators match these filters."
+              : view === "candidates"
+                ? "No creators have crossed their posting deadline."
+                : "No creators have been offboarded yet."}
+          </strong>
+          <p>
+            {view === "candidates"
+              ? "Creators appear here automatically after an estimated delivery date passes while the posting form remains unsubmitted."
+              : "A creator enters this ledger only after a mandatory reason is confirmed."}
+          </p>
         </div>
       ) : (
-        <div className="order-status-cards-panel">
-          <OffboardingCardsGrid rows={filtered} onOpen={setSelected} />
+        <div className="offboarding-creator-grid">
+          {rows.map((creator) => (
+            <CreatorCard
+              key={`${creator.state}-${creator.infId}`}
+              creator={creator}
+              onOpen={() => setSelected(creator)}
+              onOffboard={() => setConfirming(creator)}
+            />
+          ))}
         </div>
       )}
 
       {selected && (
-        <OffboardingDetailModal
-          row={selected}
+        <CreatorOverviewModal
+          creator={selected}
           onClose={() => setSelected(null)}
+          onOffboard={
+            selected.state === "candidate"
+              ? () => {
+                  setSelected(null);
+                  setConfirming(selected);
+                }
+              : undefined
+          }
+        />
+      )}
+      {confirming && (
+        <OffboardReasonModal
+          creator={confirming}
+          onClose={() => setConfirming(null)}
+          onSuccess={() => setView("offboarded")}
         />
       )}
     </section>
   );
 }
 
-// Collab ID for display — prefer the stamped collab_id, fall back to the
-// legacy inf_id||'-C'||collab_number shape for older rows that predate the
-// stamped column.
-function collabIdOf(r: OffboardingRow): string | null {
-  return (
-    r.collabId ??
-    (r.infId ? `${r.infId}-C${Number(r.collabNumber ?? 1)}` : null)
-  );
-}
-
-function PaymentPill({ status }: { status: string }) {
-  const s = status.toLowerCase();
-  const tone =
-    s === "done"
-      ? "bg-success-bg text-success border-success/20"
-      : s === "due"
-        ? "bg-warning-bg text-warning border-warning/20"
-        : "bg-bg-white text-text-tertiary border-border";
-  const label = s === "done" ? "Paid" : status || "Not Due";
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 text-[0.66rem] font-bold tracking-[0.04em] px-2 py-0.5 rounded-full border whitespace-nowrap",
-        tone,
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
-function OffboardingListTable({
-  rows,
+function CreatorCard({
+  creator,
   onOpen,
+  onOffboard,
 }: {
-  rows: OffboardingRow[];
-  onOpen: (row: OffboardingRow) => void;
+  creator: OffboardingCreator;
+  onOpen: () => void;
+  onOffboard: () => void;
 }) {
-  return (
-    <div className="campaign-list-view stage-campaign-list">
-      {rows.map((r, index) => (
-        <OffboardingListRow
-          key={r.postId}
-          row={r}
-          index={index}
-          onOpen={onOpen}
-        />
-      ))}
-    </div>
-  );
-}
-
-function offboardingTone(r: OffboardingRow) {
-  return r.paymentStatus.toLowerCase() === "done"
-    ? "var(--color-success-text)"
-    : "var(--color-warning-text, #b57514)";
-}
-
-function offboardingProgress(r: OffboardingRow) {
-  return r.paymentStatus.toLowerCase() === "done" ? 100 : 72;
-}
-
-function offboardingDeliverableCount(r: OffboardingRow) {
-  return r.staticPosts + r.reels + r.stories;
-}
-
-function offboardingStyle(row: OffboardingRow, index: number) {
-  return {
-    "--campaign-accent": offboardingTone(row),
-    "--campaign-progress": `${offboardingProgress(row)}%`,
-    "--campaign-card-index": index,
-  } as CSSProperties;
-}
-
-function OffboardingListRow({
-  row,
-  index,
-  onOpen,
-}: {
-  row: OffboardingRow;
-  index: number;
-  onOpen: (row: OffboardingRow) => void;
-}) {
-  const collabId = collabIdOf(row);
+  const isCandidate = creator.state === "candidate";
   return (
     <article
-      className="campaign-list-row stage-campaign-row"
-      style={offboardingStyle(row, index)}
-      role="button"
-      tabIndex={0}
-      onClick={() => onOpen(row)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onOpen(row);
-        }
-      }}
+      className={cn(
+        "offboarding-creator-card",
+        isCandidate
+          ? "offboarding-creator-card--candidate"
+          : "offboarding-creator-card--offboarded",
+      )}
+      onClick={onOpen}
     >
-      <div className="stage-campaign-identity">
+      <div className="offboarding-creator-card__head">
         <Avatar
-          src={row.profilePicUrl}
-          username={row.username}
-          name={row.name}
-          size={46}
+          src={creator.profilePicUrl}
+          username={creator.username}
+          name={creator.name}
+          size={48}
         />
-        <div className="campaign-list-row__main">
-          <div className="campaign-card__id-row">
-            <span className="campaign-card__id">
-              <strong>{row.postId || collabId || "—"}</strong>
-            </span>
-            <PaymentPill status={row.paymentStatus} />
-          </div>
-          <h3>{row.name || row.username || "—"}</h3>
-          <p>
-            @{row.username || "—"} · {row.campaign || "—"} ·{" "}
-            {collabId || row.infId || "—"}
-          </p>
+        <div className="offboarding-creator-card__identity">
+          <span>{creator.infId}</span>
+          <h3>{creator.name || creator.username}</h3>
+          <p>@{creator.username}</p>
         </div>
-      </div>
-
-      <div className="campaign-list-row__allocation stage-campaign-signal">
-        <div>
-          <span>Offboarding</span>
-          <strong>{offboardingProgress(row)}%</strong>
-        </div>
-        <span className="campaign-card__progress-track" aria-hidden>
-          <span />
+        <span
+          className={cn(
+            "offboarding-creator-card__status",
+            isCandidate ? "is-overdue" : "is-offboarded",
+          )}
+        >
+          {isCandidate ? `${creator.daysOverdue}d overdue` : "Offboarded"}
         </span>
-        <div className="campaign-list-row__reachouts">
-          <span>{deliverablesLabel(row)}</span>
-          <strong>{offboardingDeliverableCount(row)}</strong>
-        </div>
       </div>
 
-      <dl className="campaign-list-row__stats">
+      <dl className="offboarding-creator-card__stats">
         <div>
-          <dt>Order ID</dt>
-          <dd>{row.orderId || "—"}</dd>
+          <dt>Deliverables</dt>
+          <dd>{creator.overdueDeliverables}</dd>
         </div>
         <div>
-          <dt>Collab</dt>
-          <dd>{row.collabType || "—"}</dd>
+          <dt>Collabs</dt>
+          <dd>{creator.overdueCollabs}</dd>
         </div>
         <div>
-          <dt>Commercials</dt>
-          <dd>{row.commercials > 0 ? formatRupees(row.commercials) : "—"}</dd>
-        </div>
-        <div>
-          <dt>Reached Out</dt>
-          <dd>{formatDate(row.reachoutDate)}</dd>
+          <dt>{isCandidate ? "Oldest deadline" : "Offboarded on"}</dt>
+          <dd>
+            {isCandidate
+              ? formatDate(creator.oldestDeadline)
+              : formatDate(creator.blacklistedAt)}
+          </dd>
         </div>
       </dl>
 
-      <div className="campaign-list-row__actions">
+      <div className="offboarding-creator-card__context">
+        <span>
+          <FileWarning size={12} aria-hidden />
+          {creator.postIds.length > 0
+            ? creator.postIds.slice(0, 3).join(", ")
+            : "No post IDs captured"}
+          {creator.postIds.length > 3
+            ? ` +${creator.postIds.length - 3} more`
+            : ""}
+        </span>
+        <span>
+          <Users size={12} aria-hidden />
+          {creator.teamMembers.join(", ") || "Team not recorded"}
+        </span>
+      </div>
+
+      {!isCandidate && creator.blacklistReason && (
+        <p className="offboarding-creator-card__reason">
+          {creator.blacklistReason}
+        </p>
+      )}
+
+      <footer className="offboarding-creator-card__actions">
         <button
           type="button"
           className="campaign-list-action campaign-list-action--brief"
           onClick={(event) => {
             event.stopPropagation();
-            onOpen(row);
+            onOpen();
           }}
         >
-          <Eye size={13} aria-hidden />
-          Overview
+          <Eye size={13} aria-hidden /> Overview
         </button>
-      </div>
+        {isCandidate && (
+          <button
+            type="button"
+            className="offboarding-creator-card__offboard"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOffboard();
+            }}
+          >
+            <UserMinus size={13} aria-hidden /> Offboard creator
+          </button>
+        )}
+      </footer>
     </article>
   );
 }
 
-function OffboardingCardsGrid({
-  rows,
-  onOpen,
-}: {
-  rows: OffboardingRow[];
-  onOpen: (row: OffboardingRow) => void;
-}) {
-  return (
-    <div className="campaign-card-grid stage-campaign-card-grid">
-      {rows.map((r, index) => (
-        <article
-          key={r.postId}
-          className="campaign-card stage-campaign-card"
-          style={offboardingStyle(r, index)}
-          role="button"
-          tabIndex={0}
-          aria-label={`View details for ${r.postId}`}
-          onClick={() => onOpen(r)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onOpen(r);
-            }
-          }}
-        >
-          <div className="campaign-card__head">
-            <div className="stage-campaign-card-head">
-              <Avatar
-                src={r.profilePicUrl}
-                username={r.username}
-                name={r.name}
-                size={46}
-              />
-              <div className="min-w-0">
-                <div className="campaign-card__id-row">
-                  <span className="campaign-card__id">
-                    <strong>{r.postId || collabIdOf(r) || "—"}</strong>
-                  </span>
-                  <PaymentPill status={r.paymentStatus} />
-                </div>
-                <h3>{r.name || r.username || "—"}</h3>
-                {r.username && (
-                  <p className="campaign-card__message">@{r.username}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="campaign-card__meta-row">
-            {collabIdOf(r) && (
-              <span
-                className="campaign-chip tabular"
-                title="Collab ID — groups all deliverables of this collaboration"
-              >
-                {collabIdOf(r)}
-              </span>
-            )}
-            <PaymentPill status={r.paymentStatus} />
-            <span className="campaign-chip">{r.campaign || "—"}</span>
-            {r.category && <span className="pill pill--muted">{r.category}</span>}
-            {r.collabType && (
-              <span className="pill pill--muted">{r.collabType}</span>
-            )}
-          </div>
-
-          <div className="campaign-card__progress">
-            <div>
-              <span>Offboarding</span>
-              <strong>{offboardingProgress(r)}% ready</strong>
-            </div>
-            <span className="campaign-card__progress-track" aria-hidden>
-              <span />
-            </span>
-          </div>
-
-          <dl className="campaign-card__facts">
-            <div>
-              <dt>Deliverables</dt>
-              <dd>{deliverablesLabel(r)}</dd>
-            </div>
-            <div>
-              <dt>Order ID</dt>
-              <dd>{r.orderId || "—"}</dd>
-            </div>
-            <div>
-              <dt>Commercials</dt>
-              <dd>{r.commercials > 0 ? formatRupees(r.commercials) : "—"}</dd>
-            </div>
-            <div>
-              <dt>Reached Out</dt>
-              <dd>{formatDate(r.reachoutDate)}</dd>
-            </div>
-            <div>
-              <dt>Followers</dt>
-              <dd>{r.followers ? r.followers.toLocaleString("en-IN") : "—"}</dd>
-            </div>
-          </dl>
-
-          <div className="campaign-card__actions">
-            <button
-              type="button"
-              className="campaign-list-action campaign-list-action--brief"
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpen(r);
-              }}
-            >
-              <Eye size={12} aria-hidden />
-              Overview
-            </button>
-          </div>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function OffboardingDetailModal({
-  row,
+function CreatorOverviewModal({
+  creator,
   onClose,
+  onOffboard,
 }: {
-  row: OffboardingRow;
+  creator: OffboardingCreator;
   onClose: () => void;
+  onOffboard?: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
-  const collabId = collabIdOf(row);
-  const items: Array<[string, ReactNode]> = [
-    ["Post ID", row.postId || "—"],
-    ["Collab ID", collabId || "—"],
-    ["INF ID", row.infId || "—"],
-    ["Campaign", row.campaign || "—"],
-    ["Collab Type", row.collabType || "—"],
-    ["Deliverables", deliverablesLabel(row)],
-    ["Ads Usage Rights", row.adsUsageRights || "—"],
-    ["Commercials", row.commercials > 0 ? formatRupees(row.commercials) : "—"],
-    ["Order ID", row.orderId || "—"],
-    ["Order Status", row.orderStatus || "—"],
-    ["Tracking ID", row.trackingId || "—"],
-    ["Payment", row.paymentStatus || "—"],
-    ["Onboarded", formatDate(row.onboardDate)],
-    ["Est. Delivery", formatDate(row.estDelivery)],
-    ["Reached Out", formatDate(row.reachoutDate)],
-    [
-      "Followers",
-      row.followers ? row.followers.toLocaleString("en-IN") : "—",
-    ],
-    ["Category", row.category || "—"],
-    [
-      "Post Link",
-      row.postLink ? (
-        <a
-          href={row.postLink}
-          target="_blank"
-          rel="noopener"
-          className="text-link"
-        >
-          Open
-        </a>
-      ) : (
-        "—"
-      ),
-    ],
+  const stats: Array<[string, ReactNode]> = [
+    ["Creator ID", creator.infId],
+    ["Creator tier", creator.category || "Not recorded"],
+    ["Followers", creator.followers?.toLocaleString("en-IN") || "Not recorded"],
+    ["Overdue deliverables", creator.overdueDeliverables],
+    ["Overdue collabs", creator.overdueCollabs],
+    ["Oldest deadline", formatDate(creator.oldestDeadline)],
+    ["Days overdue", `${creator.daysOverdue} days`],
+    ["Last onboarded", formatDate(creator.lastOnboardDate)],
   ];
 
   return createPortal(
-    <div className="modal-backdrop modal-backdrop--onboarding" onClick={onClose}>
+    <div
+      className="modal-backdrop modal-backdrop--onboarding"
+      onClick={onClose}
+    >
       <div
-        className="modal-panel modal-panel--lg modal-panel--onboarding ob-overview-modal"
-        onClick={(e) => e.stopPropagation()}
+        className={OVERVIEW_MODAL_CLASSES}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="offboarding-overview-title"
+        onClick={(event) => event.stopPropagation()}
       >
-        <header className="modal-head">
-          <div className="flex items-center gap-2 min-w-0">
-            <Eye size={16} aria-hidden />
-            <h2 className="font-semibold">Offboarding Overview</h2>
-            <span className="chip text-[10px] tabular">{row.postId}</span>
+        <header className="modal-head campaign-detail-head ad-detail-head">
+          <div className="min-w-0">
+            <div className="campaign-card__id-row">
+              <span className="campaign-card__id">{creator.infId}</span>
+              <span
+                className={cn(
+                  "offboarding-creator-card__status",
+                  creator.state === "candidate"
+                    ? "is-overdue"
+                    : "is-offboarded",
+                )}
+              >
+                {creator.state === "candidate"
+                  ? `${creator.daysOverdue}d overdue`
+                  : "Offboarded"}
+              </span>
+            </div>
+            <h2 id="offboarding-overview-title">
+              {creator.name || creator.username}
+            </h2>
+            <p className="campaign-detail-subtitle">@{creator.username}</p>
           </div>
           <button
             type="button"
-            className="icon-btn"
+            className="icon-btn campaign-detail-close-btn"
             onClick={onClose}
             aria-label="Close"
           >
-            <X size={14} aria-hidden />
+            <X size={15} aria-hidden />
           </button>
         </header>
 
-        <div className="modal-body ob-overview-body">
-          <section className="ob-overview-card">
+        <div className="modal-body campaign-detail-body ad-detail-body">
+          <section className="ob-overview-card offboarding-overview-profile">
             <div className="ob-overview-head">
               <Avatar
-                src={row.profilePicUrl}
-                username={row.username}
-                name={row.name}
-                size={48}
+                src={creator.profilePicUrl}
+                username={creator.username}
+                name={creator.name}
+                size={58}
               />
               <div className="ob-overview-identity">
-                <strong>{row.name || row.username || "—"}</strong>
-                <span>@{row.username || "—"}</span>
+                <strong>{creator.name || creator.username}</strong>
+                <span>@{creator.username}</span>
               </div>
-              <PaymentPill status={row.paymentStatus} />
+              {creator.instagramLink && (
+                <a
+                  href={creator.instagramLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="campaign-detail-section-link"
+                >
+                  <ExternalLink size={12} aria-hidden /> Instagram
+                </a>
+              )}
             </div>
             <div className="ob-overview-pills">
-              {collabId && (
-                <span className="campaign-chip tabular" title="Collab ID">
-                  {collabId}
+              {creator.campaigns.map((campaign) => (
+                <span className="campaign-chip" key={campaign}>
+                  {campaign}
                 </span>
-              )}
-              <span className="campaign-chip">{row.campaign || "—"}</span>
-              <span className="pill pill--muted">Offboarded</span>
+              ))}
+              {creator.teamMembers.map((member) => (
+                <span className="pill pill--muted" key={member}>
+                  {member}
+                </span>
+              ))}
             </div>
           </section>
 
-          <section className="ob-overview-grid">
-            {items.map(([label, value]) => (
-              <div className="ob-overview-item" key={label}>
-                <span>{label}</span>
-                <strong className="tabular">{value}</strong>
+          <dl className="campaign-detail-stat-grid ad-detail-stat-grid">
+            {stats.map(([label, value]) => (
+              <div key={label}>
+                <dt>{label}</dt>
+                <dd>{value}</dd>
               </div>
             ))}
+          </dl>
+
+          <section className="campaign-detail-section">
+            <div className="campaign-detail-section-head">
+              <div>
+                <h3>Posting evidence</h3>
+                <p>
+                  Post IDs still in the unsubmitted Posting queue when this
+                  creator was reviewed.
+                </p>
+              </div>
+            </div>
+            <div className="offboarding-post-id-list">
+              {creator.postIds.length > 0 ? (
+                creator.postIds.map((postId) => (
+                  <span key={postId}>{postId}</span>
+                ))
+              ) : (
+                <span>No post IDs were captured.</span>
+              )}
+            </div>
           </section>
+
+          {creator.state === "offboarded" && (
+            <section className="campaign-detail-section offboarding-reason-panel">
+              <div className="campaign-detail-section-head">
+                <div>
+                  <h3>Offboarding reason</h3>
+                  <p>
+                    Recorded by {creator.blacklistedBy || "an administrator"} on{" "}
+                    {formatDate(creator.blacklistedAt)}.
+                  </p>
+                </div>
+              </div>
+              <p>{creator.blacklistReason || "No reason recorded."}</p>
+            </section>
+          )}
         </div>
 
         <footer className="modal-foot ob-overview-footer">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close
           </button>
+          {onOffboard && (
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={onOffboard}
+              className="gap-1.5"
+            >
+              <UserMinus size={14} aria-hidden /> Offboard creator
+            </Button>
+          )}
+        </footer>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function OffboardReasonModal({
+  creator,
+  onClose,
+  onSuccess,
+}: {
+  creator: OffboardingCreator;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [reason, setReason] = useState("");
+  const [pending, startTransition] = useTransition();
+  const cleanReason = reason.trim();
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  const submit = () => {
+    if (cleanReason.length < OFFBOARDING_REASON_MIN) {
+      toast.error(
+        `Add a clear offboarding reason with at least ${OFFBOARDING_REASON_MIN} characters.`,
+      );
+      return;
+    }
+    startTransition(async () => {
+      const result = await offboardCreator({
+        infId: creator.infId,
+        reason: cleanReason,
+      });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(`@${result.username} has been offboarded and blacklisted.`);
+      onClose();
+      onSuccess();
+      router.refresh();
+    });
+  };
+
+  return createPortal(
+    <div
+      className="modal-backdrop modal-backdrop--onboarding"
+      onClick={pending ? undefined : onClose}
+    >
+      <div
+        className="modal-panel modal-panel--onboarding creator-offboard-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="offboard-dialog-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="modal-head">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="creator-offboard-dialog__icon">
+              <AlertTriangle size={17} aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h2 id="offboard-dialog-title">Offboard @{creator.username}</h2>
+              <p>Creator-level permanent block</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            disabled={pending}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+
+        <div className="modal-body creator-offboard-dialog__body">
+          <div className="creator-offboard-dialog__warning">
+            <Ban size={18} aria-hidden />
+            <p>
+              This blocks the creator from every future reach-out and onboarding
+              attempt. Existing history remains unchanged.
+            </p>
+          </div>
+          <label className="creator-offboard-dialog__field">
+            <span>
+              Reason <strong>*</strong>
+            </span>
+            <textarea
+              autoFocus
+              value={reason}
+              onChange={(event) =>
+                setReason(event.target.value.slice(0, OFFBOARDING_REASON_MAX))
+              }
+              placeholder="Describe what happened, follow-up attempts made, and why this creator should be blocked..."
+              rows={6}
+              disabled={pending}
+            />
+            <small>
+              <span>
+                {cleanReason.length < OFFBOARDING_REASON_MIN
+                  ? `Minimum ${OFFBOARDING_REASON_MIN} characters`
+                  : "Reason ready"}
+              </span>
+              <span>
+                {reason.length}/{OFFBOARDING_REASON_MAX}
+              </span>
+            </small>
+          </label>
+        </div>
+
+        <footer className="modal-foot">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClose}
+            disabled={pending}
+          >
+            Cancel
+          </button>
+          <Button
+            variant="danger"
+            size="sm"
+            loading={pending}
+            disabled={pending || cleanReason.length < OFFBOARDING_REASON_MIN}
+            onClick={submit}
+            className="gap-1.5"
+          >
+            <UserMinus size={14} aria-hidden /> Confirm offboarding
+          </Button>
         </footer>
       </div>
     </div>,

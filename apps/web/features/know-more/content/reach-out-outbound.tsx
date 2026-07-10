@@ -28,12 +28,16 @@ export default function ReachOutOutboundKM() {
           </li>
           <li>
             <strong>Collab history per row</strong> · each creator shows their
-            past collaborations — <KMCode>↻ {"{N}"} collab(s) · C1, C2 · next C
-            {"{n}"}</KMCode> for a repeat collaborator,{" "}
+            past collaborations —{" "}
+            <KMCode>
+              ↻ {"{N}"} collab(s) · C1, C2 · next C{"{n}"}
+            </KMCode>{" "}
+            for a repeat collaborator,{" "}
             <KMCode>Reached out before · next C2</KMCode> for a historic creator
             we only ever reached out to, or <KMCode>First collab</KMCode> for a
-            brand-new one. Sourced from the <KMCode>prior_collab_summary</KMCode>{" "}
-            RPC, so the predicted next C matches exactly what onboarding mints.
+            brand-new one. Sourced from the{" "}
+            <KMCode>prior_collab_summary</KMCode> RPC, so the predicted next C
+            matches exactly what onboarding mints.
           </li>
           <li>
             <strong>Onboard button</strong> · each row has an{" "}
@@ -57,8 +61,8 @@ export default function ReachOutOutboundKM() {
             (avatar, follower tier, ER, verification badge) fed by the lookup.
           </li>
           <li>
-            Form auto-fills creator name, gender, followers, language from
-            the cache hit; you can override any field before submit.
+            Form auto-fills creator name, gender, followers, language from the
+            cache hit; you can override any field before submit.
           </li>
         </KMList>
       </KMSection>
@@ -66,42 +70,47 @@ export default function ReachOutOutboundKM() {
       <KMSection tag="Lookup pipeline (lookupCreator action) — INSTANT via Meta">
         <KMList>
           <li>
-            <strong>1. creators</strong> — existing row is matched by handle (or
-            legacy <KMCode>profile_id</KMCode> if the handle changed), then{" "}
-            <strong>refreshed live from Meta</strong> and updated in place —{" "}
-            <em>same SIF, same profile_id, no new creator</em>. Badge:{" "}
-            &quot;Existing · Refreshed&quot;. Re-reach is allowed (submit no
-            longer blocked) subject to the eligibility rules below.
+            <strong>1. creator blacklist</strong> — a known offboarded handle
+            returns an immediate red error with its reason. The lookup stops
+            before Meta and the form cannot submit.
           </li>
           <li>
-            <strong>2. Meta business_discovery</strong> — LIVE fetch on the
+            <strong>2. creators</strong> — an eligible existing row is matched
+            by handle (or legacy <KMCode>profile_id</KMCode> if the handle
+            changed), then <strong>refreshed live from Meta</strong> and updated
+            in place — <em>same SIF, same profile_id, no new creator</em>.
+            Badge: &quot;Existing · Refreshed&quot;. Re-reach is allowed (submit
+            no longer blocked) subject to the eligibility rules below.
+          </li>
+          <li>
+            <strong>3. Meta business_discovery</strong> — LIVE fetch on the
             Fetch click (no Apify, no wait, no cost). Returns followers, profile
             pic, avg likes, ER, and the legacy numeric{" "}
             <KMCode>profile_id</KMCode> (Meta <KMCode>ig_id</KMCode>). Badge:
             &quot;Live&quot;.
           </li>
           <li>
-            <strong>3. historic</strong> — Meta missed but the handle is in{" "}
-            <KMCode>ig_data_historic</KMCode> → cached metrics. Badge: &quot;Last
-            known&quot;.
+            <strong>4. historic</strong> — Meta missed but the handle is in{" "}
+            <KMCode>ig_data_historic</KMCode> → cached metrics. Badge:
+            &quot;Last known&quot;.
           </li>
           <li>
-            <strong>4. deactivated / error</strong> — Meta &quot;Cannot find
-            User&quot; (personal/dead) + no archive ⇒ <strong>deactivated</strong>{" "}
-            (manual entry still allowed); a transient Meta failure ⇒{" "}
-            <strong>error</strong> (retry). Badge: &quot;Not fetchable&quot; /
-            &quot;Fetch failed&quot;.
+            <strong>5. deactivated / error</strong> — Meta &quot;Cannot find
+            User&quot; (personal/dead) + no archive ⇒{" "}
+            <strong>deactivated</strong> (manual entry still allowed); a
+            transient Meta failure ⇒ <strong>error</strong> (retry). Badge:
+            &quot;Not fetchable&quot; / &quot;Fetch failed&quot;.
           </li>
         </KMList>
       </KMSection>
 
       <KMSection tag="Rate gate (batch of 50 + cooldown)">
         <KMCallout tone="info">
-          Each outbound Fetch is <strong>1 call drawn from a rolling window of
-          50</strong> (shared with the inbound batch Fetch). After 50 calls — or
-          when Meta&apos;s X-App-Usage crosses 75% — the server opens a{" "}
-          <strong>cooldown</strong> and further fetches are paused with a retry
-          countdown. State lives in{" "}
+          Each outbound Fetch is{" "}
+          <strong>1 call drawn from a rolling window of 50</strong> (shared with
+          the inbound batch Fetch). After 50 calls — or when Meta&apos;s
+          X-App-Usage crosses 75% — the server opens a <strong>cooldown</strong>{" "}
+          and further fetches are paused with a retry countdown. State lives in{" "}
           <KMCode>app_settings.meta_fetch_window</KMCode>; logic in{" "}
           <KMCode>lib/meta-rate-limit.ts</KMCode> (mirrors{" "}
           <KMCode>ig_fetching.py</KMCode>). The token is READ-ONLY — we never
@@ -116,8 +125,8 @@ export default function ReachOutOutboundKM() {
             followers, gender, language, ER, avg_likes, verification.
           </li>
           <li>
-            <strong>posts</strong> · submit_reachout RPC inserts the row (returns
-            its bigserial <KMCode>id</KMCode>), workflow_status{" "}
+            <strong>posts</strong> · submit_reachout RPC inserts the row
+            (returns its bigserial <KMCode>id</KMCode>), workflow_status{" "}
             <KMCode>Reach Out</KMCode>, campaign_id, content_type, reachout_type{" "}
             <KMCode>Outbound</KMCode>, reachout_direction{" "}
             <KMCode>outbound</KMCode>. Commercial agreed amount + collab_type
@@ -143,10 +152,10 @@ export default function ReachOutOutboundKM() {
             Followers can be blank if the cron hasn&apos;t enriched yet.
           </li>
           <li>
-            Commercial figures captured downstream during Onboarding (or
-            already on the post when it came from Inbound). The per-type rate
-            columns (reel/post/story) were retired 2026-05-27 — a single
-            agreed total now equal-splits across deliverables.
+            Commercial figures captured downstream during Onboarding (or already
+            on the post when it came from Inbound). The per-type rate columns
+            (reel/post/story) were retired 2026-05-27 — a single agreed total
+            now equal-splits across deliverables.
           </li>
           <li>
             Re-submitting same username + campaign creates a new deliverable
@@ -155,8 +164,8 @@ export default function ReachOutOutboundKM() {
             keyed to the order.
           </li>
           <li>
-            <KMCode>onboarded_by</KMCode> stamps with the signed-in user
-            email for audit.
+            <KMCode>onboarded_by</KMCode> stamps with the signed-in user email
+            for audit.
           </li>
           <li>
             <strong>Instagram URL validation</strong> — the IG link is checked
@@ -166,23 +175,26 @@ export default function ReachOutOutboundKM() {
           </li>
           <li>
             <strong>Reach-out eligibility (2026-07-08)</strong> — an existing
-            creator CAN be reached out again (the old &quot;existing creator →
-            Onboarding only&quot; block is gone). Two rules gate it, both
-            ignoring <KMCode>Cancelled</KMCode>/<KMCode>Offboarded</KMCode>{" "}
-            (voided) reach-outs so a dead collab frees re-engagement:
+            creator CAN be reached out again unless the creator is permanently
+            blacklisted. After that terminal check, two cooldown rules apply;
+            both ignore <KMCode>Cancelled</KMCode> or legacy voided collabs:
             <br />
             <strong>· Cooldown</strong> — one active reach-out per creator per
             rolling <strong>30 days</strong> (across all campaigns).
             <br />
-            <strong>· Per-campaign</strong> — never a second active reach-out for
-            the same campaign; free to map to a different campaign next cycle.
+            <strong>· Per-campaign</strong> — never a second active reach-out
+            for the same campaign; free to map to a different campaign next
+            cycle.
             <br />
             Enforced server-side in{" "}
-            <KMCode>guards.ts › checkReachoutAllowed</KMCode> (shared by outbound
-            + inbound), with a field error on the Instagram URL.
+            <KMCode>guards.ts › checkReachoutAllowed</KMCode> (shared by
+            outbound + inbound), with a field error on the Instagram URL. The
+            creator blacklist always wins over cooldown or campaign status.
           </li>
           <li>
-            <strong>Reach-out is unlimited; the cap is an ONBOARDING cap</strong>{" "}
+            <strong>
+              Reach-out is unlimited; the cap is an ONBOARDING cap
+            </strong>{" "}
             (2026-06-10) — a campaign can collect any number of reach-outs. The
             allocated creator count (Σ <KMCode>num_influencers</KMCode>) is
             enforced at <strong>onboarding</strong> instead (see the Onboarding
@@ -201,8 +213,8 @@ export default function ReachOutOutboundKM() {
 
       <KMCallout tone="warning">
         Don&apos;t skip the live IG lookup — confirms the handle exists and
-        primes downstream avatars / tier badges. Typo submits create stuck
-        rows the cron can never enrich.
+        primes downstream avatars / tier badges. Typo submits create stuck rows
+        the cron can never enrich.
       </KMCallout>
     </>
   );

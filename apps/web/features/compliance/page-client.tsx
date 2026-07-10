@@ -417,6 +417,16 @@ function Section({
   icon: LucideIcon;
   children: React.ReactNode;
 }) {
+  const definitions: Record<string, string> = {
+    "Pipeline Health":
+      "Counts current workflow records by stage. Active excludes RTO and cancelled work, while Total Creators reflects every record in scope.",
+    "Conversion Rates":
+      "Shows how much work reaches the next milestone. Each tile displays completed records over the eligible starting group, plus the resulting percentage.",
+    "Avg Turnaround Times":
+      "Average calendar days between the named workflow milestones, using only records where both dates are available.",
+    "Data Coverage":
+      "Shows how consistently required operational fields are filled, such as email, bank details, order ID, and tracking ID.",
+  };
   return (
     <section className="flex min-w-0 max-w-full flex-col gap-1.5 overflow-hidden sm:gap-3">
       <h2 className="flex items-center gap-1.5 sm:gap-2 text-[0.66rem] sm:text-[0.82rem] font-extrabold text-text-primary uppercase tracking-[0.06em]">
@@ -425,6 +435,13 @@ function Section({
           <Icon size={12} aria-hidden className="hidden sm:block" />
         </span>
         {title}
+        <InfoDot
+          title={title}
+          text={
+            definitions[title] ??
+            "This section uses records matching the filters currently applied to the Compliance view."
+          }
+        />
       </h2>
       <div className="acc-kpi-grid compliance-kpi-grid bento-stagger">
         {children}
@@ -490,6 +507,10 @@ function PctTile({
         <span className="truncate text-[0.64rem] font-bold uppercase tracking-[0.05em]">
           {label}
         </span>
+        <InfoDot
+          title={label}
+          text={`${sub}. The large number is the matching record count and the bar shows its percentage of the relevant total.`}
+        />
       </div>
       <div className="text-[1.7rem] font-bold leading-none tracking-[-0.01em] tabular-nums text-text-primary">
         <CountUp
@@ -577,7 +598,13 @@ function TatKpi({
           <span className="truncate text-[0.64rem] font-bold uppercase tracking-[0.05em]">
             {label}
           </span>
-          {info && <InfoDot text={info} />}
+          <InfoDot
+            title={label}
+            text={
+              info ??
+              "Average calendar days between these two milestones for records with both dates."
+            }
+          />
         </div>
         <div className="text-[1.7rem] font-bold leading-none tracking-[-0.01em] tabular-nums text-text-primary">
           —
@@ -605,6 +632,10 @@ function CampaignBreakdown({ rows }: { rows: ComplianceData["campaigns"] }) {
       <section className="bento-tile min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-bg-white p-2 sm:rounded-2xl sm:p-4">
         <h2 className="text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
           Campaign Breakdown
+          <InfoDot
+            title="Campaign Breakdown"
+            text="One row per campaign. Total is all collabs in scope; posting rate is posted collabs divided by the campaign total."
+          />
         </h2>
         <p className="mt-2 text-xs text-text-tertiary">No campaign data yet.</p>
       </section>
@@ -618,6 +649,10 @@ function CampaignBreakdown({ rows }: { rows: ComplianceData["campaigns"] }) {
             <ClipboardCheck size={12} aria-hidden />
           </span>
           Campaign Breakdown
+          <InfoDot
+            title="Campaign Breakdown"
+            text="One row per campaign. Total is all collaborations in scope; posting rate is posted collaborations divided by the campaign total."
+          />
         </h2>
         <span className="text-[0.6rem] text-text-tertiary">
           {rows.length} campaigns · sorted A→Z
@@ -702,6 +737,10 @@ function TeamCards({ entries }: { entries: ComplianceData["team"] }) {
             <Users size={12} aria-hidden />
           </span>
           Onboarded By
+          <InfoDot
+            title="Onboarded By"
+            text="One tile per team member, showing how many collabs are attributed to them as the onboarding owner."
+          />
         </h2>
         <span className="text-[0.6rem] text-text-tertiary">
           {entries.length} contributors

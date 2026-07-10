@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { InfoDot } from "../bento-kit";
 import { CountUpInt } from "../count-up-stats";
 
 /**
@@ -23,28 +24,33 @@ export function DashboardHero({
     <article
       className={cn(
         "bento-tile relative h-full overflow-hidden rounded-2xl border border-border p-5",
-        "bg-gradient-to-br from-bg-white via-bg-base to-[#F5EFD8]",
+        "bg-bg-white",
         "flex flex-col gap-3 min-h-[210px]",
       )}
     >
-      <div className="absolute -top-16 -right-20 w-56 h-56 rounded-full bg-accent/22 blur-3xl pointer-events-none" />
-      <div className="absolute top-12 right-2 w-32 h-32 rounded-full bg-[#7B4FBF]/18 blur-3xl pointer-events-none" />
-
       <div className="relative z-10 inline-flex items-center gap-2 self-start rounded-full bg-bg-white/80 border border-border px-2.5 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
         <Sparkles size={11} className="text-accent" aria-hidden />
         Saadaa Insights
+        <InfoDot
+          title="Pipeline pulse"
+          text="A short summary of the current pipeline. Conversion compares onboarded collaborations with reach-outs; post rate compares completed posting forms with onboarded collaborations."
+        />
       </div>
 
       <h2 className="relative z-10 font-emph text-[1.55rem] sm:text-[1.85rem] leading-[1.05] font-bold text-text-primary">
         Pipeline pulse is{" "}
         <span className="text-[#9a7a00]">
-          {postRatePct >= 50 ? "thriving" : postRatePct >= 20 ? "warming up" : "ramping"}
+          {postRatePct >= 50
+            ? "thriving"
+            : postRatePct >= 20
+              ? "warming up"
+              : "ramping"}
         </span>
         .
       </h2>
       <p className="relative z-10 text-[0.82rem] leading-relaxed text-text-secondary max-w-md">
-        <CountUpInt value={totalReachOut} /> reach-outs → <CountUpInt value={totalPosted} />{" "}
-        posts live. Conversion at{" "}
+        <CountUpInt value={totalReachOut} /> reach-outs →{" "}
+        <CountUpInt value={totalPosted} /> posts live. Conversion at{" "}
         <strong className="text-text-primary">
           <CountUpInt value={conversionPct} />%
         </strong>

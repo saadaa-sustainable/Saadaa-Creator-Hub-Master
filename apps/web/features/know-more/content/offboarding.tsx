@@ -5,128 +5,124 @@ export default function OffboardingKM() {
     <>
       <KMHeader
         title="Offboarding"
-        subtitle="Terminal stage that VOIDS a collab — we are not continuing with the creator for it. A voided collab is removed from every other surface (boards, kanban cards, dashboards, the Accounts Hub Due list), so its leftover balance can never be paid. Money already disbursed is kept as history. Manual, one-way, gated to authorized operators."
+        subtitle="Creator-level ghosting review and permanent blacklist. The tray shows onboarded creators whose estimated delivery date has passed and whose posting form is still not submitted. Offboarding is one-way: the creator cannot be reached out or onboarded again."
       />
 
-      <KMSection tag="Page layout (top → bottom)">
+      <KMSection tag="Who enters the review tray">
         <KMList>
           <li>
-            <strong>1. PageHeader</strong> — Offboarding title + Know More
-            button.
+            At least one deliverable is still in <KMCode>On Board</KMCode> or{" "}
+            <KMCode>Order Sent</KMCode>.
           </li>
           <li>
-            <strong>2. Filter strip</strong> — search (name / handle / order
-            ID / campaign), campaign, payment status. URL-driven so views are
-            shareable; a <KMCode>Clear filters</KMCode> ghost button appears
-            once any filter is active.
+            Its <KMCode>est_delivery</KMCode> date is before today in IST.
           </li>
           <li>
-            <strong>3. Move to Offboarding panel</strong> — pick a collab from
-            the Collab ID dropdown and confirm to park the whole collab episode
-            here.
+            The Posting form has not been submitted, so the deliverable has not
+            moved to <KMCode>Posted</KMCode>.
           </li>
           <li>
-            <strong>4. KPI strip</strong> — Offboarding count · Awaiting
-            Payment · Fully Paid · Committed Spend.
-          </li>
-          <li>
-            <strong>5. Board</strong> — list table or cards grid (mobile auto-
-            switches to Cards) of every offboarded collab. Click any card or row
-            to open the <strong>Offboarding Overview</strong> popup with the full
-            collab detail (deliverables as <KMCode>1P : 1R</KMCode>, dates,
-            order, payment, links).
+            The creator is not already blacklisted. Multiple overdue
+            deliverables are grouped into one creator card.
           </li>
         </KMList>
       </KMSection>
 
-      <KMSection tag="Data sources">
+      <KMSection tag="Page layout">
         <KMList>
           <li>
-            <strong>posts</strong> · every row with{" "}
-            <KMCode>workflow_status = &apos;Offboarded&apos;</KMCode> AND{" "}
-            <KMCode>deliverable_index</KMCode> in (null, 1). Child deliverables
-            are folded into the parent so each card is one collab.
+            <strong>Filters</strong> — search by creator, handle, or post ID and
+            narrow the tray by campaign.
           </li>
           <li>
-            <strong>creators</strong> · inf_name, profile_pic, category,
-            followers for the cells + avatars.
+            <strong>KPIs</strong> — creators needing review, overdue
+            deliverables, longest overdue age, and total offboarded creators.
           </li>
           <li>
-            <strong>instagram_cache</strong> · fallback profile_pic when the
-            creators row isn&apos;t enriched yet.
+            <strong>Needs review</strong> — one card per creator, showing the
+            overdue age, affected deliverables, campaigns, team owners, and
+            earliest missed deadline.
+          </li>
+          <li>
+            <strong>Offboarded</strong> — the permanent blacklist ledger with
+            reason, operator, timestamp, and the evidence captured at the time.
+          </li>
+          <li>
+            <strong>Creator overview</strong> — uses the same centered,
+            scrollable layout as the Ad Status overview. Long values wrap and
+            remain fully readable instead of being shortened with ellipses.
           </li>
         </KMList>
       </KMSection>
 
-      <KMSection tag="The Offboarding transition (void)">
+      <KMSection tag="Offboard action">
         <p>
-          Use the Move panel: pick the collab from the <strong>Collab ID</strong>{" "}
-          dropdown (active collabs only) and confirm. The server action sets{" "}
-          <KMCode>workflow_status = &apos;Offboarded&apos;</KMCode> on every
-          deliverable that shares the collab&apos;s{" "}
-          <KMCode>(inf_id, collab_number)</KMCode>, so the whole episode voids
-          together.
+          Open a candidate and choose <strong>Offboard creator</strong>. A clear
+          reason of 10 to 1,000 characters is mandatory. The server checks the
+          deadline and posting status again immediately before writing, so a
+          stale screen cannot blacklist someone whose posting form was just
+          completed. The transactional RPC locks the creator and qualifying post
+          rows, rebuilds the evidence, updates the blacklist, and fires the
+          audit trigger as one operation.
         </p>
         <KMList>
           <li>
-            <strong>Removed everywhere</strong> · the shared{" "}
-            <KMCode>isVoidedStatus</KMCode> filter drops the collab from the
-            Accounts Hub board + Due CSV, Order Status, Influencer Journey, and
-            every dashboard / analytics view. Its remaining balance can no longer
-            be paid — exactly the point of voiding.
+            The creator row receives <KMCode>is_blacklisted = true</KMCode>, the
+            reason, actor email, timestamp, and a JSON evidence snapshot.
           </li>
           <li>
-            <strong>Paid history kept</strong> · payment rows are never deleted
-            or altered. Money already disbursed (e.g. a partial installment
-            before a dispute) stays in the DB, the Sheet View Payments tab, and
-            the Accounts <KMCode>Paid</KMCode> / <KMCode>All</KMCode> CSV exports
-            (which opt in via <KMCode>includeVoided</KMCode>).
+            Existing post and payment rows are not rewritten or deleted. The
+            blacklist belongs to the creator, not to one collab.
+          </li>
+          <li>
+            There is no restore button. Any correction requires an intentional
+            admin data operation.
           </li>
         </KMList>
       </KMSection>
 
-      <KMSection tag="Permissions">
+      <KMSection tag="Permanent enforcement">
         <KMList>
           <li>
-            The page and the move action both require the{" "}
-            <KMCode>offboarding_write</KMCode> scope. Global Admins hold it by
-            default, so it stays admin-only until the custom{" "}
-            <KMCode>Offboarding Manager</KMCode> role is assigned to someone.
+            Outbound and inbound Instagram lookups return an immediate red
+            Offboarded result with the recorded reason. A known blocked handle
+            is rejected before a Meta request is spent.
           </li>
           <li>
-            Operators without the scope never see the sidebar entry and are
-            redirected away from the route — this is purely additive, no
-            existing access is removed.
+            Both Reach Out submit paths check the blacklist again on the server,
+            so stale forms and direct action calls cannot bypass it.
+          </li>
+          <li>
+            Onboarding performs the same server-side check by creator ID and
+            username before campaign-cap or Shopify work begins.
           </li>
         </KMList>
       </KMSection>
 
-      <KMSection tag="Rules + edge cases">
+      <KMSection tag="Audit and access">
         <KMList>
           <li>
-            Terminal + one-way. There is no revert control on this screen by
-            design; correcting a mistaken move is an explicit data operation.
+            The database trigger writes one append-only row to{" "}
+            <KMCode>creator_audit_log</KMCode> in the same transaction as the
+            blacklist update. It records the creator, reason, actor, evidence,
+            and timestamp.
           </li>
           <li>
-            Committed Spend sums the agreed per-collab commercials (Σ
-            commercial_amount per inf_id + collab_number), not the equal-split
-            per-row value.
+            Creator events appear under the <strong>Creator</strong> source in
+            Audit Log.
           </li>
           <li>
-            Awaiting Payment counts any voided collab whose payment_status is
-            not <KMCode>Done</KMCode> — money that was owed but, because the
-            collab is voided, will <strong>not</strong> be paid (it no longer
-            appears on the Accounts Hub Due list). This KPI is a record on the
-            Offboarding page only.
+            Viewing and acting on this page require{" "}
+            <KMCode>offboarding_write</KMCode>. The audit table is service-role
+            only and append-only for the application.
           </li>
         </KMList>
       </KMSection>
 
-      <KMCallout tone="info">
-        Offboarding voids a collab: it disappears from every active surface and
-        its leftover balance becomes unpayable. If you need to pay part of it
-        first, do that in Accounts Hub <strong>before</strong> voiding — already
-        disbursed money is kept as history afterwards.
+      <KMCallout tone="warning">
+        Offboarding is a permanent creator decision, not a way to close one bad
+        collaboration. Review every overdue deliverable and write a reason the
+        next operator can understand before confirming.
       </KMCallout>
     </>
   );

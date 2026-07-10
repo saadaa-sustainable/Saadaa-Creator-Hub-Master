@@ -9,7 +9,6 @@ import type { OffboardingFilterOptions, OffboardingFilters } from "./types";
 const FILTER_KEYS = [
   "search",
   "campaign",
-  "paymentStatus",
 ] as const satisfies readonly (keyof OffboardingFilters)[];
 
 export function OffboardingFiltersBar({
@@ -55,7 +54,7 @@ export function OffboardingFiltersBar({
             <input
               type="search"
               defaultValue={initial.search ?? ""}
-              placeholder="Name, handle, order ID…"
+              placeholder="Creator, handle, post ID..."
               onChange={(e) => setParam("search", e.target.value || undefined)}
               className="onboarding-filter-select"
             />
@@ -71,17 +70,6 @@ export function OffboardingFiltersBar({
               label: `${c.id}${c.name && c.name !== c.id ? ` · ${c.name}` : ""}`,
               value: c.id,
             })),
-          ]}
-        />
-        <FilterSelect
-          label="Payment"
-          value={initial.paymentStatus ?? ""}
-          onChange={(v) => setParam("paymentStatus", v)}
-          options={[
-            { label: "All payments", value: "" },
-            { label: "Paid", value: "Done" },
-            { label: "Due", value: "Due" },
-            { label: "Not Due", value: "Not Due" },
           ]}
         />
         <div className="onboarding-filter-actions">

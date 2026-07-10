@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar } from "@/components/ui";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { cn } from "@/lib/cn";
 import {
   formatDate,
@@ -162,9 +163,15 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
       <article className="bento-tile rounded-2xl border border-border bg-bg-white p-3 sm:p-4 flex flex-col gap-3 sm:gap-4 min-w-0 overflow-hidden">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
-              My workload
-            </p>
+            <div className="inline-flex items-center gap-1.5">
+              <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
+                My workload
+              </p>
+              <InfoTooltip
+                title="My workload"
+                content="All collabs assigned to you in the current filter scope. Posted percentage is posted or delivered work divided by your total assigned work."
+              />
+            </div>
             <h2 className="text-lg sm:text-xl font-extrabold text-text-primary tabular leading-none">
               {stats.total}
             </h2>
@@ -181,19 +188,36 @@ function MyDashboardInsights({ posts }: { posts: MyPost[] }) {
           />
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <MiniStat label="Posted" value={stats.posted} tone="text-success" />
+          <MiniStat
+            label="Posted"
+            value={stats.posted}
+            tone="text-success"
+            info="Your assigned deliverables whose posting form is complete or whose order is delivered."
+          />
           <MiniStat
             label="Pay pending"
             value={stats.pendingPay}
             tone="text-warning"
+            info="Your assigned collaborations still waiting for payment completion."
           />
-          <MiniStat label="Overdue" value={stats.overdue} tone="text-danger" />
+          <MiniStat
+            label="Overdue"
+            value={stats.overdue}
+            tone="text-danger"
+            info="Your assigned onboarded work whose expected delivery date has passed without a completed posting form."
+          />
         </div>
       </article>
       <article className="bento-tile rounded-2xl border border-border bg-bg-white p-3 sm:p-4 min-w-0 overflow-hidden">
-        <p className="text-[0.58rem] sm:text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary mb-2.5 sm:mb-3">
-          Stage mix
-        </p>
+        <div className="mb-2.5 inline-flex items-center gap-1.5 sm:mb-3">
+          <p className="text-[0.58rem] sm:text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
+            Stage mix
+          </p>
+          <InfoTooltip
+            title="Stage mix"
+            content="How your assigned collabs are distributed across Reach Out, On Board, Posted, and Payment. A collab may appear in more than one action bucket when it has separate pending work."
+          />
+        </div>
         <div className="space-y-2.5 sm:space-y-3">
           {STAGES.map((stage) => {
             const count = posts.filter((post) =>
@@ -238,9 +262,15 @@ function TeamLeaderboard({ entries }: { entries: TeamLeaderboardEntry[] }) {
     <article className="bento-tile rounded-2xl border border-border bg-bg-white p-3 sm:p-4 min-w-0 overflow-hidden">
       <header className="flex items-center justify-between gap-3 mb-3">
         <div>
-          <p className="text-[0.58rem] sm:text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
-            Team leaderboard
-          </p>
+          <div className="inline-flex items-center gap-1.5">
+            <p className="text-[0.58rem] sm:text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
+              Team leaderboard
+            </p>
+            <InfoTooltip
+              title="Team leaderboard"
+              content="Ranks team members by this week's workflow score. Posted and paid work increase the score; the bar compares each score with the current leader."
+            />
+          </div>
           <h2 className="text-base sm:text-lg font-extrabold text-text-primary">
             This week&apos;s movers
           </h2>
@@ -290,10 +320,12 @@ function MiniStat({
   label,
   value,
   tone,
+  info,
 }: {
   label: string;
   value: number;
   tone: string;
+  info: string;
 }) {
   return (
     <div className="rounded-xl border border-border bg-bg-muted/45 p-2.5 sm:p-3 min-w-0">
@@ -305,8 +337,9 @@ function MiniStat({
       >
         {value}
       </div>
-      <div className="mt-1 text-[0.5rem] sm:text-[0.54rem] uppercase tracking-[0.07em] font-extrabold text-text-tertiary">
+      <div className="mt-1 inline-flex items-center gap-1 text-[0.5rem] sm:text-[0.54rem] uppercase tracking-[0.07em] font-extrabold text-text-tertiary">
         {label}
+        <InfoTooltip title={label} content={info} />
       </div>
     </div>
   );
@@ -596,8 +629,14 @@ export function MyDashboardWorkloadBoard({
       <TeamLeaderboard entries={leaderboard} />
       <article className="bento-tile rounded-2xl bg-bg-white border border-border p-2.5 sm:p-4 flex flex-col gap-2.5 sm:gap-3 min-w-0 overflow-hidden">
         <header className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
+          <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-text-secondary">
             My Kanban · submit directly from each stage
+            <InfoTooltip
+              title="My Kanban"
+              content="Your assigned collabs grouped by the next action you can take. Open a card to review it or use the stage action to submit onboarding, posting, or payment details."
+              side="bottom"
+              align="start"
+            />
           </span>
           <span className="text-[0.6rem] text-text-tertiary">
             Filter above, then open the right form from the card

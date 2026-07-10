@@ -441,7 +441,10 @@ function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
       </Card>
     );
   }
-  const max = Math.max(1, ...rows.map((r) => Math.max(r.budgetCost, r.actualCost)));
+  const max = Math.max(
+    1,
+    ...rows.map((r) => Math.max(r.budgetCost, r.actualCost)),
+  );
   return (
     <Card
       title="Budget vs Actual"
@@ -454,7 +457,10 @@ function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
           const actualPct = (r.actualCost / max) * 100;
           const over = r.variance > 0;
           return (
-            <li key={r.campaignId} className="flex flex-col gap-1 text-[0.7rem]">
+            <li
+              key={r.campaignId}
+              className="flex flex-col gap-1 text-[0.7rem]"
+            >
               <div className="flex items-baseline justify-between gap-2">
                 <div className="min-w-0 flex items-baseline gap-1.5">
                   <span className="font-extrabold text-text-primary truncate">
@@ -784,7 +790,11 @@ function MonthSummary({ rows }: { rows: MonthSummaryRow[] }) {
     );
   }
   return (
-    <Card title="Month Summary" icon={Calendar} subtitle={`${rows.length} months`}>
+    <Card
+      title="Month Summary"
+      icon={Calendar}
+      subtitle={`${rows.length} months`}
+    >
       <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
         <table className="w-full text-[0.65rem] sm:text-xs min-w-[640px]">
           <thead>
@@ -979,12 +989,34 @@ function Card({
   info?: string;
   children: React.ReactNode;
 }) {
+  const definitions: Record<string, string> = {
+    "Budget vs Actual":
+      "Compares the approved campaign budget with recorded creator commercial spend. Longer actual bars than budget bars indicate overspend.",
+    "Tier Mix":
+      "Shows how actual creator spend is distributed across follower tiers. Percentages are each tier's share of total actual spend.",
+    Alerts:
+      "Campaigns appear here when actual spend is over budget or when too little of the approved budget has been used.",
+    "Cost Composition":
+      "Splits the total cost into creator compensation and garment cost so the real campaign outlay is visible.",
+    "Campaign Totals":
+      "One row per campaign. Budget values come from campaign planning; actual values come from recorded creator commercials. Variance is actual minus budget.",
+    "Month Summary":
+      "Groups budgeted and actual creator counts and spend by month. Utilised is actual spend divided by budgeted spend.",
+    "Campaign Breakdown (per tier)":
+      "A detailed campaign and creator-tier view. Each row compares planned creator count and spend with actual results for that tier.",
+    "Tier Breakdown":
+      "Combines all campaigns by creator tier and compares planned versus actual creator counts and spend.",
+  };
+  const resolvedInfo =
+    info ??
+    definitions[title] ??
+    `${title} uses the records matching the filters currently applied to Cost Analytics.`;
   return (
     <section className="bento-tile h-full rounded-2xl bg-bg-white border border-border p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3 min-w-0">
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <h3 className="text-[0.75rem] sm:text-sm font-extrabold uppercase tracking-[0.06em] text-text-primary inline-flex items-center gap-1.5">
           {Icon && <Icon size={12} aria-hidden />} {title}
-          {info && <InfoDot text={info} />}
+          <InfoDot text={resolvedInfo} title={title} />
         </h3>
         {subtitle && (
           <span className="text-[0.6rem] text-text-tertiary">{subtitle}</span>
@@ -1002,9 +1034,7 @@ function Empty({ msg }: { msg: string }) {
 function VarianceCell({ value }: { value: number }) {
   if (value === 0) {
     return (
-      <td className="py-1.5 px-1.5 text-right tabular text-text-tertiary">
-        —
-      </td>
+      <td className="py-1.5 px-1.5 text-right tabular text-text-tertiary">—</td>
     );
   }
   const over = value > 0;
@@ -1031,7 +1061,10 @@ function UtilCell({ pct }: { pct: number }) {
       <div className="flex items-center gap-1.5 justify-end">
         <div className="h-1 w-16 sm:w-20 rounded-full bg-bg-muted overflow-hidden">
           <div
-            className={cn("bento-bar h-full transition-all duration-500", barTone)}
+            className={cn(
+              "bento-bar h-full transition-all duration-500",
+              barTone,
+            )}
             style={{ width: `${Math.min(100, pct)}%` }}
           />
         </div>
