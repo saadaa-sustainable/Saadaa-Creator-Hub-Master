@@ -1,4 +1,14 @@
 
+### Onboarding edit → admin approval → posting gate (2026-07-10)
+- **Edit a submitted onboarding** — new "Edit Onboarding" button in the onboarding overview (onboarded collabs). Editable: order_id, collab_type, commercial (collab total), barter qty, ads usage rights, est_delivery. The change is **held, not applied**.
+- On submit → an `onboarding_edit_requests` row (one pending per collab) + **global admins emailed** a before/after diff. Shows in **/approvals** under a new "Onboarding edits" section with the diff + Approve/Reject.
+- **Approve** (admin only, `decideOnboardingEdit`) applies `after` to every deliverable (re-resolves email if the order changed, equal-splits commercials), logs to `approval_logs`, clears pending. **Reject** discards.
+- **Posting gate**: while a collab has a pending onboarding edit, every `-P{n}` posting submit errors until an admin decides. Migration `onboarding_edit_requests` (applied to prod). Files: `features/onboarding/{edit-actions,edit-fields,onboarding-edit-modal,onboarding-table}`, `features/posting/actions.ts`, `features/approvals/{queries,page-client}`.
+
+### Offboarding — 15-day grace + repeat-collab fix (2026-07-10)
+- **Offboarding** now surfaces a creator only once est_delivery **+ 15 days** is crossed (`OFFBOARDING_GRACE_DAYS`), not the moment it passes.
+- **Repeat collab bug fixed** — "New Collab — Existing Creator" always failed ("Could not create the repeat collab") because the action gated on a null `post_id` (reach-out rows have none until onboarding mints it); now uses the row id. Cleaned the orphan rows the bug left.
+
 ### Accounts Hub — kanban restructure, partial payments, payment-gate rule, INF Orders (2026-07-10)
 - **Kanban columns** are now **Onboarded · Posted · Payments · Partial Payments** (Reach Out removed). Priority buckets: outstanding balance → Partial Payments; fully Done → Payments; else by stage. **Sole-barter collabs are hidden** from Onboarded/Posted (kanban + list) — no payment against them. New **Partial Payment** CSV export (`mode=partial`), shown only when a partial exists.
 - **Payment gate — honor `partnership_approved_at`.** A collab is payable when the creator's partnership is currently `approved` OR an approval timestamp was recorded (the auto-fetched acceptance) and they have not since gone pending/rejected/revoked. Key-presence (stored at invite time) + admin override still don't count. Implemented in `lib/payment-eligibility.ts` and mirrored into the DB (`reconcile_creator_payment_eligibility` + `record_eligible_collab_payment` patched in place, applied to prod + verified). `partnership_approved_at` threaded through every accounts-hub select/route.
