@@ -82,6 +82,32 @@ export interface AccountsRow {
   _isPartial?: boolean;
 }
 
+/**
+ * INF Orders row — one representative per collab_id that is mapped to a Collab
+ * ID and has an order (Barter + Barter + Paid). `commercial` is the collab total
+ * finalized at onboarding. Served by /api/accounts/inf-orders.
+ */
+export interface InfOrderRow {
+  post_id: string;
+  collab_id: string;
+  inf_id: string | null;
+  inf_name: string | null;
+  username: string | null;
+  profile_pic: string | null;
+  campaign_id: string | null;
+  campaign_name: string | null;
+  collab_type: string | null;
+  commercial: number;
+  garment_qty: string | null;
+  onboard_date: string | null;
+  order_id: string | null;
+  order_date: string | null;
+  order_status: string | null;
+  tracking_status: string | null;
+  order_total: number | null;
+  deliverables: number;
+}
+
 export interface AccountsKpi {
   postsDone: number;
   notDue: { count: number; sum: number };

@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import { AccountsKanban } from "./accounts-kanban";
 import { AccountsTable } from "./accounts-table";
 import { AccountsExportBar } from "./export-bar";
+import { InfOrdersButton } from "./inf-orders";
 import type { AccountsRow } from "./types";
 
 interface AccountsBoardProps {
@@ -33,6 +34,7 @@ export function AccountsBoard({
       <div className="acc-toolbar">
         <AccountsExportBar variant="desktop" hasPartial={hasPartial} />
         <AccountsExportBar variant="mobile" hasPartial={hasPartial} />
+        <InfOrdersButton />
         <div className="acc-toolbar__spacer" />
         <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
           <button
