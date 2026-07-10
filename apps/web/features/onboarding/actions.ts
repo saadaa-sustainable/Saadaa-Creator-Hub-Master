@@ -812,17 +812,22 @@ export async function submitRepeatCollab(
   });
   if (error) return { ok: false, error: error.message };
   const row = Array.isArray(data) ? data[0] : data;
-  const newPostId = (row?.post_id as string | undefined) ?? undefined;
-  if (!newPostId)
+  // A fresh reach-out row is keyed by its DB `id`. post_id / collab_id are NULL
+  // until onboarding mints them (reach-out rows have no post_id by design), so we
+  // must NOT gate on post_id here — that was the "Could not create the repeat
+  // collab" bug. submitOnboarding keys by id and mints P{n}/C{n}.
+  const newId = (row?.id as number | undefined) ?? undefined;
+  if (newId == null)
     return { ok: false, error: "Could not create the repeat collab." };
 
   const result = await submitOnboarding({
     ...onboardingFields,
-    postId: newPostId,
+    id: newId,
   });
   if (!result.ok) {
-    // Failed onboard → remove the just-created C2 parent so no orphan remains.
-    await (supabase as any).from("posts").delete().eq("post_id", newPostId);
+    // Failed onboard → remove the just-created C2 reach-out row so no orphan
+    // remains (keyed by id — it has no post_id yet).
+    await (supabase as any).from("posts").delete().eq("id", newId);
   }
   return result;
 }
