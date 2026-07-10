@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/ui";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker, type DateRange } from "@/components/ui/date-range-picker";
 import { cn } from "@/lib/cn";
 import { formatRupees, formatDate } from "@/lib/formatters";
 import type { InfOrderRow } from "./types";
@@ -124,6 +125,7 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState("");
   const [campaign, setCampaign] = useState("");
   const [collabType, setCollabType] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange>({ from: "", to: "" });
 
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -159,8 +161,15 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const ct = collabType.trim().toLowerCase();
+    const { from, to } = dateRange;
     return (rows ?? []).filter((r) => {
       if (campaign && r.campaign_id !== campaign) return false;
+      if (from || to) {
+        const day = String(r.order_date ?? "").slice(0, 10);
+        if (!day) return false;
+        if (from && day < from) return false;
+        if (to && day > to) return false;
+      }
       if (ct) {
         const rowCt = (r.collab_type ?? "").trim().toLowerCase();
         if (ct === "barter") {
@@ -175,7 +184,7 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
       }
       return true;
     });
-  }, [rows, q, campaign, collabType]);
+  }, [rows, q, campaign, collabType, dateRange]);
 
   if (!mounted || typeof document === "undefined") return null;
 
@@ -214,7 +223,7 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
         </header>
 
         {/* Filters */}
-        <div className="shrink-0 grid grid-cols-1 sm:grid-cols-3 gap-2 px-3 pb-2 sm:px-4">
+        <div className="shrink-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 px-3 pb-2 sm:px-4">
           <label className="onboarding-filter-field acc-filter-search">
             <span>
               <Search size={10} aria-hidden /> Search
@@ -251,6 +260,14 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
               ]}
               placeholder="All types"
               searchPlaceholder="Search…"
+            />
+          </label>
+          <label className="onboarding-filter-field">
+            <span>Order Date</span>
+            <DateRangePicker
+              value={dateRange}
+              onChange={setDateRange}
+              label="Order Date"
             />
           </label>
         </div>
