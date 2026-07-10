@@ -3,16 +3,26 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  AlertCircle,
   AlertTriangle,
   CheckCircle2,
+  Gift,
   Landmark,
   Loader2,
-  Package,
+  Mail,
+  MapPin,
   Pencil,
-  RefreshCw,
+  Phone,
+  QrCode,
+  RotateCw,
+  ShieldCheck,
+  ShoppingBag,
+  Truck,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/cn";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
   fetchOrderForEdit,
   getOnboardingEditForm,
@@ -26,11 +36,11 @@ import {
 } from "./edit-fields";
 
 /**
- * Edit a submitted onboarding — mirrors the onboarding form (collab, Shopify
- * order with Fetch, bank details for Barter + Paid, deliverables). The change is
- * HELD for Global-Admin approval; posting for the collab is blocked until then.
- * On approval, changing the order id re-derives every order detail (email,
- * tracking, products, address) across all deliverables.
+ * Edit a submitted onboarding — SAME visual language as the Onboarding
+ * Configuration form (ob-form-section / form-floating / shopify-preview).
+ * The change is HELD for Global-Admin approval; posting for the collab is
+ * blocked until then. Changing the Order ID re-derives every order detail
+ * on approval.
  */
 export function OnboardingEditModal({
   collabId,
@@ -117,7 +127,9 @@ export function OnboardingEditModal({
       return;
     }
     if (orderChanged && !order) {
-      toast.error("Fetch the new order to confirm its details before submitting.");
+      toast.error(
+        "Fetch the new order to confirm its details before submitting.",
+      );
       return;
     }
     setSaving(true);
@@ -169,8 +181,8 @@ export function OnboardingEditModal({
 
         <div className="modal-body">
           {loadErr ? (
-            <div className="ob-form-error-banner">
-              <AlertTriangle size={14} aria-hidden />
+            <div className="alert alert-warning">
+              <AlertCircle size={14} />
               {loadErr}
             </div>
           ) : !form ? (
@@ -179,184 +191,314 @@ export function OnboardingEditModal({
               <span className="text-sm">Loading onboarding…</span>
             </div>
           ) : (
-            <div className="flex flex-col gap-3.5">
+            <>
               <div
-                className="alert"
-                style={{
-                  background: form.pending
-                    ? "var(--color-warning-bg)"
-                    : "var(--color-bg-surface)",
-                  color: form.pending
-                    ? "var(--color-warning-text)"
-                    : "var(--color-text-secondary)",
-                  border: "1px solid var(--color-border)",
-                  fontSize: "0.72rem",
-                }}
+                className={cn(
+                  "alert",
+                  form.pending ? "alert-warning" : undefined,
+                )}
+                style={
+                  form.pending
+                    ? undefined
+                    : {
+                        background: "var(--color-bg-surface)",
+                        color: "var(--color-text-secondary)",
+                        border: "1px solid var(--color-border)",
+                      }
+                }
               >
                 {form.pending ? (
                   <>
-                    <AlertTriangle size={13} aria-hidden /> This collab already has
-                    an edit awaiting approval. Resolve it in Approvals first.
+                    <AlertTriangle size={14} /> This collab already has an edit
+                    awaiting approval. Resolve it in Approvals first.
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 size={13} aria-hidden /> Changes are held for
-                    admin approval and applied to all {form.deliverables}{" "}
-                    deliverable{form.deliverables === 1 ? "" : "s"} on approve.
-                    Posting stays blocked until then. Changing the Order ID
-                    re-pulls every order detail.
+                    <ShieldCheck size={14} /> Changes are held for admin
+                    approval and applied to all {form.deliverables} deliverable
+                    {form.deliverables === 1 ? "" : "s"} on approve. Posting
+                    stays blocked until then. Changing the Order ID re-pulls
+                    every order detail.
                   </>
                 )}
               </div>
 
-              {/* Collaboration */}
-              <section className="ob-form-section flex flex-col gap-3">
-                <SectionHead icon={Pencil} title="Collaboration" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Field label="Collab Type">
-                    <select
-                      className="onboarding-filter-select"
+              {/* ── Collaboration ── */}
+              <section className="ob-form-section">
+                <h5 className="section-title">
+                  <Pencil size={13} className="inline mr-2" />
+                  Collaboration
+                </h5>
+                <div className="form-grid">
+                  <div className="form-floating relative">
+                    <SearchableSelect
+                      id="obe_collab"
                       value={values.collab_type}
-                      onChange={(e) => set("collab_type", e.target.value)}
-                    >
-                      <option value="">—</option>
-                      <option value="Barter">Barter</option>
-                      <option value="Barter + Paid">Barter + Paid</option>
-                    </select>
-                  </Field>
-                  <Field
-                    label="Commercials (₹)"
-                    hint={isBarter ? "Barter ₹0" : undefined}
-                  >
+                      onChange={(v) => set("collab_type", v)}
+                      options={[
+                        { value: "Barter", label: "Barter" },
+                        { value: "Barter + Paid", label: "Barter + Paid" },
+                      ]}
+                      searchPlaceholder="Search…"
+                    />
+                    <label htmlFor="obe_collab">
+                      Collab Type <span className="req">*</span>
+                    </label>
+                  </div>
+
+                  <div className="form-floating relative">
                     <input
-                      className="ob-input"
-                      inputMode="numeric"
+                      type="number"
+                      min={0}
+                      className={cn("form-control", isBarter && "br-readonly")}
+                      id="obe_commercials"
+                      placeholder=" "
+                      readOnly={isBarter}
                       value={isBarter ? "0" : values.commercial_amount}
-                      disabled={isBarter}
                       onChange={(e) => set("commercial_amount", e.target.value)}
                     />
-                  </Field>
-                  <Field label="Est. Content Delivery">
+                    <label htmlFor="obe_commercials">Commercials ₹</label>
+                    {isBarter && (
+                      <span className="barter-badge">
+                        <Gift size={10} /> BARTER ₹0
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="form-floating">
                     <input
                       type="date"
-                      className="ob-input onboarding-filter-select"
+                      className="form-control"
+                      id="obe_estDate"
+                      placeholder=" "
                       value={values.est_delivery}
                       onChange={(e) => set("est_delivery", e.target.value)}
                     />
-                  </Field>
-                  <Field label="Ads Usage Rights">
-                    <select
-                      className="onboarding-filter-select"
-                      value={values.ads_usage_rights}
-                      onChange={(e) => set("ads_usage_rights", e.target.value)}
-                    >
-                      {EDIT_ADS_USAGE_OPTIONS.map((a) => (
-                        <option key={a || "none"} value={a}>
-                          {a || "None"}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                </div>
-              </section>
-
-              {/* Shopify order */}
-              <section className="ob-form-section flex flex-col gap-3">
-                <SectionHead icon={Package} title="Shopify Order" />
-                <div className="flex items-end gap-2">
-                  <Field label="Order ID" className="flex-1">
-                    <input
-                      className="ob-input"
-                      value={values.order_id}
-                      onChange={(e) => {
-                        set("order_id", e.target.value);
-                        setOrder(null);
-                        setOrderErr(null);
-                      }}
-                      placeholder="Shopify order number"
-                    />
-                  </Field>
-                  <button
-                    type="button"
-                    className="action-btn shrink-0"
-                    onClick={runFetch}
-                    disabled={fetching}
-                  >
-                    {fetching ? (
-                      <Loader2 size={12} className="animate-spin" aria-hidden />
-                    ) : (
-                      <RefreshCw size={12} aria-hidden />
-                    )}
-                    Fetch
-                  </button>
-                </div>
-                {orderChanged && !order && !orderErr && (
-                  <p className="text-[0.66rem] text-warning inline-flex items-center gap-1">
-                    <AlertTriangle size={11} aria-hidden /> Order changed — Fetch
-                    to confirm the new order&apos;s details before submitting.
-                  </p>
-                )}
-                {orderErr && (
-                  <p className="text-[0.66rem] text-danger inline-flex items-center gap-1">
-                    <AlertTriangle size={11} aria-hidden /> {orderErr}
-                  </p>
-                )}
-                {order && (
-                  <div className="rounded-xl border border-border bg-bg-muted/40 p-2.5 text-[0.68rem] grid grid-cols-1 sm:grid-cols-2 gap-y-1 gap-x-3">
-                    <PreviewRow label="Customer" value={order.customer_name} />
-                    <PreviewRow label="Email" value={order.email} />
-                    <PreviewRow label="Status" value={order.order_status} />
-                    <PreviewRow label="Tracking" value={order.tracking_id} />
-                    <PreviewRow
-                      label="Products"
-                      value={order.garments_sent}
-                      full
-                    />
-                    <PreviewRow label="Address" value={order.address} full />
+                    <label htmlFor="obe_estDate">
+                      Est. Content Delivery <span className="req">*</span>
+                    </label>
                   </div>
-                )}
+
+                  <div className="form-floating">
+                    <SearchableSelect
+                      id="obe_adsRights"
+                      value={values.ads_usage_rights}
+                      onChange={(v) => set("ads_usage_rights", v)}
+                      options={[
+                        { value: "", label: "None" },
+                        ...EDIT_ADS_USAGE_OPTIONS.filter((a) => a !== "").map(
+                          (a) => ({ value: a, label: a }),
+                        ),
+                      ]}
+                      placeholder="None"
+                      searchPlaceholder="Search…"
+                    />
+                    <label htmlFor="obe_adsRights">
+                      <ShieldCheck size={11} className="inline mr-1" />
+                      Ads Usage Rights
+                    </label>
+                  </div>
+                </div>
               </section>
 
-              {/* Bank — Barter + Paid only */}
-              {isBarterPaid && (
-                <section className="ob-form-section flex flex-col gap-3">
-                  <SectionHead icon={Landmark} title="Bank Details" />
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <Field label="Bank Name">
+              {/* ── Shopify Order ── */}
+              <section className="ob-form-section">
+                <h5 className="section-title">
+                  <ShoppingBag size={13} className="inline mr-2" />
+                  Shopify Order
+                </h5>
+                <div className="form-grid">
+                  <div className="form-grid-full flex gap-2 items-stretch">
+                    <div className="form-floating flex-1">
                       <input
-                        className="ob-input"
+                        type="text"
+                        className="form-control"
+                        id="obe_orderId"
+                        placeholder=" "
+                        value={values.order_id}
+                        onChange={(e) => {
+                          set("order_id", e.target.value);
+                          setOrder(null);
+                          setOrderErr(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            runFetch();
+                          }
+                        }}
+                      />
+                      <label htmlFor="obe_orderId">
+                        Shopify Order ID <span className="req">*</span>
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={runFetch}
+                      disabled={fetching || !values.order_id.trim()}
+                    >
+                      {fetching ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <RotateCw size={14} />
+                      )}
+                      Fetch
+                    </button>
+                  </div>
+
+                  {orderChanged && !order && !orderErr && (
+                    <div className="alert alert-warning form-grid-full">
+                      <AlertCircle size={14} />
+                      Order changed — Fetch to confirm the new order&apos;s
+                      details before submitting.
+                    </div>
+                  )}
+                  {orderErr && (
+                    <div className="alert alert-warning form-grid-full">
+                      <AlertCircle size={14} />
+                      {orderErr}
+                    </div>
+                  )}
+
+                  {order && (
+                    <div className="shopify-preview form-grid-full">
+                      <div className="shopify-preview__head">
+                        <ShoppingBag size={12} />
+                        Shopify Synchronization
+                        <span className="status-badge">
+                          {order.order_status ?? "Pending"}
+                        </span>
+                      </div>
+                      <dl className="shopify-preview__grid">
+                        <div>
+                          <dt>
+                            <Mail size={11} />
+                            Email
+                          </dt>
+                          <dd>{order.email ?? "—"}</dd>
+                        </div>
+                        <div>
+                          <dt>
+                            <Phone size={11} />
+                            Contact
+                          </dt>
+                          <dd>{order.phone ?? "—"}</dd>
+                        </div>
+                        <div>
+                          <dt>
+                            <Truck size={11} />
+                            Status
+                          </dt>
+                          <dd>{order.order_status ?? "—"}</dd>
+                        </div>
+                        <div className="span-2">
+                          <dt>
+                            <MapPin size={11} />
+                            Address
+                          </dt>
+                          <dd>{order.address ?? "—"}</dd>
+                        </div>
+                        {order.tracking_id && (
+                          <div>
+                            <dt>
+                              <QrCode size={11} />
+                              Tracking
+                            </dt>
+                            <dd className="tabular">{order.tracking_id}</dd>
+                          </div>
+                        )}
+                        {order.garments_sent != null && (
+                          <div>
+                            <dt>
+                              <ShoppingBag size={11} />
+                              Garments Sent
+                            </dt>
+                            <dd className="tabular">{order.garments_sent}</dd>
+                          </div>
+                        )}
+                        {order.total_price != null && (
+                          <div>
+                            <dt>Total</dt>
+                            <dd className="tabular">₹{order.total_price}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* ── Bank Details (Barter + Paid only) ── */}
+              {isBarterPaid && (
+                <section className="ob-form-section">
+                  <h5 className="section-title">
+                    <Landmark size={13} className="inline mr-2" />
+                    Bank Details
+                    <span className="chip chip--info">For Paid Collabs</span>
+                  </h5>
+                  <div className="form-grid">
+                    <div className="form-floating">
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="obe_bankName"
+                        placeholder=" "
                         value={values.bank_name}
                         onChange={(e) => set("bank_name", e.target.value)}
                       />
-                    </Field>
-                    <Field label="Account Number">
+                      <label htmlFor="obe_bankName">Bank Account Name</label>
+                    </div>
+                    <div className="form-floating">
                       <input
-                        className="ob-input"
+                        type="text"
+                        className="form-control"
+                        id="obe_bankNumber"
+                        placeholder=" "
                         value={values.bank_number}
                         onChange={(e) => set("bank_number", e.target.value)}
                       />
-                    </Field>
-                    <Field label="IFSC Code">
+                      <label htmlFor="obe_bankNumber">Account Number</label>
+                    </div>
+                    <div className="form-floating">
                       <input
-                        className="ob-input"
+                        type="text"
+                        className="form-control"
+                        id="obe_ifsc"
+                        placeholder=" "
                         value={values.ifsc}
                         onChange={(e) => set("ifsc", e.target.value)}
                       />
-                    </Field>
+                      <label htmlFor="obe_ifsc">IFSC Code</label>
+                    </div>
                   </div>
                 </section>
               )}
 
-              <Field label="Reason for the edit" required>
-                <textarea
-                  className="ob-input"
-                  rows={2}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. Wrong order ID entered at onboarding, correcting to the right order."
-                />
-              </Field>
-            </div>
+              {/* ── Reason ── */}
+              <section className="ob-form-section">
+                <h5 className="section-title">
+                  <Pencil size={13} className="inline mr-2" />
+                  Reason for the Edit
+                </h5>
+                <div className="form-grid">
+                  <div className="form-floating form-grid-full">
+                    <textarea
+                      className="form-control"
+                      id="obe_reason"
+                      placeholder=" "
+                      rows={2}
+                      style={{ minHeight: "4.6rem" }}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                    />
+                    <label htmlFor="obe_reason">
+                      Why is this edit needed? <span className="req">*</span>
+                    </label>
+                  </div>
+                </div>
+              </section>
+            </>
           )}
         </div>
 
@@ -382,7 +524,7 @@ export function OnboardingEditModal({
             {saving ? (
               <Loader2 size={13} className="animate-spin" aria-hidden />
             ) : (
-              <Pencil size={13} aria-hidden />
+              <CheckCircle2 size={13} aria-hidden />
             )}
             {saving ? "Submitting…" : "Submit for Approval"}
           </button>
@@ -390,70 +532,5 @@ export function OnboardingEditModal({
       </div>
     </div>,
     document.body,
-  );
-}
-
-function SectionHead({
-  icon: Icon,
-  title,
-}: {
-  icon: typeof Pencil;
-  title: string;
-}) {
-  return (
-    <div className="inline-flex items-center gap-1.5 text-[0.7rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary">
-      <Icon size={12} aria-hidden />
-      {title}
-    </div>
-  );
-}
-
-function Field({
-  label,
-  hint,
-  required,
-  className,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  required?: boolean;
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className={`flex flex-col gap-1 ${className ?? ""}`}>
-      <span className="ob-form-label flex items-center justify-between">
-        <span>
-          {label}
-          {required && <span style={{ color: "var(--color-danger-text)" }}> *</span>}
-        </span>
-        {hint && (
-          <span className="text-[0.58rem] font-bold text-success normal-case tracking-normal">
-            {hint}
-          </span>
-        )}
-      </span>
-      {children}
-    </label>
-  );
-}
-
-function PreviewRow({
-  label,
-  value,
-  full,
-}: {
-  label: string;
-  value: string | null;
-  full?: boolean;
-}) {
-  return (
-    <div className={full ? "sm:col-span-2 min-w-0" : "min-w-0"}>
-      <span className="text-text-tertiary">{label}: </span>
-      <span className="text-text-primary font-medium break-words">
-        {value || "—"}
-      </span>
-    </div>
   );
 }

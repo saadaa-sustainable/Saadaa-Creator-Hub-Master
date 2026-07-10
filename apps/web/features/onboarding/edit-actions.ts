@@ -99,6 +99,7 @@ export interface EditOrderPreview {
   order_id: string;
   customer_name: string | null;
   email: string | null;
+  phone: string | null;
   address: string | null;
   garments_sent: string | null;
   tracking_id: string | null;
@@ -117,7 +118,7 @@ export async function fetchOrderForEdit(
   const { data, error } = await (supabase as any)
     .from("shopify_orders")
     .select(
-      "order_id, customer_name, email, address, garments_sent, tracking_id, fulfillment, total_price",
+      "order_id, customer_name, email, phone, address, garments_sent, tracking_id, tracking_status, fulfillment, total_price",
     )
     .eq("order_id", id)
     .maybeSingle();
@@ -133,10 +134,11 @@ export async function fetchOrderForEdit(
       order_id: String(data.order_id ?? id),
       customer_name: data.customer_name ?? null,
       email: data.email ?? null,
+      phone: data.phone ?? null,
       address: data.address ?? null,
       garments_sent: data.garments_sent ?? null,
       tracking_id: data.tracking_id ?? null,
-      order_status: data.fulfillment ?? null,
+      order_status: data.tracking_status ?? data.fulfillment ?? null,
       total_price: data.total_price != null ? Number(data.total_price) : null,
     },
   };
