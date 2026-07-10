@@ -5,7 +5,7 @@ export default function OffboardingKM() {
     <>
       <KMHeader
         title="Offboarding"
-        subtitle="Creator-level ghosting review and permanent blacklist. The tray shows onboarded creators whose estimated delivery date has passed and whose posting form is still not submitted. Offboarding is one-way: the creator cannot be reached out or onboarded again."
+        subtitle="Creator-level ghosting review and permanent blacklist. The tray shows onboarded creators whose estimated delivery date passed more than 15 days ago and whose posting form is still not submitted. Offboarding is one-way: the creator cannot be reached out or onboarded again."
       />
 
       <KMSection tag="Who enters the review tray">
@@ -15,7 +15,9 @@ export default function OffboardingKM() {
             <KMCode>Order Sent</KMCode>.
           </li>
           <li>
-            Its <KMCode>est_delivery</KMCode> date is before today in IST.
+            Its <KMCode>est_delivery</KMCode> date passed <strong>more than 15
+            days ago</strong> in IST (a 15-day grace after the estimated delivery
+            date before the creator surfaces here).
           </li>
           <li>
             The Posting form has not been submitted, so the deliverable has not

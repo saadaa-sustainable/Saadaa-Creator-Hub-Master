@@ -4,6 +4,24 @@ export const OFFBOARDING_PENDING_STATUSES = ["On Board", "Order Sent"] as const;
 export const OFFBOARDING_REASON_MIN = 10;
 export const OFFBOARDING_REASON_MAX = 1000;
 
+/**
+ * Grace period AFTER the estimated delivery date before a creator surfaces as an
+ * offboarding candidate. A creator only appears once est_delivery is crossed AND
+ * this many further days have also passed (they've had the product + a fair
+ * window and still not posted).
+ */
+export const OFFBOARDING_GRACE_DAYS = 15;
+
+/** The cutoff date: est_delivery must be before (today − grace) to qualify. */
+export function offboardingCutoffIso(
+  today: string,
+  grace = OFFBOARDING_GRACE_DAYS,
+): string {
+  const ms = Date.parse(`${today.slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(ms)) return today;
+  return new Date(ms - grace * 86_400_000).toISOString().slice(0, 10);
+}
+
 export const OffboardCreatorSchema = z.object({
   infId: z.string().trim().min(1, "Creator ID is required"),
   reason: z
@@ -39,9 +57,10 @@ export function isOffboardingCandidateRow(
 ): boolean {
   const status = String(row.workflow_status ?? "").trim();
   const deadline = String(row.est_delivery ?? "").slice(0, 10);
+  // Candidate only once est_delivery + OFFBOARDING_GRACE_DAYS is also crossed.
   return (
     OFFBOARDING_PENDING_STATUSES.some((pending) => pending === status) &&
     /^\d{4}-\d{2}-\d{2}$/.test(deadline) &&
-    deadline < today
+    deadline < offboardingCutoffIso(today)
   );
 }

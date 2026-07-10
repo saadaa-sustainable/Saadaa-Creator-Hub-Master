@@ -112,7 +112,7 @@ export function OffboardingBoard({
           </strong>
           <p>
             {view === "candidates"
-              ? "Creators appear here automatically after an estimated delivery date passes while the posting form remains unsubmitted."
+              ? "Creators appear here automatically once an estimated delivery date has passed by more than 15 days while the posting form remains unsubmitted."
               : "A creator enters this ledger only after a mandatory reason is confirmed."}
           </p>
         </div>

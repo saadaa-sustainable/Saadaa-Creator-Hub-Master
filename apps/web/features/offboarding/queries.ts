@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/server";
 import {
   daysOverdue,
   isOffboardingCandidateRow,
+  offboardingCutoffIso,
   OFFBOARDING_PENDING_STATUSES,
   todayIsoInIndia,
 } from "./rules";
@@ -175,6 +176,8 @@ export async function fetchOffboardingData(
 }> {
   const supabase = createServiceClient();
   const today = todayIsoInIndia();
+  // Only surface a creator once est_delivery + OFFBOARDING_GRACE_DAYS is crossed.
+  const cutoff = offboardingCutoffIso(today);
 
   const [
     { data: overdueRows, error: overdueError },
@@ -186,7 +189,7 @@ export async function fetchOffboardingData(
         "post_id, collab_id, inf_id, username, campaign_id, workflow_status, est_delivery, onboard_date, onboarded_by, logged_by",
       )
       .in("workflow_status", [...OFFBOARDING_PENDING_STATUSES])
-      .lt("est_delivery", today)
+      .lt("est_delivery", cutoff)
       .not("inf_id", "is", null)
       .order("est_delivery", { ascending: true })
       .limit(50000),
