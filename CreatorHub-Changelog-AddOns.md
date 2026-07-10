@@ -1,4 +1,7 @@
 
+### Data fix — old Sakshi vs new Sakshi Kumari attribution (2026-07-10)
+- Two different people were merged by the historic ingest: **"Sakshi"** (former member, left; owns all Tracker rows Feb 2025 → Apr 2026) had been canonicalized to **"Sakshi Kumari"** (new member, joined June 2026). Renamed 1,942 `logged_by` + 202 `onboarded_by` rows in `historic_posts` back to **"Sakshi"**. Live `posts` rows (27 Jun+ = genuinely Sakshi Kumari's) untouched; raw archives were already correct. Team dropdowns now list the two people separately and the new member's numbers reflect only her own work. Ingest canon rule documented (old Tracker "Sakshi" stays "Sakshi"; June-2026+ sheets' bare "sakshi" = Sakshi Kumari).
+
 ### Approvals — bell + badges, history diff, card polish (2026-07-10)
 - **Top-right bell + refresh (DAM-style)** — fixed cluster on every page (admins): refresh re-pulls data; the bell wears a **red circle with the white pending-approvals count** and opens /approvals. The count also prefixes the **browser tab title** ("(1) …") and shows as the same red pill on the **Approvals item in the side nav**. Count is tag-cached (`approvals-count`) — no per-nav DB reads; every approval mutation revalidates it.
 - **Approval History rows are clickable** — onboarding edits open the stored **before → after diff** (+ reason, requested/decided by); campaign edits diff the proposed payload against the before snapshot.
