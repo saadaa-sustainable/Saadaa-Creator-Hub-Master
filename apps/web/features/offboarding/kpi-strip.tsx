@@ -4,7 +4,7 @@ import type { OffboardingKpi } from "./types";
 
 export function OffboardingKpiStrip({ kpi }: { kpi: OffboardingKpi }) {
   return (
-    <section>
+    <section className="offboarding-kpi-section" data-depth="2">
       <div className="acc-kpi-group">
         <UserMinus size={13} aria-hidden /> Creator offboarding overview
       </div>

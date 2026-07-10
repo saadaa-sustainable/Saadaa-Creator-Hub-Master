@@ -49,6 +49,7 @@ export function OffboardingBoard({
     <section
       className="offboarding-workspace"
       aria-label="Creator offboarding tray"
+      data-depth="3"
     >
       <div className="offboarding-workspace__head">
         <div>
@@ -172,6 +173,7 @@ function CreatorCard({
           : "offboarding-creator-card--offboarded",
       )}
       onClick={onOpen}
+      data-depth="4"
     >
       <div className="offboarding-creator-card__head">
         <Avatar

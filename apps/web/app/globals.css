@@ -8823,6 +8823,46 @@
 /* ===========================================================================
  * Creator-level offboarding workspace
  * ========================================================================== */
+.offboarding-stage {
+  --stage-accent: var(--color-danger-text);
+  gap: 1rem;
+}
+
+.offboarding-stage .page-header {
+  min-height: 3.25rem;
+}
+
+.onboarding-stage.offboarding-stage .offboarding-filter-card {
+  border-radius: 8px;
+  padding: 0.78rem;
+}
+
+.offboarding-stage .offboarding-filter-card .onboarding-filter-grid {
+  grid-template-columns: minmax(18rem, 1.45fr) minmax(15rem, 1fr) auto;
+  align-items: end;
+}
+
+.offboarding-stage .offboarding-filter-card .onboarding-filter-actions {
+  align-items: center;
+  justify-content: flex-end;
+  width: auto;
+}
+
+.offboarding-kpi-section {
+  display: grid;
+  gap: 0.56rem;
+  min-width: 0;
+}
+
+.offboarding-stage .acc-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.offboarding-stage .acc-kpi-grid > .bento-tile {
+  min-height: 8.25rem;
+  border-radius: 8px;
+}
+
 .offboarding-workspace {
   display: grid;
   gap: 0.9rem;
@@ -8831,11 +8871,16 @@
 
 .offboarding-workspace__head {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.2rem 0 0.8rem;
+  min-height: 4.5rem;
+  padding: 0.35rem 0 0.85rem;
   border-bottom: 1px solid var(--color-border);
+}
+
+.offboarding-workspace__head > div:first-child {
+  min-width: 0;
 }
 
 .offboarding-workspace__eyebrow {
@@ -8843,6 +8888,7 @@
   color: var(--color-danger-text);
   font-size: 0.62rem;
   font-weight: 800;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -8861,8 +8907,9 @@
   line-height: 1.45;
 }
 
-.offboarding-workspace__tabs {
+.onboarding-stage.offboarding-stage .offboarding-workspace__tabs {
   flex: 0 0 auto;
+  margin: 0;
 }
 
 .offboarding-workspace__tabs button > span {
@@ -8877,9 +8924,30 @@
 }
 
 .offboarding-workspace__empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.46rem;
   min-height: 240px;
   border: 1px dashed var(--color-border-strong);
   border-radius: 8px;
+  background: var(--color-bg-white);
+  padding: 2rem;
+  text-align: center;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 18px 42px -38px rgba(22, 21, 19, 0.3);
+}
+
+.offboarding-workspace__empty > svg {
+  box-sizing: content-box;
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  padding: 0.62rem;
 }
 
 .offboarding-workspace__empty strong {
@@ -8889,9 +8957,10 @@
 
 .offboarding-workspace__empty p {
   max-width: 60ch;
-  margin: 0;
+  margin: 0.05rem 0 0;
   color: var(--color-text-tertiary);
   font-size: 0.74rem;
+  line-height: 1.5;
   text-align: center;
 }
 
@@ -8899,6 +8968,22 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+
+.offboarding-creator-grid > * {
+  animation: bentoRise 0.36s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.offboarding-creator-grid > *:nth-child(2) {
+  animation-delay: 0.04s;
+}
+
+.offboarding-creator-grid > *:nth-child(3) {
+  animation-delay: 0.08s;
+}
+
+.offboarding-creator-grid > *:nth-child(n + 4) {
+  animation-delay: 0.12s;
 }
 
 .offboarding-creator-card {
@@ -9275,21 +9360,49 @@
 }
 
 @media (max-width: 900px) {
+  .offboarding-stage .acc-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .offboarding-stage .offboarding-filter-card .onboarding-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .offboarding-stage .offboarding-filter-card .onboarding-filter-actions {
+    grid-column: 1 / -1;
+  }
+
   .offboarding-creator-grid {
     grid-template-columns: 1fr;
   }
 }
 
+@media (max-width: 767px) {
+  .onboarding-stage.offboarding-stage .offboarding-workspace__tabs {
+    display: inline-flex;
+  }
+}
+
 @media (max-width: 640px) {
+  .offboarding-stage .acc-kpi-grid,
+  .offboarding-stage .offboarding-filter-card .onboarding-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
   .offboarding-workspace__head {
     align-items: stretch;
     flex-direction: column;
+    min-height: 0;
   }
 
   .offboarding-workspace__tabs {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
+  }
+
+  .onboarding-stage.offboarding-stage .offboarding-workspace__tabs {
+    display: grid;
   }
 
   .offboarding-workspace__tabs button {
@@ -9332,9 +9445,18 @@
     width: calc(100vw - 1rem);
     max-height: calc(100dvh - 1rem);
   }
+
+  .offboarding-workspace__empty {
+    min-height: 210px;
+    padding: 1.35rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .offboarding-creator-grid > * {
+    animation: none;
+  }
+
   .offboarding-creator-card,
   .offboarding-creator-card:hover {
     transition: none;

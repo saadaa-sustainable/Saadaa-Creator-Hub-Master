@@ -45,7 +45,11 @@ export function OffboardingFiltersBar({
   const hasAny = FILTER_KEYS.some((k) => params.get(k));
 
   return (
-    <div className="onboarding-filter-card" aria-busy={pending}>
+    <div
+      className="onboarding-filter-card offboarding-filter-card"
+      aria-busy={pending}
+      data-depth="1"
+    >
       <div className="onboarding-filter-grid">
         <label className="onboarding-filter-field acc-filter-search">
           <span>Search</span>
