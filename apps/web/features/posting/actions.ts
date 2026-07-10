@@ -187,6 +187,37 @@ export async function submitPosting(input: unknown) {
 
   const supabase = createServiceClient();
 
+  // GATE: block posting while this collab has an onboarding edit awaiting admin
+  // approval. The corrected onboarding (e.g. a fixed order_id) must be ratified
+  // before any -P{n} deliverable can be marked Posted.
+  {
+    const { data: postRow } = await (supabase as any)
+      .from("posts")
+      .select("collab_id, inf_id, collab_number")
+      .eq("post_id", postId)
+      .maybeSingle();
+    const collabKey =
+      (postRow?.collab_id as string | null) ||
+      (postRow?.inf_id
+        ? `${postRow.inf_id}-C${Number(postRow.collab_number ?? 1)}`
+        : null);
+    if (collabKey) {
+      const { data: pendingEdit } = await (supabase as any)
+        .from("onboarding_edit_requests")
+        .select("id")
+        .eq("collab_id", collabKey)
+        .eq("status", "Pending Approval")
+        .maybeSingle();
+      if (pendingEdit) {
+        return {
+          ok: false as const,
+          error:
+            "This collab has an onboarding edit awaiting admin approval. Posting is blocked until it is approved or rejected in the Approvals page.",
+        };
+      }
+    }
+  }
+
   const { error: updErr } = await (supabase as any)
     .from("posts")
     .update({

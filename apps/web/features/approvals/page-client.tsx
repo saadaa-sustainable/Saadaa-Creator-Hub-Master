@@ -28,6 +28,8 @@ import {
   rejectCampaign,
   rejectCampaignEditRequest,
 } from "@/features/campaigns/actions";
+import { decideOnboardingEdit } from "@/features/onboarding/edit-actions";
+import type { OnboardingEditItem } from "@/features/onboarding/edit-fields";
 import type {
   ApprovalHistoryItem,
   ApprovalHistoryStatus,
@@ -97,26 +99,43 @@ export function ApprovalsBody({ data }: { data: ApprovalQueueData }) {
         ))}
       </div>
 
-      {data.items.length === 0 ? (
+      {data.items.length === 0 && data.onboardingEdits.length === 0 ? (
         <div className="glass-card flex flex-col items-center justify-center gap-2 rounded-[var(--radius)] border border-border bg-bg-white py-16 text-center text-text-tertiary">
           <Inbox size={28} aria-hidden />
           <p className="font-medium text-text-primary">
             Nothing awaiting approval
           </p>
           <p className="text-sm">
-            New campaigns and edit requests land here for sign-off before they
-            go live.
+            New campaigns, edit requests, and onboarding edits land here for
+            sign-off before they go live.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          {data.items.map((c) => (
-            <ApprovalCard
-              key={`${c.kind}-${c.approvalId ?? c.campaignId}`}
-              c={c}
-            />
-          ))}
-        </div>
+        <>
+          {data.items.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              {data.items.map((c) => (
+                <ApprovalCard
+                  key={`${c.kind}-${c.approvalId ?? c.campaignId}`}
+                  c={c}
+                />
+              ))}
+            </div>
+          )}
+          {data.onboardingEdits.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h3 className="text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary inline-flex items-center gap-1.5">
+                <FilePenLine size={13} aria-hidden /> Onboarding edits (
+                {data.onboardingEdits.length})
+              </h3>
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                {data.onboardingEdits.map((e) => (
+                  <OnboardingEditCard key={e.id} e={e} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       <ApprovalHistory history={data.history} total={data.historyTotal} />
@@ -333,6 +352,157 @@ function Metric({
       <div className="mt-1 truncate text-[0.82rem] font-bold text-text-primary tabular-nums">
         {value}
       </div>
+    </div>
+  );
+}
+
+function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [rejecting, setRejecting] = useState(false);
+  const [note, setNote] = useState("");
+
+  const decide = (decision: "approve" | "reject") => {
+    start(async () => {
+      const res = await decideOnboardingEdit(
+        e.id,
+        decision,
+        decision === "reject" ? note : undefined,
+      );
+      if (!res.ok) {
+        toast.error(res.error ?? "Could not record the decision");
+        return;
+      }
+      toast.success(
+        decision === "approve"
+          ? `${e.collabId} edit approved & applied — posting unblocked.`
+          : `${e.collabId} edit rejected.`,
+      );
+      router.refresh();
+    });
+  };
+
+  return (
+    <div className="rounded-[14px] border border-border bg-bg-white p-3 flex flex-col gap-2.5 min-w-0">
+      <header className="flex items-start gap-2.5">
+        <span
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px]"
+          style={{ background: "#F3EDFB", color: "#7B4FBF" }}
+        >
+          <FilePenLine size={15} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <strong className="text-text-primary tabular truncate">
+              {e.collabId}
+            </strong>
+            <span className="text-[0.6rem] text-text-tertiary whitespace-nowrap">
+              {formatDate(e.createdAt) ?? ""}
+            </span>
+          </div>
+          <div className="text-[0.66rem] text-text-secondary truncate">
+            {e.creator ?? "—"}
+            {e.requestedBy ? ` · by ${e.requestedBy}` : ""}
+          </div>
+        </div>
+      </header>
+
+      {e.reason && (
+        <p className="text-[0.68rem] text-text-secondary italic">
+          “{e.reason}”
+        </p>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-[0.66rem] min-w-[300px]">
+          <thead>
+            <tr className="text-text-tertiary uppercase text-[0.5rem] font-extrabold border-b border-border">
+              <th className="text-left pb-1 pr-2">Field</th>
+              <th className="text-left pb-1 px-1.5">Before</th>
+              <th className="text-left pb-1 pl-1.5">After</th>
+            </tr>
+          </thead>
+          <tbody>
+            {e.changes.map((c) => (
+              <tr key={c.field} className="border-t border-border">
+                <td className="py-1 pr-2 font-bold text-text-primary">
+                  {c.label}
+                </td>
+                <td className="py-1 px-1.5 text-danger line-through">
+                  {c.before || "—"}
+                </td>
+                <td className="py-1 pl-1.5 text-success font-semibold">
+                  {c.after || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {rejecting ? (
+        <div className="flex flex-col gap-2">
+          <textarea
+            className="ob-input"
+            rows={2}
+            value={note}
+            onChange={(ev) => setNote(ev.target.value)}
+            placeholder="Reason for rejecting (optional)…"
+          />
+          <div className="flex items-center justify-end gap-1.5">
+            <button
+              type="button"
+              className="btn btn-ghost h-8 px-3 text-xs"
+              onClick={() => setRejecting(false)}
+              disabled={pending}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn h-8 px-3 text-xs"
+              style={{
+                background: "var(--color-danger-bg)",
+                color: "var(--color-danger-text)",
+                border: "1px solid var(--color-danger-text)",
+              }}
+              onClick={() => decide("reject")}
+              disabled={pending}
+            >
+              {pending ? (
+                <Loader2 size={12} className="animate-spin" aria-hidden />
+              ) : (
+                <X size={12} aria-hidden />
+              )}
+              Confirm reject
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-end gap-1.5 pt-0.5">
+          <button
+            type="button"
+            className="btn btn-ghost h-8 px-3 text-xs"
+            onClick={() => setRejecting(true)}
+            disabled={pending}
+          >
+            <X size={12} aria-hidden /> Reject
+          </button>
+          <button
+            type="button"
+            className="btn-primary-cta h-8 px-3 text-xs"
+            onClick={() => decide("approve")}
+            disabled={pending}
+          >
+            {pending ? (
+              <Loader2 size={12} className="animate-spin" aria-hidden />
+            ) : (
+              <Check size={12} aria-hidden />
+            )}
+            Approve &amp; apply
+          </button>
+        </div>
+      )}
     </div>
   );
 }

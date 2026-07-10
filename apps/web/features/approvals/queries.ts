@@ -1,9 +1,16 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import {
+  ONBOARDING_EDIT_FIELD_LABELS,
+  type OnboardingEditField,
+  type OnboardingEditItem,
+} from "@/features/onboarding/edit-fields";
+
+export type { OnboardingEditItem };
 
 /**
- * Approvals queue — new campaigns and campaign edit requests awaiting sign-off.
- * Decisions are written to approval_logs, which also powers the history table
- * below and the global Audit Log.
+ * Approvals queue — new campaigns, campaign edit requests, and onboarding edits
+ * awaiting sign-off. Decisions are written to approval_logs, which also powers
+ * the history table below and the global Audit Log.
  */
 
 export type ApprovalKind = "campaign" | "edit";
@@ -47,6 +54,7 @@ export interface ApprovalHistoryItem {
 export interface ApprovalQueueData {
   items: ApprovalItem[];
   total: number;
+  onboardingEdits: OnboardingEditItem[];
   history: ApprovalHistoryItem[];
   historyTotal: number;
 }
@@ -77,7 +85,7 @@ const historyStatus = (action: string): ApprovalHistoryStatus => {
 export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
   const svc = createServiceClient() as any;
 
-  const [campaigns, edits, logs] = await Promise.all([
+  const [campaigns, edits, onboardingEditsRes, logs] = await Promise.all([
     svc
       .from("campaigns")
       .select(
@@ -92,6 +100,14 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
         "id, campaign_id, status, request_payload, requested_by_email, requested_by_name, notes, created_at",
       )
       .eq("request_type", "edit")
+      .eq("status", "Pending Approval")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    svc
+      .from("onboarding_edit_requests")
+      .select(
+        "id, collab_id, inf_id, requested_by, requested_by_name, reason, before, after, created_at",
+      )
       .eq("status", "Pending Approval")
       .order("created_at", { ascending: false })
       .limit(200),
@@ -161,6 +177,51 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
     return tb - ta;
   });
 
+  // Onboarding edits — build the before/after diff (changed fields only).
+  const onbRaw = (onboardingEditsRes?.data ?? []) as Raw[];
+  const editFields = Object.keys(
+    ONBOARDING_EDIT_FIELD_LABELS,
+  ) as OnboardingEditField[];
+  const onbInfIds = [
+    ...new Set(onbRaw.map((r) => asString(r.inf_id)).filter(Boolean)),
+  ] as string[];
+  const nameByInf = new Map<string, string>();
+  if (onbInfIds.length > 0) {
+    const { data: creators } = await svc
+      .from("creators")
+      .select("inf_id, inf_name")
+      .in("inf_id", onbInfIds)
+      .limit(2000);
+    for (const c of (creators ?? []) as Raw[]) {
+      const id = asString(c.inf_id);
+      const nm = asString(c.inf_name);
+      if (id && nm) nameByInf.set(id, nm);
+    }
+  }
+  const onboardingEdits: OnboardingEditItem[] = onbRaw.map((r) => {
+    const before = (r.before ?? {}) as Record<string, unknown>;
+    const after = (r.after ?? {}) as Record<string, unknown>;
+    const changes = editFields
+      .map((f) => ({
+        field: f,
+        label: ONBOARDING_EDIT_FIELD_LABELS[f],
+        before: String(before[f] ?? "").trim(),
+        after: String(after[f] ?? "").trim(),
+      }))
+      .filter((c) => c.before !== c.after);
+    const infId = asString(r.inf_id);
+    return {
+      id: asNumber(r.id) ?? 0,
+      collabId: String(r.collab_id ?? ""),
+      creator: (infId && nameByInf.get(infId)) || infId || null,
+      requestedBy:
+        asString(r.requested_by_name) ?? asString(r.requested_by),
+      reason: asString(r.reason),
+      createdAt: asString(r.created_at),
+      changes,
+    };
+  });
+
   const history: ApprovalHistoryItem[] = ((logs.data ?? []) as Raw[]).map(
     (r) => {
       const action = String(r.action ?? "Changed");
@@ -183,6 +244,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
   return {
     items,
     total: items.length,
+    onboardingEdits,
     history,
     historyTotal: history.length,
   };

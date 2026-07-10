@@ -16,6 +16,7 @@ import {
   Link as LinkIcon,
   List as ListIcon,
   Mail,
+  Pencil,
   PackageCheck,
   Send,
   X,
@@ -46,6 +47,7 @@ import {
 } from "./columns";
 import { OrderCreationModal } from "./order-form";
 import { CollabEmailModal, type CollabEmailDraft } from "./collab-email-modal";
+import { OnboardingEditModal } from "./onboarding-edit-modal";
 import type { OnboardingRow } from "./types";
 
 export interface OnboardingTableProps {
@@ -624,6 +626,7 @@ function OnboardingOverviewModal({
   onEmail: (postId: string) => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
@@ -849,6 +852,17 @@ function OnboardingOverviewModal({
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close
           </button>
+          {isOnboarded(row) && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setEditOpen(true)}
+              title="Edit this onboarding (held for admin approval)"
+            >
+              <Pencil size={14} aria-hidden />
+              Edit Onboarding
+            </button>
+          )}
           {canSendEmail && (
             <button
               type="button"
@@ -866,6 +880,12 @@ function OnboardingOverviewModal({
           )}
         </footer>
       </div>
+      {editOpen && (
+        <OnboardingEditModal
+          collabId={collabIdLabel(row)}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
     </div>,
     document.body,
   );

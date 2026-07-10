@@ -1,0 +1,291 @@
+"use server";
+
+import { after } from "next/server";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { assertPermission } from "@/lib/rbac.server";
+import { createServiceClient } from "@/lib/supabase/server";
+import {
+  NOTIFICATION_TYPES,
+  resolveGlobalAdminEmails,
+  sendNotification,
+  wrapNotificationHtml,
+} from "@/lib/notifications";
+import {
+  EDITABLE_FIELDS,
+  ONBOARDING_EDIT_FIELD_LABELS,
+  type OnboardingEditField,
+  type OnboardingEditForm,
+} from "./edit-fields";
+
+/**
+ * Onboarding edit → approval flow (actions).
+ *
+ * A team member can correct a submitted onboarding (e.g. a wrong order_id). The
+ * change is NOT applied directly — it is held as an `onboarding_edit_requests`
+ * row (status 'Pending Approval'), global admins are emailed, and it appears in
+ * /approvals with a before/after diff. While pending, posting for the whole
+ * collab is blocked (see features/posting/actions.ts). On approval the `after`
+ * snapshot is applied to every deliverable of the collab; on rejection it is
+ * discarded. Field constants + types live in ./edit-fields (client-safe).
+ */
+
+export async function getOnboardingEditForm(
+  collabId: string,
+): Promise<{ ok: true; form: OnboardingEditForm } | { ok: false; error: string }> {
+  await assertPermission("onboarding_write");
+  const cid = collabId.trim();
+  if (!cid) return { ok: false, error: "Collab ID missing" };
+
+  const supabase = createServiceClient();
+  const { data: rows, error } = await (supabase as any)
+    .from("posts")
+    .select(
+      "post_id, inf_id, username, campaign_id, order_id, collab_type, commercial_amount, garment_qty, ads_usage_rights, est_delivery, collab_id, collab_number",
+    )
+    .eq("collab_id", cid)
+    .order("post_id", { ascending: true });
+  if (error) return { ok: false, error: error.message };
+  const list = (rows ?? []) as Array<Record<string, any>>;
+  if (!list.length) return { ok: false, error: `Collab ${cid} not found` };
+  const rep = list[0];
+
+  const [{ data: creator }, { data: pendingReq }] = await Promise.all([
+    rep.inf_id
+      ? (supabase as any)
+          .from("creators")
+          .select("inf_name, username")
+          .eq("inf_id", rep.inf_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    (supabase as any)
+      .from("onboarding_edit_requests")
+      .select("id")
+      .eq("collab_id", cid)
+      .eq("status", "Pending Approval")
+      .maybeSingle(),
+  ]);
+
+  const total = list.reduce(
+    (s, r) => s + Number(r.commercial_amount ?? 0),
+    0,
+  );
+
+  return {
+    ok: true,
+    form: {
+      collabId: cid,
+      postId: String(rep.post_id ?? ""),
+      infId: rep.inf_id ?? null,
+      creatorName: creator?.inf_name ?? null,
+      username: rep.username ?? creator?.username ?? null,
+      campaignId: rep.campaign_id ?? null,
+      deliverables: list.length,
+      values: {
+        order_id: String(rep.order_id ?? ""),
+        collab_type: String(rep.collab_type ?? ""),
+        commercial_amount: String(total),
+        garment_qty: String(rep.garment_qty ?? ""),
+        ads_usage_rights: String(rep.ads_usage_rights ?? ""),
+        est_delivery: String(rep.est_delivery ?? "").slice(0, 10),
+      },
+      pending: Boolean(pendingReq),
+    },
+  };
+}
+
+export async function submitOnboardingEdit(input: {
+  collabId: string;
+  reason: string;
+  values: Partial<Record<OnboardingEditField, string>>;
+}): Promise<{ ok: boolean; error?: string }> {
+  const actor = await assertPermission("onboarding_write");
+  const cid = (input.collabId ?? "").trim();
+  if (!cid) return { ok: false, error: "Collab ID missing" };
+  const reason = (input.reason ?? "").trim();
+  if (reason.length < 5)
+    return { ok: false, error: "Add a short reason for the edit (min 5 chars)." };
+
+  const cur = await getOnboardingEditForm(cid);
+  if (!cur.ok) return { ok: false, error: cur.error };
+  if (cur.form.pending)
+    return {
+      ok: false,
+      error: "This collab already has an edit awaiting approval.",
+    };
+
+  const before = cur.form.values;
+  const afterVals: Record<string, string> = {};
+  const changed: OnboardingEditField[] = [];
+  for (const f of EDITABLE_FIELDS) {
+    const nv = String(input.values[f] ?? before[f] ?? "").trim();
+    afterVals[f] = nv;
+    if (nv !== String(before[f] ?? "").trim()) changed.push(f);
+  }
+  if (changed.length === 0) return { ok: false, error: "No changes to submit." };
+
+  const supabase = createServiceClient();
+  const { error } = await (supabase as any)
+    .from("onboarding_edit_requests")
+    .insert({
+      collab_id: cid,
+      post_id: cur.form.postId,
+      inf_id: cur.form.infId,
+      requested_by: actor.email ?? null,
+      requested_by_name: actor.name ?? actor.email ?? null,
+      reason,
+      before,
+      after: afterVals,
+      status: "Pending Approval",
+    });
+  if (error) {
+    const dup =
+      error.code === "23505" ||
+      String(error.message ?? "").includes("one_pending");
+    return {
+      ok: false,
+      error: dup
+        ? "This collab already has an edit awaiting approval."
+        : error.message,
+    };
+  }
+
+  revalidatePath("/approvals");
+  revalidatePath("/onboarding");
+
+  // Notify global admins (best-effort, after the response).
+  const summary = {
+    collabId: cid,
+    creator: cur.form.creatorName ?? cur.form.username ?? cur.form.infId ?? cid,
+    requester: actor.name ?? actor.email ?? "a team member",
+    reason,
+    changed: changed.map((f) => ({
+      label: ONBOARDING_EDIT_FIELD_LABELS[f],
+      before: before[f] || "—",
+      after: afterVals[f] || "—",
+    })),
+  };
+  after(async () => {
+    const admins = (await resolveGlobalAdminEmails()).filter(
+      (e) => e && e.includes("@"),
+    );
+    if (admins.length === 0) return;
+    const esc = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const rowsHtml = summary.changed
+      .map(
+        (c) =>
+          `<tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;font-weight:800;">${esc(c.label)}</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;color:#C0392B;">${esc(c.before)}</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;color:#4F7C4D;font-weight:700;">${esc(c.after)}</td></tr>`,
+      )
+      .join("");
+    const bodyHtml = `
+      <p style="margin:0 0 12px;">An onboarding edit needs your approval before it applies. Posting for this collab is blocked until you decide.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 12px;">
+        <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;font-weight:800;width:34%;">Collab ID</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;" colspan="2">${esc(summary.collabId)}</td></tr>
+        <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">Creator</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;" colspan="2">${esc(summary.creator)}</td></tr>
+        <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">Requested by</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;" colspan="2">${esc(summary.requester)}</td></tr>
+        <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">Reason</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;" colspan="2">${esc(summary.reason)}</td></tr>
+      </table>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr><td style="padding:6px 10px;background:#2C2420;color:#F0C61E;border:1px solid #2C2420;font-weight:800;">Field</td><td style="padding:6px 10px;background:#2C2420;color:#FFFCF8;border:1px solid #2C2420;border-left:0;font-weight:800;">Before</td><td style="padding:6px 10px;background:#2C2420;color:#FFFCF8;border:1px solid #2C2420;border-left:0;font-weight:800;">After</td></tr>
+        ${rowsHtml}
+      </table>
+      <p style="margin:14px 0 0;font-size:12px;color:#9A9384;">Approve or reject this in the Approvals page.</p>`;
+    await sendNotification({
+      type: NOTIFICATION_TYPES.CAMPAIGN_CREATED,
+      to: admins,
+      subject: `Onboarding edit needs approval — ${summary.collabId}`,
+      title: "Onboarding Edit — Approval Needed",
+      subtitle: `Collab ID: ${summary.collabId}`,
+      htmlBody: wrapNotificationHtml({
+        title: "Onboarding Edit — Approval Needed",
+        subtitle: `Collab ID: ${summary.collabId}`,
+        bodyHtml,
+      }),
+      wrap: false,
+      collabId: summary.collabId,
+    });
+  });
+
+  return { ok: true };
+}
+
+async function applyOnboardingEdit(
+  supabase: any,
+  req: Record<string, any>,
+): Promise<void> {
+  const cid = String(req.collab_id);
+  const after = (req.after ?? {}) as Record<string, string>;
+
+  const { data: sibs } = await supabase
+    .from("posts")
+    .select("post_id")
+    .eq("collab_id", cid);
+  const count = ((sibs ?? []) as unknown[]).length || 1;
+  const total = Number(after.commercial_amount ?? 0);
+  const split = count > 0 ? total / count : total;
+
+  const patch: Record<string, unknown> = {
+    order_id: after.order_id || null,
+    collab_type: after.collab_type || null,
+    garment_qty: after.garment_qty || null,
+    ads_usage_rights: after.ads_usage_rights || null,
+    est_delivery: after.est_delivery || null,
+    commercial_amount: split,
+  };
+  // If the order changed, re-resolve the creator email from the new order.
+  if (after.order_id) {
+    const { data: ord } = await supabase
+      .from("shopify_orders")
+      .select("email")
+      .eq("order_id", after.order_id)
+      .maybeSingle();
+    if (ord?.email) patch.email = ord.email;
+  }
+  await supabase.from("posts").update(patch).eq("collab_id", cid);
+}
+
+export async function decideOnboardingEdit(
+  id: number,
+  decision: "approve" | "reject",
+  note?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const actor = await assertPermission("admin");
+  const supabase = createServiceClient();
+  const { data: req, error } = await (supabase as any)
+    .from("onboarding_edit_requests")
+    .select("*")
+    .eq("id", id)
+    .eq("status", "Pending Approval")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!req)
+    return { ok: false, error: "Request not found or already decided." };
+
+  if (decision === "approve") {
+    await applyOnboardingEdit(supabase, req);
+  }
+
+  await (supabase as any)
+    .from("onboarding_edit_requests")
+    .update({
+      status: decision === "approve" ? "Approved" : "Rejected",
+      decided_by: actor.email ?? null,
+      decided_by_name: actor.name ?? actor.email ?? null,
+      decided_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  await (supabase as any).from("approval_logs").insert({
+    action_type: "onboarding_edit",
+    action: decision === "approve" ? "Approved" : "Rejected",
+    entity_id: String(req.collab_id),
+    admin_email: actor.email ?? null,
+    admin_name: actor.name ?? actor.email ?? null,
+    notes: note?.trim() || req.reason || null,
+  });
+
+  revalidatePath("/approvals");
+  revalidatePath("/onboarding");
+  revalidateTag("posts");
+  return { ok: true };
+}
