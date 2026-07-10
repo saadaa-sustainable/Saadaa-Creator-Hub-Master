@@ -79,17 +79,30 @@ const PRESETS: Preset[] = [
  * popover with presets + a two-month calendar + Apply / Cancel. Emits
  * `{from, to}` ISO strings ("" = open-ended). Used for order/reach-out ranges.
  */
+export interface DateRangeMode {
+  value: string;
+  label: string;
+}
+
 export function DateRangePicker({
   value,
   onChange,
   label = "Order Date",
   today = iso(new Date()),
+  modes,
+  mode,
+  onModeChange,
 }: {
   value: DateRange;
   onChange: (v: DateRange) => void;
   label?: string;
   /** Injectable "today" (ISO) so callers control the clock. */
   today?: string;
+  /** Optional date-basis toggle rendered inside the popover (e.g. Reach Out /
+   *  Onboarded / Posted) for views with multiple from/to pairs. */
+  modes?: DateRangeMode[];
+  mode?: string;
+  onModeChange?: (mode: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange>(value);
@@ -157,14 +170,21 @@ export function DateRangePicker({
     };
   }, [open]);
 
-  const summary =
+  const activeModeLabel =
+    modes && mode ? modes.find((m) => m.value === mode)?.label : null;
+  const rangeText =
     value.from && value.to
       ? `${pretty(value.from)} → ${pretty(value.to)}`
       : value.from
         ? `From ${pretty(value.from)}`
         : value.to
           ? `Until ${pretty(value.to)}`
-          : "All dates";
+          : "";
+  const summary = rangeText
+    ? activeModeLabel
+      ? `${activeModeLabel}: ${rangeText}`
+      : rangeText
+    : "All dates";
 
   const onDayClick = (d: Date) => {
     const day = iso(d);
@@ -222,6 +242,31 @@ export function DateRangePicker({
             role="dialog"
             aria-label={`${label} range`}
           >
+          {modes && modes.length > 1 && (
+            <div
+              className="mb-2 inline-flex rounded-full border border-border bg-bg-muted/50 p-0.5"
+              role="tablist"
+              aria-label="Date basis"
+            >
+              {modes.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === m.value}
+                  onClick={() => onModeChange?.(m.value)}
+                  className={cn(
+                    "px-2.5 py-1 rounded-full text-[0.66rem] font-extrabold transition-colors",
+                    mode === m.value
+                      ? "bg-[#F0C61E] text-[#161513]"
+                      : "text-text-secondary hover:bg-bg-muted",
+                  )}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Presets */}
             <div className="flex sm:flex-col gap-1 flex-wrap sm:w-32 shrink-0">

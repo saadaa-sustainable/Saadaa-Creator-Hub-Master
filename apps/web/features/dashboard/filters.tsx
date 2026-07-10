@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DashboardFilterOptions, DashboardFilters } from "./types";
 
 const FILTER_KEYS = [
@@ -72,22 +73,23 @@ export function DashboardFiltersBar({
         </label>
 
         <label className="onboarding-filter-field">
-          <span>Date from</span>
-          <input
-            type="date"
-            value={initial.dateFrom ?? ""}
-            onChange={(e) => setParam("dateFrom", e.target.value || undefined)}
-            className="onboarding-filter-select"
-          />
-        </label>
-
-        <label className="onboarding-filter-field">
-          <span>Date to</span>
-          <input
-            type="date"
-            value={initial.dateTo ?? ""}
-            onChange={(e) => setParam("dateTo", e.target.value || undefined)}
-            className="onboarding-filter-select"
+          <span>Date range</span>
+          <DateRangePicker
+            label="Date range"
+            value={{ from: initial.dateFrom ?? "", to: initial.dateTo ?? "" }}
+            onChange={(r) => {
+              // Atomic two-key update — sequential setParam calls would race.
+              const next = new URLSearchParams(params.toString());
+              if (r.from) next.set("dateFrom", r.from);
+              else next.delete("dateFrom");
+              if (r.to) next.set("dateTo", r.to);
+              else next.delete("dateTo");
+              startTransition(() =>
+                router.replace(`?${next.toString()}` as never, {
+                  scroll: false,
+                }),
+              );
+            }}
           />
         </label>
 

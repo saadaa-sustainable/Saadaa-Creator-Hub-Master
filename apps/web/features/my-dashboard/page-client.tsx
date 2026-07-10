@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type {
   MyDashboardFilterOptions,
   MyDashboardKpi,
@@ -25,27 +26,6 @@ function inRange(d: string | null, from: string, to: string): boolean {
   return true;
 }
 
-function FilterDate({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="onboarding-filter-field">
-      <span>{label}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="onboarding-filter-select"
-      />
-    </label>
-  );
-}
 
 export interface MyDashboardBodyProps {
   kpi: MyDashboardKpi;
@@ -71,12 +51,10 @@ export function MyDashboardBody({
     campaign: "",
     status: "",
     tier: "",
-    reachFrom: "",
-    reachTo: "",
-    onboardFrom: "",
-    onboardTo: "",
-    postFrom: "",
-    postTo: "",
+    // One date range applied to the selected basis (reach / onboard / post).
+    dateMode: "reach",
+    dateFrom: "",
+    dateTo: "",
   });
 
   const filteredPosts = useMemo(() => {
@@ -96,13 +74,13 @@ export function MyDashboardBody({
       if (filters.tier && post.creator?.category !== filters.tier) {
         return false;
       }
-      if (!inRange(post.reach_out_date, filters.reachFrom, filters.reachTo)) {
-        return false;
-      }
-      if (!inRange(post.onboard_date, filters.onboardFrom, filters.onboardTo)) {
-        return false;
-      }
-      if (!inRange(post.post_date, filters.postFrom, filters.postTo)) {
+      const dateValue =
+        filters.dateMode === "onboard"
+          ? post.onboard_date
+          : filters.dateMode === "post"
+            ? post.post_date
+            : post.reach_out_date;
+      if (!inRange(dateValue, filters.dateFrom, filters.dateTo)) {
         return false;
       }
       return true;
@@ -115,12 +93,9 @@ export function MyDashboardBody({
       campaign: "",
       status: "",
       tier: "",
-      reachFrom: "",
-      reachTo: "",
-      onboardFrom: "",
-      onboardTo: "",
-      postFrom: "",
-      postTo: "",
+      dateMode: "reach",
+      dateFrom: "",
+      dateTo: "",
     });
 
   return (
@@ -202,38 +177,36 @@ export function MyDashboardBody({
                 searchPlaceholder="Search tiers…"
               />
             </label>
-            <FilterDate
-              label="Reached From"
-              value={filters.reachFrom}
-              onChange={(v) => setFilters((prev) => ({ ...prev, reachFrom: v }))}
-            />
-            <FilterDate
-              label="Reached To"
-              value={filters.reachTo}
-              onChange={(v) => setFilters((prev) => ({ ...prev, reachTo: v }))}
-            />
-            <FilterDate
-              label="Onboarded From"
-              value={filters.onboardFrom}
-              onChange={(v) => setFilters((prev) => ({ ...prev, onboardFrom: v }))}
-            />
-            <FilterDate
-              label="Onboarded To"
-              value={filters.onboardTo}
-              onChange={(v) => setFilters((prev) => ({ ...prev, onboardTo: v }))}
-            />
-            <FilterDate
-              label="Posted From"
-              value={filters.postFrom}
-              onChange={(v) => setFilters((prev) => ({ ...prev, postFrom: v }))}
-            />
-            <FilterDate
-              label="Posted To"
-              value={filters.postTo}
-              onChange={(v) => setFilters((prev) => ({ ...prev, postTo: v }))}
-            />
+            <label className="onboarding-filter-field">
+              <span>Date range</span>
+              <DateRangePicker
+                label="Date range"
+                value={{ from: filters.dateFrom, to: filters.dateTo }}
+                onChange={(r) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    dateFrom: r.from,
+                    dateTo: r.to,
+                  }))
+                }
+                modes={[
+                  { value: "reach", label: "Reached" },
+                  { value: "onboard", label: "Onboarded" },
+                  { value: "post", label: "Posted" },
+                ]}
+                mode={filters.dateMode}
+                onModeChange={(m) =>
+                  setFilters((prev) => ({ ...prev, dateMode: m }))
+                }
+              />
+            </label>
           </div>
-          {Object.values(filters).some(Boolean) && (
+          {(filters.q ||
+            filters.campaign ||
+            filters.status ||
+            filters.tier ||
+            filters.dateFrom ||
+            filters.dateTo) && (
             <div className="flex justify-end mt-3">
               <button
                 type="button"

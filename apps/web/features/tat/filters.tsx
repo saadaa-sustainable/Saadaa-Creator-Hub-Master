@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Calendar, Filter, Layers, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { TatFilterOptions, TatFilters } from "./types";
 
 const FILTER_KEYS = [
@@ -107,29 +108,27 @@ export function TatFiltersBar({
 
         <label className="onboarding-filter-field">
           <span>
-            <Calendar size={10} aria-hidden /> Reach Out From
+            <Calendar size={10} aria-hidden /> Reach Out date
           </span>
-          <input
-            type="date"
-            value={initial.reachOutFrom ?? ""}
-            onChange={(e) =>
-              setParam("reachOutFrom", e.target.value || undefined)
-            }
-            className="onboarding-filter-select"
-          />
-        </label>
-
-        <label className="onboarding-filter-field">
-          <span>
-            <Calendar size={10} aria-hidden /> Reach Out To
-          </span>
-          <input
-            type="date"
-            value={initial.reachOutTo ?? ""}
-            onChange={(e) =>
-              setParam("reachOutTo", e.target.value || undefined)
-            }
-            className="onboarding-filter-select"
+          <DateRangePicker
+            label="Reach Out date"
+            value={{
+              from: initial.reachOutFrom ?? "",
+              to: initial.reachOutTo ?? "",
+            }}
+            onChange={(r) => {
+              // Atomic two-key update — sequential setParam calls would race.
+              const next = new URLSearchParams(params.toString());
+              if (r.from) next.set("reachOutFrom", r.from);
+              else next.delete("reachOutFrom");
+              if (r.to) next.set("reachOutTo", r.to);
+              else next.delete("reachOutTo");
+              startTransition(() =>
+                router.replace(`?${next.toString()}` as never, {
+                  scroll: false,
+                }),
+              );
+            }}
           />
         </label>
 
