@@ -48,9 +48,6 @@ export function OnboardingEditModal({
     commercial_amount: "",
     ads_usage_rights: "",
     est_delivery: "",
-    reels: "0",
-    static_posts: "0",
-    stories: "0",
     bank_name: "",
     bank_number: "",
     ifsc: "",
@@ -259,30 +256,6 @@ export function OnboardingEditModal({
                         </option>
                       ))}
                     </select>
-                  </Field>
-                  <Field label="Reels">
-                    <input
-                      className="ob-input"
-                      inputMode="numeric"
-                      value={values.reels}
-                      onChange={(e) => set("reels", e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Static Posts">
-                    <input
-                      className="ob-input"
-                      inputMode="numeric"
-                      value={values.static_posts}
-                      onChange={(e) => set("static_posts", e.target.value)}
-                    />
-                  </Field>
-                  <Field label="Stories">
-                    <input
-                      className="ob-input"
-                      inputMode="numeric"
-                      value={values.stories}
-                      onChange={(e) => set("stories", e.target.value)}
-                    />
                   </Field>
                 </div>
               </section>

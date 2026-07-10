@@ -40,7 +40,7 @@ export async function getOnboardingEditForm(
   const { data: rows, error } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, inf_id, username, campaign_id, order_id, collab_type, commercial_amount, ads_usage_rights, est_delivery, reels, static_posts, stories, bank_name, bank_number, ifsc, collab_id, collab_number",
+      "post_id, inf_id, username, campaign_id, order_id, collab_type, commercial_amount, ads_usage_rights, est_delivery, bank_name, bank_number, ifsc, collab_id, collab_number",
     )
     .eq("collab_id", cid)
     .order("post_id", { ascending: true });
@@ -86,9 +86,6 @@ export async function getOnboardingEditForm(
         commercial_amount: String(total),
         ads_usage_rights: String(rep.ads_usage_rights ?? ""),
         est_delivery: String(rep.est_delivery ?? "").slice(0, 10),
-        reels: String(rep.reels ?? 0),
-        static_posts: String(rep.static_posts ?? 0),
-        stories: String(rep.stories ?? 0),
         bank_name: String(rep.bank_name ?? ""),
         bank_number: String(rep.bank_number ?? ""),
         ifsc: String(rep.ifsc ?? ""),
@@ -277,11 +274,6 @@ async function applyOnboardingEdit(
   const count = sibList.length || 1;
   const total = Number(after.commercial_amount ?? 0);
   const split = count > 0 ? total / count : total;
-  const repPostId =
-    sibList
-      .map((s) => String(s.post_id ?? ""))
-      .filter(Boolean)
-      .sort()[0] ?? null;
 
   // Collab-level fields — applied to EVERY deliverable of the collab.
   const patch: Record<string, unknown> = {
@@ -315,19 +307,6 @@ async function applyOnboardingEdit(
   }
 
   await supabase.from("posts").update(patch).eq("collab_id", cid);
-
-  // Deliverable counts are metadata (not restructured): apply to the collab
-  // representative only, never re-spawn/delete child deliverable rows.
-  if (repPostId) {
-    await supabase
-      .from("posts")
-      .update({
-        reels: Number(after.reels ?? 0) || 0,
-        static_posts: Number(after.static_posts ?? 0) || 0,
-        stories: Number(after.stories ?? 0) || 0,
-      })
-      .eq("post_id", repPostId);
-  }
 }
 
 /** Light state/city extraction from a Shopify India address tail "…, City, State, Pincode, Country". */
