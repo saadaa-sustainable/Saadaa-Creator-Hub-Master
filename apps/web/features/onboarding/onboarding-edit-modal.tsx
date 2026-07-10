@@ -362,7 +362,13 @@ export function OnboardingEditModal({
 
         <footer
           className="modal-foot"
-          style={{ bottom: 0, marginBottom: 0, paddingBottom: "0.95rem" }}
+          style={{
+            position: "static",
+            margin: 0,
+            padding: "0.9rem 1.15rem 1.15rem",
+            borderRadius: "0 0 16px 16px",
+            backdropFilter: "none",
+          }}
         >
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
