@@ -18,13 +18,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
-import { extractShortcode } from "@/lib/instagram-shortcode";
+import { extractShortcode, postDateFromUrl } from "@/lib/instagram-shortcode";
 import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { fetchTeamRows, type TeamRow } from "./actions";
-import {
-  historicBacklogOnboard,
-  historicBacklogPosting,
-} from "./backlog-actions";
+import { historicBacklogPosting } from "./backlog-actions";
 
 // ── stage bucketing (mirrors the dashboard column logic) ───────────────────
 type Stage = "reach" | "onboard" | "posted" | "delivered" | "closed";
@@ -242,10 +239,11 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 }
 
 /**
- * Backlog filling on a historic row: complete the missing order (Onboard) or
- * the missing post link (Posting) straight from the drawer. Order fill pulls
- * every order detail from the synced Shopify order; posting fill auto-derives
- * the post date from the IG shortcode and auto-sends the partnership invite.
+ * Backlog filling on a historic row — POSTING ONLY, for rows that are already
+ * onboarded (order present) but missing a real post link. Paste the URL: the
+ * post date auto-derives from the IG shortcode (live preview below the input)
+ * and the creator's partnership invite is auto-sent. Optional download link +
+ * raw dump match the live Posting form. No onboard/order flow here.
  */
 function BacklogFillSection({
   row,
@@ -254,98 +252,50 @@ function BacklogFillSection({
   row: FlaggedRow;
   onUpdated?: () => void;
 }) {
-  const needsOrder = !hasOrder(row);
   const needsPost = hasOrder(row) && !contentLinkOk(row.post_link);
-  const [orderId, setOrderId] = useState(row.order_id ?? "");
-  const [collabType, setCollabType] = useState(row.collab_type ?? "");
   const [postLink, setPostLink] = useState("");
-  const [saving, setSaving] = useState<"order" | "post" | null>(null);
-  const [done, setDone] = useState<"order" | "post" | null>(null);
+  const [downloadLink, setDownloadLink] = useState("");
+  const [rawDump, setRawDump] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  // Live post-date preview — decoded from the pasted link's shortcode, exactly
+  // what the save will write (falls back to today when not decodable).
+  const derivedDate = postLink.trim() ? postDateFromUrl(postLink) : null;
 
-  if (!needsOrder && !needsPost) return null;
+  if (!needsPost) return null;
   if (done) {
     return (
       <div className="rounded-xl border border-success-text/30 bg-success-bg px-3 py-2 text-[0.7rem] text-success-text font-bold">
-        {done === "order"
-          ? "Order details filled — the row is onboarded."
-          : "Post saved — date auto-set, partnership invite sent."}
+        Post saved — date auto-set, partnership invite sent.
       </div>
     );
   }
 
-  const saveOrder = () => {
-    if (row.id == null) return;
-    setSaving("order");
-    historicBacklogOnboard({
-      id: row.id,
-      orderId,
-      collabType: collabType || undefined,
-    }).then((res) => {
-      setSaving(null);
-      if (!res.ok) {
-        toast.error(res.error ?? "Could not fill the order");
-        return;
-      }
-      toast.success(
-        `Order ${res.applied?.order_id} filled — email/tracking/products updated.`,
-      );
-      setDone("order");
-      onUpdated?.();
-    });
-  };
-
   const savePost = () => {
     if (row.id == null) return;
-    setSaving("post");
-    historicBacklogPosting({ id: row.id, postLink }).then((res) => {
-      setSaving(null);
-      if (!res.ok) {
-        toast.error(res.error ?? "Could not save the post");
-        return;
-      }
-      toast.success(
-        `Posted — date ${res.postDate}${res.dateSource === "shortcode" ? " (from the post link)" : ""}. Partnership invite sent.`,
-      );
-      setDone("post");
-      onUpdated?.();
-    });
+    setSaving(true);
+    historicBacklogPosting({ id: row.id, postLink, downloadLink, rawDump }).then(
+      (res) => {
+        setSaving(false);
+        if (!res.ok) {
+          toast.error(res.error ?? "Could not save the post");
+          return;
+        }
+        toast.success(
+          `Posted — date ${res.postDate}${res.dateSource === "shortcode" ? " (from the post link)" : ""}. Partnership invite sent.`,
+        );
+        setDone(true);
+        onUpdated?.();
+      },
+    );
   };
 
   return (
     <div className="rounded-xl border border-border bg-bg-surface px-3 py-2.5 flex flex-col gap-2">
       <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary">
-        Fill backlog data
+        Fill posting backlog
       </span>
-      {needsOrder ? (
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            className="onboarding-filter-select flex-1"
-            placeholder="Shopify order id…"
-            value={orderId}
-            onChange={(e) => setOrderId(e.target.value)}
-          />
-          <select
-            className="onboarding-filter-select sm:w-40"
-            value={collabType}
-            onChange={(e) => setCollabType(e.target.value)}
-          >
-            <option value="">Collab type…</option>
-            <option value="Barter">Barter</option>
-            <option value="Barter + Paid">Barter + Paid</option>
-          </select>
-          <button
-            type="button"
-            className="acc-export-bar__btn acc-export-bar__btn--primary shrink-0"
-            onClick={saveOrder}
-            disabled={saving === "order" || !orderId.trim()}
-          >
-            {saving === "order" ? (
-              <Loader2 size={12} className="animate-spin" aria-hidden />
-            ) : null}
-            Fill order
-          </button>
-        </div>
-      ) : (
+      <div className="flex flex-col gap-2">
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             className="onboarding-filter-select flex-1"
@@ -357,19 +307,44 @@ function BacklogFillSection({
             type="button"
             className="acc-export-bar__btn acc-export-bar__btn--primary shrink-0"
             onClick={savePost}
-            disabled={saving === "post" || !postLink.trim()}
+            disabled={saving || !postLink.trim()}
           >
-            {saving === "post" ? (
+            {saving ? (
               <Loader2 size={12} className="animate-spin" aria-hidden />
             ) : null}
             Save post
           </button>
         </div>
-      )}
+        {postLink.trim() && (
+          <span
+            className={cn(
+              "text-[0.64rem] font-bold",
+              derivedDate ? "text-success-text" : "text-warning-text",
+            )}
+          >
+            Post date:{" "}
+            {derivedDate
+              ? `${derivedDate} (from the link)`
+              : "not decodable — today's date will be used"}
+          </span>
+        )}
+        <input
+          className="onboarding-filter-select"
+          placeholder="Download link (optional)…"
+          value={downloadLink}
+          onChange={(e) => setDownloadLink(e.target.value)}
+        />
+        <textarea
+          className="onboarding-filter-select"
+          style={{ minHeight: "3.2rem", height: "auto", paddingTop: 8 }}
+          placeholder="Raw dump (optional)…"
+          value={rawDump}
+          onChange={(e) => setRawDump(e.target.value)}
+        />
+      </div>
       <span className="text-[0.6rem] text-text-tertiary">
-        {needsOrder
-          ? "Order details (email, tracking, products, status) auto-fetch from the synced Shopify order. No email is sent."
-          : "Post date auto-derives from the link; the creator's partnership invite is auto-sent."}
+        Post date auto-derives from the link; the creator&apos;s partnership
+        invite is auto-sent.
       </span>
     </div>
   );

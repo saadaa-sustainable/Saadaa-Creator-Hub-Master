@@ -9,15 +9,13 @@ import { isContentLink } from "@/lib/workflow";
 import { syncCreatorPartnership } from "@/lib/partnership-sync";
 
 /**
- * Historic backlog filling — the team completes missing data on `historic_posts`
- * rows straight from the Historic Analytics row drawer:
- *
- *  - Onboard: enter the Shopify order id → order details auto-fetched and
- *    written onto the row (email / tracking / products / status), plus any
- *    missing collab_type. NO collab-email flow (deliberately).
- *  - Posting: paste the post URL → the post date is auto-derived from the IG
- *    shortcode (same as the live Posting form) and the creator's Meta
- *    partnership invite is auto-sent (best-effort).
+ * Historic backlog filling — POSTING ONLY (per product decision 2026-07-10):
+ * for historic rows that are already onboarded (order present) but missing a
+ * real post link, the team pastes the post URL straight from the Historic
+ * Analytics row drawer. The post date auto-derives from the IG shortcode (same
+ * rule as the live Posting form), optional download link + raw dump are stored,
+ * and the creator's Meta partnership invite is auto-sent (best-effort). There
+ * is deliberately NO onboard/order fill flow here.
  *
  * Funnel + Internal (historic source) read historic_posts on render, so counts
  * reflect the fill on the next refresh.
@@ -25,94 +23,6 @@ import { syncCreatorPartnership } from "@/lib/partnership-sync";
 
 function todayIsoInIndia(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-}
-
-export interface BacklogOrderResult {
-  ok: boolean;
-  error?: string;
-  /** What was written (for the toast). */
-  applied?: {
-    order_id: string;
-    email: string | null;
-    tracking_id: string | null;
-    order_status: string | null;
-    garments_sent: string | null;
-  };
-}
-
-/** Fill order data on a historic row from a Shopify order id (backlog onboard). */
-export async function historicBacklogOnboard(input: {
-  id: number;
-  orderId: string;
-  collabType?: string;
-}): Promise<BacklogOrderResult> {
-  await assertPermission("onboarding_write");
-  const id = Number(input.id);
-  const orderId = (input.orderId ?? "").trim();
-  if (!Number.isFinite(id) || id <= 0)
-    return { ok: false, error: "Row id missing" };
-  if (!orderId) return { ok: false, error: "Enter the Shopify order id" };
-
-  const supabase = createServiceClient();
-  const [{ data: row, error: rowErr }, { data: order, error: ordErr }] =
-    await Promise.all([
-      (supabase as any)
-        .from("historic_posts")
-        .select("id, workflow_status, onboard_date, collab_type")
-        .eq("id", id)
-        .maybeSingle(),
-      (supabase as any)
-        .from("shopify_orders")
-        .select(
-          "order_id, email, tracking_id, tracking_status, fulfillment, garments_sent, address",
-        )
-        .eq("order_id", orderId)
-        .maybeSingle(),
-    ]);
-  if (rowErr) return { ok: false, error: rowErr.message };
-  if (!row) return { ok: false, error: "Historic row not found" };
-  if (ordErr) return { ok: false, error: ordErr.message };
-  if (!order)
-    return {
-      ok: false,
-      error: `Order ${orderId} not found in synced Shopify orders.`,
-    };
-
-  const status =
-    (order.tracking_status as string | null) ??
-    (order.fulfillment as string | null) ??
-    null;
-  const patch: Record<string, unknown> = {
-    order_id: orderId,
-    email: order.email ?? null,
-    tracking_id: order.tracking_id ?? null,
-    order_status: status,
-    garments_sent: order.garments_sent ?? null,
-  };
-  if (input.collabType?.trim()) patch.collab_type = input.collabType.trim();
-  if (!row.onboard_date) patch.onboard_date = todayIsoInIndia();
-  // Reached-out row gains its order → it is onboarded now. Never downgrade a
-  // row that already progressed (Posted stays Posted).
-  const wf = String(row.workflow_status ?? "").trim().toLowerCase();
-  if (!wf || wf === "reach out") patch.workflow_status = "On Board";
-
-  const { error: updErr } = await (supabase as any)
-    .from("historic_posts")
-    .update(patch)
-    .eq("id", id);
-  if (updErr) return { ok: false, error: updErr.message };
-
-  revalidatePath("/historic-analytics");
-  return {
-    ok: true,
-    applied: {
-      order_id: orderId,
-      email: (order.email as string | null) ?? null,
-      tracking_id: (order.tracking_id as string | null) ?? null,
-      order_status: status,
-      garments_sent: (order.garments_sent as string | null) ?? null,
-    },
-  };
 }
 
 export interface BacklogPostingResult {
@@ -126,6 +36,8 @@ export interface BacklogPostingResult {
 export async function historicBacklogPosting(input: {
   id: number;
   postLink: string;
+  downloadLink?: string;
+  rawDump?: string;
 }): Promise<BacklogPostingResult> {
   await assertPermission("posting_submit");
   const id = Number(input.id);
@@ -152,13 +64,19 @@ export async function historicBacklogPosting(input: {
   if (rowErr) return { ok: false, error: rowErr.message };
   if (!row) return { ok: false, error: "Historic row not found" };
 
+  const patch: Record<string, unknown> = {
+    post_link: postLink,
+    post_date: postDate,
+    workflow_status: "Posted",
+  };
+  const downloadLink = (input.downloadLink ?? "").trim();
+  const rawDump = (input.rawDump ?? "").trim();
+  if (downloadLink) patch.download_link = downloadLink;
+  if (rawDump) patch.raw_dump = rawDump;
+
   const { error: updErr } = await (supabase as any)
     .from("historic_posts")
-    .update({
-      post_link: postLink,
-      post_date: postDate,
-      workflow_status: "Posted",
-    })
+    .update(patch)
     .eq("id", id);
   if (updErr) return { ok: false, error: updErr.message };
 
