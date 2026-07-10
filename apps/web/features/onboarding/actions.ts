@@ -841,6 +841,7 @@ export type CollabEmailPreviewResult =
       collabType: string;
       adsUsageRights: string;
       campaignId: string | null;
+      campaignName: string | null;
       attachments: CollabEmailAttachment[];
     }
   | { ok: false; error: string };
@@ -920,7 +921,7 @@ export async function getCollabEmailPreview(
     campaignId
       ? (supabase as any)
           .from("campaigns")
-          .select("brief_link, internal_brief_link")
+          .select("brief_link, internal_brief_link, campaign_name")
           .eq("campaign_id", campaignId)
           .maybeSingle()
           .then(
@@ -1045,12 +1046,14 @@ export async function getCollabEmailPreview(
     collabType,
     adsUsageRights: (post.ads_usage_rights as string | null) ?? "",
     campaignId,
+    campaignName: (campaignRaw?.campaign_name as string | null) ?? null,
     attachments,
   };
 }
 
 function buildCollabEmailHtml(opts: {
   collabId: string;
+  campaignName: string | null;
   creatorName: string;
   agreedAmount: string;
   barterAmount: string;
@@ -1066,12 +1069,24 @@ function buildCollabEmailHtml(opts: {
       .replace(/"/g, "&quot;");
 
   const collabId = escHtml(opts.collabId);
+  const campaignName = escHtml((opts.campaignName ?? "").trim());
   const creatorName = escHtml(opts.creatorName || "creator");
   const agreedAmount = escHtml(opts.agreedAmount);
   const barterAmount = escHtml(opts.barterAmount);
   const adsUsageRights = escHtml(opts.adsUsageRights);
   const collabType = opts.collabType;
+  // Pure Barter = no cash paid, so hide the ₹ amount AND the whole Payment Terms
+  // section (we only send product). Barter + Paid keeps both.
   const isPureBarter = collabType.toLowerCase() === "barter";
+  const showPayment = !isPureBarter;
+  const campaignLine = campaignName
+    ? `<p style="color:rgba(255,255,255,0.66);margin:3px 0 0;font-size:0.72rem;letter-spacing:0.4px;text-transform:uppercase;">Campaign Name: <strong style="color:#FFFCF8;">${campaignName}</strong></p>`
+    : "";
+  const paymentTermsSection = showPayment
+    ? `<h3 style="${"color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:22px 0 10px;"}">Payment Terms</h3>
+<ul style="${"padding-left:20px;margin:0 0 8px;color:#161513;"}"><li>Payment will be processed once all agreed deliverables are live and the required ad partnership is active.</li><li>Payments are processed as per our standard payment cycle, one month after the content goes live, on the next applicable payment date, either the <strong>15th or the 30th</strong>.</li><li>To process the payment, please reply to this email with your generated invoice/bill for the agreed amount, clearly mentioning <strong>Collab ID: ${collabId}</strong>.</li></ul>`
+    : "";
+  const paymentTermsWord = showPayment ? " payment terms," : "";
   const deliverableLines = opts.deliverables
     .map((d) => `<li>${escHtml(d)}</li>`)
     .join("");
@@ -1092,11 +1107,11 @@ function buildCollabEmailHtml(opts: {
 
   return `<div style="font-family:Arial,sans-serif;color:#161513;max-width:600px;margin:0 auto;line-height:1.65;background:#FAF8F5;">
 <div style="background:#2C2420;padding:24px 28px;border-radius:12px 12px 0 0;">
-<table width="100%" cellpadding="0" cellspacing="0"><tr><td><h2 style="color:#F0C61E;margin:0;font-size:1.18rem;letter-spacing:0.2px;">Collaboration Confirmation</h2><p style="color:rgba(255,255,255,0.66);margin:5px 0 0;font-size:0.78rem;letter-spacing:0.5px;text-transform:uppercase;">Collab ID: <strong style="color:#FFFCF8;">${collabId}</strong></p></td><td align="right" style="vertical-align:middle;"><span style="background:#F0C61E;color:#2C2420;font-size:0.7rem;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;">Saadaa</span></td></tr></table>
+<table width="100%" cellpadding="0" cellspacing="0"><tr><td><h2 style="color:#F0C61E;margin:0;font-size:1.18rem;letter-spacing:0.2px;">Collaboration Confirmation</h2><p style="color:rgba(255,255,255,0.66);margin:5px 0 0;font-size:0.78rem;letter-spacing:0.5px;text-transform:uppercase;">Collab ID: <strong style="color:#FFFCF8;">${collabId}</strong></p>${campaignLine}</td><td align="right" style="vertical-align:middle;"><span style="background:#F0C61E;color:#2C2420;font-size:0.7rem;font-weight:800;padding:4px 10px;border-radius:20px;letter-spacing:0.5px;text-transform:uppercase;">Saadaa</span></td></tr></table>
 </div>
 <div style="background:#FAF8F5;padding:26px 28px;border:1px solid #E7E2D2;border-top:none;border-radius:0 0 12px 12px;">
 <p style="margin:0 0 10px;">Hi <strong>${creatorName}</strong>,</p>
-<p style="margin:0 0 16px;">We're excited to move forward with this collaboration. Please find the confirmed collaboration details, timelines, payment terms, and content guidelines below.</p>
+<p style="margin:0 0 16px;">We're excited to move forward with this collaboration. Please find the confirmed collaboration details, timelines,${paymentTermsWord} and content guidelines below.</p>
 <p style="margin:0 0 8px;"><span style="display:inline-block;background:#F0EAD6;color:#2C2420;font-size:0.76rem;font-weight:800;padding:5px 12px;border-radius:999px;">COLLAB ID: ${collabId}</span></p>
 <h3 style="${H3}">Agreed Deliverables</h3>
 <ul style="${UL}">${deliverableLines}${adsLine}</ul>
@@ -1105,15 +1120,14 @@ function buildCollabEmailHtml(opts: {
 <h3 style="${H3}">Timelines</h3>
 <ul style="${UL}"><li>Script Submission: <strong>Within 3 days</strong> of product delivery</li><li>First Draft Submission: <strong>Within 7 days</strong> of product delivery</li><li>Content Go Live: <strong>Within 10 days</strong> of product delivery</li></ul>
 <p style="margin:0 0 8px;font-size:0.86rem;color:#6E695E;">All timelines will be counted from the date the product is delivered.</p>
-<h3 style="${H3}">Payment Terms</h3>
-<ul style="${UL}"><li>Payment will be processed once all agreed deliverables are live and the required ad partnership is active.</li><li>Payments are processed as per our standard payment cycle, one month after the content goes live, on the next applicable payment date, either the <strong>15th or the 30th</strong>.</li><li>To process the payment, please reply to this email with your generated invoice/bill for the agreed amount, clearly mentioning <strong>Collab ID: ${collabId}</strong>.</li></ul>
+${paymentTermsSection}
 <h3 style="${H3}">Content Guidelines</h3>
 <ul style="${UL}"><li>Use the hashtags: <strong>#RAHOSAADAA #PEHNOSAADAA #SAADAA</strong></li><li>Send the collaboration request to the agreed SAADAA Instagram handle.</li><li>Tag the relevant handles: <strong>@saadaadesigns</strong> and <strong>@saadaa_women</strong> or <strong>@saadaa_men</strong>.</li><li>Please include <strong>@saadaadesigns</strong> and the relevant handle (@saadaa_women or @saadaa_men) in the caption.</li><li>Ensure that the SAADAA brand name is pronounced correctly in the content <em>(a pronunciation voice note is attached).</em></li><li>Use the correct spelling of SAADAA throughout the video, caption, and all overlay text.</li><li>Ensure the product is properly ironed and presented neatly before shooting.</li><li>You're free to write the caption in your own style, as long as it clearly highlights the brand and product.</li></ul>
 <h3 style="${H3}">Content Direction</h3>
 <p style="margin:0 0 8px;">Keep the content authentic and aligned with your usual content style. The storytelling should feel natural, engaging, and relevant to your audience.</p>
 <p style="margin:0 0 14px;">Focus on clean visuals that clearly highlight the product's fit, fabric, and overall look. Please ensure that both the product and brand are clearly visible throughout the content.</p>
 <div style="background:#F0EAD6;border:1px solid #E8C87A;border-radius:10px;padding:13px 16px;margin:18px 0;">
-<p style="margin:0;font-size:0.88rem;">Kindly review all the details carefully and reply to this email with your confirmation. By confirming, you acknowledge and agree to the deliverables, commercials, timelines, payment terms, content guidelines, and usage rights mentioned above.</p>
+<p style="margin:0;font-size:0.88rem;">Kindly review all the details carefully and reply to this email with your confirmation. By confirming, you acknowledge and agree to the deliverables, commercials, timelines,${paymentTermsWord} content guidelines, and usage rights mentioned above.</p>
 </div>
 <p style="margin:0 0 4px;">Looking forward to working together and creating great content.</p>
 <p style="margin-top:20px;margin-bottom:0;">Thanks &amp; Regards,</p>
@@ -1150,6 +1164,7 @@ async function fetchDriveFileAsAttachment(driveId: string): Promise<{
 export async function sendCollabEmail(payload: {
   postId: string;
   collabId: string;
+  campaignName?: string | null;
   emailTo: string;
   creatorName: string;
   agreedAmount: string;
@@ -1216,6 +1231,7 @@ export async function sendCollabEmail(payload: {
 
   const htmlBody = buildCollabEmailHtml({
     collabId: payload.collabId,
+    campaignName: payload.campaignName ?? null,
     creatorName: payload.creatorName,
     agreedAmount: payload.agreedAmount,
     barterAmount: payload.barterAmount,

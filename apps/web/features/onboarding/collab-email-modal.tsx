@@ -70,6 +70,7 @@ function esc(s: string): string {
 
 function buildPreviewHtml(opts: {
   collabId: string;
+  campaignName?: string | null;
   creatorName: string;
   agreedAmount: string;
   barterAmount: string;
@@ -78,6 +79,11 @@ function buildPreviewHtml(opts: {
   collabType: string;
 }): string {
   const isPureBarter = opts.collabType.toLowerCase() === "barter";
+  const showPayment = !isPureBarter;
+  const campaignName = (opts.campaignName ?? "").trim();
+  const campaignLine = campaignName
+    ? `<div style="color:rgba(255,255,255,0.64);font-size:0.68rem;margin-top:3px;letter-spacing:0.04em;text-transform:uppercase;">Campaign Name: <strong style="color:#FFFCF8;">${esc(campaignName)}</strong></div>`
+    : "";
   const garments = opts.barterAmount.trim();
   const barterText = garments
     ? `${garments} Product${garments === "1" ? "" : "s"}`
@@ -96,10 +102,10 @@ function buildPreviewHtml(opts: {
 
   return `<div style="background:#2C2420;margin:-18px -18px 18px;padding:18px 20px;border-radius:10px 10px 0 0;">
 <div style="color:#F0C61E;font-weight:800;font-size:1rem;line-height:1.2;">Collaboration Confirmation</div>
-<div style="color:rgba(255,255,255,0.64);font-size:0.72rem;margin-top:4px;letter-spacing:0.04em;text-transform:uppercase;">Collab ID: <strong style="color:#FFFCF8;">${esc(opts.collabId)}</strong></div>
+<div style="color:rgba(255,255,255,0.64);font-size:0.72rem;margin-top:4px;letter-spacing:0.04em;text-transform:uppercase;">Collab ID: <strong style="color:#FFFCF8;">${esc(opts.collabId)}</strong></div>${campaignLine}
 </div>
 <p style="margin:0 0 10px;">Hi <strong>${esc(opts.creatorName || "creator")}</strong>,</p>
-<p style="margin:0 0 14px;">We're excited to move forward with this collaboration. Please find the confirmed collaboration details, timelines, payment terms, and content guidelines below.</p>
+<p style="margin:0 0 14px;">We're excited to move forward with this collaboration. Please find the confirmed collaboration details, timelines,${showPayment ? " payment terms," : ""} and content guidelines below.</p>
 <p style="margin:0 0 8px;"><span style="display:inline-block;background:#F0EAD6;color:#2C2420;font-size:0.74rem;font-weight:800;padding:5px 10px;border-radius:999px;">COLLAB ID: ${esc(opts.collabId)}</span></p>
 <p style="${H}">Agreed Deliverables</p>
 <ul style="margin:0 0 8px;padding-left:18px;">${delivLines}</ul>
@@ -108,15 +114,19 @@ function buildPreviewHtml(opts: {
 <p style="${H}">Timelines</p>
 <ul style="margin:0 0 4px;padding-left:18px;"><li>Script Submission: <strong>Within 3 days</strong> of product delivery</li><li>First Draft Submission: <strong>Within 7 days</strong> of product delivery</li><li>Content Go Live: <strong>Within 10 days</strong> of product delivery</li></ul>
 <p style="margin:0 0 8px;font-size:0.8rem;color:#6E695E;">All timelines counted from the date the product is delivered.</p>
-<p style="${H}">Payment Terms</p>
-<ul style="margin:0 0 8px;padding-left:18px;"><li>Payment is processed once all deliverables are live and the required ad partnership is active.</li><li>Standard cycle: one month after go-live, on the next applicable date — the <strong>15th or the 30th</strong>.</li><li>Reply with your invoice/bill mentioning <strong>Collab ID: ${esc(opts.collabId)}</strong>.</li></ul>
+${
+  showPayment
+    ? `<p style="${H}">Payment Terms</p>
+<ul style="margin:0 0 8px;padding-left:18px;"><li>Payment is processed once all deliverables are live and the required ad partnership is active.</li><li>Standard cycle: one month after go-live, on the next applicable date — the <strong>15th or the 30th</strong>.</li><li>Reply with your invoice/bill mentioning <strong>Collab ID: ${esc(opts.collabId)}</strong>.</li></ul>`
+    : ""
+}
 <p style="${H}">Content Guidelines</p>
 <ul style="margin:0 0 8px;padding-left:18px;"><li>Use the hashtags: <strong>#RAHOSAADAA #PEHNOSAADAA #SAADAA</strong></li><li>Send the collaboration request to the agreed SAADAA Instagram handle.</li><li>Tag the relevant handles: <strong>@saadaadesigns</strong> and <strong>@saadaa_women</strong> or <strong>@saadaa_men</strong>.</li><li>Please include <strong>@saadaadesigns</strong> and the relevant handle (@saadaa_women or @saadaa_men) in the caption.</li><li>Ensure that the SAADAA brand name is pronounced correctly in the content <em>(a pronunciation voice note is attached).</em></li><li>Use the correct spelling of SAADAA throughout the video, caption, and all overlay text.</li><li>Ensure the product is properly ironed and presented neatly before shooting.</li><li>You're free to write the caption in your own style, as long as it clearly highlights the brand and product.</li></ul>
 <p style="${H}">Content Direction</p>
 <p style="margin:0 0 6px;font-size:0.86rem;">Keep the content authentic and aligned with your usual style — natural, engaging, relevant to your audience.</p>
 <p style="margin:0 0 12px;font-size:0.86rem;">Focus on clean visuals highlighting the product's fit, fabric, and look. Product and brand clearly visible throughout.</p>
 <div style="background:#F0EAD6;border:1px solid #E8C87A;border-radius:10px;padding:12px 14px;margin:14px 0;">
-<p style="margin:0;font-size:0.82rem;">Kindly review all details and reply with your confirmation. By confirming, you agree to the deliverables, commercials, timelines, payment terms, content guidelines, and usage rights above.</p>
+<p style="margin:0;font-size:0.82rem;">Kindly review all details and reply with your confirmation. By confirming, you agree to the deliverables, commercials, timelines,${showPayment ? " payment terms," : ""} content guidelines, and usage rights above.</p>
 </div>
 <p style="margin:0 0 4px;">Looking forward to working together and creating great content.</p>
 <p style="margin-top:16px;margin-bottom:0;">Thanks &amp; Regards,</p>
@@ -203,6 +213,7 @@ export function CollabEmailPane({
     const sendArgs = {
       postId,
       collabId: preview.collabId,
+      campaignName: preview.campaignName,
       emailTo: to,
       creatorName,
       agreedAmount,
@@ -264,6 +275,7 @@ export function CollabEmailPane({
   const previewHtml = preview
     ? buildPreviewHtml({
         collabId: preview.collabId,
+        campaignName: preview.campaignName,
         creatorName,
         agreedAmount,
         barterAmount,

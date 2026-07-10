@@ -34,6 +34,7 @@ export async function resendBlockedCollabEmail(
   const result = await sendCollabEmail({
     postId: id,
     collabId: preview.collabId,
+    campaignName: preview.campaignName,
     emailTo: preview.emailTo,
     creatorName: preview.creatorName,
     agreedAmount: preview.agreedAmount,
