@@ -10,6 +10,8 @@ import { assertPermission } from "@/lib/rbac.server";
  * the row), so no join is needed for the historic source.
  */
 export interface TeamRow {
+  /** DB row id — keys the historic backlog-filling updates. */
+  id: number | null;
   post_id_short: string | null;
   post_id: string | null;
   inf_id: string | null;
@@ -58,6 +60,7 @@ export interface TeamRow {
 }
 
 const HISTORIC_COLS = [
+  "id",
   "post_id_short", "post_id", "inf_id", "collab_id", "username", "campaign_id",
   "nomenclature", "workflow_status", "source_tag", "reachout_direction",
   "content_type", "collab_type", "commercial_amount", "payment_status",
@@ -73,6 +76,7 @@ const HISTORIC_COLS = [
 // denormalised ones (followers/category/gender/avatar/ER) — those come from the
 // creators join below. No source_tag on posts.
 const LIVE_COLS = [
+  "id",
   "post_id_short", "post_id", "inf_id", "collab_id", "username", "campaign_id",
   "nomenclature", "workflow_status", "reachout_direction", "content_type",
   "collab_type", "commercial_amount", "payment_status", "order_id", "tracking_id",

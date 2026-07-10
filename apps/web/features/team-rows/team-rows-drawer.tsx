@@ -16,10 +16,15 @@ import {
   Eye,
   AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { extractShortcode } from "@/lib/instagram-shortcode";
 import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { fetchTeamRows, type TeamRow } from "./actions";
+import {
+  historicBacklogOnboard,
+  historicBacklogPosting,
+} from "./backlog-actions";
 
 // ── stage bucketing (mirrors the dashboard column logic) ───────────────────
 type Stage = "reach" | "onboard" | "posted" | "delivered" | "closed";
@@ -236,7 +241,151 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function RowDetailModal({ row, onClose }: { row: FlaggedRow; onClose: () => void }) {
+/**
+ * Backlog filling on a historic row: complete the missing order (Onboard) or
+ * the missing post link (Posting) straight from the drawer. Order fill pulls
+ * every order detail from the synced Shopify order; posting fill auto-derives
+ * the post date from the IG shortcode and auto-sends the partnership invite.
+ */
+function BacklogFillSection({
+  row,
+  onUpdated,
+}: {
+  row: FlaggedRow;
+  onUpdated?: () => void;
+}) {
+  const needsOrder = !hasOrder(row);
+  const needsPost = hasOrder(row) && !contentLinkOk(row.post_link);
+  const [orderId, setOrderId] = useState(row.order_id ?? "");
+  const [collabType, setCollabType] = useState(row.collab_type ?? "");
+  const [postLink, setPostLink] = useState("");
+  const [saving, setSaving] = useState<"order" | "post" | null>(null);
+  const [done, setDone] = useState<"order" | "post" | null>(null);
+
+  if (!needsOrder && !needsPost) return null;
+  if (done) {
+    return (
+      <div className="rounded-xl border border-success-text/30 bg-success-bg px-3 py-2 text-[0.7rem] text-success-text font-bold">
+        {done === "order"
+          ? "Order details filled — the row is onboarded."
+          : "Post saved — date auto-set, partnership invite sent."}
+      </div>
+    );
+  }
+
+  const saveOrder = () => {
+    if (row.id == null) return;
+    setSaving("order");
+    historicBacklogOnboard({
+      id: row.id,
+      orderId,
+      collabType: collabType || undefined,
+    }).then((res) => {
+      setSaving(null);
+      if (!res.ok) {
+        toast.error(res.error ?? "Could not fill the order");
+        return;
+      }
+      toast.success(
+        `Order ${res.applied?.order_id} filled — email/tracking/products updated.`,
+      );
+      setDone("order");
+      onUpdated?.();
+    });
+  };
+
+  const savePost = () => {
+    if (row.id == null) return;
+    setSaving("post");
+    historicBacklogPosting({ id: row.id, postLink }).then((res) => {
+      setSaving(null);
+      if (!res.ok) {
+        toast.error(res.error ?? "Could not save the post");
+        return;
+      }
+      toast.success(
+        `Posted — date ${res.postDate}${res.dateSource === "shortcode" ? " (from the post link)" : ""}. Partnership invite sent.`,
+      );
+      setDone("post");
+      onUpdated?.();
+    });
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-bg-surface px-3 py-2.5 flex flex-col gap-2">
+      <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary">
+        Fill backlog data
+      </span>
+      {needsOrder ? (
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            className="onboarding-filter-select flex-1"
+            placeholder="Shopify order id…"
+            value={orderId}
+            onChange={(e) => setOrderId(e.target.value)}
+          />
+          <select
+            className="onboarding-filter-select sm:w-40"
+            value={collabType}
+            onChange={(e) => setCollabType(e.target.value)}
+          >
+            <option value="">Collab type…</option>
+            <option value="Barter">Barter</option>
+            <option value="Barter + Paid">Barter + Paid</option>
+          </select>
+          <button
+            type="button"
+            className="acc-export-bar__btn acc-export-bar__btn--primary shrink-0"
+            onClick={saveOrder}
+            disabled={saving === "order" || !orderId.trim()}
+          >
+            {saving === "order" ? (
+              <Loader2 size={12} className="animate-spin" aria-hidden />
+            ) : null}
+            Fill order
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            className="onboarding-filter-select flex-1"
+            placeholder="https://www.instagram.com/reel/…"
+            value={postLink}
+            onChange={(e) => setPostLink(e.target.value)}
+          />
+          <button
+            type="button"
+            className="acc-export-bar__btn acc-export-bar__btn--primary shrink-0"
+            onClick={savePost}
+            disabled={saving === "post" || !postLink.trim()}
+          >
+            {saving === "post" ? (
+              <Loader2 size={12} className="animate-spin" aria-hidden />
+            ) : null}
+            Save post
+          </button>
+        </div>
+      )}
+      <span className="text-[0.6rem] text-text-tertiary">
+        {needsOrder
+          ? "Order details (email, tracking, products, status) auto-fetch from the synced Shopify order. No email is sent."
+          : "Post date auto-derives from the link; the creator's partnership invite is auto-sent."}
+      </span>
+    </div>
+  );
+}
+
+function RowDetailModal({
+  row,
+  source = "historic",
+  onUpdated,
+  onClose,
+}: {
+  row: FlaggedRow;
+  source?: "historic" | "live";
+  onUpdated?: () => void;
+  onClose: () => void;
+}) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   useEffect(() => {
@@ -321,6 +470,9 @@ function RowDetailModal({ row, onClose }: { row: FlaggedRow; onClose: () => void
                 )}
               </span>
             </div>
+          )}
+          {source === "historic" && row.id != null && (
+            <BacklogFillSection row={row} onUpdated={onUpdated} />
           )}
           <section className="campaign-detail-overview ad-detail-overview">
             <div className="campaign-detail-allocation-card ad-detail-profile-card">
@@ -503,6 +655,11 @@ export function TeamRowsDrawer({
       alive = false;
     };
   }, [team, source]);
+  // Backlog fill saved inside the detail modal → refetch so the drawer + stage
+  // counts reflect the new data without reopening.
+  const reload = () => {
+    fetchTeamRows(team, source).then((r) => setRows(r));
+  };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !selected && onClose();
     window.addEventListener("keydown", onKey);
@@ -706,7 +863,14 @@ export function TeamRowsDrawer({
         </footer>
       </div>
 
-      {selected && <RowDetailModal row={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <RowDetailModal
+          row={selected}
+          source={source}
+          onUpdated={reload}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>,
     document.body,
   );
