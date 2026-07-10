@@ -31,6 +31,7 @@ const CSV_HEADERS = [
   "Order ID",
   "Order Date",
   "Order Status",
+  "Product Total",
   "Order Total",
   "Tracking",
   "Customer",
@@ -66,6 +67,7 @@ function downloadInfOrdersCsv(rows: InfOrderRow[]): void {
         r.order_id,
         r.order_date,
         r.order_status,
+        r.product_total,
         r.order_total,
         r.tracking_status,
         r.customer_name,
@@ -302,6 +304,7 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
                     <th className="text-left pb-2 px-1.5">Order ID</th>
                     <th className="text-left pb-2 px-1.5">Order Date</th>
                     <th className="text-left pb-2 px-1.5">Order Status</th>
+                    <th className="text-right pb-2 px-1.5">Product Total</th>
                     <th className="text-right pb-2 px-1.5">Order Total</th>
                     <th className="text-left pb-2 px-1.5">Tracking</th>
                     <th className="text-left pb-2 px-1.5">Customer</th>
@@ -386,6 +389,11 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
                       </td>
                       <td className="py-1.5 px-1.5 text-text-tertiary">
                         {r.order_status ?? "—"}
+                      </td>
+                      <td className="py-1.5 px-1.5 text-right tabular text-text-primary font-semibold">
+                        {r.product_total != null
+                          ? formatRupees(r.product_total)
+                          : "—"}
                       </td>
                       <td className="py-1.5 px-1.5 text-right tabular text-text-secondary">
                         {r.order_total != null ? formatRupees(r.order_total) : "—"}

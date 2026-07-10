@@ -74,7 +74,7 @@ export async function GET() {
     const { data: orders } = await (supabase as any)
       .from("shopify_orders")
       .select(
-        "order_id, order_date, order_placed_date, tracking_status, total_price, address, customer_name, phone, garments_sent",
+        "order_id, order_date, order_placed_date, tracking_status, total_price, subtotal_price, address, customer_name, phone, garments_sent",
       )
       .in("order_id", orderIds)
       .limit(10_000);
@@ -105,6 +105,8 @@ export async function GET() {
       order_status: r.order_status ?? null,
       tracking_status: order?.tracking_status ?? null,
       order_total: order?.total_price != null ? Number(order.total_price) : null,
+      product_total:
+        order?.subtotal_price != null ? Number(order.subtotal_price) : null,
       customer_name: order?.customer_name ?? null,
       phone: order?.phone ?? null,
       address: order?.address ?? null,

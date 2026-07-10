@@ -107,6 +107,8 @@ export interface InfOrderRow {
   order_status: string | null;
   tracking_status: string | null;
   order_total: number | null;
+  /** Product subtotal (line-items value before discount) = "Total product price". */
+  product_total: number | null;
   customer_name: string | null;
   phone: string | null;
   address: string | null;
