@@ -226,6 +226,8 @@ export async function submitPosting(input: unknown) {
       download_link: downloadLink || null,
       raw_dump: rawDump || null,
       workflow_status: "Posted",
+      // Posting-stage attribution — drives the "Posted by" filter on Submitted.
+      posted_by: actor.name || actor.email || null,
     })
     .eq("post_id", postId);
 

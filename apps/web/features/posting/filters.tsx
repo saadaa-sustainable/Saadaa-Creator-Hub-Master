@@ -151,7 +151,7 @@ export function PostingFiltersBar({
           ]}
         />
         <FilterSelect
-          label="Onboarded by"
+          label={initial.submitted === "yes" ? "Posted by" : "Onboarded by"}
           value={initial.onboardedBy ?? ""}
           onChange={(v) => setParam("onboardedBy", v)}
           options={[

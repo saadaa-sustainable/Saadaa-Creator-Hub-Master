@@ -142,6 +142,34 @@ export function PostingTable({
   );
 }
 
+/** Contextual attribution: posted rows show who posted (fallback: onboarder for
+ *  rows predating the posted_by stamp), queue rows show who onboarded. */
+function postingAttributionLabel(r: PostingRow): string | null {
+  if (isPosted(r)) {
+    const who = r.posted_by ?? r.onboarded_by;
+    return who ? `Posted by ${who}` : null;
+  }
+  return r.onboarded_by ? `Onboarded by ${r.onboarded_by}` : null;
+}
+
+function postingDaysAgo(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = Date.parse(`${String(iso).slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+}
+
+/** Contextual age: posted rows → days since the post; queue rows → days since
+ *  onboarding. Null when the date is missing. */
+function postingAgeLabel(r: PostingRow): string | null {
+  if (isPosted(r)) {
+    const d = postingDaysAgo(r.post_date);
+    return d == null ? null : `Posted ${d === 0 ? "today" : `${d}d ago`}`;
+  }
+  const d = postingDaysAgo(r.onboard_date);
+  return d == null ? null : `Onboarded ${d === 0 ? "today" : `${d}d ago`}`;
+}
+
 function postingTone(r: PostingRow) {
   return isPosted(r)
     ? "var(--color-success-text)"
@@ -213,6 +241,10 @@ function PostingListRow({
           <p>
             @{r.creator?.username ?? "—"} · {r.post_id_short ?? r.post_id} ·{" "}
             {collabIdLabel(r)}
+            {postingAttributionLabel(r) && (
+              <> · {postingAttributionLabel(r)}</>
+            )}
+            {postingAgeLabel(r) && <> · {postingAgeLabel(r)}</>}
           </p>
         </div>
       </div>
@@ -334,6 +366,12 @@ function PostingCard({
           <span className="pill pill--muted">
             {r.nomenclature ?? r.content_type}
           </span>
+        )}
+        {postingAttributionLabel(r) && (
+          <span className="pill pill--muted">{postingAttributionLabel(r)}</span>
+        )}
+        {postingAgeLabel(r) && (
+          <span className="pill pill--muted">{postingAgeLabel(r)}</span>
         )}
       </div>
 

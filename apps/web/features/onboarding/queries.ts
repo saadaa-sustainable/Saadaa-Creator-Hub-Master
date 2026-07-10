@@ -61,6 +61,8 @@ export async function fetchOnboardingTable(
       collab_number,
       collab_id,
       inf_id,
+      logged_by,
+      onboarded_by,
       campaign:campaigns ( campaign_id, campaign_name ),
       creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link, is_active )
     `,
@@ -72,7 +74,13 @@ export async function fetchOnboardingTable(
   if (filters.creatorTier) q = q.eq("creators.category", filters.creatorTier);
   if (filters.region) q = q.eq("creators.state", filters.region);
   // Team member who logged the reach-out (stable; never overwritten).
-  if (filters.reachedOutBy) q = q.eq("logged_by", filters.reachedOutBy);
+  // Submitted view filters by who ONBOARDED; the work queue by who reached out.
+  // Same URL param either way — the filter relabels itself.
+  if (filters.reachedOutBy)
+    q = q.eq(
+      submittedYes ? "onboarded_by" : "logged_by",
+      filters.reachedOutBy,
+    );
   if (filters.contentType) q = q.eq("content_type", filters.contentType);
   if (filters.collabType) q = q.eq("collab_type", filters.collabType);
   // Submitted view filters on the ONBOARDED date; the work queue on reach-out.

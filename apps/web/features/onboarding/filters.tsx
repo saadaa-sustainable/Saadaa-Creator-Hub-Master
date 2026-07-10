@@ -151,7 +151,9 @@ export function OnboardingFiltersBar({
           ]}
         />
         <FilterSelect
-          label="Reached out by"
+          label={
+            initial.submitted === "yes" ? "Onboarded by" : "Reached out by"
+          }
           value={initial.reachedOutBy ?? ""}
           onChange={(v) => setParam("reachedOutBy", v)}
           options={[

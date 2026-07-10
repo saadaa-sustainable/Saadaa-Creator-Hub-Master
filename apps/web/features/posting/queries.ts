@@ -71,6 +71,8 @@ export async function fetchPostingTable(
       collab_number,
       collab_id,
       inf_id,
+      onboarded_by,
+      posted_by,
       campaign:campaigns ( campaign_id, campaign_name ),
       creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link, is_active )
     `,
@@ -81,7 +83,17 @@ export async function fetchPostingTable(
   if (filters.statusFilter) q = q.eq("workflow_status", filters.statusFilter);
   if (filters.creatorTier) q = q.eq("creators.category", filters.creatorTier);
   // Team member who onboarded the collab.
-  if (filters.onboardedBy) q = q.eq("onboarded_by", filters.onboardedBy);
+  // Submitted view filters by who POSTED (posted_by; older rows fall back to
+  // the onboarder); the work queue by who onboarded. Same URL param either way.
+  if (filters.onboardedBy) {
+    if (submittedYes) {
+      q = q.or(
+        `posted_by.eq.${filters.onboardedBy},and(posted_by.is.null,onboarded_by.eq.${filters.onboardedBy})`,
+      );
+    } else {
+      q = q.eq("onboarded_by", filters.onboardedBy);
+    }
+  }
   if (filters.contentType) q = q.eq("content_type", filters.contentType);
   if (filters.collabType) q = q.eq("collab_type", filters.collabType);
   // Ad-rights filter is applied in JS below (see ADS_YES). ads_usage_rights is

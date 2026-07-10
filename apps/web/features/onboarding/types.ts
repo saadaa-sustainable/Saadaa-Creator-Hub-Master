@@ -10,6 +10,9 @@ export interface OnboardingRow {
   post_id: PostsRow["post_id"];
   post_id_short: PostsRow["post_id_short"];
   workflow_status: PostsRow["workflow_status"];
+  /** Who logged the reach-out / who onboarded — row + overview attribution. */
+  logged_by?: string | null;
+  onboarded_by?: string | null;
   content_type?: PostsRow["content_type"];
   nomenclature?: PostsRow["nomenclature"];
   reach_out_date: PostsRow["reach_out_date"];

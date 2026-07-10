@@ -157,6 +157,12 @@ export function PostingOverviewModal({
               value={formatDate(row.onboard_date) ?? "—"}
               mono
             />
+            {row.onboarded_by && (
+              <OverviewItem label="Onboarded By" value={row.onboarded_by} />
+            )}
+            {row.posted_by && (
+              <OverviewItem label="Posted By" value={row.posted_by} />
+            )}
             <OverviewItem
               label="Deliverables"
               value={formatDeliverables(row)}

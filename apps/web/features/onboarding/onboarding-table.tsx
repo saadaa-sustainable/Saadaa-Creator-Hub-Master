@@ -240,6 +240,33 @@ export function OnboardingTable({
   );
 }
 
+/** Contextual attribution: onboarded rows show who onboarded, queue rows who
+ *  reached out. Null when the field is empty. */
+function attributionLabel(r: OnboardingRow): string | null {
+  if (isOnboarded(r)) {
+    return r.onboarded_by ? `Onboarded by ${r.onboarded_by}` : null;
+  }
+  return r.logged_by ? `Reached out by ${r.logged_by}` : null;
+}
+
+function daysAgo(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = Date.parse(`${String(iso).slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+}
+
+/** Contextual age: onboarded rows → days since onboarding; queue rows → days
+ *  since the reach-out. Null when the date is missing. */
+function ageLabel(r: OnboardingRow): string | null {
+  if (isOnboarded(r)) {
+    const d = daysAgo(r.onboard_date);
+    return d == null ? null : `Onboarded ${d === 0 ? "today" : `${d}d ago`}`;
+  }
+  const d = daysAgo(r.reach_out_date);
+  return d == null ? null : `Reached out ${d === 0 ? "today" : `${d}d ago`}`;
+}
+
 function onboardingTone(r: OnboardingRow) {
   if (isOnboarded(r)) return "var(--color-success-text)";
   if (isOverdue(r)) return "var(--color-danger-text, #cf3f33)";
@@ -327,6 +354,8 @@ function OnboardingListRow({
           <p>
             @{r.creator?.username ?? "—"} · {r.post_id_short ?? r.post_id} ·{" "}
             {collabIdLabel(r)}
+            {attributionLabel(r) && <> · {attributionLabel(r)}</>}
+            {ageLabel(r) && <> · {ageLabel(r)}</>}
           </p>
         </div>
       </div>
@@ -477,6 +506,12 @@ function ObCard({
           <span className="pill pill--muted">
             {r.nomenclature ?? r.content_type}
           </span>
+        )}
+        {attributionLabel(r) && (
+          <span className="pill pill--muted">{attributionLabel(r)}</span>
+        )}
+        {ageLabel(r) && (
+          <span className="pill pill--muted">{ageLabel(r)}</span>
         )}
       </div>
 
@@ -715,6 +750,12 @@ function OnboardingOverviewModal({
           <section className="ob-overview-grid">
             <OverviewItem label="Post ID" value={row.post_id} mono />
             <OverviewItem label="Collab ID" value={collabIdLabel(row)} mono />
+            {row.logged_by && (
+              <OverviewItem label="Reached Out By" value={row.logged_by} />
+            )}
+            {isOnboarded(row) && row.onboarded_by && (
+              <OverviewItem label="Onboarded By" value={row.onboarded_by} />
+            )}
             <OverviewItem
               label="Deliverables"
               value={formatDeliverableCount(deliverableCount)}
