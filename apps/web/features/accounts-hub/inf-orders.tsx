@@ -392,10 +392,7 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
                       <td className="py-1.5 px-1.5 text-right tabular text-text-secondary">
                         {r.garment_qty ?? "—"}
                       </td>
-                      <td
-                        className="py-1.5 px-1.5 text-text-secondary max-w-[320px] truncate"
-                        title={r.garments_sent ?? undefined}
-                      >
+                      <td className="py-1.5 px-1.5 text-text-secondary">
                         {r.garments_sent ?? "—"}
                       </td>
                       <td className="py-1.5 px-1.5 tabular text-text-secondary">
@@ -418,16 +415,13 @@ function InfOrdersModal({ onClose }: { onClose: () => void }) {
                       <td className="py-1.5 px-1.5 text-text-tertiary">
                         {r.tracking_status ?? "—"}
                       </td>
-                      <td className="py-1.5 px-1.5 text-text-secondary max-w-[140px] truncate">
+                      <td className="py-1.5 px-1.5 text-text-secondary">
                         {r.customer_name ?? "—"}
                       </td>
                       <td className="py-1.5 px-1.5 tabular text-text-tertiary">
                         {r.phone ?? "—"}
                       </td>
-                      <td
-                        className="py-1.5 pl-1.5 text-text-tertiary max-w-[240px] truncate"
-                        title={r.address ?? undefined}
-                      >
+                      <td className="py-1.5 pl-1.5 pr-3 text-text-tertiary">
                         {r.address ?? "—"}
                       </td>
                     </tr>

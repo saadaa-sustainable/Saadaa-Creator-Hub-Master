@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   addMonths,
   eachDayOfInterval,
@@ -89,7 +96,13 @@ export function DateRangePicker({
   const [month, setMonth] = useState<Date>(
     () => parse(value.from) ?? parse(today) ?? new Date(0),
   );
-  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number }>({
+    top: 0,
+    left: 0,
+    width: 300,
+  });
   const todayDate = parse(today) ?? new Date(0);
 
   // Sync draft + visible month whenever the popover opens.
@@ -101,12 +114,37 @@ export function DateRangePicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Close on outside click / Escape.
+  // Position the portalled popover: right-aligned to the trigger, clamped to the
+  // viewport so it never overflows the modal / screen edge.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const vw = window.innerWidth;
+      const twoMonth = vw >= 640;
+      const width = Math.min(twoMonth ? 620 : 320, vw - 16);
+      let left = r.right - width; // right-align to the trigger
+      left = Math.max(8, Math.min(left, vw - width - 8));
+      const top = Math.min(r.bottom + 6, window.innerHeight - 40);
+      setPos({ top, left, width });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
+  // Close on outside click / Escape (trigger + portalled popover are both "inside").
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node))
-        setOpen(false);
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -150,8 +188,9 @@ export function DateRangePicker({
   };
 
   return (
-    <div className="relative" ref={rootRef}>
+    <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="onboarding-filter-select flex items-center justify-between gap-2 w-full text-left"
@@ -168,13 +207,21 @@ export function DateRangePicker({
         <Calendar size={13} aria-hidden className="shrink-0 text-text-tertiary" />
       </button>
 
-      {open && (
-        <div
-          className="absolute z-[2100] mt-1 rounded-xl border border-border bg-bg-white shadow-lg p-2 sm:p-3"
-          style={{ minWidth: 280, right: 0 }}
-          role="dialog"
-          aria-label={`${label} range`}
-        >
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            ref={popRef}
+            className="fixed z-[2100] rounded-xl border border-border bg-bg-white shadow-lg p-2 sm:p-3 overflow-auto"
+            style={{
+              top: pos.top,
+              left: pos.left,
+              width: pos.width,
+              maxHeight: `calc(100dvh - ${Math.round(pos.top) + 16}px)`,
+            }}
+            role="dialog"
+            aria-label={`${label} range`}
+          >
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Presets */}
             <div className="flex sm:flex-col gap-1 flex-wrap sm:w-32 shrink-0">
@@ -268,9 +315,10 @@ export function DateRangePicker({
               </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
