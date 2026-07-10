@@ -34,6 +34,7 @@ const POSTS_SELECT = [
   "ifsc",
   "email",
   "collab_email_sent_at",
+  "collab_email_skipped",
   "deliverable_index",
 ].join(",");
 
@@ -272,11 +273,13 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
     }
 
     // MISSING_COLLAB_EMAIL — parent only, onboarded/posted/delivered,
-    // collab_email_sent_at IS NULL.
+    // collab_email_sent_at IS NULL, and NOT deliberately skipped ("Save & Skip
+    // Email" is an operator decision, not a miss — matches the Onboarding KPI).
     if (
       isParent &&
       PARENT_STATUSES.has(wf) &&
-      !hasValue(p.collab_email_sent_at)
+      !hasValue(p.collab_email_sent_at) &&
+      p.collab_email_skipped !== true
     ) {
       const meInfId = (p.inf_id as string | null) ?? null;
       missingEmails.push({
