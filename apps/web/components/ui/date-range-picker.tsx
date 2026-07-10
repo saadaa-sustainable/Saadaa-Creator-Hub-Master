@@ -137,8 +137,11 @@ export function DateRangePicker({
       const vw = window.innerWidth;
       const twoMonth = vw >= 640;
       const width = Math.min(twoMonth ? 620 : 320, vw - 16);
-      let left = r.right - width; // right-align to the trigger
-      left = Math.max(8, Math.min(left, vw - width - 8));
+      // Open aligned with the trigger's LEFT edge, extending right; only shift
+      // back when that would overflow the viewport's right edge.
+      let left = r.left;
+      if (left + width > vw - 8) left = vw - width - 8;
+      left = Math.max(8, left);
       const top = Math.min(r.bottom + 6, window.innerHeight - 40);
       setPos({ top, left, width });
     };
@@ -339,21 +342,22 @@ export function DateRangePicker({
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                className="btn btn-ghost h-7 px-2 text-[0.66rem]"
+                className="inline-flex items-center gap-1 whitespace-nowrap h-7 px-2.5 rounded-full text-[0.66rem] font-bold text-text-secondary hover:bg-bg-muted transition-colors"
                 onClick={clear}
               >
-                <X size={11} aria-hidden /> Clear
+                <X size={11} aria-hidden className="shrink-0" />
+                Clear
               </button>
               <button
                 type="button"
-                className="btn btn-ghost h-7 px-2 text-[0.66rem]"
+                className="inline-flex items-center whitespace-nowrap h-7 px-2.5 rounded-full text-[0.66rem] font-bold text-text-secondary hover:bg-bg-muted transition-colors"
                 onClick={() => setOpen(false)}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                className="acc-export-bar__btn acc-export-bar__btn--primary h-7"
+                className="acc-export-bar__btn acc-export-bar__btn--primary h-7 whitespace-nowrap"
                 onClick={apply}
               >
                 Apply
