@@ -12,10 +12,14 @@ export default function SheetsKM() {
         <KMList>
           <li>
             <strong>1. Tab bar</strong> — one tab per Supabase table (Posts ·
-            Creators · Campaigns · Budget Sheet · Payments · Shopify Orders ·
-            System Errors · Instagram Cache · Inbound Queue · User Access).
-            Live row counts via parallel <KMCode>head:true</KMCode> count
-            fetches.
+            <strong> Historic Posts</strong> · Creators · Campaigns · Budget
+            Sheet · Payments · Shopify Orders · System Errors · Instagram Cache
+            · Inbound Queue · User Access). Live row counts via parallel{" "}
+            <KMCode>head:true</KMCode> count fetches. The{" "}
+            <strong>Historic Posts</strong> tab is the migrated Tracker archive
+            — fill backlog data here in bulk (status, collab type, dates, order
+            id, tracking, products, post link, commercials, payment, email); it
+            feeds Historic Analytics.
           </li>
           <li>
             <strong>2. Toolbar</strong> — search, Edit mode toggle, Density

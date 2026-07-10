@@ -87,6 +87,33 @@ export default function HistoricAnalyticsKM() {
         </KMCallout>
       </KMSection>
 
+      <KMSection tag="Filling the posting backlog">
+        <KMList>
+          <li>
+            In the Funnel / Internal team-row drawer, open a row that is{" "}
+            <strong>onboarded (order present) but has no real post link</strong>{" "}
+            — a <strong>Fill posting backlog</strong> box appears.
+          </li>
+          <li>
+            Paste the post URL: a <strong>live post-date preview</strong> shows
+            under the input (decoded from the Instagram link itself; falls back
+            to today when the link isn&apos;t decodable). Optional Download link
+            and Raw dump fields match the live Posting form.
+          </li>
+          <li>
+            On save the creator&apos;s <strong>partnership is checked live</strong>{" "}
+            — an invite is sent only if they haven&apos;t accepted yet; the
+            message reports the real outcome (already approved / invite sent /
+            invite pending / rejected–revoked).
+          </li>
+          <li>
+            The row flips to <KMCode>Posted</KMCode> and Funnel + Internal
+            counts update immediately. For bulk edits use the{" "}
+            <strong>Historic Posts</strong> tab in Sheet View.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Access">
         <KMList>
           <li>
