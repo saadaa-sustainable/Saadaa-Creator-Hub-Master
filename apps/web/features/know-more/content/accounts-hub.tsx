@@ -35,9 +35,20 @@ export default function AccountsHubKM() {
           </li>
           <li>
             <strong>4. Toolbar</strong> — Downloads (Due CSV · Paid CSV ·{" "}
-            <strong>Partial Payment</strong> · All) on the left, Kanban / List
-            view toggle on the right. The <strong>Partial Payment</strong> export
-            only appears when at least one collab has an outstanding balance.
+            <strong>Partial Payment</strong> · All) + the <strong>INF Orders</strong>{" "}
+            button on the left, Kanban / List view toggle on the right. The{" "}
+            <strong>Partial Payment</strong> export only appears when at least one
+            collab has an outstanding balance.
+          </li>
+          <li>
+            <strong>INF Orders</strong> — a modal listing every collab mapped to a
+            Collab ID that has an order (<strong>Barter AND Barter + Paid</strong>)
+            — the barter orders the payment board hides. Unmapped orders are
+            excluded. One row per collab with INF ID, Post ID, Collab ID, creator,
+            campaign, <strong>Collab Type</strong>, commercial finalized at
+            onboarding, garments, order id/date, tracking. Filters: search +
+            campaign + <strong>Collab Type</strong> (All / Barter / Barter + Paid);{" "}
+            <strong>Export CSV</strong> downloads exactly the rows shown.
           </li>
           <li>
             <strong>5. Board</strong> — Kanban (4 columns:{" "}
@@ -124,11 +135,16 @@ export default function AccountsHubKM() {
           </li>
           <li>
             <strong>Partnership</strong> — the creator must have{" "}
-            <strong>accepted</strong> the partnership request (
-            <KMCode>partnership_status = approved</KMCode>) before a draft or
-            final payment can be written. This applies to every collab,
-            regardless of Ads Usage Rights. A Partnership Key or admin override
-            does not bypass creator acceptance.
+            <strong>accepted</strong> the partnership before a draft or final
+            payment can be written: the current{" "}
+            <KMCode>partnership_status</KMCode> is <KMCode>approved</KMCode>, OR a{" "}
+            <KMCode>partnership_approved_at</KMCode> timestamp was recorded (the
+            auto-fetched acceptance) and the creator has not since gone{" "}
+            <KMCode>pending</KMCode>/<KMCode>rejected</KMCode>/
+            <KMCode>revoked</KMCode>. Applies to every collab regardless of Ads
+            Usage Rights. A Partnership Key alone (stored at invite time) or an
+            admin override does NOT bypass creator acceptance. Enforced in both
+            the app and the payment DB functions.
           </li>
         </KMList>
         <p>
