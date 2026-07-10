@@ -4,6 +4,8 @@ export interface PaymentEligibilityDeliverable {
   post_link?: string | null;
   post_date?: string | null;
   partnership_status?: string | null;
+  /** Timestamp stamped when the creator's partnership was approved (auto-fetch). */
+  partnership_approved_at?: string | null;
 }
 
 /** A posting form is complete only when both its live URL and post date exist. */
@@ -14,13 +16,24 @@ export function postingFormCompleted(
 }
 
 /**
- * Payment requires the creator's real partnership acceptance. An admin key or
- * ad_partnership_valid override is intentionally not accepted by this gate.
+ * Payment requires the creator's real partnership acceptance:
+ *   - the current state is `approved`, OR
+ *   - a `partnership_approved_at` timestamp was recorded (the auto-fetched
+ *     acceptance) and the creator has not SINCE backed out.
+ *
+ * A `pending` / `rejected` / `revoked` current state never counts, even with a
+ * stale approval timestamp. The admin `ad_partnership_valid` override and bare
+ * partnership-key presence are intentionally NOT accepted here (the key is
+ * stored at invite time, before acceptance).
  */
 export function creatorAcceptedPartnership(
   row: PaymentEligibilityDeliverable,
 ): boolean {
-  return parseStoredPartnershipState(row.partnership_status) === "approved";
+  const state = parseStoredPartnershipState(row.partnership_status);
+  if (state === "pending" || state === "rejected" || state === "revoked") {
+    return false;
+  }
+  return state === "approved" || Boolean(row.partnership_approved_at);
 }
 
 /** Saadaa pays per collab, so every deliverable must satisfy both gates. */

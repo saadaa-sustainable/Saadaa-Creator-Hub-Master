@@ -19,8 +19,18 @@ describe("payment eligibility", () => {
     expect(postingFormCompleted({ ...ready, post_date: null })).toBe(false);
   });
 
-  it("accepts only the creator-approved partnership state", () => {
+  it("accepts approved status or a recorded approval timestamp", () => {
     expect(creatorAcceptedPartnership(ready)).toBe(true);
+    // A recorded approval timestamp counts even when the status has gone blank.
+    expect(
+      creatorAcceptedPartnership({
+        post_link: ready.post_link,
+        post_date: ready.post_date,
+        partnership_status: null,
+        partnership_approved_at: "2026-07-09T10:00:00Z",
+      }),
+    ).toBe(true);
+    // Pending never counts — the "Pending Approval" ordering trap.
     expect(
       creatorAcceptedPartnership({
         ...ready,
@@ -29,6 +39,14 @@ describe("payment eligibility", () => {
     ).toBe(false);
     expect(
       creatorAcceptedPartnership({ ...ready, partnership_status: "rejected" }),
+    ).toBe(false);
+    // A since-revoked creator does NOT count, even with a stale approval stamp.
+    expect(
+      creatorAcceptedPartnership({
+        ...ready,
+        partnership_status: "Revoked",
+        partnership_approved_at: "2026-07-09T10:00:00Z",
+      }),
     ).toBe(false);
   });
 

@@ -65,6 +65,7 @@ export async function fetchAccountsHubData(
       partnership_id,
       ad_partnership_valid,
       partnership_status,
+      partnership_approved_at,
       username,
       post_link,
       post_date,
@@ -243,7 +244,7 @@ export async function fetchAccountsHubData(
       const { data: sibs } = await (supabase as any)
         .from("posts")
         .select(
-          "inf_id, collab_number, collab_id, post_link, post_date, partnership_status",
+          "inf_id, collab_number, collab_id, post_link, post_date, partnership_status, partnership_approved_at",
         )
         .in("inf_id", candidateInfIds);
       for (const s of (sibs ?? []) as Array<{
@@ -253,6 +254,7 @@ export async function fetchAccountsHubData(
         post_link: string | null;
         post_date: string | null;
         partnership_status: string | null;
+        partnership_approved_at: string | null;
       }>) {
         if (!s.collab_id && s.collab_number == null) continue;
         const key = collabKeyOf(s as unknown as Record<string, unknown>);
@@ -535,6 +537,7 @@ export async function fetchPayableEligiblePosts(): Promise<
     partnership_id: string | null;
     ad_partnership_valid: boolean | null;
     partnership_status: string | null;
+    partnership_approved_at: string | null;
   }>
 > {
   const supabase = createServiceClient();
@@ -545,7 +548,7 @@ export async function fetchPayableEligiblePosts(): Promise<
     .select(
       `
       post_id, post_id_short, commercial_amount, campaign_id, workflow_status,
-      ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status, deliverable_index,
+      ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status, partnership_approved_at, deliverable_index,
       post_link, post_date, inf_id, collab_number, collab_id,
       creator:creators ( username, inf_name, profile_pic )
     `,
@@ -619,6 +622,7 @@ export async function fetchPayableEligiblePosts(): Promise<
       partnership_id: r.partnership_id ?? null,
       ad_partnership_valid: r.ad_partnership_valid ?? null,
       partnership_status: r.partnership_status ?? null,
+      partnership_approved_at: r.partnership_approved_at ?? null,
       inf_name: r.creator?.inf_name ?? null,
       username: r.creator?.username ?? null,
       profile_pic: r.creator?.profile_pic ?? null,

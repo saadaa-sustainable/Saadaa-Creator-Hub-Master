@@ -36,6 +36,8 @@ export interface AccountsRow {
   ad_partnership_valid?: boolean | null;
   /** Normalized Meta partnership state (pending/approved/rejected/revoked/none). */
   partnership_status: string | null;
+  /** Timestamp the partnership was approved (real auto-fetched acceptance). */
+  partnership_approved_at?: string | null;
   post_link: PostsRow["post_link"];
   post_date: PostsRow["post_date"];
   onboard_date: PostsRow["onboard_date"];

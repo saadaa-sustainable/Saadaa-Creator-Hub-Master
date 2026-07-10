@@ -42,6 +42,7 @@ interface DeliverableRow {
   partnership_id: string | null;
   ad_partnership_valid: boolean | null;
   partnership_status: string | null;
+  partnership_approved_at: string | null;
   post_link: string | null;
   post_date: string | null;
   payment_status: string | null;

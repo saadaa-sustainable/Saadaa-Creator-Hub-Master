@@ -69,6 +69,7 @@ interface PostContext {
   partnership_id: string | null;
   ad_partnership_valid: boolean | null;
   partnership_status: string | null;
+  partnership_approved_at: string | null;
   post_link: string | null;
   post_date: string | null;
   bank_name: string | null;
@@ -145,7 +146,7 @@ export async function submitPayments(
   const { data: postRows, error: postsErr } = await (supabase as any)
     .from("posts")
     .select(
-      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, collab_id, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, partnership_status, post_link, post_date, bank_name, bank_number, ifsc",
+      "post_id, post_id_short, workflow_status, commercial_amount, inf_id, username, collab_number, collab_id, deliverable_index, ads_usage_rights, ads_results, partnership_id, ad_partnership_valid, partnership_status, partnership_approved_at, post_link, post_date, bank_name, bank_number, ifsc",
     )
     .in("post_id", postIds);
   if (postsErr) return { ok: false, error: postsErr.message };
@@ -244,7 +245,7 @@ export async function submitPayments(
     const { data: collabRows, error: collabRowsError } = await (supabase as any)
       .from("posts")
       .select(
-        "post_id, post_id_short, inf_id, collab_number, collab_id, commercial_amount, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status",
+        "post_id, post_id_short, inf_id, collab_number, collab_id, commercial_amount, post_link, post_date, ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status, partnership_approved_at",
       )
       .in("inf_id", infIds);
     if (collabRowsError) {
