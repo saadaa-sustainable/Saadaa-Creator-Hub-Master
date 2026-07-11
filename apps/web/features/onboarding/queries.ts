@@ -90,7 +90,11 @@ export async function fetchOnboardingTable(
   if (filters.reachoutDateTo) q = q.lte(dateCol, filters.reachoutDateTo);
 
   const { data, error } = await q
-    .order("reach_out_date", { ascending: false })
+    // Newest reach-outs first; date-less rows sink to the bottom (SQL DESC
+    // defaults to NULLS FIRST, which floated them to the top). id desc breaks
+    // same-day ties so the latest entries lead.
+    .order("reach_out_date", { ascending: false, nullsFirst: false })
+    .order("id", { ascending: false })
     // High cap — the July ingests alone exceed the old 500, which silently
     // hid older reach-outs from the queue AND its in-memory search.
     .limit(10_000);

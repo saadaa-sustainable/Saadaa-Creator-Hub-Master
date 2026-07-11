@@ -73,6 +73,8 @@ export async function fetchPostingTable(
       inf_id,
       onboarded_by,
       posted_by,
+      bank_number,
+      ifsc,
       campaign:campaigns ( campaign_id, campaign_name ),
       creator:creators  ( inf_id, username, inf_name, followers, category, state, profile_pic, instagram_link, is_active )
     `,

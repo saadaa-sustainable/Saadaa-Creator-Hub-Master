@@ -98,30 +98,9 @@ export const OnboardingSchema = z
         message: "Row id or Post ID required",
       });
     }
-    // Bank details required for Barter + Paid
-    if (data.collabType === "Barter + Paid") {
-      if (!data.bankName) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["bankName"],
-          message: "Bank Account Name required for Barter + Paid",
-        });
-      }
-      if (!data.bankNumber) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["bankNumber"],
-          message: "Bank Account Number required for Barter + Paid",
-        });
-      }
-      if (!data.ifsc) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["ifsc"],
-          message: "IFSC required for Barter + Paid",
-        });
-      }
-    }
+    // Bank details are OPTIONAL at onboarding for Barter + Paid (2026-07-11
+    // decision) — if left empty here, the POSTING form makes them mandatory
+    // before the deliverable can be marked Posted (see posting/schema+actions).
   });
 
 export type OnboardingInput = z.infer<typeof OnboardingSchema>;

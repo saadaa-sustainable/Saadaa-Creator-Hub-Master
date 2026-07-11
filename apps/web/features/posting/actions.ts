@@ -169,7 +169,8 @@ export async function submitPosting(input: unknown) {
     return { ok: false as const, error: "Validation failed", fieldErrors };
   }
 
-  const { postId, postDate, postLink, downloadLink, rawDump } = parsed.data;
+  const { postId, postDate, postLink, downloadLink, rawDump, bankName, bankNumber, ifsc } =
+    parsed.data;
 
   // Resolve post_date: form > shortcode decode > today
   let resolvedDate = postDate?.trim() || "";
@@ -190,13 +191,14 @@ export async function submitPosting(input: unknown) {
   // GATE: block posting while this collab has an onboarding edit awaiting admin
   // approval. The corrected onboarding (e.g. a fixed order_id) must be ratified
   // before any -P{n} deliverable can be marked Posted.
+  let collabKey: string | null = null;
   {
     const { data: postRow } = await (supabase as any)
       .from("posts")
-      .select("collab_id, inf_id, collab_number")
+      .select("collab_id, inf_id, collab_number, collab_type, bank_name, bank_number, ifsc")
       .eq("post_id", postId)
       .maybeSingle();
-    const collabKey =
+    collabKey =
       (postRow?.collab_id as string | null) ||
       (postRow?.inf_id
         ? `${postRow.inf_id}-C${Number(postRow.collab_number ?? 1)}`
@@ -216,6 +218,32 @@ export async function submitPosting(input: unknown) {
         };
       }
     }
+
+    // GATE: Barter + Paid needs bank details before Posted. Optional at
+    // onboarding (2026-07-11) — if the collab still has none, the posting form
+    // must supply all three.
+    const isBarterPaid =
+      String(postRow?.collab_type ?? "").trim().toLowerCase() ===
+      "barter + paid";
+    const bankOnRow =
+      String(postRow?.bank_number ?? "").trim().length > 0 &&
+      String(postRow?.ifsc ?? "").trim().length > 0;
+    const bankInForm =
+      (bankName ?? "").length > 0 &&
+      (bankNumber ?? "").length > 0 &&
+      (ifsc ?? "").length > 0;
+    if (isBarterPaid && !bankOnRow && !bankInForm) {
+      const fieldErrors: Record<string, string> = {};
+      if (!bankName) fieldErrors.bankName = "Required for Barter + Paid";
+      if (!bankNumber) fieldErrors.bankNumber = "Required for Barter + Paid";
+      if (!ifsc) fieldErrors.ifsc = "Required for Barter + Paid";
+      return {
+        ok: false as const,
+        error:
+          "Bank details were not filled at onboarding — add them here to mark this Barter + Paid collab as Posted.",
+        fieldErrors,
+      };
+    }
   }
 
   const { error: updErr } = await (supabase as any)
@@ -232,6 +260,15 @@ export async function submitPosting(input: unknown) {
     .eq("post_id", postId);
 
   if (updErr) return { ok: false as const, error: updErr.message };
+
+  // Bank details supplied in the posting form → stamp them on EVERY deliverable
+  // of the collab (payments read them from the representative row).
+  if (collabKey && bankName && bankNumber && ifsc) {
+    await (supabase as any)
+      .from("posts")
+      .update({ bank_name: bankName, bank_number: bankNumber, ifsc })
+      .eq("collab_id", collabKey);
+  }
 
   // Partnership auto-invite happens CLIENT-DRIVEN right after this action
   // returns: the posting form opens a blocking status popup that checks the

@@ -1,6 +1,16 @@
 "use client";
-import { useEffect, useState, type CSSProperties } from "react";
-import { Eye, Grid3X3, Inbox, List as ListIcon, Send } from "lucide-react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import {
+  Check,
+  ChevronDown,
+  Clock3,
+  Eye,
+  Grid3X3,
+  Inbox,
+  Layers,
+  List as ListIcon,
+  Send,
+} from "lucide-react";
 import { PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
 import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { PartnershipBadge } from "@/components/ui/status-pill";
@@ -44,6 +54,24 @@ export function PostingTable({
   // New filter/search result set → back to page one.
   useEffect(() => setVisibleCount(RENDER_PAGE), [rows]);
 
+  // Collab-level grouping (2026-07-11): deliverable rows sharing a collab_id
+  // collapse into ONE group when the collab has >1 deliverable row (stories
+  // never spawn rows, so they're excluded by construction). Single-deliverable
+  // collabs keep the classic per-row layout. Order preserved (fetch order).
+  const groups = useMemo<Array<{ key: string; items: PostingRow[] }>>(() => {
+    const map = new Map<string, PostingRow[]>();
+    const order: string[] = [];
+    for (const r of rows) {
+      const k = collabIdLabel(r) || r.post_id || "";
+      if (!map.has(k)) {
+        map.set(k, []);
+        order.push(k);
+      }
+      map.get(k)!.push(r);
+    }
+    return order.map((k) => ({ key: k, items: map.get(k)! }));
+  }, [rows]);
+
   // Mobile force-cards (matches onboarding behavior).
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -69,6 +97,14 @@ export function PostingTable({
           creatorName={selected.creator?.inf_name}
           username={selected.creator?.username}
           adsUsageRights={selected.ads_usage_rights}
+          requireBank={
+            (selected.collab_type ?? "").trim().toLowerCase() ===
+              "barter + paid" &&
+            !(
+              String(selected.bank_number ?? "").trim() &&
+              String(selected.ifsc ?? "").trim()
+            )
+          }
         />
       )}
       {overviewRow && (
@@ -114,45 +150,66 @@ export function PostingTable({
       </div>
 
       {view === "list" ? (
-        rows.length === 0 ? (
+        groups.length === 0 ? (
           <PostingEmpty />
         ) : (
           <div className="campaign-list-view stage-campaign-list">
-            {rows.slice(0, visibleCount).map((r, index) => (
-              <PostingListRow
-                key={r.post_id}
-                r={r}
-                index={index}
-                onSubmit={setSelected}
-                onOverview={setOverviewRow}
-              />
-            ))}
+            {groups.slice(0, visibleCount).map((g, index) =>
+              g.items.length === 1 ? (
+                <PostingListRow
+                  key={g.items[0].post_id}
+                  r={g.items[0]}
+                  index={index}
+                  onSubmit={setSelected}
+                  onOverview={setOverviewRow}
+                />
+              ) : (
+                <CollabGroupSection
+                  key={g.key}
+                  group={g}
+                  index={index}
+                  onSubmit={setSelected}
+                  onOverview={setOverviewRow}
+                />
+              ),
+            )}
           </div>
         )
-      ) : rows.length === 0 ? (
+      ) : groups.length === 0 ? (
         <PostingEmpty />
       ) : (
         <div className="ob-card-grid">
-          {rows.slice(0, visibleCount).map((r) => (
-            <PostingCard
-              key={r.post_id}
-              r={r}
-              rows={rows}
-              onSubmit={setSelected}
-              onOverview={setOverviewRow}
-            />
-          ))}
+          {groups.slice(0, visibleCount).map((g, index) =>
+            g.items.length === 1 ? (
+              <PostingCard
+                key={g.items[0].post_id}
+                r={g.items[0]}
+                rows={rows}
+                onSubmit={setSelected}
+                onOverview={setOverviewRow}
+              />
+            ) : (
+              <div key={g.key} style={{ gridColumn: "1 / -1" }}>
+                <CollabGroupSection
+                  group={g}
+                  index={index}
+                  onSubmit={setSelected}
+                  onOverview={setOverviewRow}
+                />
+              </div>
+            ),
+          )}
         </div>
       )}
 
-      {rows.length > visibleCount && (
+      {groups.length > visibleCount && (
         <div className="flex justify-center pt-1">
           <button
             type="button"
             className="rounded-[10px] border border-border bg-bg-white px-4 py-2 text-[0.8rem] font-semibold text-text-secondary transition-colors hover:bg-bg-muted"
             onClick={() => setVisibleCount((v) => v + 50)}
           >
-            Show more ({rows.length - visibleCount} remaining)
+            Show more ({groups.length - visibleCount} remaining)
           </button>
         </div>
       )}
@@ -326,6 +383,143 @@ function PostingListRow({
           </button>
         )}
       </div>
+    </article>
+  );
+}
+
+/**
+ * Collab-level group (2026-07-11): one section per collab_id with >1
+ * deliverable row. The header shows the creator once + a chip per deliverable
+ * (green ✓ submitted / amber pending) and "x/y submitted"; expanding reveals
+ * the classic per-deliverable rows so each posting form is filed one by one.
+ */
+function CollabGroupSection({
+  group,
+  index,
+  onSubmit,
+  onOverview,
+}: {
+  group: { key: string; items: PostingRow[] };
+  index: number;
+  onSubmit: (row: PostingRow) => void;
+  onOverview: (row: PostingRow) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const rep = group.items[0];
+  const total = group.items.length;
+  const submitted = group.items.filter((r) => isPosted(r)).length;
+  const allDone = submitted === total;
+
+  const shortLabel = (r: PostingRow): string => {
+    const short = r.post_id_short ?? r.post_id ?? "";
+    const m = String(short).match(/P\d+$/i);
+    return m ? m[0].toUpperCase() : String(short);
+  };
+
+  return (
+    <article
+      className="campaign-list-row stage-campaign-row"
+      style={{
+        ...postingStyle(rep, index),
+        display: "block",
+        ...(allDone
+          ? { ["--campaign-accent" as string]: "var(--color-success-text)" }
+          : {}),
+      }}
+    >
+      <button
+        type="button"
+        className="flex w-full flex-wrap items-center gap-3 text-left"
+        onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
+      >
+        <InstagramPreviewCard
+          pic={rep.creator?.profile_pic}
+          username={rep.creator?.username}
+          size={46}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="campaign-card__id-row">
+            {rep.campaign?.campaign_id && (
+              <span className="campaign-card__id">
+                <strong>{rep.campaign.campaign_id}</strong>
+              </span>
+            )}
+            <span className="pill pill--muted inline-flex items-center gap-1">
+              <Layers size={10} aria-hidden />
+              {total} deliverables
+            </span>
+            <span
+              className={cn(
+                "pill inline-flex items-center gap-1 font-bold",
+                allDone
+                  ? "bg-success-bg text-success-text"
+                  : "bg-warning-bg text-warning-text",
+              )}
+            >
+              {submitted}/{total} submitted
+            </span>
+          </div>
+          <h3 className="truncate">
+            {rep.creator?.inf_name ?? rep.creator?.username ?? "—"}
+          </h3>
+          <p className="truncate">
+            @{rep.creator?.username ?? "—"} · {group.key}
+            {postingAttributionLabel(rep) && (
+              <> · {postingAttributionLabel(rep)}</>
+            )}
+          </p>
+        </div>
+
+        {/* Per-deliverable status chips — pending forms stand out at a glance. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {group.items.map((r) => {
+            const done = isPosted(r);
+            return (
+              <span
+                key={r.post_id}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[0.62rem] font-extrabold tabular whitespace-nowrap",
+                  done
+                    ? "border-success-text/30 bg-success-bg text-success-text"
+                    : "border-warning-text/30 bg-warning-bg text-warning-text",
+                )}
+                title={`${r.post_id_short ?? r.post_id} — ${done ? "posted" : "posting form pending"}`}
+              >
+                {done ? (
+                  <Check size={10} aria-hidden />
+                ) : (
+                  <Clock3 size={10} aria-hidden />
+                )}
+                {shortLabel(r)}
+              </span>
+            );
+          })}
+        </div>
+
+        <ChevronDown
+          size={16}
+          aria-hidden
+          className={cn(
+            "shrink-0 text-text-tertiary transition-transform",
+            expanded && "rotate-180",
+          )}
+        />
+      </button>
+
+      {expanded && (
+        <div className="campaign-list-view stage-campaign-list mt-3 border-t border-border pt-3">
+          {group.items.map((r, i) => (
+            <PostingListRow
+              key={r.post_id}
+              r={r}
+              index={i}
+              onSubmit={onSubmit}
+              onOverview={onOverview}
+            />
+          ))}
+        </div>
+      )}
     </article>
   );
 }

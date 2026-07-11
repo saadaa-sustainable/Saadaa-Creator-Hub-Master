@@ -23,6 +23,10 @@ export interface PostingRow {
   commercial_amount: PostsRow["commercial_amount"];
   barter_amount?: number | string | null;
   collab_type?: string | null;
+  /** Bank presence — drives the mandatory-bank gate in the posting form when
+   *  a Barter + Paid collab skipped bank details at onboarding. */
+  bank_number?: string | null;
+  ifsc?: string | null;
   order_id?: string | null;
   order_status?: string | null;
   tracking_id?: PostsRow["tracking_id"];

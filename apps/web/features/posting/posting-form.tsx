@@ -55,6 +55,9 @@ interface PostingFormProps {
   adsUsageRights?: string | null;
   /** Pre-fill from prior partial save (re-open). */
   initial?: Partial<PostingInput>;
+  /** Barter + Paid collab whose bank details were skipped at onboarding —
+   *  the bank section shows and becomes MANDATORY. */
+  requireBank?: boolean;
   open: boolean;
   onClose: () => void;
 }
@@ -67,6 +70,7 @@ export function PostingModal({
   username,
   adsUsageRights,
   initial,
+  requireBank = false,
   open,
   onClose,
 }: PostingFormProps) {
@@ -112,6 +116,9 @@ export function PostingModal({
       downloadLink: initial?.downloadLink ?? "",
       rawDump: initial?.rawDump ?? "",
       adsUsageRights: adsUsageRights || "",
+      bankName: "",
+      bankNumber: "",
+      ifsc: "",
     },
     mode: "onBlur",
   });
@@ -306,6 +313,15 @@ export function PostingModal({
     }
     if (!dateOk) {
       toast.error("Confirm the post date matches Instagram before submitting.");
+      return;
+    }
+    if (
+      requireBank &&
+      !(values.bankName?.trim() && values.bankNumber?.trim() && values.ifsc?.trim())
+    ) {
+      toast.error(
+        "Bank details were not filled at onboarding — add Bank Name, Account Number and IFSC to post this Barter + Paid collab.",
+      );
       return;
     }
     startSubmit(async () => {
@@ -616,6 +632,53 @@ export function PostingModal({
                     Raw Footage Dump
                   </label>
                 </div>
+
+                {/* Bank details — MANDATORY here when this Barter + Paid collab
+                skipped them at onboarding (optional there since 2026-07-11). */}
+                {requireBank && (
+                  <>
+                    <div className="form-grid-full alert alert-warning" style={{ marginBottom: 0 }}>
+                      Bank details were not filled at onboarding — they are
+                      required to post this Barter + Paid collab.
+                    </div>
+                    <div className="form-floating">
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="pt_bankName"
+                        placeholder=" "
+                        {...register("bankName")}
+                      />
+                      <label htmlFor="pt_bankName">
+                        Bank Account Name <span className="req">*</span>
+                      </label>
+                    </div>
+                    <div className="form-floating">
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="pt_bankNumber"
+                        placeholder=" "
+                        {...register("bankNumber")}
+                      />
+                      <label htmlFor="pt_bankNumber">
+                        Account Number <span className="req">*</span>
+                      </label>
+                    </div>
+                    <div className="form-floating">
+                      <input
+                        type="text"
+                        className="form-control"
+                        id="pt_ifsc"
+                        placeholder=" "
+                        {...register("ifsc")}
+                      />
+                      <label htmlFor="pt_ifsc">
+                        IFSC Code <span className="req">*</span>
+                      </label>
+                    </div>
+                  </>
+                )}
 
                 {/* Partnership Key input removed (2026-07-02): the partnership-ad
                 invite is auto-sent right after submit via the blocking status

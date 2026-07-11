@@ -37,6 +37,12 @@ export const PostingSchema = z.object({
     .default("")
     .refine((v) => !v || isValidUrl(v), "Raw footage link must be a valid URL"),
   adsUsageRights: z.string().trim().optional().default(""),
+  // Bank details — OPTIONAL at onboarding for Barter + Paid (2026-07-11); when
+  // still missing on the collab, submitPosting makes these three MANDATORY
+  // before the deliverable can be marked Posted.
+  bankName: z.string().trim().optional().default(""),
+  bankNumber: z.string().trim().optional().default(""),
+  ifsc: z.string().trim().optional().default(""),
 });
 
 export type PostingInput = z.infer<typeof PostingSchema>;
