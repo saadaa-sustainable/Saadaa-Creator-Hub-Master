@@ -2,6 +2,11 @@
 ### Data fix — old Sakshi vs new Sakshi Kumari attribution (2026-07-10)
 - Two different people were merged by the historic ingest: **"Sakshi"** (former member, left; owns all Tracker rows Feb 2025 → Apr 2026) had been canonicalized to **"Sakshi Kumari"** (new member, joined June 2026). Renamed 1,942 `logged_by` + 202 `onboarded_by` rows in `historic_posts` back to **"Sakshi"**. Live `posts` rows (27 Jun+ = genuinely Sakshi Kumari's) untouched; raw archives were already correct. Team dropdowns now list the two people separately and the new member's numbers reflect only her own work. Ingest canon rule documented (old Tracker "Sakshi" stays "Sakshi"; June-2026+ sheets' bare "sakshi" = Sakshi Kumari).
 
+### Posting — collab-level grouping, bank gate at posting, onboarding sort (2026-07-11)
+- **Posting queue groups by collab** — when a collab has more than one deliverable row, it renders as ONE section: creator shown once, a chip per deliverable (**green ✓ posted / amber pending**), an **"x/y submitted"** pill, and an expander that reveals the classic per-deliverable rows so each posting form is filed one at a time. Single-deliverable collabs keep the old layout (stories never spawn rows, so they're excluded by construction).
+- **Bank details moved to a posting-time gate** — optional at onboarding for Barter + Paid now; if skipped, the posting form shows a warning + mandatory Bank Name / Account Number / IFSC (only when missing) and stamps them across the collab on submit. Server-side gate too.
+- **Onboarding "Not Submitted" now truly newest-first** — DESC was floating date-less rows to the top (SQL NULLS FIRST); fixed with nullsFirst:false + id tie-break.
+
 ### Queue truncation fix + range picker everywhere else + Ad Status date filter (2026-07-11)
 - **Bug: reach-outs missing from the Onboarding queue** (e.g. mrighnaaaaaaa / SIF-10263) — the queue fetched only the newest **500** rows while 795 reach-outs were dated ≥ 4 Jul, so older rows vanished from the list AND its search. Fix: full fetch (10k cap) + **render pagination** ("Show more", 30 first, +50 per click, resets on filter change) in both Onboarding and Posting.
 - **Error Portal Missing Email corrected** — excluded "Save & Skip Email" collabs; now matches the Onboarding Pending Email KPI (both read 1).
