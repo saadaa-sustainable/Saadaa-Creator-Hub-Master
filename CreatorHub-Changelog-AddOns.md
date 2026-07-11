@@ -2,6 +2,11 @@
 ### Data fix — old Sakshi vs new Sakshi Kumari attribution (2026-07-10)
 - Two different people were merged by the historic ingest: **"Sakshi"** (former member, left; owns all Tracker rows Feb 2025 → Apr 2026) had been canonicalized to **"Sakshi Kumari"** (new member, joined June 2026). Renamed 1,942 `logged_by` + 202 `onboarded_by` rows in `historic_posts` back to **"Sakshi"**. Live `posts` rows (27 Jun+ = genuinely Sakshi Kumari's) untouched; raw archives were already correct. Team dropdowns now list the two people separately and the new member's numbers reflect only her own work. Ingest canon rule documented (old Tracker "Sakshi" stays "Sakshi"; June-2026+ sheets' bare "sakshi" = Sakshi Kumari).
 
+### Queue truncation fix + range picker everywhere else + Ad Status date filter (2026-07-11)
+- **Bug: reach-outs missing from the Onboarding queue** (e.g. mrighnaaaaaaa / SIF-10263) — the queue fetched only the newest **500** rows while 795 reach-outs were dated ≥ 4 Jul, so older rows vanished from the list AND its search. Fix: full fetch (10k cap) + **render pagination** ("Show more", 30 first, +50 per click, resets on filter change) in both Onboarding and Posting.
+- **Error Portal Missing Email corrected** — excluded "Save & Skip Email" collabs; now matches the Onboarding Pending Email KPI (both read 1).
+- **Range picker rollout completed** — Creator Analytics (Reached/Posted toggle), Partnership Status (Requested/Posted/Onboarding toggle), and **Ad Status gains its first date filter** (Posted-date range on the row's post date).
+
 ### Onboarding + Posting — submission-aware team filter, attribution + age labels (2026-07-10)
 - **Team filter flips with the Submitted toggle** — Onboarding: "Reached out by" (queue) ↔ **"Onboarded by"** (Submitted). Posting: "Onboarded by" (queue) ↔ **"Posted by"** (Submitted; new `posts.posted_by` stamped on every posting submit — older posted rows fall back to the onboarder).
 - **Rows, cards & Overview** now show who owns the row in context — `Reached out by X` / `Onboarded by X` / `Posted by X` — plus an **age label** (`Reached out 12d ago`, `Onboarded 3d ago`, `Posted today`); hidden when the date is missing. Overview shows both attribution fields when present.
