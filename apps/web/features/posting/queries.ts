@@ -109,7 +109,9 @@ export async function fetchPostingTable(
 
   const { data, error } = await q
     .order("onboard_date", { ascending: false })
-    .limit(500);
+    // High cap — the old 500 silently hid older rows from the queue AND its
+    // in-memory search (same truncation bug as the onboarding queue).
+    .limit(10_000);
   if (error) throw error;
 
   let rows = (data ?? []) as unknown as PostingRow[];

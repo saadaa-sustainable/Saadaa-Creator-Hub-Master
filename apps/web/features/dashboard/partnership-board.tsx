@@ -29,6 +29,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { DeactivatedBadge } from "@/components/ui/status-pill";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { formatFollowers, formatRupees } from "@/lib/formatters";
 import { WhCategoryBadge } from "@/features/ad-status/ad-board";
 import {
@@ -177,6 +178,46 @@ export function PartnershipBoard({
         router.replace(`?${next.toString()}` as never, { scroll: false }),
       );
     },
+    [params, router],
+  );
+
+  // One date-range picker over three bases (Requested / Posted / Onboarding).
+  // The active basis is inferred from which URL pair is set; switching the
+  // basis moves the current range onto the new pair atomically.
+  const DATE_PAIRS = {
+    requested: ["sentFrom", "sentTo"],
+    posted: ["postedFrom", "postedTo"],
+    onboard: ["onboardFrom", "onboardTo"],
+  } as const;
+  const dateMode: keyof typeof DATE_PAIRS =
+    initialFilters.postedFrom || initialFilters.postedTo
+      ? "posted"
+      : initialFilters.onboardFrom || initialFilters.onboardTo
+        ? "onboard"
+        : "requested";
+  const dateFrom =
+    initialFilters.postedFrom ??
+    initialFilters.onboardFrom ??
+    initialFilters.sentFrom ??
+    "";
+  const dateTo =
+    initialFilters.postedTo ??
+    initialFilters.onboardTo ??
+    initialFilters.sentTo ??
+    "";
+  const applyDateRange = useCallback(
+    (mode: keyof typeof DATE_PAIRS, from: string, to: string) => {
+      const next = new URLSearchParams(params.toString());
+      Object.values(DATE_PAIRS)
+        .flat()
+        .forEach((k) => next.delete(k));
+      if (from) next.set(DATE_PAIRS[mode][0], from);
+      if (to) next.set(DATE_PAIRS[mode][1], to);
+      startNav(() =>
+        router.replace(`?${next.toString()}` as never, { scroll: false }),
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [params, router],
   );
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -359,36 +400,27 @@ export function PartnershipBoard({
               ...data.teamOptions.map((t) => ({ value: t, label: t })),
             ]}
           />
-          <FilterDate
-            label="Requested from"
-            value={initialFilters.sentFrom ?? ""}
-            onChange={(v) => setParam("sentFrom", v)}
-          />
-          <FilterDate
-            label="Requested to"
-            value={initialFilters.sentTo ?? ""}
-            onChange={(v) => setParam("sentTo", v)}
-          />
-          <FilterDate
-            label="Posted from"
-            value={initialFilters.postedFrom ?? ""}
-            onChange={(v) => setParam("postedFrom", v)}
-          />
-          <FilterDate
-            label="Posted to"
-            value={initialFilters.postedTo ?? ""}
-            onChange={(v) => setParam("postedTo", v)}
-          />
-          <FilterDate
-            label="Onboarding from"
-            value={initialFilters.onboardFrom ?? ""}
-            onChange={(v) => setParam("onboardFrom", v)}
-          />
-          <FilterDate
-            label="Onboarding to"
-            value={initialFilters.onboardTo ?? ""}
-            onChange={(v) => setParam("onboardTo", v)}
-          />
+          <label className="onboarding-filter-field">
+            <span>Date range</span>
+            <DateRangePicker
+              label="Date range"
+              value={{ from: dateFrom, to: dateTo }}
+              modes={[
+                { value: "requested", label: "Requested" },
+                { value: "posted", label: "Posted" },
+                { value: "onboard", label: "Onboarding" },
+              ]}
+              mode={dateMode}
+              onModeChange={(m) =>
+                applyDateRange(
+                  m as "requested" | "posted" | "onboard",
+                  dateFrom,
+                  dateTo,
+                )
+              }
+              onChange={(r) => applyDateRange(dateMode, r.from, r.to)}
+            />
+          </label>
           <label className="onboarding-filter-field">
             <span>Ad ID</span>
             <input
@@ -740,24 +772,3 @@ function FilterSelect({
   );
 }
 
-function FilterDate({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string | undefined) => void;
-}) {
-  return (
-    <label className="onboarding-filter-field">
-      <span>{label}</span>
-      <input
-        type="date"
-        className="onboarding-filter-select"
-        value={value}
-        onChange={(e) => onChange(e.target.value || undefined)}
-      />
-    </label>
-  );
-}

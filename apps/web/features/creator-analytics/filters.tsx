@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { workflowStatusLabel } from "@/lib/formatters";
 import type {
   CreatorAnalyticsFilterOptions,
@@ -174,26 +175,64 @@ export function CreatorAnalyticsFiltersBar({
           ]}
         />
 
-        <FilterDate
-          label="Reach Out from"
-          value={initial.reachOutFrom ?? ""}
-          onBlur={(v) => setParam("reachOutFrom", v)}
-        />
-        <FilterDate
-          label="Reach Out to"
-          value={initial.reachOutTo ?? ""}
-          onBlur={(v) => setParam("reachOutTo", v)}
-        />
-        <FilterDate
-          label="Posted from"
-          value={initial.postedFrom ?? ""}
-          onBlur={(v) => setParam("postedFrom", v)}
-        />
-        <FilterDate
-          label="Posted to"
-          value={initial.postedTo ?? ""}
-          onBlur={(v) => setParam("postedTo", v)}
-        />
+        <label className="onboarding-filter-field">
+          <span>Date range</span>
+          <DateRangePicker
+            label="Date range"
+            value={{
+              from:
+                (initial.postedFrom ?? "")
+                  ? (initial.postedFrom ?? "")
+                  : (initial.reachOutFrom ?? ""),
+              to:
+                (initial.postedTo ?? "")
+                  ? (initial.postedTo ?? "")
+                  : (initial.reachOutTo ?? ""),
+            }}
+            modes={[
+              { value: "reached", label: "Reached" },
+              { value: "posted", label: "Posted" },
+            ]}
+            mode={initial.postedFrom || initial.postedTo ? "posted" : "reached"}
+            onModeChange={(m) => {
+              // Switching the basis moves the active range onto the new pair.
+              const next = new URLSearchParams(params.toString());
+              const from =
+                next.get("postedFrom") ?? next.get("reachOutFrom") ?? "";
+              const to = next.get("postedTo") ?? next.get("reachOutTo") ?? "";
+              ["reachOutFrom", "reachOutTo", "postedFrom", "postedTo"].forEach(
+                (k) => next.delete(k),
+              );
+              if (from)
+                next.set(m === "posted" ? "postedFrom" : "reachOutFrom", from);
+              if (to) next.set(m === "posted" ? "postedTo" : "reachOutTo", to);
+              next.delete("cpage");
+              next.delete("page");
+              startTransition(() =>
+                router.replace(`?${next.toString()}` as never, {
+                  scroll: false,
+                }),
+              );
+            }}
+            onChange={(r) => {
+              const posted = Boolean(initial.postedFrom || initial.postedTo);
+              const next = new URLSearchParams(params.toString());
+              ["reachOutFrom", "reachOutTo", "postedFrom", "postedTo"].forEach(
+                (k) => next.delete(k),
+              );
+              if (r.from)
+                next.set(posted ? "postedFrom" : "reachOutFrom", r.from);
+              if (r.to) next.set(posted ? "postedTo" : "reachOutTo", r.to);
+              next.delete("cpage");
+              next.delete("page");
+              startTransition(() =>
+                router.replace(`?${next.toString()}` as never, {
+                  scroll: false,
+                }),
+              );
+            }}
+          />
+        </label>
 
         <div className="onboarding-filter-actions">
           {hasAny && (
@@ -224,26 +263,6 @@ function FilterSelect({ label, value, onChange, options }: FilterSelectProps) {
         options={options.map((o) => ({ value: o.value, label: o.label }))}
         placeholder={`All ${label.toLowerCase()}`}
         searchPlaceholder={`Search ${label.toLowerCase()}…`}
-      />
-    </label>
-  );
-}
-
-interface FilterDateProps {
-  label: string;
-  value: string;
-  onBlur: (value: string | undefined) => void;
-}
-
-function FilterDate({ label, value, onBlur }: FilterDateProps) {
-  return (
-    <label className="onboarding-filter-field">
-      <span>{label}</span>
-      <input
-        type="date"
-        defaultValue={value}
-        onBlur={(e) => onBlur(e.target.value || undefined)}
-        className="onboarding-filter-select"
       />
     </label>
   );

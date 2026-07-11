@@ -37,6 +37,12 @@ export function PostingTable({
   const [selected, setSelected] = useState<PostingRow | null>(null);
   const [overviewRow, setOverviewRow] = useState<PostingRow | null>(null);
   const [view, setView] = useState<"list" | "cards">(initialView);
+  // Render pagination — the full set is fetched (search/filters see everything);
+  // only the DOM is windowed. "Show more" reveals the next page.
+  const RENDER_PAGE = 30;
+  const [visibleCount, setVisibleCount] = useState(RENDER_PAGE);
+  // New filter/search result set → back to page one.
+  useEffect(() => setVisibleCount(RENDER_PAGE), [rows]);
 
   // Mobile force-cards (matches onboarding behavior).
   useEffect(() => {
@@ -112,7 +118,7 @@ export function PostingTable({
           <PostingEmpty />
         ) : (
           <div className="campaign-list-view stage-campaign-list">
-            {rows.map((r, index) => (
+            {rows.slice(0, visibleCount).map((r, index) => (
               <PostingListRow
                 key={r.post_id}
                 r={r}
@@ -127,7 +133,7 @@ export function PostingTable({
         <PostingEmpty />
       ) : (
         <div className="ob-card-grid">
-          {rows.map((r) => (
+          {rows.slice(0, visibleCount).map((r) => (
             <PostingCard
               key={r.post_id}
               r={r}
@@ -136,6 +142,18 @@ export function PostingTable({
               onOverview={setOverviewRow}
             />
           ))}
+        </div>
+      )}
+
+      {rows.length > visibleCount && (
+        <div className="flex justify-center pt-1">
+          <button
+            type="button"
+            className="rounded-[10px] border border-border bg-bg-white px-4 py-2 text-[0.8rem] font-semibold text-text-secondary transition-colors hover:bg-bg-muted"
+            onClick={() => setVisibleCount((v) => v + 50)}
+          >
+            Show more ({rows.length - visibleCount} remaining)
+          </button>
         </div>
       )}
     </>

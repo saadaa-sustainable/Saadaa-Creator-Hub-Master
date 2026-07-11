@@ -91,7 +91,9 @@ export async function fetchOnboardingTable(
 
   const { data, error } = await q
     .order("reach_out_date", { ascending: false })
-    .limit(500);
+    // High cap — the July ingests alone exceed the old 500, which silently
+    // hid older reach-outs from the queue AND its in-memory search.
+    .limit(10_000);
   if (error) throw error;
 
   let rows = (data ?? []) as unknown as OnboardingRow[];

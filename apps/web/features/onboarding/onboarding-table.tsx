@@ -67,6 +67,12 @@ export function OnboardingTable({
   } | null>(null);
   const [view, setView] = useState<"list" | "cards">(initialView);
   const [repeatOpen, setRepeatOpen] = useState(false);
+  // Render pagination — the full set is fetched (search/filters see everything);
+  // only the DOM is windowed. "Show more" reveals the next page.
+  const RENDER_PAGE = 30;
+  const [visibleCount, setVisibleCount] = useState(RENDER_PAGE);
+  // New filter/search result set → back to page one.
+  useEffect(() => setVisibleCount(RENDER_PAGE), [rows]);
 
   // Collapse the board to ONE row per collab_id: render the collab
   // representative only (lowest post_id within each collab_id group).
@@ -204,9 +210,9 @@ export function OnboardingTable({
           />
         ) : (
           <div className="campaign-list-view stage-campaign-list">
-            {parentRows.map((r, index) => (
+            {parentRows.slice(0, visibleCount).map((r, index) => (
               <OnboardingListRow
-                key={r.post_id}
+                key={r.post_id ?? r.id}
                 r={r}
                 rows={rows}
                 index={index}
@@ -224,9 +230,9 @@ export function OnboardingTable({
         />
       ) : (
         <div className="ob-card-grid">
-          {parentRows.map((r) => (
+          {parentRows.slice(0, visibleCount).map((r) => (
             <ObCard
-              key={r.post_id}
+              key={r.post_id ?? r.id}
               r={r}
               rows={rows}
               onOpen={setOrderRow}
@@ -234,6 +240,18 @@ export function OnboardingTable({
               onEmail={(postId) => setCollabEmail({ postId })}
             />
           ))}
+        </div>
+      )}
+
+      {parentRows.length > visibleCount && (
+        <div className="flex justify-center pt-1">
+          <button
+            type="button"
+            className="rounded-[10px] border border-border bg-bg-white px-4 py-2 text-[0.8rem] font-semibold text-text-secondary transition-colors hover:bg-bg-muted"
+            onClick={() => setVisibleCount((v) => v + 50)}
+          >
+            Show more ({parentRows.length - visibleCount} remaining)
+          </button>
         </div>
       )}
     </>
