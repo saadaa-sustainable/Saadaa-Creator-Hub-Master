@@ -100,9 +100,13 @@ export function PostingTable({
           requireBank={
             (selected.collab_type ?? "").trim().toLowerCase() ===
               "barter + paid" &&
-            !(
-              String(selected.bank_number ?? "").trim() &&
-              String(selected.ifsc ?? "").trim()
+            // COLLAB-LEVEL: bank present on ANY deliverable of this collab
+            // (e.g. filled while posting a sibling) satisfies the gate.
+            !rows.some(
+              (r) =>
+                collabIdLabel(r) === collabIdLabel(selected) &&
+                String(r.bank_number ?? "").trim() &&
+                String(r.ifsc ?? "").trim(),
             )
           }
         />

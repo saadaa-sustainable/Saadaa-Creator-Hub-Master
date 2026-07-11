@@ -221,18 +221,38 @@ export async function submitPosting(input: unknown) {
 
     // GATE: Barter + Paid needs bank details before Posted. Optional at
     // onboarding (2026-07-11) — if the collab still has none, the posting form
-    // must supply all three.
+    // must supply all three. COLLAB-LEVEL check: bank present on ANY deliverable
+    // of the collab satisfies it (e.g. filled while posting a sibling P{n}).
     const isBarterPaid =
       String(postRow?.collab_type ?? "").trim().toLowerCase() ===
       "barter + paid";
-    const bankOnRow =
+    let bankOnCollab =
       String(postRow?.bank_number ?? "").trim().length > 0 &&
       String(postRow?.ifsc ?? "").trim().length > 0;
+    if (isBarterPaid && !bankOnCollab && postRow?.inf_id) {
+      const { data: sibs } = await (supabase as any)
+        .from("posts")
+        .select("collab_id, collab_number, bank_number, ifsc")
+        .eq("inf_id", postRow.inf_id)
+        .limit(100);
+      bankOnCollab = ((sibs ?? []) as Array<Record<string, unknown>>).some(
+        (s) => {
+          const sKey =
+            (s.collab_id as string | null) ||
+            `${postRow.inf_id}-C${Number(s.collab_number ?? 1)}`;
+          return (
+            sKey === collabKey &&
+            String(s.bank_number ?? "").trim().length > 0 &&
+            String(s.ifsc ?? "").trim().length > 0
+          );
+        },
+      );
+    }
     const bankInForm =
       (bankName ?? "").length > 0 &&
       (bankNumber ?? "").length > 0 &&
       (ifsc ?? "").length > 0;
-    if (isBarterPaid && !bankOnRow && !bankInForm) {
+    if (isBarterPaid && !bankOnCollab && !bankInForm) {
       const fieldErrors: Record<string, string> = {};
       if (!bankName) fieldErrors.bankName = "Required for Barter + Paid";
       if (!bankNumber) fieldErrors.bankNumber = "Required for Barter + Paid";
@@ -262,12 +282,25 @@ export async function submitPosting(input: unknown) {
   if (updErr) return { ok: false as const, error: updErr.message };
 
   // Bank details supplied in the posting form → stamp them on EVERY deliverable
-  // of the collab (payments read them from the representative row).
+  // of the collab (payments read them from the representative row). Covers
+  // legacy rows whose collab_id is null via the inf_id-C{n} fallback key.
   if (collabKey && bankName && bankNumber && ifsc) {
-    await (supabase as any)
+    const patch = { bank_name: bankName, bank_number: bankNumber, ifsc };
+    const { count } = await (supabase as any)
       .from("posts")
-      .update({ bank_name: bankName, bank_number: bankNumber, ifsc })
+      .update(patch, { count: "exact" })
       .eq("collab_id", collabKey);
+    if (!count) {
+      const m = collabKey.match(/^(SIF-\d+)-C(\d+)$/i);
+      if (m) {
+        await (supabase as any)
+          .from("posts")
+          .update(patch)
+          .eq("inf_id", m[1])
+          .eq("collab_number", Number(m[2]))
+          .is("collab_id", null);
+      }
+    }
   }
 
   // Partnership auto-invite happens CLIENT-DRIVEN right after this action
