@@ -74,6 +74,9 @@ export interface AdStatusFilters {
   adStatus?: string;
   search?: string;
   sort?: string;
+  /** Posted-date range applied to row.postDate (ISO). */
+  postedFrom?: string;
+  postedTo?: string;
 }
 
 export interface AdStatusFilterOptions {

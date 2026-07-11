@@ -2015,12 +2015,21 @@ export function AdStatusBoard({
   const classification = filters.classification ?? "";
   const adStatus = (filters.adStatus ?? "").trim().toLowerCase();
   const sortKey = filters.sort ?? "";
+  const postedFrom = (filters.postedFrom ?? "").slice(0, 10);
+  const postedTo = (filters.postedTo ?? "").slice(0, 10);
 
   const matchesBase = (r: AdStatusRow) => {
     if (q) {
       const hay =
         `${r.name} ${r.username} ${r.postId} ${r.postIdShort} ${r.primaryAd?.adName ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
+    }
+    // Posted-date range — rows without a post date drop out when a range is set.
+    if (postedFrom || postedTo) {
+      const day = (r.postDate ?? "").slice(0, 10);
+      if (!day) return false;
+      if (postedFrom && day < postedFrom) return false;
+      if (postedTo && day > postedTo) return false;
     }
     // Ad Status = the row's DISPLAYED delivery status: the first-occurrence
     // ad's Meta status (ACTIVE/PAUSED/…) when matched, else the legacy field.
@@ -2041,7 +2050,7 @@ export function AdStatusBoard({
     // under an adStatus filter (no warehouse ad → no delivery status).
     return sortAdRows(untested.filter(matchesBase), sortKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [untested, q, adStatus, sortKey]);
+  }, [untested, q, adStatus, sortKey, postedFrom, postedTo]);
 
   const filteredAdRun = useMemo(() => {
     // __untested special value → collapse run section
@@ -2060,7 +2069,7 @@ export function AdStatusBoard({
     });
     return sortAdRows(filtered, sortKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adRun, q, classification, adStatus, sortKey]);
+  }, [adRun, q, classification, adStatus, sortKey, postedFrom, postedTo]);
 
   const total = filteredUntested.length + filteredAdRun.length;
 

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowDownUp, Hash, Search, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { AdStatusFilterOptions, AdStatusFilters } from "./types";
 
 const FILTER_KEYS = [
@@ -13,6 +14,8 @@ const FILTER_KEYS = [
   "classification",
   "adStatus",
   "sort",
+  "postedFrom",
+  "postedTo",
 ] as const satisfies readonly (keyof AdStatusFilters)[];
 
 const SORT_OPTIONS = [
@@ -165,6 +168,29 @@ export function AdStatusFiltersBar({
             placeholder="Default order"
             searchPlaceholder="Search sort…"
             className="campaign-filter-combobox"
+          />
+        </div>
+
+        <div className="min-w-[190px]">
+          <DateRangePicker
+            label="Posted date"
+            value={{
+              from: initial.postedFrom ?? "",
+              to: initial.postedTo ?? "",
+            }}
+            onChange={(r) => {
+              // Atomic two-key update — sequential setParam calls would race.
+              const next = new URLSearchParams(params.toString());
+              if (r.from) next.set("postedFrom", r.from);
+              else next.delete("postedFrom");
+              if (r.to) next.set("postedTo", r.to);
+              else next.delete("postedTo");
+              startTransition(() =>
+                router.replace(`?${next.toString()}` as never, {
+                  scroll: false,
+                }),
+              );
+            }}
           />
         </div>
       </div>
