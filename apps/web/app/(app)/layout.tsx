@@ -7,6 +7,7 @@ import { SidebarScrim } from "@/components/nav/sidebar-scrim";
 import { MobileTopbar } from "@/components/nav/mobile-topbar";
 import { TopBar } from "@/components/nav/top-bar";
 import { getPendingApprovalsCount } from "@/lib/approvals-count";
+import { getActingAs } from "@/lib/impersonation";
 import { KnowMoreModal } from "@/features/know-more/know-more-modal";
 import { TestModeBanner } from "@/components/ui/test-mode-banner";
 import { getTestModeScopes } from "@/features/settings/actions";
@@ -37,6 +38,10 @@ export default async function AppShell({
   // DB read; approval mutations revalidateTag("approvals-count").
   const approvalsCount = isAdmin ? await getPendingApprovalsCount() : 0;
 
+  // "Acting as" pill — cookie read; hits the DB only while an admin is
+  // actively impersonating (cookie present), so normal navs stay read-free.
+  const actingAs = isAdmin ? await getActingAs() : null;
+
   return (
     <div className="app-shell">
       <a href="#main-content" className="skip-link">
@@ -54,7 +59,12 @@ export default async function AppShell({
           {children}
         </main>
       </div>
-      {isAdmin && <TopBar approvalsCount={approvalsCount} />}
+      {isAdmin && (
+        <TopBar
+          approvalsCount={approvalsCount}
+          actingAsName={actingAs?.name ?? null}
+        />
+      )}
       <KnowMoreModal />
     </div>
   );

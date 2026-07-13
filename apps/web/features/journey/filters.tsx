@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type {
   JourneyClientFilters,
   JourneyFilterOptions,
   JourneyFilters,
 } from "./types";
+import { JOURNEY_STAGE_OPTIONS } from "./types";
 
 /** Category → Tier label mapping (mirrors legacy). */
 export const TIER_LABELS = [
@@ -67,7 +69,10 @@ export function JourneyFiltersBar({
   );
 
   const hasUrlFilter = !!params.get("campaign");
-  const hasClientFilter = Object.values(clientFilters).some(Boolean);
+  // dateMode is a basis toggle, not a filter — always truthy, so exclude it.
+  const hasClientFilter = Object.entries(clientFilters).some(
+    ([key, value]) => key !== "dateMode" && Boolean(value),
+  );
   const hasAny = hasUrlFilter || hasClientFilter;
 
   const clearAll = () => {
@@ -83,6 +88,10 @@ export function JourneyFiltersBar({
       tier: "",
       orderStatus: "",
       collabType: "",
+      stage: "",
+      dateMode: "reached",
+      dateFrom: "",
+      dateTo: "",
     });
   };
 
@@ -193,6 +202,47 @@ export function JourneyFiltersBar({
             ]}
             placeholder="All Types"
             searchPlaceholder="Search types…"
+          />
+        </label>
+
+        {/* Stage — client-side */}
+        <label className="onboarding-filter-field">
+          <span>Stage</span>
+          <SearchableSelect
+            value={clientFilters.stage}
+            onChange={(v) => onClientFiltersChange({ stage: v })}
+            options={[
+              { value: "", label: "All Stages" },
+              ...JOURNEY_STAGE_OPTIONS.map((s) => ({
+                value: s.value,
+                label: s.label,
+              })),
+            ]}
+            placeholder="All Stages"
+            searchPlaceholder="Search stages…"
+          />
+        </label>
+
+        {/* Date range — client-side, with a Reached/Onboarded/Posted basis toggle */}
+        <label className="onboarding-filter-field">
+          <span>Date range</span>
+          <DateRangePicker
+            label="Date range"
+            value={{ from: clientFilters.dateFrom, to: clientFilters.dateTo }}
+            onChange={(r) =>
+              onClientFiltersChange({ dateFrom: r.from, dateTo: r.to })
+            }
+            modes={[
+              { value: "reached", label: "Reached" },
+              { value: "onboarded", label: "Onboarded" },
+              { value: "posted", label: "Posted" },
+            ]}
+            mode={clientFilters.dateMode}
+            onModeChange={(m) =>
+              onClientFiltersChange({
+                dateMode: m as JourneyClientFilters["dateMode"],
+              })
+            }
           />
         </label>
       </div>

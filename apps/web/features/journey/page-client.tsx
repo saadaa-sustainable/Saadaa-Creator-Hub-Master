@@ -7,7 +7,7 @@ import type {
   JourneyFilterOptions,
   JourneyFilters,
 } from "./types";
-import { EMPTY_CLIENT_FILTERS } from "./types";
+import { EMPTY_CLIENT_FILTERS, JOURNEY_STAGE_OPTIONS } from "./types";
 import { computeJourney } from "./compute";
 import { JourneyKpiStrip } from "./kpi-strip";
 import { JourneyFunnelStrip } from "./funnel-strip";
@@ -43,14 +43,43 @@ function applyClientFilters(
   cards: JourneyCard[],
   filters: JourneyClientFilters,
 ): JourneyCard[] {
-  const { search, influencer, teamMember, tier, orderStatus, collabType } =
-    filters;
+  const {
+    search,
+    influencer,
+    teamMember,
+    tier,
+    orderStatus,
+    collabType,
+    stage,
+    dateMode,
+    dateFrom,
+    dateTo,
+  } = filters;
   const hasAny =
-    search || influencer || teamMember || tier || orderStatus || collabType;
+    search ||
+    influencer ||
+    teamMember ||
+    tier ||
+    orderStatus ||
+    collabType ||
+    stage ||
+    dateFrom ||
+    dateTo;
 
   if (!hasAny) return cards;
 
   const searchLower = search.toLowerCase().trim();
+  const stageStatuses = stage
+    ? JOURNEY_STAGE_OPTIONS.find((s) => s.value === stage)?.statuses
+    : undefined;
+  // Date basis column for the range filter. Rows missing that date are
+  // excluded while a range is active (they can't be placed in time).
+  const dateField =
+    dateMode === "posted"
+      ? ("post_date" as const)
+      : dateMode === "onboarded"
+        ? ("onboard_date" as const)
+        : ("reach_out_date" as const);
 
   return cards.filter((card) => {
     // Search: name, username, post_id
@@ -92,6 +121,18 @@ function applyClientFilters(
 
     // Collab type: match by content_type
     if (collabType && card.content_type !== collabType) return false;
+
+    // Stage: match by workflow_status set
+    if (stageStatuses && !stageStatuses.includes(card.workflow_status ?? ""))
+      return false;
+
+    // Date range on the selected basis (reached / onboarded / posted)
+    if (dateFrom || dateTo) {
+      const raw = (card[dateField] ?? "").slice(0, 10);
+      if (!raw) return false;
+      if (dateFrom && raw < dateFrom) return false;
+      if (dateTo && raw > dateTo) return false;
+    }
 
     return true;
   });

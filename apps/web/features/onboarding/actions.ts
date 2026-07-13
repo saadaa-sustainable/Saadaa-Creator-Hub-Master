@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { readTermsAttachmentFile, TERMS_ATTACHMENT } from "@/lib/attachments";
 import { logSystemError, resolveSystemError } from "@/lib/system-errors";
 import { assertPermission } from "@/lib/rbac.server";
+import { attributionName } from "@/lib/impersonation";
 import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
@@ -382,7 +383,9 @@ export async function submitOnboarding(
       .map((garment) => garment.trim())
       .filter(Boolean).length ||
     null;
-  const onboardedBy = actor.name || actor.email || null;
+  // Attribution follows the acting-as identity when a Global Admin is
+  // submitting on a team member's behalf (lib/impersonation.ts).
+  const onboardedBy = await attributionName(actor);
 
   // §6.2 deliverable expansion
   const total = v.reels + v.posts;

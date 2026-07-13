@@ -4,6 +4,7 @@ import {
   type OnboardingEditField,
   type OnboardingEditItem,
 } from "@/features/onboarding/edit-fields";
+import { buildCampaignChanges, type CampaignChange } from "./campaign-diff";
 
 export type { OnboardingEditItem };
 
@@ -30,6 +31,9 @@ export interface ApprovalItem {
   createdBy: string | null;
   createdAt: string | null;
   notes?: string | null;
+  /** Edit requests only — before/after diff so admins see what changed
+   *  BEFORE deciding (same table the onboarding-edit card renders). */
+  changes?: CampaignChange[];
 }
 
 export type ApprovalHistoryStatus =
@@ -97,7 +101,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
     svc
       .from("campaign_approval_requests")
       .select(
-        "id, campaign_id, status, request_payload, requested_by_email, requested_by_name, notes, created_at",
+        "id, campaign_id, status, request_payload, before_payload, requested_by_email, requested_by_name, notes, created_at",
       )
       .eq("request_type", "edit")
       .eq("status", "Pending Approval")
@@ -152,6 +156,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
 
   const editItems: ApprovalItem[] = ((edits.data ?? []) as Raw[]).map((r) => {
     const payload = (r.request_payload ?? {}) as Raw;
+    const beforePayload = (r.before_payload ?? {}) as Raw;
     return {
       kind: "edit",
       approvalId: asNumber(r.id) ?? undefined,
@@ -168,6 +173,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
         asString(r.requested_by_name) ?? asString(r.requested_by_email),
       createdAt: asString(r.created_at),
       notes: asString(r.notes),
+      changes: buildCampaignChanges(payload, beforePayload),
     };
   });
 

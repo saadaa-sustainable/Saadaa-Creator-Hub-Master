@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
+import { attributionName } from "@/lib/impersonation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { closeCampaignIfComplete } from "@/lib/campaign-lifecycle";
 import { getCampaignAutoCloseEnabled } from "@/features/settings/actions";
@@ -275,7 +276,9 @@ export async function submitPosting(input: unknown) {
       raw_dump: rawDump || null,
       workflow_status: "Posted",
       // Posting-stage attribution — drives the "Posted by" filter on Submitted.
-      posted_by: actor.name || actor.email || null,
+      // Follows the acting-as identity when a Global Admin submits on a team
+      // member's behalf (lib/impersonation.ts).
+      posted_by: await attributionName(actor),
     })
     .eq("post_id", postId);
 

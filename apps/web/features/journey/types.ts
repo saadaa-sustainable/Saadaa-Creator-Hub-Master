@@ -126,6 +126,12 @@ export interface JourneyClientFilters {
   tier: string;
   orderStatus: string;
   collabType: string;
+  /** Pipeline stage: "" (all) | "reach-out" | "onboarding" | "posted". */
+  stage: string;
+  /** Date-range basis: which date column the range applies to. */
+  dateMode: "reached" | "onboarded" | "posted";
+  dateFrom: string;
+  dateTo: string;
 }
 
 export const EMPTY_CLIENT_FILTERS: JourneyClientFilters = {
@@ -135,4 +141,19 @@ export const EMPTY_CLIENT_FILTERS: JourneyClientFilters = {
   tier: "",
   orderStatus: "",
   collabType: "",
+  stage: "",
+  dateMode: "reached",
+  dateFrom: "",
+  dateTo: "",
 };
+
+/** Stage filter options → the workflow_status sets each stage covers. */
+export const JOURNEY_STAGE_OPTIONS: {
+  value: string;
+  label: string;
+  statuses: string[];
+}[] = [
+  { value: "reach-out", label: "Reach Out", statuses: ["Reach Out"] },
+  { value: "onboarding", label: "Onboarding", statuses: ["On Board", "Order Sent"] },
+  { value: "posted", label: "Posted", statuses: ["Posted", "Delivered"] },
+];

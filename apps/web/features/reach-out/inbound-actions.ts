@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { assertPermission } from "@/lib/rbac.server";
+import { attributionName } from "@/lib/impersonation";
 import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
@@ -41,6 +42,9 @@ export async function submitInboundBatch(
   input: unknown,
 ): Promise<InboundBatchResult> {
   const actor = await assertPermission("reachout_inbound");
+  // Attribution follows the acting-as identity when a Global Admin is
+  // submitting on a team member's behalf (lib/impersonation.ts).
+  const loggedBy = await attributionName(actor);
   await assertCreateAllowed("creator", actor, "Creators (Reach Out)");
 
   const parsed = InboundBatchSchema.safeParse(input);
@@ -136,7 +140,7 @@ export async function submitInboundBatch(
         p_collab_type: null,
         p_commercial_amount: 0,
         p_raw_dump: null,
-        p_logged_by_email: actor.name || actor.email,
+        p_logged_by_email: loggedBy,
       })
       .single();
 

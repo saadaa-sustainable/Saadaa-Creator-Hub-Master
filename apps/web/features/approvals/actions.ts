@@ -6,6 +6,7 @@ import {
   ONBOARDING_EDIT_FIELD_LABELS,
   type OnboardingEditField,
 } from "@/features/onboarding/edit-fields";
+import { buildCampaignChanges } from "./campaign-diff";
 
 /**
  * Detail behind an Approval History row. For onboarding edits this is the
@@ -22,17 +23,6 @@ export interface ApprovalHistoryDetail {
   changes: Array<{ label: string; before: string | null; after: string }>;
 }
 
-const CAMPAIGN_PAYLOAD_LABELS: Record<string, string> = {
-  campaignName: "Campaign Name",
-  keyMessage: "Key Message",
-  totalBudget: "Total Budget (₹)",
-  numCreators: "No. of Creators",
-  startDate: "Start Date",
-  endDate: "End Date",
-  briefLink: "Brief Link",
-  internalBriefLink: "Internal Brief Link",
-  status: "Status",
-};
 
 export async function getApprovalHistoryDetail(input: {
   actionType: string;
@@ -109,16 +99,7 @@ export async function getApprovalHistoryDetail(input: {
       string,
       unknown
     >;
-    const changes = Object.entries(payload)
-      .filter(([, v]) => v != null && String(v).trim() !== "")
-      .map(([k, v]) => ({
-        label: CAMPAIGN_PAYLOAD_LABELS[k] ?? k,
-        before:
-          beforePayload[k] != null ? String(beforePayload[k]) : null,
-        after: String(v),
-      }))
-      // Show only real differences when a before snapshot exists.
-      .filter((c) => c.before == null || c.before !== c.after);
+    const changes = buildCampaignChanges(payload, beforePayload);
     return {
       ok: true,
       detail: {

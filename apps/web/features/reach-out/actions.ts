@@ -5,6 +5,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { after } from "next/server";
 import { ReachOutSchema } from "./schema";
 import { assertPermission } from "@/lib/rbac.server";
+import { attributionName } from "@/lib/impersonation";
 import { assertCreateAllowed } from "@/lib/test-mode";
 import { createServiceClient } from "@/lib/supabase/server";
 import { stampTestRows } from "@/features/settings/actions";
@@ -156,7 +157,9 @@ export async function submitReachOut(input: unknown): Promise<ReachOutResult> {
       p_collab_type: null,
       p_commercial_amount: null,
       p_raw_dump: null,
-      p_logged_by_email: actor.name || actor.email,
+      // Attribution follows the acting-as identity when a Global Admin is
+      // submitting on a team member's behalf (lib/impersonation.ts).
+      p_logged_by_email: await attributionName(actor),
     })
     .single();
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -232,20 +233,51 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Metric
-          icon={Wallet}
-          label="Budget"
-          value={c.budget != null ? formatRupees(c.budget) : "-"}
-        />
-        <Metric
-          icon={Users}
-          label="Creators"
-          value={c.creators != null ? String(c.creators) : "-"}
-        />
-        <Metric icon={Calendar} label="Start" value={formatDate(c.startDate)} />
-        <Metric icon={Calendar} label="End" value={formatDate(c.endDate)} />
-      </div>
+      {/* Edit requests: before/after diff so the admin sees exactly what
+          changes BEFORE deciding — same table the onboarding-edit card uses. */}
+      {isEdit && (c.changes?.length ?? 0) > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[300px] text-[0.7rem]">
+            <thead>
+              <tr className="border-b border-border text-[0.54rem] font-extrabold uppercase text-text-tertiary">
+                <th className="pb-1 pr-2 text-left">Field</th>
+                <th className="px-1.5 pb-1 text-left">Before</th>
+                <th className="pb-1 pl-1.5 text-left">After</th>
+              </tr>
+            </thead>
+            <tbody>
+              {c.changes!.map((ch) => (
+                <tr key={ch.label} className="border-t border-border">
+                  <td className="py-1 pr-2 font-bold text-text-primary">
+                    {ch.label}
+                  </td>
+                  <td className="max-w-[160px] truncate px-1.5 py-1 text-danger-text line-through">
+                    {ch.before ?? "—"}
+                  </td>
+                  <td className="max-w-[200px] truncate py-1 pl-1.5 font-semibold text-[#2E7145]">
+                    {ch.after || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Metric
+            icon={Wallet}
+            label="Budget"
+            value={c.budget != null ? formatRupees(c.budget) : "-"}
+          />
+          <Metric
+            icon={Users}
+            label="Creators"
+            value={c.creators != null ? String(c.creators) : "-"}
+          />
+          <Metric icon={Calendar} label="Start" value={formatDate(c.startDate)} />
+          <Metric icon={Calendar} label="End" value={formatDate(c.endDate)} />
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {c.briefLink && /^https?:\/\//i.test(c.briefLink) && (
@@ -647,7 +679,10 @@ function HistoryDetailModal({
   detail: ApprovalHistoryDetail;
   onClose: () => void;
 }) {
-  return (
+  // Portal to <body> — required. Rendered in-tree, the fixed backdrop is
+  // trapped by `.onboarding-stage`'s persistent transform (rise animation
+  // keeps a stacking context), so it painted BELOW the sidebar.
+  return createPortal(
     <div
       className="modal-backdrop modal-backdrop--onboarding"
       role="dialog"
@@ -722,7 +757,8 @@ function HistoryDetailModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
