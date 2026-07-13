@@ -18,6 +18,33 @@ export default function MyDashboardKM() {
         </p>
       </KMSection>
 
+      <KMSection tag="View as team member (Global Admins)">
+        <p>
+          Global Admins see a <strong>View as team member</strong> control
+          under the page header. Picking a member switches the whole dashboard
+          to <em>their</em> pipeline — and, until you exit, every reach-out,
+          onboarding and posting form you submit anywhere in CreatorHub is
+          recorded under that member (<KMCode>logged_by</KMCode> /{" "}
+          <KMCode>onboarded_by</KMCode> / <KMCode>posted_by</KMCode>).
+        </p>
+        <KMList>
+          <li>
+            While acting, an amber <strong>&quot;Acting as&quot;</strong> pill
+            sits in the top-right corner on every page — click its ✕ (or
+            &quot;Exit — back to me&quot; here) to return to yourself.
+          </li>
+          <li>
+            The switch lives in a browser <strong>session cookie</strong>: it
+            ends when you exit or close the browser, and it is re-validated on
+            the server on every request (only admins, only active members).
+          </li>
+          <li>
+            Every start/stop is written to the audit log under your real admin
+            account, so on-behalf submits are always traceable.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="KPI formulas">
         <KMList>
           <li>

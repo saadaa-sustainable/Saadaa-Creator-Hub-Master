@@ -27,6 +27,8 @@
 - Hydrates dynamic permission scopes from `access_roles` + `access_role_permissions` using the **service-role** client; on any error it logs loudly and falls back to the static role map (`rbac.ts`), which is **fail-closed** for unknown custom roles.
 - Side effect (best-effort, non-blocking): bumps `last_login_at`/`last_active_at` (debounced 5 min) and writes a `login` row to `user_audit_log`.
 
+**`lib/impersonation.ts`** (2026-07-13) layers "Act as" on top of `getActor()` WITHOUT touching it: `getActingAs()` resolves the `ch-act-as` session cookie (admin-only, target must be an active `user_access` row, never self — else null), and `attributionName(actor)` is what the workflow write stamps (reach-out `logged_by`, onboarding `onboarded_by`, posting `posted_by`) route through. Permission checks ALWAYS use the real actor; only attribution switches. Start/stop actions live in `features/impersonation/actions.ts` (audited). Details in chapter 07 → My Dashboard.
+
 ## RBAC
 
 - **`lib/rbac.ts`** (client-safe): defines 14 `PermissionKey`s — `admin`, `campaign_create`, `campaign_edit`, `reachout_outbound`, `reachout_inbound`, `onboarding_write`, `posting_submit`, `accounts_write`, `performance_view`, `order_status_view`, `sheet_view`, `offboarding_write`, `system_config`, `role_mgmt`. `hasPermission(actor, key)` trusts DB-resolved `actor.permissions` when present (with `admin` implying all non-admin keys), otherwise falls back to `STATIC_GRANTS` per normalized role (Global Admin / User / Accounts Team / Campaign Owner) plus a hard-coded admin-email allowlist.

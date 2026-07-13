@@ -27,6 +27,18 @@ export default function ApprovalsKM() {
             <strong>Campaign cards</strong> — name + id, owner, created date, key
             message, budget / creators / dates, and the campaign brief link.
           </li>
+          <li>
+            <strong>Edit-request cards</strong> (campaign edits and onboarding
+            edits) — show a <strong>Field / Before / After</strong> table of
+            exactly what changes, so you can decide without opening anything
+            else. Approving applies the new values; rejecting leaves the
+            original untouched.
+          </li>
+          <li>
+            <strong>Approval History</strong> — every past decision. Clicking a
+            campaign-edit or onboarding-edit row opens a popup with the same
+            Before/After breakdown that was decided on.
+          </li>
         </KMList>
       </KMSection>
 

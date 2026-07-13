@@ -16,7 +16,11 @@ export default function JourneyKM() {
           <li>
             <strong>2. Filter bar</strong> — Campaign (URL-driven; share the URL to
             hand off a filtered view) plus instant client-side filters: Search,
-            Influencer, Team Member, Tier, Order Status, Collab Type. Hit
+            Influencer, Team Member, Tier, Order Status, Collab Type, Stage
+            (Reach Out / Onboarding / Posted) and a Date range picker whose
+            toggle picks which date it applies to — Reached (reach-out date),
+            Onboarded (onboard date) or Posted (post date). Rows missing the
+            chosen date drop out while a range is active. Hit
             &quot;Clear&quot; to reset.
           </li>
           <li>
