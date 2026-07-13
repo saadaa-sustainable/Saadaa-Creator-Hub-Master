@@ -790,6 +790,22 @@ export function MyDashboardWorkloadBoard({
     return () => window.clearTimeout(t);
   }, []);
 
+  // Render pagination per column — a member can hold hundreds of reach-outs;
+  // mounting them all at once freezes slower machines. 30 first, +50 per click.
+  const RENDER_PAGE = 30;
+  const [visibleByStage, setVisibleByStage] = useState<
+    Partial<Record<StageKey, number>>
+  >({});
+  useEffect(() => {
+    setVisibleByStage({});
+  }, [posts]);
+  const visibleFor = (key: StageKey) => visibleByStage[key] ?? RENDER_PAGE;
+  const showMore = (key: StageKey) =>
+    setVisibleByStage((prev) => ({
+      ...prev,
+      [key]: (prev[key] ?? RENDER_PAGE) + 50,
+    }));
+
   const grouped = useMemo(() => {
     const map = new Map<StageKey, MyPost[]>();
     for (const stage of STAGES) map.set(stage.key, []);
@@ -918,42 +934,65 @@ export function MyDashboardWorkloadBoard({
                     )}
                   >
                     {items.length === 0 ? (
-                      <div className="flex-1 grid place-items-center text-[0.7rem] text-text-tertiary py-8 italic">
-                        No cards here
+                      <div className="flex-1 grid place-items-center text-[0.7rem] text-text-tertiary py-8 italic text-center px-3">
+                        {fullSet.length > 0
+                          ? "Hidden by your filters — press Clear in the filter bar above"
+                          : "No cards here"}
                       </div>
                     ) : stage.key === "on-board" ? (
-                      onboardGroups.map((group) =>
-                        group.length > 1 ? (
-                          <CollabWorkloadCard
-                            key={group[0].post_id ?? ""}
-                            group={group}
-                            stage={stage}
-                            onSubmit={handleSubmit}
-                            onOverview={handleOverview}
-                          />
-                        ) : (
+                      onboardGroups
+                        .slice(0, visibleFor(stage.key))
+                        .map((group) =>
+                          group.length > 1 ? (
+                            <CollabWorkloadCard
+                              key={group[0].post_id ?? ""}
+                              group={group}
+                              stage={stage}
+                              onSubmit={handleSubmit}
+                              onOverview={handleOverview}
+                            />
+                          ) : (
+                            <WorkloadCard
+                              key={
+                                group[0].post_id ??
+                                `${group[0].username}-${stage.key}`
+                              }
+                              post={group[0]}
+                              stage={stage}
+                              onSubmit={handleSubmit}
+                              onOverview={handleOverview}
+                            />
+                          ),
+                        )
+                    ) : (
+                      items
+                        .slice(0, visibleFor(stage.key))
+                        .map((post) => (
                           <WorkloadCard
                             key={
-                              group[0].post_id ??
-                              `${group[0].username}-${stage.key}`
+                              post.post_id ?? `${post.username}-${stage.key}`
                             }
-                            post={group[0]}
+                            post={post}
                             stage={stage}
                             onSubmit={handleSubmit}
                             onOverview={handleOverview}
                           />
-                        ),
-                      )
-                    ) : (
-                      items.map((post) => (
-                        <WorkloadCard
-                          key={post.post_id ?? `${post.username}-${stage.key}`}
-                          post={post}
-                          stage={stage}
-                          onSubmit={handleSubmit}
-                          onOverview={handleOverview}
-                        />
-                      ))
+                        ))
+                    )}
+                    {(stage.key === "on-board"
+                      ? onboardGroups.length
+                      : items.length) > visibleFor(stage.key) && (
+                      <button
+                        type="button"
+                        className="mt-1 h-8 w-full rounded-lg border border-border bg-bg-white text-[0.68rem] font-extrabold text-text-secondary transition hover:border-accent/45 hover:text-text-primary"
+                        onClick={() => showMore(stage.key)}
+                      >
+                        Show more (
+                        {(stage.key === "on-board"
+                          ? onboardGroups.length
+                          : items.length) - visibleFor(stage.key)}{" "}
+                        hidden)
+                      </button>
                     )}
                   </div>
                 </section>
