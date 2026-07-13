@@ -18,6 +18,31 @@ export default function MyDashboardKM() {
         </p>
       </KMSection>
 
+      <KMSection tag="My Kanban — cards, Overview, grouped collabs">
+        <KMList>
+          <li>
+            <strong>Overview</strong> on every card opens a popup with the
+            complete creator profile (SIF, Instagram, followers, tier, ER, avg
+            likes, gender, state, language, type, agency) plus everything
+            submitted so far: reach-out info, the onboarding form (order,
+            deliverables, amount, ads rights, bank presence) and per-deliverable
+            posting details.
+          </li>
+          <li>
+            <strong>Onboard column groups by Collab ID</strong> — a collab with
+            more than one deliverable shows as ONE card with an x/y-submitted
+            pill and its own Submit per pending P{"{n}"} (same rule as the
+            Posting stage). The column count counts collabs.
+          </li>
+          <li>
+            <strong>Bank rule:</strong> for Barter + Paid collabs that skipped
+            bank details at onboarding, the posting form opened here asks for
+            them — filling them on any one deliverable satisfies the whole
+            collab.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="View as team member (Global Admins)">
         <p>
           Global Admins see a <strong>View as team member</strong> control
