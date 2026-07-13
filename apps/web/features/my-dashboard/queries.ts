@@ -32,6 +32,8 @@ const POSTS_SELECT = [
   "order_id",
   "order_status",
   "onboarded_by",
+  "logged_by",
+  "posted_by",
   "post_link",
   "download_link",
   "raw_dump",
@@ -65,12 +67,21 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
 }> {
   const supabase = createServiceClient();
 
+  // Ownership scope — a member owns a row at ANY stage they touched: reach-out
+  // rows carry ONLY logged_by (onboarded_by stays null until onboarding), the
+  // onboard belongs to onboarded_by, and the posting to posted_by. Scoping by
+  // onboarded_by alone dropped every reach-out (My Dashboard showed 0 while
+  // the Journey team filter showed hundreds).
+  const member = userEmail;
   const { data, error } = await (supabase as any)
     .from("posts")
     .select(POSTS_SELECT)
-    .eq("onboarded_by", userEmail)
-    .order("reach_out_date", { ascending: false })
-    .limit(500);
+    .or(
+      `onboarded_by.eq.${member},logged_by.eq.${member},posted_by.eq.${member}`,
+    )
+    // High cap — the old 500 silently truncated (same bug as the stage queues).
+    .order("reach_out_date", { ascending: false, nullsFirst: false })
+    .limit(10_000);
 
   if (error) {
     console.error("[my-dashboard] posts query failed:", error);
@@ -161,26 +172,42 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
     };
   });
 
+  // Per-stage ownership (mirrors the stage pages): a reach-out belongs to the
+  // member who LOGGED it (logged_by; legacy rows fall back to onboarded_by),
+  // the onboard/RTO to the onboarder, and the posting to the posting-form
+  // submitter (older posted rows: null posted_by → the onboarder).
+  const norm = (v: unknown) => String(v ?? "").trim();
+  const reachOwner = (p: {
+    logged_by?: string | null;
+    onboarded_by?: string | null;
+  }) => norm(p.logged_by) || norm(p.onboarded_by);
+  const onboardOwner = (p: {
+    logged_by?: string | null;
+    onboarded_by?: string | null;
+  }) => norm(p.onboarded_by) || norm(p.logged_by);
+  const postOwner = (p: {
+    logged_by?: string | null;
+    onboarded_by?: string | null;
+    posted_by?: string | null;
+  }) => norm(p.posted_by) || onboardOwner(p);
+
   const { data: leaderboardRows, error: leaderboardError } = await (
     supabase as any
   )
     .from("posts")
-    .select("onboarded_by, workflow_status, payment_status")
-    .not("onboarded_by", "is", null)
-    .limit(2000);
+    .select("onboarded_by, logged_by, posted_by, workflow_status, payment_status")
+    .limit(10_000);
 
   if (leaderboardError) {
     console.warn("[my-dashboard] leaderboard query failed:", leaderboardError);
   }
 
   const leaderboardMap = new Map<string, TeamLeaderboardEntry>();
-  for (const row of (leaderboardRows ?? []) as Array<{
-    onboarded_by: string | null;
-    workflow_status: string | null;
-    payment_status: string | null;
-  }>) {
-    const name = String(row.onboarded_by ?? "").trim();
-    if (!name) continue;
+  const bump = (
+    name: string,
+    field: "active" | "posted" | "paid",
+  ): void => {
+    if (!name) return;
     const entry =
       leaderboardMap.get(name) ??
       ({
@@ -190,12 +217,25 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
         paid: 0,
         score: 0,
       } satisfies TeamLeaderboardEntry);
-    const status = row.workflow_status ?? "";
-    if ((ACTIVE_STATUSES as readonly string[]).includes(status)) entry.active++;
-    if ((POSTED_STATUSES as readonly string[]).includes(status)) entry.posted++;
-    if (row.payment_status === "Done") entry.paid++;
+    entry[field]++;
     entry.score = entry.posted * 5 + entry.paid * 8 + entry.active * 2;
     leaderboardMap.set(name, entry);
+  };
+  for (const row of (leaderboardRows ?? []) as Array<{
+    onboarded_by: string | null;
+    logged_by: string | null;
+    posted_by: string | null;
+    workflow_status: string | null;
+    payment_status: string | null;
+  }>) {
+    const status = row.workflow_status ?? "";
+    if ((ACTIVE_STATUSES as readonly string[]).includes(status)) {
+      bump(status === "Reach Out" ? reachOwner(row) : onboardOwner(row), "active");
+    }
+    if ((POSTED_STATUSES as readonly string[]).includes(status)) {
+      bump(postOwner(row), "posted");
+    }
+    if (row.payment_status === "Done") bump(onboardOwner(row), "paid");
   }
 
   // Compute KPI counts
@@ -212,14 +252,27 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   const allCampaigns = new Set<string>();
   const activeCampaignSet = new Set<string>();
 
+  // KPI buckets stay status-based, but each bucket only counts rows the member
+  // owns AT THAT STAGE (a reach-out they logged that someone else onboarded
+  // counts in the other member's Pending Post, not theirs).
   for (const p of posts) {
     const s = p.workflow_status ?? "";
-    if ((ACTIVE_STATUSES as readonly string[]).includes(s)) kpi.myActive++;
-    if ((PENDING_POST_STATUSES as readonly string[]).includes(s))
+    const mineReach = reachOwner(p) === member;
+    const mineOnboard = onboardOwner(p) === member;
+    const minePost = postOwner(p) === member;
+
+    if (s === "Reach Out" && mineReach) {
+      kpi.myActive++;
+      kpi.totalReachouts++;
+    }
+    if ((PENDING_POST_STATUSES as readonly string[]).includes(s) && mineOnboard) {
+      kpi.myActive++;
       kpi.pendingPost++;
-    if ((POSTED_STATUSES as readonly string[]).includes(s)) kpi.posted++;
-    if ((RTO_STATUSES as readonly string[]).includes(s)) kpi.rtos++;
-    if (s === "Reach Out") kpi.totalReachouts++;
+    }
+    if ((POSTED_STATUSES as readonly string[]).includes(s) && minePost)
+      kpi.posted++;
+    if ((RTO_STATUSES as readonly string[]).includes(s) && mineOnboard)
+      kpi.rtos++;
 
     const camp = String(p.campaign_id ?? "").trim();
     if (camp) {
@@ -240,6 +293,8 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   const pendingActions: PendingAction[] = [];
 
   for (const p of posts) {
+    // Chase list = the onboarder's job — skip rows the member only logged.
+    if (onboardOwner(p) !== member) continue;
     const s = p.workflow_status ?? "";
 
     // Overdue delivery: On Board or Order Sent + est_delivery is set + est_delivery < today

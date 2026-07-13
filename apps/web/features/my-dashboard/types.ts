@@ -1,6 +1,8 @@
 /**
  * Types for the My Dashboard personal workload view.
- * Data is always scoped to posts where onboarded_by = current user email.
+ * Data is scoped to posts the member OWNS at any stage: reach-outs they
+ * logged (logged_by), collabs they onboarded (onboarded_by), and postings
+ * they submitted (posted_by) — same ownership rule as the Journey team filter.
  */
 
 export interface MyPost {
@@ -18,6 +20,11 @@ export interface MyPost {
   order_status: string | null;
   inf_name: string | null;
   onboarded_by: string | null;
+  /** Reach-out owner — reach-out rows carry ONLY logged_by (onboarded_by is
+   *  null until onboarding). */
+  logged_by?: string | null;
+  /** Posting-form submitter (older posted rows: null → onboarder). */
+  posted_by?: string | null;
   post_link?: string | null;
   download_link?: string | null;
   raw_dump?: string | null;
