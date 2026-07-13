@@ -57,7 +57,7 @@
 
 ## My Dashboard — Personal Workload Board
 
-**Route:** `/my-dashboard`, scoped to `posts.onboarded_by = actor.name || actor.email`. Pulls my posts (≤500), joins creators, reconstructs collab totals from equal-split siblings.
+**Route:** `/my-dashboard`. **Ownership scoping (2026-07-13, a0be08c):** rows are owned via `logged_by OR onboarded_by OR posted_by = actor.name || actor.email` (≤10k; the old `onboarded_by`-only + 500-cap scope dropped every reach-out — reach-out rows carry ONLY `logged_by`). KPIs count PER-STAGE ownership: Reach Out → `logged_by` (fallback onboarded_by), On Board/Order Sent/RTO → `onboarded_by`, Posted → `posted_by` (fallback onboarder); pending-actions chase list = onboarder's; leaderboard attributes the same way. Joins creators, reconstructs collab totals from equal-split siblings.
 
 - **KPIs:** myActive, pendingPost, posted, rtos, totalCampaigns, activeCampaigns, totalReachouts.
 - **Pending actions:** "Overdue delivery" (On Board/Order Sent + est_delivery<today) and "Awaiting post" (Delivered + no post_date), sorted by daysOverdue, top-15.
