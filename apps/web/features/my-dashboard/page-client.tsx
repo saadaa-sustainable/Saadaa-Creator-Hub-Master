@@ -224,6 +224,7 @@ export function MyDashboardBody({
       </div>
       <MyDashboardWorkloadBoard
         posts={filteredPosts}
+        allPosts={posts}
         leaderboard={leaderboard}
       />
     </>

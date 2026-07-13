@@ -31,6 +31,7 @@ import { submitPayments } from "@/features/accounts-hub/actions";
 import { AccountsOverviewModal } from "@/features/accounts-hub/accounts-overview-modal";
 import { OrderCreationModal } from "@/features/onboarding/order-form";
 import { PostingModal } from "@/features/posting/posting-form";
+import { MyCardOverviewModal } from "./card-overview-modal";
 import type { MyPost, TeamLeaderboardEntry } from "./types";
 
 type StageKey = "reach-out" | "on-board" | "posted" | "payment";
@@ -362,10 +363,12 @@ function WorkloadCard({
   post,
   stage,
   onSubmit,
+  onOverview,
 }: {
   post: MyPost;
   stage: StageDef;
   onSubmit: (post: MyPost, stage: StageDef) => void;
+  onOverview: (post: MyPost, stage: StageDef) => void;
 }) {
   const Icon = stage.icon;
   // Payment column is read-only here — submissions belong to Accounts Hub.
@@ -459,21 +462,167 @@ function WorkloadCard({
         </dd>
       </dl>
 
+      <div className="mt-1 flex items-center gap-1.5">
+        {/* Overview — the full submitted-form info for this card's stage
+            (creator + reach-out + onboarding + posting sections by data).
+            Payment cards keep their single Overview action (Accounts modal). */}
+        {!isPayment && (
+          <button
+            type="button"
+            className="h-8 px-2.5 text-[0.7rem] rounded-lg inline-flex items-center justify-center gap-1 border border-border bg-bg-white font-extrabold text-text-secondary transition hover:border-accent/45 hover:text-text-primary"
+            onClick={() => onOverview(post, stage)}
+          >
+            <Eye size={12} aria-hidden />
+            Overview
+          </button>
+        )}
+        <button
+          type="button"
+          className={cn(
+            "flex-1 h-8 text-[0.7rem] rounded-lg inline-flex items-center justify-center gap-1 border font-extrabold transition",
+            canSubmit
+              ? "border-[#b8d4f8] bg-[#eef6ff] text-[#2f67c8] hover:bg-[#e4f0ff]"
+              : "border-border bg-bg-muted text-text-tertiary cursor-default",
+          )}
+          onClick={() => {
+            if (canSubmit) onSubmit(post, stage);
+          }}
+          disabled={!canSubmit}
+        >
+          <ButtonIcon size={12} aria-hidden />
+          {actionText}
+        </button>
+      </div>
+    </article>
+  );
+}
+
+/**
+ * Grouped Onboard card — same rule as the Posting stage: when a collab has
+ * MORE than one deliverable (stories never spawn rows), the deliverables
+ * combine into ONE card with a per-deliverable pending/submitted list, each
+ * pending row opening its own posting form. Single-deliverable collabs keep
+ * the normal card.
+ */
+function CollabWorkloadCard({
+  group,
+  stage,
+  onSubmit,
+  onOverview,
+}: {
+  group: MyPost[];
+  stage: StageDef;
+  onSubmit: (post: MyPost, stage: StageDef) => void;
+  onOverview: (post: MyPost, stage: StageDef) => void;
+}) {
+  const rep = group[0];
+  const submitted = group.filter(postingComplete).length;
+  const allDone = submitted === group.length;
+  return (
+    <article className="rounded-xl bg-bg-white border border-border p-2 sm:p-2.5 flex flex-col gap-1.5 sm:gap-2 shadow-[0_1px_3px_rgba(22,21,19,0.05)] min-w-0 transition-[transform,box-shadow,border-color] duration-150 hover:border-accent/45 hover:shadow-[0_12px_32px_-16px_rgba(22,21,19,0.2)] motion-safe:hover:-translate-y-0.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1 text-[0.55rem] font-extrabold uppercase tracking-[0.05em] rounded-full px-1.5 py-0.5 bg-bg-muted text-text-secondary whitespace-nowrap">
+          <stage.icon size={8} aria-hidden />
+          {rep.workflow_status
+            ? workflowStatusLabel(rep.workflow_status)
+            : stage.title}
+        </span>
+        <span
+          className={cn(
+            "text-[0.55rem] font-extrabold rounded-full px-1.5 py-0.5",
+            allDone ? "bg-success-bg text-success" : "bg-warning-bg text-warning",
+          )}
+        >
+          {submitted}/{group.length} submitted
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 min-w-0">
+        <Avatar
+          src={rep.creator?.profile_pic ?? null}
+          username={rep.username}
+          name={creatorName(rep)}
+          size={28}
+        />
+        <div className="flex-1 min-w-0">
+          <div className="text-[0.82rem] font-extrabold text-text-primary leading-tight truncate">
+            {creatorName(rep)}
+          </div>
+          <div className="text-[0.62rem] text-text-tertiary truncate leading-tight">
+            @{rep.username ?? "—"} · {formatFollowers(rep.creator?.followers)}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {collabId(rep) && (
+          <span
+            className="pill text-[0.55rem] py-0.5 px-1.5 tabular"
+            title="Collab ID"
+          >
+            {collabId(rep)}
+          </span>
+        )}
+        <span className="pill pill--info text-[0.55rem] py-0.5 px-1.5">
+          {group.length} deliverables
+        </span>
+        {rep.campaign_id && (
+          <span className="pill text-[0.55rem] py-0.5 px-1.5">
+            {rep.campaign_id}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {group.map((p) => {
+          const done = postingComplete(p);
+          return (
+            <div
+              key={p.post_id ?? ""}
+              className="flex items-center justify-between gap-2 rounded-lg border border-border bg-bg-surface/60 px-2 py-1"
+            >
+              <span className="text-[0.64rem] font-bold tabular text-text-primary truncate">
+                P{p.deliverable_index ?? "?"}
+                {p.deliverable_type ? (
+                  <span className="ml-1 font-normal text-text-tertiary">
+                    {p.deliverable_type}
+                  </span>
+                ) : null}
+              </span>
+              {done ? (
+                <span className="inline-flex items-center gap-1 text-[0.58rem] font-extrabold text-success">
+                  <CheckCircle2 size={11} aria-hidden /> Submitted
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="h-6 px-2 text-[0.6rem] rounded-md inline-flex items-center gap-1 border border-[#b8d4f8] bg-[#eef6ff] font-extrabold text-[#2f67c8] transition hover:bg-[#e4f0ff]"
+                  onClick={() => onSubmit(p, stage)}
+                >
+                  <CheckCircle2 size={10} aria-hidden /> Submit
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <dl className="grid grid-cols-[auto_1fr] gap-y-0.5 gap-x-2 text-[0.62rem]">
+        <dt className="text-text-tertiary font-bold uppercase tracking-[0.05em]">
+          Amount
+        </dt>
+        <dd className="text-right tabular font-bold text-text-primary truncate">
+          {formatRupees(rep.commercial_amount)}
+        </dd>
+      </dl>
+
       <button
         type="button"
-        className={cn(
-          "mt-1 w-full h-8 text-[0.7rem] rounded-lg inline-flex items-center justify-center gap-1 border font-extrabold transition",
-          canSubmit
-            ? "border-[#b8d4f8] bg-[#eef6ff] text-[#2f67c8] hover:bg-[#e4f0ff]"
-            : "border-border bg-bg-muted text-text-tertiary cursor-default",
-        )}
-        onClick={() => {
-          if (canSubmit) onSubmit(post, stage);
-        }}
-        disabled={!canSubmit}
+        className="mt-0.5 w-full h-8 text-[0.7rem] rounded-lg inline-flex items-center justify-center gap-1 border border-border bg-bg-white font-extrabold text-text-secondary transition hover:border-accent/45 hover:text-text-primary"
+        onClick={() => onOverview(rep, stage)}
       >
-        <ButtonIcon size={12} aria-hidden />
-        {actionText}
+        <Eye size={12} aria-hidden />
+        Overview
       </button>
     </article>
   );
@@ -596,15 +745,41 @@ function PaymentQuickModal({
 
 export function MyDashboardWorkloadBoard({
   posts,
+  allPosts,
   leaderboard,
 }: {
   posts: MyPost[];
+  /** Unfiltered set — sibling scans (bank gate, overview deliverable list)
+   *  must see the whole collab even when filters hide some rows. */
+  allPosts?: MyPost[];
   leaderboard: TeamLeaderboardEntry[];
 }) {
   const router = useRouter();
   const [onboardingPost, setOnboardingPost] = useState<MyPost | null>(null);
   const [postingPost, setPostingPost] = useState<MyPost | null>(null);
   const [paymentPost, setPaymentPost] = useState<MyPost | null>(null);
+  const [overviewPost, setOverviewPost] = useState<MyPost | null>(null);
+  const fullSet = allPosts ?? posts;
+
+  // Collab-level bank gate — same rule as the Posting stage: a Barter + Paid
+  // collab whose onboarding skipped bank details makes the posting form
+  // demand them, and bank on ANY deliverable of the collab satisfies all.
+  const requireBankFor = (post: MyPost): boolean => {
+    if (
+      String(post.collab_type ?? "")
+        .trim()
+        .toLowerCase() !== "barter + paid"
+    )
+      return false;
+    const key = collabId(post);
+    if (!key) return false;
+    return !fullSet.some(
+      (p) =>
+        collabId(p) === key &&
+        String(p.bank_number ?? "").trim() &&
+        String(p.ifsc ?? "").trim(),
+    );
+  };
 
   // One-shot entrance window: `.bento-stagger` sits on the column lists only
   // during the initial mount choreography (max delay 0.4s + 0.42s run), then
@@ -635,6 +810,26 @@ export function MyDashboardWorkloadBoard({
       setPostingPost(post);
     }
   };
+
+  const handleOverview = (post: MyPost) => setOverviewPost(post);
+
+  // Onboard column groups by Collab ID when a collab has >1 deliverable —
+  // mirrors the Posting stage's grouped view. Other columns stay per-row.
+  const onboardGroups = useMemo(() => {
+    const items = grouped.get("on-board") ?? [];
+    const map = new Map<string, MyPost[]>();
+    for (const p of items) {
+      const key = collabId(p) ?? p.post_id ?? `${p.username}`;
+      const list = map.get(key);
+      if (list) list.push(p);
+      else map.set(key, [p]);
+    }
+    return [...map.values()].map((g) =>
+      g.sort((a, b) =>
+        String(a.post_id ?? "").localeCompare(String(b.post_id ?? "")),
+      ),
+    );
+  }, [grouped]);
 
   return (
     <>
@@ -713,7 +908,7 @@ export function MyDashboardWorkloadBoard({
                       </div>
                     </div>
                     <span className="text-[0.62rem] font-extrabold tabular text-text-secondary bg-bg-white border border-border rounded-full px-2 py-0.5">
-                      {items.length}
+                      {stage.key === "on-board" ? onboardGroups.length : items.length}
                     </span>
                   </header>
                   <div
@@ -726,6 +921,29 @@ export function MyDashboardWorkloadBoard({
                       <div className="flex-1 grid place-items-center text-[0.7rem] text-text-tertiary py-8 italic">
                         No cards here
                       </div>
+                    ) : stage.key === "on-board" ? (
+                      onboardGroups.map((group) =>
+                        group.length > 1 ? (
+                          <CollabWorkloadCard
+                            key={group[0].post_id ?? ""}
+                            group={group}
+                            stage={stage}
+                            onSubmit={handleSubmit}
+                            onOverview={handleOverview}
+                          />
+                        ) : (
+                          <WorkloadCard
+                            key={
+                              group[0].post_id ??
+                              `${group[0].username}-${stage.key}`
+                            }
+                            post={group[0]}
+                            stage={stage}
+                            onSubmit={handleSubmit}
+                            onOverview={handleOverview}
+                          />
+                        ),
+                      )
                     ) : (
                       items.map((post) => (
                         <WorkloadCard
@@ -733,6 +951,7 @@ export function MyDashboardWorkloadBoard({
                           post={post}
                           stage={stage}
                           onSubmit={handleSubmit}
+                          onOverview={handleOverview}
                         />
                       ))
                     )}
@@ -774,9 +993,11 @@ export function MyDashboardWorkloadBoard({
           open
           postId={postingPost.post_id}
           postIdShort={compactId(postingPost)}
+          collabId={collabId(postingPost) ?? undefined}
           creatorName={creatorName(postingPost)}
           username={postingPost.username}
           adsUsageRights={postingPost.ads_usage_rights}
+          requireBank={requireBankFor(postingPost)}
           initial={{
             postDate: postingPost.post_date ?? "",
             postLink: postingPost.post_link ?? "",
@@ -784,6 +1005,13 @@ export function MyDashboardWorkloadBoard({
             rawDump: postingPost.raw_dump ?? "",
           }}
           onClose={() => setPostingPost(null)}
+        />
+      )}
+      {overviewPost && (
+        <MyCardOverviewModal
+          post={overviewPost}
+          allPosts={fullSet}
+          onClose={() => setOverviewPost(null)}
         />
       )}
       {paymentPost?.post_id && (

@@ -40,6 +40,11 @@ const POSTS_SELECT = [
   "inf_id",
   "collab_number",
   "deliverable_index",
+  "deliverable_type",
+  "content_type",
+  "tracking_id",
+  "bank_number",
+  "ifsc",
   "ads_usage_rights",
   "commercial_amount",
   "collab_type",
@@ -51,11 +56,20 @@ const POSTS_SELECT = [
 ].join(",");
 
 const CREATORS_SELECT = [
+  "inf_id",
   "username",
   "inf_name",
   "profile_pic",
   "category",
   "followers",
+  "gender",
+  "state",
+  "language",
+  "instagram_link",
+  "er",
+  "avg_likes",
+  "creator_type",
+  "agency_name",
 ].join(",");
 
 export async function fetchMyDashboardData(userEmail: string): Promise<{
@@ -115,10 +129,19 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
           .toLowerCase();
         if (!username) continue;
         creatorMap.set(username, {
+          inf_id: (c.inf_id as string | null) ?? null,
           inf_name: (c.inf_name as string | null) ?? null,
           profile_pic: (c.profile_pic as string | null) ?? null,
           category: (c.category as string | null) ?? null,
           followers: typeof c.followers === "number" ? c.followers : null,
+          gender: (c.gender as string | null) ?? null,
+          state: (c.state as string | null) ?? null,
+          language: (c.language as string | null) ?? null,
+          instagram_link: (c.instagram_link as string | null) ?? null,
+          er: typeof c.er === "number" ? c.er : null,
+          avg_likes: typeof c.avg_likes === "number" ? c.avg_likes : null,
+          creator_type: (c.creator_type as string | null) ?? null,
+          agency_name: (c.agency_name as string | null) ?? null,
         });
       }
     }

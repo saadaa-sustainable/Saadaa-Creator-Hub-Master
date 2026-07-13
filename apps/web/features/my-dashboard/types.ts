@@ -31,6 +31,13 @@ export interface MyPost {
   inf_id?: string | null;
   collab_number?: number | null;
   deliverable_index?: number | null;
+  deliverable_type?: string | null;
+  content_type?: string | null;
+  tracking_id?: string | null;
+  /** Bank presence — drives the posting-form mandatory-bank gate for
+   *  Barter + Paid collabs that skipped bank at onboarding (collab-level). */
+  bank_number?: string | null;
+  ifsc?: string | null;
   ads_usage_rights?: string | null;
   commercial_amount?: number | null;
   collab_type?: string | null;
@@ -40,10 +47,19 @@ export interface MyPost {
   payment_status?: string | null;
   partnership_id?: string | null;
   creator?: {
+    inf_id?: string | null;
     inf_name: string | null;
     profile_pic: string | null;
     category: string | null;
     followers: number | null;
+    gender?: string | null;
+    state?: string | null;
+    language?: string | null;
+    instagram_link?: string | null;
+    er?: number | null;
+    avg_likes?: number | null;
+    creator_type?: string | null;
+    agency_name?: string | null;
   } | null;
 }
 
