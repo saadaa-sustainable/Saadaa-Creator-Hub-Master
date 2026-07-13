@@ -52,8 +52,6 @@ interface ShopifyAddress {
 interface ShopifyLineItem {
   sku?: string | null;
   title?: string | null;
-  /** Colour / size variant ("Mint Green / M") — NOT part of `title`. */
-  variant_title?: string | null;
   quantity?: number | null;
   name?: string | null;
 }
@@ -119,20 +117,8 @@ function mapOrder(o: ShopifyOrder): Record<string, unknown> {
     .filter((s): s is string => Boolean(s))
     .join(", ");
 
-  // Full garment label = product title + colour/size variant + quantity.
-  // `li.title` alone is the BASE product ("Flowy Linen Half Sleeve Kurta");
-  // the colour lives in `variant_title` ("Mint Green / M"), so title-only
-  // stripped the colour from every order view.
   const garmentsSent = (o.line_items ?? [])
-    .map((li) => {
-      const base = (li.title || li.name || "").trim();
-      if (!base) return null;
-      const variant = (li.variant_title ?? "").trim();
-      const qty = Number(li.quantity ?? 1);
-      const label =
-        variant && !base.includes(variant) ? `${base} (${variant})` : base;
-      return qty > 1 ? `${label} ×${qty}` : label;
-    })
+    .map((li) => li.title || li.name)
     .filter((s): s is string => Boolean(s))
     .join(", ");
 
