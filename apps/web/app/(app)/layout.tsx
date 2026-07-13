@@ -59,12 +59,13 @@ export default async function AppShell({
           {children}
         </main>
       </div>
-      {isAdmin && (
-        <TopBar
-          approvalsCount={approvalsCount}
-          actingAsName={actingAs?.name ?? null}
-        />
-      )}
+      {/* Everyone gets the cluster (refresh + live Meta fetch-state pill);
+          the approvals bell inside stays admin-only. */}
+      <TopBar
+        approvalsCount={approvalsCount}
+        actingAsName={actingAs?.name ?? null}
+        isAdmin={isAdmin}
+      />
       <KnowMoreModal />
     </div>
   );
