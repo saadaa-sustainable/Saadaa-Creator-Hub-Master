@@ -1,5 +1,6 @@
 import "server-only";
 import { extractShortcode } from "./instagram-shortcode";
+import { resolveMetaToken } from "./meta-token";
 
 /**
  * Meta Graph `business_discovery` — INSTANT public-profile lookup for a handle.
@@ -56,8 +57,10 @@ export interface MetaDiscoveryResult {
   usagePct?: number;
 }
 
-function creds(): { token: string; ownId: string } | null {
-  const token = process.env.META_GRAPH_API_TOKEN?.trim();
+async function creds(): Promise<{ token: string; ownId: string } | null> {
+  // Token goes through resolveMetaToken — a staged temporary token (rate-limit
+  // incidents) wins until its expiry, then the main token resumes automatically.
+  const token = await resolveMetaToken();
   // Our own IG business id. `META_IG_BUSINESS_ID` is the canonical name (set this
   // on Vercel — `ID` is too generic to rely on in prod); `ID` is kept as a local
   // fallback so existing .env.local files keep working.
@@ -69,7 +72,12 @@ function creds(): { token: string; ownId: string } | null {
 }
 
 export function isMetaGraphConfigured(): boolean {
-  return creds() !== null;
+  // Presence check only (sync callers) — the MAIN creds define "configured";
+  // the temp override never changes whether the integration exists.
+  return Boolean(
+    process.env.META_GRAPH_API_TOKEN?.trim() &&
+      (process.env.META_IG_BUSINESS_ID || process.env.ID)?.trim(),
+  );
 }
 
 function cleanHandle(handle: string): string {
@@ -182,7 +190,7 @@ function parseBody(
  * Returns 0 on any failure.
  */
 export async function probeAppUsage(): Promise<number> {
-  const c = creds();
+  const c = await creds();
   if (!c) return 0;
   try {
     const res = await fetch(
@@ -243,7 +251,7 @@ export async function fetchIgVerified(handle: string): Promise<boolean | null> {
 export async function fetchBusinessDiscovery(
   handle: string,
 ): Promise<MetaDiscoveryResult> {
-  const c = creds();
+  const c = await creds();
   if (!c) return { status: "error", error: "Meta Graph not configured" };
   const clean = cleanHandle(handle);
   if (!clean) return { status: "error", error: "empty handle" };
@@ -349,7 +357,7 @@ export async function fetchPostByShortcode(
   handle: string,
   shortcode: string,
 ): Promise<MetaPostResult> {
-  const c = creds();
+  const c = await creds();
   if (!c) return { status: "error", error: "Meta Graph not configured" };
   const clean = cleanHandle(handle);
   const sc = shortcode.trim();
@@ -412,7 +420,7 @@ export async function fetchPostByShortcodeDeep(
    *  already have appeared; stop instead of burning the remaining pages. */
   stopBeforeIso?: string | null,
 ): Promise<MetaPostResult> {
-  const c = creds();
+  const c = await creds();
   if (!c) return { status: "error", error: "Meta Graph not configured" };
   const clean = cleanHandle(handle);
   const sc = shortcode.trim();
@@ -493,7 +501,7 @@ export async function fetchPostByShortcodeDeep(
 export async function fetchBusinessDiscoveryBatch(
   handles: string[],
 ): Promise<{ results: MetaDiscoveryResult[]; usagePct: number }> {
-  const c = creds();
+  const c = await creds();
   if (!c) {
     return {
       results: handles.map(() => ({

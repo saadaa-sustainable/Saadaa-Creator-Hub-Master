@@ -21,6 +21,7 @@ import {
   toPartnershipState,
   type PartnershipState,
 } from "./partnership";
+import { resolveMetaToken } from "./meta-token";
 
 const GRAPH_VERSION = "v22.0";
 
@@ -35,15 +36,20 @@ export interface PartnershipStatus {
   handle: string;
 }
 
-function creds(): { token: string; ownId: string } | null {
-  const token = process.env.META_GRAPH_API_TOKEN?.trim();
+async function creds(): Promise<{ token: string; ownId: string } | null> {
+  // Temp-token override during rate-limit incidents — see lib/meta-token.ts.
+  const token = await resolveMetaToken();
   const ownId = (process.env.META_IG_BUSINESS_ID || process.env.ID)?.trim();
   if (!token || !ownId) return null;
   return { token, ownId };
 }
 
 export function isPartnershipConfigured(): boolean {
-  return creds() !== null;
+  // Presence check only (sync callers) — based on the MAIN creds.
+  return Boolean(
+    process.env.META_GRAPH_API_TOKEN?.trim() &&
+      (process.env.META_IG_BUSINESS_ID || process.env.ID)?.trim(),
+  );
 }
 
 function cleanHandle(h: string): string {
@@ -61,7 +67,7 @@ export async function getPartnershipStatus(
   | { ok: true; status: PartnershipStatus }
   | { ok: false; error: string }
 > {
-  const c = creds();
+  const c = await creds();
   if (!c) return { ok: false, error: "Meta partnership not configured" };
   const handle = cleanHandle(handleInput);
   if (!handle) return { ok: false, error: "Empty creator handle" };
@@ -123,7 +129,7 @@ export async function sendPartnershipInvite(
   | { ok: true; permissionId: string | null; rawStatus: string | null }
   | { ok: false; error: string }
 > {
-  const c = creds();
+  const c = await creds();
   if (!c) return { ok: false, error: "Meta partnership not configured" };
   const handle = cleanHandle(handleInput);
   if (!handle) return { ok: false, error: "Empty creator handle" };
