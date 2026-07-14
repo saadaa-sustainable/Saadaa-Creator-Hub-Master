@@ -9,9 +9,11 @@ import { META_BATCH_SIZE } from "@/lib/meta-graph";
  * after a burst (~500 calls). So we throttle centrally, mirroring ig_fetching.py:
  *
  *   - A rolling counter of calls. Every outbound Fetch = 1 call; an inbound bulk
- *     Fetch = up to META_BATCH_SIZE (50) calls in one Meta batch POST.
- *   - After the counter CROSSES 50 (a full batch worth of calls), a cooldown is
- *     enforced — new fetches are blocked until it elapses, then the counter resets.
+ *     Fetch = up to META_BATCH_SIZE (50) calls in one Meta batch POST. Cache-served
+ *     fetches (lib note in reach-out actions) never touch Meta or this counter.
+ *   - When the counter crosses 50 the window resets; it only takes the 60s
+ *     breather if Meta's own X-App-Usage is already warming (≥ WARM_USAGE_PCT) —
+ *     a cold quota keeps fetching with no pause.
  *   - If Meta's X-App-Usage crosses HIGH_USAGE_PCT, a LONGER cooldown kicks in
  *     immediately (the real abuse-block early-warning, like ig_fetching.py --cool-pct).
  *
@@ -22,10 +24,15 @@ import { META_BATCH_SIZE } from "@/lib/meta-graph";
 
 const META_FETCH_WINDOW_KEY = "meta_fetch_window";
 
-/** Calls per rolling window before a cooldown (one Meta batch worth). */
+/** Calls per rolling window (display + burst bookkeeping — one Meta batch worth). */
 const COOLDOWN_AFTER = META_BATCH_SIZE; // 50
-/** Cooldown after crossing the batch-of-50 (seconds). */
+/** Breather when a window fills WHILE Meta usage is already warming (seconds). */
 const POST_BATCH_COOLDOWN_SEC = 60;
+/** X-App-Usage % above which a filled window takes the 60s breather. Below
+ *  this, the window just resets with NO pause — quota is comfortably cold and
+ *  a forced wait would be pure self-inflicted friction (2026-07-14: the team
+ *  hit "50 → 60s pause" at 39% real usage). */
+const WARM_USAGE_PCT = 60;
 /** X-App-Usage % that forces an early, longer cooldown. */
 const HIGH_USAGE_PCT = 75;
 /** Cooldown when X-App-Usage is high (seconds) — ig_fetching.py --cool-sec. */
@@ -130,12 +137,27 @@ export async function recordMetaUsage(
   let count = state.count + Math.max(0, callsMade);
   let cooldownUntil: number | null = null;
 
-  if (usagePct >= HIGH_USAGE_PCT) {
+  // Some calls (batch outer responses) miss the usage header → usagePct 0.
+  // Judge "how hot is Meta" by the freshest real reading instead of assuming cold.
+  const effUsage =
+    usagePct > 0
+      ? usagePct
+      : state.lastUsagePct &&
+          state.lastUsageAt &&
+          now - state.lastUsageAt < USAGE_FRESH_MS
+        ? state.lastUsagePct
+        : 0;
+
+  if (effUsage >= HIGH_USAGE_PCT) {
     cooldownUntil = now + HIGH_USAGE_COOLDOWN_SEC * 1000;
     count = 0;
   } else if (count >= COOLDOWN_AFTER) {
-    cooldownUntil = now + POST_BATCH_COOLDOWN_SEC * 1000;
+    // Window filled: pause ONLY when Meta's own gauge is warming; when the
+    // quota is cold the counter just resets and the team keeps fetching.
     count = 0;
+    if (effUsage >= WARM_USAGE_PCT) {
+      cooldownUntil = now + POST_BATCH_COOLDOWN_SEC * 1000;
+    }
   }
 
   const next: WindowState = {

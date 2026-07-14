@@ -123,11 +123,11 @@ function MetaGatePill() {
         title={
           gate.coolingDown
             ? `Instagram fetch is cooling down — new fetches resume in ${mmss}. The app paces itself so Meta doesn't block the whole token.`
-            : `Instagram fetch is available — ${gate.count} of ${gate.limit} calls used in the current pacing window (cache-served fetches are free and don't count).${
+            : `Instagram fetch is available — ${gate.count} of ${gate.limit} calls this window (cache-served fetches are free and don't count).${
                 gate.usagePct > 0
-                  ? ` Meta's own hourly quota is at ${gate.usagePct}% — crossing 75% opens a 5-minute cooldown.`
+                  ? ` Meta's own hourly quota is at ${gate.usagePct}%.`
                   : ""
-              } Crossing ${gate.limit} window calls triggers a 1-minute breather.`
+              } Pauses only happen when Meta's quota runs hot (60%+ = 1-min breather per ${gate.limit} calls, 75%+ = 5-min cooldown).`
         }
       >
         <Gauge size={12} aria-hidden />

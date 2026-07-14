@@ -131,9 +131,10 @@ export default function ReachOutInboundKM() {
           </li>
           <li>
             <strong>Rate gate</strong> — the 50-call window is shared with the
-            outbound Fetch; after 50 calls (or X-App-Usage ≥ 75%) a cooldown
-            pauses fetching with a retry countdown.{" "}
-            <KMCode>lib/meta-rate-limit.ts</KMCode>.
+            outbound Fetch, but a filled window pauses only when Meta&apos;s
+            own quota gauge is warming: &lt;60% usage → no pause (window just
+            resets); 60–75% → 1-minute breather; ≥75% → 5-minute cooldown with
+            a retry countdown. <KMCode>lib/meta-rate-limit.ts</KMCode>.
           </li>
           <li>
             <strong>Every fetch is persisted</strong> to{" "}

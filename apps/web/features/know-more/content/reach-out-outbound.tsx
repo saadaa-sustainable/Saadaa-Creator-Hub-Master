@@ -111,17 +111,17 @@ export default function ReachOutOutboundKM() {
         </KMList>
       </KMSection>
 
-      <KMSection tag="Rate gate (batch of 50 + cooldown)">
+      <KMSection tag="Rate gate (usage-driven cooldowns)">
         <KMCallout tone="info">
-          Each outbound Fetch is{" "}
-          <strong>1 call drawn from a rolling window of 50</strong> (shared with
-          the inbound batch Fetch). After 50 calls — or when Meta&apos;s
-          X-App-Usage crosses 75% — the server opens a <strong>cooldown</strong>{" "}
-          and further fetches are paused with a retry countdown. State lives in{" "}
+          Each outbound Fetch of a <strong>new</strong> handle is 1 Meta call
+          counted in a rolling window of 50 (shared with the inbound batch
+          Fetch); cache-served fetches are free and don&apos;t count. A filled
+          window pauses <strong>only if Meta&apos;s own quota gauge is warming</strong>:
+          below 60% usage the window just resets and fetching continues; 60–75%
+          → a 1-minute breather; 75%+ → a 5-minute cooldown. State lives in{" "}
           <KMCode>app_settings.meta_fetch_window</KMCode>; logic in{" "}
-          <KMCode>lib/meta-rate-limit.ts</KMCode> (mirrors{" "}
-          <KMCode>ig_fetching.py</KMCode>). The token is READ-ONLY — we never
-          write to Meta.
+          <KMCode>lib/meta-rate-limit.ts</KMCode>. The token is READ-ONLY — we
+          never write to Meta.
         </KMCallout>
         <KMCallout tone="warning">
           Why the pauses exist: Meta&apos;s app-level quota is small (about 200
