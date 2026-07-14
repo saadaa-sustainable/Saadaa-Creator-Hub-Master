@@ -83,19 +83,26 @@ export default function ReachOutOutboundKM() {
             no longer blocked) subject to the eligibility rules below.
           </li>
           <li>
-            <strong>3. Meta business_discovery</strong> — LIVE fetch on the
+            <strong>3. fresh cache (&lt;6h)</strong> — a handle live-fetched in
+            the last 6 hours is served instantly from{" "}
+            <KMCode>instagram_cache</KMCode> at <strong>zero Meta quota</strong>{" "}
+            (full data: name, followers, ER, avatar, verified). Works straight
+            through a cooldown — re-clicks and team overlaps never burn calls.
+          </li>
+          <li>
+            <strong>4. Meta business_discovery</strong> — LIVE fetch on the
             Fetch click (no Apify, no wait, no cost). Returns followers, profile
             pic, avg likes, ER, and the legacy numeric{" "}
             <KMCode>profile_id</KMCode> (Meta <KMCode>ig_id</KMCode>). Badge:
             &quot;Live&quot;.
           </li>
           <li>
-            <strong>4. historic</strong> — Meta missed but the handle is in{" "}
+            <strong>5. historic</strong> — Meta missed but the handle is in{" "}
             <KMCode>ig_data_historic</KMCode> → cached metrics. Badge:
             &quot;Last known&quot;.
           </li>
           <li>
-            <strong>5. deactivated / error</strong> — Meta &quot;Cannot find
+            <strong>6. deactivated / error</strong> — Meta &quot;Cannot find
             User&quot; (personal/dead) + no archive ⇒{" "}
             <strong>deactivated</strong> (manual entry still allowed); a
             transient Meta failure ⇒ <strong>error</strong> (retry). Badge:
@@ -115,6 +122,15 @@ export default function ReachOutOutboundKM() {
           <KMCode>lib/meta-rate-limit.ts</KMCode> (mirrors{" "}
           <KMCode>ig_fetching.py</KMCode>). The token is READ-ONLY — we never
           write to Meta.
+        </KMCallout>
+        <KMCallout tone="warning">
+          Why the pauses exist: Meta&apos;s app-level quota is small (about 200
+          calls per hour) and <strong>batching does not compress it</strong> —
+          Meta counts every sub-request of a batch individually. The 6-hour
+          fresh cache is what stretches the budget: any handle fetched recently
+          costs nothing to fetch again, even during a cooldown. If Meta itself
+          reports the request limit, the gate slams shut for 5 minutes so calls
+          that would all fail anyway stop burning.
         </KMCallout>
       </KMSection>
 

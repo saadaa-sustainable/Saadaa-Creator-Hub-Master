@@ -390,7 +390,11 @@ export function InboundForm({ campaigns }: InboundFormProps) {
                 const username = inboundUsernameFromUrl(row.instagramLink);
                 const hit = res.hits[username];
                 return (
-                  hit?.source === "creator" || hit?.source === "blacklisted"
+                  hit?.source === "creator" ||
+                  hit?.source === "blacklisted" ||
+                  // Fresh-cache serve (<6h since last live fetch) — full
+                  // live-quality data at zero Meta quota; works mid-cooldown.
+                  hit?.source === "meta"
                 );
               });
         if (applyableRows.length > 0) {

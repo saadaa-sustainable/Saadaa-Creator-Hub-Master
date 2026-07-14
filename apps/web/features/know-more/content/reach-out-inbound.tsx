@@ -116,6 +116,15 @@ export default function ReachOutInboundKM() {
             Live / Last known / Not fetchable.
           </li>
           <li>
+            <strong>Fresh cache (&lt;6h) fetches are free</strong> — handles
+            live-fetched in the last 6 hours are served from{" "}
+            <KMCode>instagram_cache</KMCode> before the Meta batch, so they
+            spend no quota and fill in even during a cooldown. Re-importing a
+            sheet you fetched an hour ago costs ~0 Meta calls (Meta counts
+            every batch sub-request individually — caching, not batching, is
+            what stretches the ~200/hr app budget).
+          </li>
+          <li>
             <strong>Fetch-before-submit is a validation rule</strong> — a row
             with a profile URL must be fetched (live, cached, or a definitive
             not-fetchable result) before the batch will submit.

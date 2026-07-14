@@ -679,6 +679,7 @@ function persistFetches(
     .filter((h) => h.source === "meta" || h.source === "historic")
     .map((h) => ({
       username: h.username,
+      inf_name: h.inf_name ?? null,
       followers: h.followers,
       er: h.er,
       avg_likes: h.avg_likes,
@@ -708,6 +709,73 @@ function persistFetches(
       console.error("[persistFetches]", e);
     }
   });
+}
+
+/**
+ * Fresh-cache TTL — a live Meta fetch this recent is served straight from
+ * instagram_cache with NO Meta call. Meta batch sub-requests each count
+ * against the app-level quota (~200/hr — batching does NOT compress them),
+ * so not spending calls on recently-fetched handles is the main capacity
+ * lever: re-clicks, team overlaps and inbound re-imports all become free.
+ */
+const FRESH_FETCH_TTL_MS = 6 * 60 * 60 * 1000;
+
+const CACHE_FETCH_COLUMNS =
+  "username, inf_name, followers, er, avg_likes, profile_pic, profile_id, biography, is_verified, status, scraped_at";
+
+interface CachedFetch {
+  meta: MetaDiscoveryResult;
+  verified: boolean | null;
+}
+
+/** Build a served-from-cache Meta result from an instagram_cache row, or null
+ *  when the row is stale (> TTL), data-less, or not a live-fetch record. */
+function cachedFetchFromRow(row: Record<string, unknown>): CachedFetch | null {
+  // Only rows written by a real live fetch — never historic-tier fallbacks.
+  if (row.status !== "meta") return null;
+  const scrapedAt =
+    typeof row.scraped_at === "string" ? Date.parse(row.scraped_at) : NaN;
+  if (
+    !Number.isFinite(scrapedAt) ||
+    Date.now() - scrapedAt > FRESH_FETCH_TTL_MS
+  )
+    return null;
+  if (typeof row.followers !== "number") return null;
+  return {
+    meta: {
+      status: "ok",
+      node: {
+        ig_id: typeof row.profile_id === "string" ? row.profile_id : null,
+        username: typeof row.username === "string" ? row.username : null,
+        name:
+          typeof row.inf_name === "string" && row.inf_name
+            ? row.inf_name
+            : null,
+        biography:
+          typeof row.biography === "string" && row.biography
+            ? row.biography
+            : null,
+        followers: row.followers,
+        profile_pic:
+          typeof row.profile_pic === "string" ? row.profile_pic : null,
+        avg_likes: typeof row.avg_likes === "number" ? row.avg_likes : null,
+        er: typeof row.er === "number" ? row.er : null,
+      },
+    },
+    verified: typeof row.is_verified === "boolean" ? row.is_verified : null,
+  };
+}
+
+async function readFreshCachedFetch(
+  supabase: ReturnType<typeof createServiceClient>,
+  username: string,
+): Promise<CachedFetch | null> {
+  const { data } = await (supabase as any)
+    .from("instagram_cache")
+    .select(CACHE_FETCH_COLUMNS)
+    .eq("username", username)
+    .maybeSingle();
+  return data ? cachedFetchFromRow(data as Record<string, unknown>) : null;
 }
 
 interface HistRow {
@@ -905,21 +973,31 @@ export async function lookupCreator(
     profile_status: string | null;
   } | null;
 
-  // 2. Meta business_discovery — INSTANT live fetch (replaces the Apify 3-hr path),
-  //    gated by the rolling batch-of-50 cooldown. When cooling down we DON'T hit
-  //    Meta — historic / deactivated / error tiers cover the request.
+  // 2. Live profile data — CACHE-FIRST (a live fetch from the last 6h serves
+  //    free, no quota), then Meta business_discovery gated by the rolling
+  //    cooldown. When cooling and there's no fresh cache, historic /
+  //    deactivated / error tiers cover the request.
   const gate = await checkMetaGate();
   let meta: MetaDiscoveryResult;
   // Best-effort verified-badge crawl (Meta can't return it) — run IN PARALLEL with
   // the Meta fetch so it adds no latency. Single-fetch only (never in bulk). null
   // when blocked/unknown → verification stays manual.
   let igVerified: boolean | null = null;
-  if (gate.coolingDown) {
+  let servedFromCache = false;
+  let attemptedLive = false;
+
+  const cached = await readFreshCachedFetch(supabase, username);
+  if (cached) {
+    meta = cached.meta;
+    igVerified = cached.verified;
+    servedFromCache = true;
+  } else if (gate.coolingDown) {
     meta = {
       status: "error",
       error: `rate-limit cooldown — retry in ${gate.retryAfterSec}s`,
     };
   } else {
+    attemptedLive = true;
     const [m, v] = await Promise.all([
       fetchBusinessDiscovery(username),
       fetchIgVerified(username),
@@ -927,6 +1005,12 @@ export async function lookupCreator(
     meta = m;
     igVerified = v;
     await recordMetaUsage(1, meta.usagePct ?? 0);
+    // Meta itself reported the app-level request limit — our own counter is
+    // beside the point; slam the gate (300s, high-usage path) so the team
+    // stops burning calls that would all error anyway.
+    if (m.status === "error" && /rate_limited/i.test(m.error ?? "")) {
+      await recordMetaUsage(0, 100);
+    }
   }
 
   // Existing creator by username (tier 1) → re-reach: refresh from live Meta and
@@ -971,13 +1055,17 @@ export async function lookupCreator(
   if (hit.source === "meta" && igVerified !== null) {
     hit.verification = igVerified ? "Yes" : "No";
   }
-  // Only report genuine fetch attempts — a cooldown defer isn't a real failure.
-  if (!gate.coolingDown) reportLookupIssue(hit);
-  persistFetches(
-    supabase,
-    [hit],
-    permission === "reachout_inbound" ? "inbound" : "outbound",
-  );
+  // Only report genuine fetch attempts — a cooldown defer or a cache serve
+  // isn't a real failure.
+  if (attemptedLive) reportLookupIssue(hit);
+  // A cache-served hit must NOT be re-persisted — the upsert would refresh
+  // scraped_at and make the row look freshly fetched forever.
+  if (!servedFromCache)
+    persistFetches(
+      supabase,
+      [hit],
+      permission === "reachout_inbound" ? "inbound" : "outbound",
+    );
   return hit;
 }
 
@@ -1104,14 +1192,35 @@ export async function lookupCreatorsBatch(
     if (u && !cleanByUser.has(u)) cleanByUser.set(u, r);
   }
 
-  // Tier 2 — ONE Meta batch (≤50), gated by the rolling cooldown.
-  const gate = await checkMetaGate();
+  // Tier 1.6 — FRESH CACHE (<6h): every Meta batch sub-request counts
+  // individually against the app-level quota (batching does NOT compress
+  // them), so handles fetched recently are served from instagram_cache free.
+  // They also keep working straight through a cooldown.
   const metaByUser = new Map<string, MetaDiscoveryResult>();
+  const cachedVerified = new Map<string, boolean>();
+  const { data: cacheRows } = await (supabase as any)
+    .from("instagram_cache")
+    .select(CACHE_FETCH_COLUMNS)
+    .in("username", remaining);
+  for (const raw of (cacheRows ?? []) as Record<string, unknown>[]) {
+    const u =
+      typeof raw.username === "string" ? raw.username.toLowerCase() : "";
+    if (!u) continue;
+    const c = cachedFetchFromRow(raw);
+    if (!c) continue;
+    metaByUser.set(u, c.meta);
+    if (c.verified !== null) cachedVerified.set(u, c.verified);
+  }
+
+  // Tier 2 — ONE Meta batch (≤50) for the cache-misses only, gated by the
+  // rolling cooldown.
+  const gate = await checkMetaGate();
   let coolingDown = gate.coolingDown;
   let retryAfterSec = gate.retryAfterSec;
   let fetched = 0;
-  if (!gate.coolingDown) {
-    const batch = remaining.slice(0, META_BATCH_SIZE);
+  const toFetch = remaining.filter((h) => !metaByUser.has(h));
+  if (!gate.coolingDown && toFetch.length > 0) {
+    const batch = toFetch.slice(0, META_BATCH_SIZE);
     const { results, usagePct } = await fetchBusinessDiscoveryBatch(batch);
     batch.forEach((h, i) => metaByUser.set(h, results[i]));
     fetched = batch.length;
@@ -1165,14 +1274,24 @@ export async function lookupCreatorsBatch(
       histByUser.get(h) ?? null,
       cleanByUser.get(h) ?? null,
     );
+    // Cache-served rows kept their verified badge from the original fetch.
+    const cv = cachedVerified.get(h);
+    if (hits[h].source === "meta" && cv !== undefined) {
+      hits[h].verification = cv ? "Yes" : "No";
+    }
     // Only report handles actually sent to Meta this batch (skip deferred >50
-    // and cooldown cases — those aren't real failures).
+    // and cooldown cases — those aren't real failures; cache serves are "ok").
     if (meta) reportLookupIssue(hits[h]);
   }
 
+  // Cache-served handles are NOT re-persisted — the upsert would refresh
+  // scraped_at and make those rows look freshly fetched forever.
+  const liveFetched = new Set(toFetch.slice(0, META_BATCH_SIZE));
   persistFetches(
     supabase,
-    Object.values(hits),
+    Object.entries(hits)
+      .filter(([h]) => liveFetched.has(h))
+      .map(([, hit]) => hit),
     permission === "reachout_inbound" ? "inbound" : "outbound",
   );
 
