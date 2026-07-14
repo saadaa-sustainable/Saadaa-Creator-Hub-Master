@@ -525,7 +525,12 @@ export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
         <a
           className="post-id tabular ob-order-link"
           style={{ color: "var(--color-success-text)" }}
-          href={shopifyOrderAdminUrl(row.original.order_id) ?? undefined}
+          href={
+            shopifyOrderAdminUrl(
+              row.original.order_id,
+              row.original._shopifyInternalId,
+            ) ?? undefined
+          }
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}

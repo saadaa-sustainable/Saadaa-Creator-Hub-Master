@@ -75,6 +75,12 @@ export interface OnboardingRow {
   _priorCollabIds?: string[];
   /** Presentation-only: the C number the next onboard will mint for this creator. */
   _nextCollab?: number;
+  /**
+   * Presentation-only: Shopify's INTERNAL order id (shopify_orders.
+   * shopify_internal_id) for this row's order_id — powers the direct
+   * "View Order" admin deep link. Absent → link falls back to admin search.
+   */
+  _shopifyInternalId?: number | string | null;
 }
 
 /**

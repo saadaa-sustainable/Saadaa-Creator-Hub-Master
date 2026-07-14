@@ -5921,6 +5921,21 @@
   .ob-overview-footer {
     justify-content: flex-end;
   }
+  /* View Order anchor in the overview footer — btn-ghost shape, green accent. */
+  a.ob-overview-shopify {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    text-decoration: none;
+    color: var(--color-success-text);
+    border-color: rgba(79, 124, 77, 0.35);
+    background: var(--color-success-bg);
+  }
+  a.ob-overview-shopify:hover {
+    background: var(--color-success-text);
+    border-color: var(--color-success-text);
+    color: #fff;
+  }
   .ob-card-email-send:hover {
     transform: translateY(-1px);
     box-shadow: 0 6px 14px -6px rgba(192, 57, 43, 0.45);
@@ -5975,6 +5990,34 @@
     background: #2b5bb5;
     color: #fff;
     border-color: #2b5bb5;
+    transform: translateY(-1px);
+  }
+  /* View Order → Shopify admin: success-green so it reads distinct from the
+     blue Overview button. */
+  .ob-card-actions a.action-shopify {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 2.06rem;
+    padding: 0.42rem 0.7rem;
+    border: 1px solid rgba(79, 124, 77, 0.35);
+    border-radius: 0.55rem;
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.12s ease-out;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .ob-card-actions a.action-shopify:hover {
+    background: var(--color-success-text);
+    color: #fff;
+    border-color: var(--color-success-text);
     transform: translateY(-1px);
   }
   .ob-card-actions button.action-primary {
@@ -7017,6 +7060,19 @@
       var(--campaign-accent) 62%,
       var(--color-text-link)
     );
+  }
+
+  /* View Order → Shopify admin: success-green, distinct from Overview. */
+  .campaign-list-action--shopify {
+    min-width: 60px;
+    border-color: rgba(79, 124, 77, 0.35);
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
+  }
+  .campaign-list-action--shopify:hover {
+    border-color: var(--color-success-text);
+    background: var(--color-success-text);
+    color: #fff;
   }
 
   .campaign-card {

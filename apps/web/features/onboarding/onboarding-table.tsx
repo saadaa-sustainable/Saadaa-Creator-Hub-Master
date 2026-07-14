@@ -432,6 +432,21 @@ function OnboardingListRow({
                 Email
               </button>
             )}
+            {r.order_id && (
+              <a
+                className="campaign-list-action campaign-list-action--shopify"
+                href={
+                  shopifyOrderAdminUrl(r.order_id, r._shopifyInternalId) ??
+                  undefined
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open order ${r.order_id} in Shopify admin`}
+              >
+                <ExternalLink size={13} aria-hidden />
+                View Order
+              </a>
+            )}
             <button
               type="button"
               className="campaign-list-action campaign-list-action--brief"
@@ -647,8 +662,11 @@ function ObCard({
             )}
             {r.order_id && (
               <a
-                className="action-view"
-                href={shopifyOrderAdminUrl(r.order_id) ?? undefined}
+                className="action-shopify"
+                href={
+                  shopifyOrderAdminUrl(r.order_id, r._shopifyInternalId) ??
+                  undefined
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
@@ -826,7 +844,12 @@ function OnboardingOverviewModal({
                 row.order_id ? (
                   <a
                     className="ob-order-link"
-                    href={shopifyOrderAdminUrl(row.order_id) ?? undefined}
+                    href={
+                      shopifyOrderAdminUrl(
+                        row.order_id,
+                        row._shopifyInternalId,
+                      ) ?? undefined
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     title={`Open order ${row.order_id} in Shopify admin`}
@@ -945,6 +968,21 @@ function OnboardingOverviewModal({
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close
           </button>
+          {row.order_id && (
+            <a
+              className="btn btn-ghost ob-overview-shopify"
+              href={
+                shopifyOrderAdminUrl(row.order_id, row._shopifyInternalId) ??
+                undefined
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Open order ${row.order_id} in Shopify admin`}
+            >
+              <ExternalLink size={14} aria-hidden />
+              View Order
+            </a>
+          )}
           {isOnboarded(row) && (
             <button
               type="button"

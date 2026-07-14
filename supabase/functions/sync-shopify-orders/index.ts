@@ -154,6 +154,9 @@ function mapOrder(o: ShopifyOrder): Record<string, unknown> {
     // mismatches → duplicate rows (one per number, one per internal id) and broke
     // creator linkage. Fallback to the internal id only if order_number is absent.
     order_id: String(o.order_number ?? o.id),
+    // Internal Shopify id kept alongside — powers direct admin deep links
+    // (admin.shopify.com/.../orders/{id}); never used as the row key.
+    shopify_internal_id: o.id ?? null,
     customer_name: customerName,
     email: o.email ?? null,
     phone: o.phone ?? o.shipping_address?.phone ?? null,

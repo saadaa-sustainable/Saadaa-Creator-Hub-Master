@@ -150,6 +150,40 @@ export async function fetchOnboardingTable(
   };
   rows = rows.map(stampPrior);
 
+  // Shopify INTERNAL order ids → direct "View Order" admin deep links.
+  // Keyed by the order NUMBER both sides store; rows the edge fn hasn't
+  // re-synced yet stay unstamped and the link falls back to admin search.
+  const orderNumbers = [
+    ...new Set(
+      rows
+        .map((row) => String(row.order_id ?? "").replace(/^#+/, "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  if (orderNumbers.length > 0) {
+    const { data: shopRows, error: shopErr } = await (supabase as any)
+      .from("shopify_orders")
+      .select("order_id, shopify_internal_id")
+      .in("order_id", orderNumbers);
+    if (shopErr) {
+      console.error("[onboarding] shopify internal ids:", shopErr.message);
+    } else {
+      const internalByOrder = new Map<string, number | string>();
+      for (const s of (shopRows ?? []) as Array<Record<string, unknown>>) {
+        const key = String(s.order_id ?? "").replace(/^#+/, "").trim();
+        if (key && s.shopify_internal_id != null)
+          internalByOrder.set(key, s.shopify_internal_id as number | string);
+      }
+      rows = rows.map((row) => {
+        const key = String(row.order_id ?? "").replace(/^#+/, "").trim();
+        const internal = key ? internalByOrder.get(key) : undefined;
+        return internal != null
+          ? { ...row, _shopifyInternalId: internal }
+          : row;
+      });
+    }
+  }
+
   const missingProfileUsernames = [
     ...new Set(
       rows
