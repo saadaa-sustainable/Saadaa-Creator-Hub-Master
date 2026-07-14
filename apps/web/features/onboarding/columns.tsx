@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import {
   AlertTriangle,
   CheckCircle2,
+  ExternalLink,
   Layers,
   Link as LinkIcon,
   RotateCcw,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import { Avatar, DeactivatedBadge, WorkflowStatusPill } from "@/components/ui";
 import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
+import { shopifyOrderAdminUrl } from "@/lib/shopify";
 import type { OnboardingRow } from "./types";
 
 /**
@@ -520,12 +522,18 @@ export const onboardingColumns: ColumnDef<OnboardingRow>[] = [
     header: "Order ID",
     cell: ({ row }) =>
       row.original.order_id ? (
-        <span
-          className="post-id tabular"
+        <a
+          className="post-id tabular ob-order-link"
           style={{ color: "var(--color-success-text)" }}
+          href={shopifyOrderAdminUrl(row.original.order_id) ?? undefined}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title={`Open order ${row.original.order_id} in Shopify admin`}
         >
           {row.original.order_id}
-        </span>
+          <ExternalLink size={10} aria-hidden />
+        </a>
       ) : (
         <span className="text-text-tertiary">—</span>
       ),

@@ -5903,6 +5903,21 @@
     padding: 8px 10px;
     font-size: 0.78rem;
   }
+  /* Order-number → Shopify-admin link (list cell + overview modal). */
+  .ob-order-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--color-success-text);
+    text-decoration: none;
+  }
+  .ob-order-link:hover {
+    text-decoration: underline;
+  }
+  .ob-order-link svg {
+    flex-shrink: 0;
+    opacity: 0.65;
+  }
   .ob-overview-footer {
     justify-content: flex-end;
   }

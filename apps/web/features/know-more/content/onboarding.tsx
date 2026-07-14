@@ -169,7 +169,9 @@ export default function OnboardingKM() {
             (freshly placed), the system does a live Shopify check and pulls it
             in — but only if the order is tagged for influencer orders{" "}
             <KMCode>INF</KMCode>. Untagged or unknown order ⇒ blocked + the
-            submitter is alerted.
+            submitter is alerted. Once onboarded, the card, list row and
+            Overview all carry a <strong>View Order</strong> link that opens
+            the order in Shopify admin (new tab).
           </li>
           <li>
             <strong>Bank Details</strong> — Bank Name, Bank Number, IFSC.

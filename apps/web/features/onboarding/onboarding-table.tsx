@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Eye,
+  ExternalLink,
   Grid3X3,
   Inbox,
   Layers,
@@ -29,6 +30,7 @@ import {
   workflowStatusLabel,
 } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import { shopifyOrderAdminUrl } from "@/lib/shopify";
 import {
   DeliverablesChip,
   EmailStatusCell,
@@ -643,6 +645,19 @@ function ObCard({
                 Send Email
               </button>
             )}
+            {r.order_id && (
+              <a
+                className="action-view"
+                href={shopifyOrderAdminUrl(r.order_id) ?? undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                title={`Open order ${r.order_id} in Shopify admin`}
+              >
+                <ExternalLink size={12} aria-hidden />
+                View Order
+              </a>
+            )}
             <button
               type="button"
               className="action-view"
@@ -805,7 +820,26 @@ function OnboardingOverviewModal({
               value={collabDeliverableBreakdown(row, rows)}
               mono
             />
-            <OverviewItem label="Order ID" value={row.order_id ?? "—"} mono />
+            <OverviewItem
+              label="Order ID"
+              value={
+                row.order_id ? (
+                  <a
+                    className="ob-order-link"
+                    href={shopifyOrderAdminUrl(row.order_id) ?? undefined}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Open order ${row.order_id} in Shopify admin`}
+                  >
+                    {row.order_id}
+                    <ExternalLink size={11} aria-hidden />
+                  </a>
+                ) : (
+                  "—"
+                )
+              }
+              mono
+            />
             <OverviewItem
               label="Order Status"
               value={row.order_status ?? "—"}
