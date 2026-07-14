@@ -126,6 +126,7 @@ Reads `posts` (+`campaigns`/`creators` joins), `instagram_cache` (avatar fallbac
 2. On miss → POST edge `sync-shopify-orders?order_id=...` (live pull; **Option B** — only upserts if the order carries the influencer `INF` tag), re-check.
 3. Still not found → reject with `fieldErrors.orderId` + fire SHOPIFY_VALIDATION_FAILED email to the submitting actor.
    Resolves email, address (`parseShopifyAddress` → street/city/state/pincode using INDIAN_STATES anchoring), tracking, garments, SKUs → `garment_qty`.
+4. **View Order link (2026-07-14):** onboarded cards get a "View Order" button, and the Order ID in the list view + Overview modal are clickable — `lib/shopify.ts shopifyOrderAdminUrl()` opens Shopify admin order search (`?query=<order number>`, new tab) since we store the order NUMBER, not Shopify's internal id. Reuse the helper for any stage that shows an order id.
 
 ### Deliverable expansion §6.2
 
