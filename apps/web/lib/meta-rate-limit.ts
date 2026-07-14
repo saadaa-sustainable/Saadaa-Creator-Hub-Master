@@ -35,12 +35,21 @@ export interface MetaGate {
   coolingDown: boolean;
   retryAfterSec: number;
   count: number;
+  /** Meta's own X-App-Usage % from the most recent call (0 = unknown/stale).
+   *  This is the real hourly-quota gauge; `count` is only our local pacing
+   *  window (cache-served fetches never move either). */
+  usagePct: number;
 }
 
 interface WindowState {
   count: number;
   cooldownUntil: number | null; // epoch ms
+  lastUsagePct?: number;
+  lastUsageAt?: number; // epoch ms of the last usage report
 }
+
+/** X-App-Usage is an hourly gauge — treat a reading older than this as stale. */
+const USAGE_FRESH_MS = 30 * 60 * 1000;
 
 function parseState(raw: unknown): WindowState {
   if (typeof raw !== "string") return { count: 0, cooldownUntil: null };
@@ -50,6 +59,8 @@ function parseState(raw: unknown): WindowState {
       count: typeof o.count === "number" ? o.count : 0,
       cooldownUntil:
         typeof o.cooldownUntil === "number" ? o.cooldownUntil : null,
+      lastUsagePct: typeof o.lastUsagePct === "number" ? o.lastUsagePct : 0,
+      lastUsageAt: typeof o.lastUsageAt === "number" ? o.lastUsageAt : 0,
     };
   } catch {
     return { count: 0, cooldownUntil: null };
@@ -80,14 +91,19 @@ async function writeState(state: WindowState): Promise<void> {
 
 function gateFrom(state: WindowState): MetaGate {
   const now = Date.now();
+  const usagePct =
+    state.lastUsagePct && state.lastUsageAt && now - state.lastUsageAt < USAGE_FRESH_MS
+      ? state.lastUsagePct
+      : 0;
   if (state.cooldownUntil && now < state.cooldownUntil) {
     return {
       coolingDown: true,
       retryAfterSec: Math.ceil((state.cooldownUntil - now) / 1000),
       count: state.count,
+      usagePct,
     };
   }
-  return { coolingDown: false, retryAfterSec: 0, count: state.count };
+  return { coolingDown: false, retryAfterSec: 0, count: state.count, usagePct };
 }
 
 /** Is a Meta fetch allowed right now? Read-only — call before fetching. */
@@ -122,7 +138,14 @@ export async function recordMetaUsage(
     count = 0;
   }
 
-  const next: WindowState = { count, cooldownUntil };
+  const next: WindowState = {
+    count,
+    cooldownUntil,
+    // Keep the freshest real usage reading for the header pill (a 0 report
+    // usually means "header missing on this call", not "quota back to zero").
+    lastUsagePct: usagePct > 0 ? usagePct : state.lastUsagePct,
+    lastUsageAt: usagePct > 0 ? now : state.lastUsageAt,
+  };
   await writeState(next);
   return gateFrom(next);
 }

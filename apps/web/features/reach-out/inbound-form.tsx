@@ -383,6 +383,8 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           chunk.map((r) => r.instagramLink),
           "reachout_inbound",
         );
+        // Nudge the header Meta pill to refresh right away (30s poll otherwise).
+        window.dispatchEvent(new Event("ch:meta-fetch"));
         const applyableRows =
           res.fetched > 0
             ? chunk

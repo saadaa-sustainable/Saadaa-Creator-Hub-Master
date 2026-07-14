@@ -174,6 +174,8 @@ export function OutboundForm({
     setVerificationOverridden(false);
     startLookup(async () => {
       const result = await lookupCreator(cleaned);
+      // Nudge the header Meta pill to refresh right away (30s poll otherwise).
+      window.dispatchEvent(new Event("ch:meta-fetch"));
       if (!result) {
         setHit(null);
         setLookupState("idle");

@@ -28,6 +28,7 @@ export async function GET() {
     retryAfterSec: gate.retryAfterSec,
     count: gate.count,
     limit: META_BATCH_SIZE,
+    usagePct: gate.usagePct,
     tokenMode: token && main && token !== main ? "temporary" : "main",
   });
 }

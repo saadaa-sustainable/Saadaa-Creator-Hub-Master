@@ -12,13 +12,19 @@ interface MetaGateState {
   retryAfterSec: number;
   count: number;
   limit: number;
+  usagePct: number;
   tokenMode: "main" | "temporary";
 }
 
+/** Fired by the Reach Out forms right after a Fetch completes so the header
+ *  pill updates immediately instead of waiting for the next 30s poll. */
+export const META_FETCH_EVENT = "ch:meta-fetch";
+
 /**
  * Live Meta fetch-state pill — the team's answer to "is Fetch broken?".
- * Polls /api/meta-gate every 30s (10s while cooling) and ticks the cooldown
- * countdown locally every second. Green-ish neutral = calls used this window;
+ * Polls /api/meta-gate every 30s (10s while cooling), refreshes instantly on
+ * META_FETCH_EVENT, and ticks the cooldown countdown locally every second.
+ * Neutral = calls used this pacing window (+ Meta's own quota % when known);
  * amber countdown = the app is pacing itself so Meta doesn't hard-block the
  * whole token; extra pill when a staged temporary token is active.
  */
@@ -31,6 +37,7 @@ function MetaGatePill() {
     let timer: number | undefined;
 
     const poll = async () => {
+      if (timer) window.clearTimeout(timer);
       try {
         const res = await fetch("/api/meta-gate", { cache: "no-store" });
         if (res.ok) {
@@ -52,6 +59,10 @@ function MetaGatePill() {
     };
     void poll();
 
+    // A Fetch just ran somewhere on this page — reflect it right away.
+    const onFetch = () => void poll();
+    window.addEventListener(META_FETCH_EVENT, onFetch);
+
     // 1s local countdown between polls.
     const tick = window.setInterval(() => {
       const g = gateRef.current;
@@ -68,6 +79,7 @@ function MetaGatePill() {
     return () => {
       alive = false;
       if (timer) window.clearTimeout(timer);
+      window.removeEventListener(META_FETCH_EVENT, onFetch);
       window.clearInterval(tick);
     };
   }, []);
@@ -111,11 +123,17 @@ function MetaGatePill() {
         title={
           gate.coolingDown
             ? `Instagram fetch is cooling down — new fetches resume in ${mmss}. The app paces itself so Meta doesn't block the whole token.`
-            : `Instagram fetch is available — ${gate.count} of ${gate.limit} calls used in the current window. Crossing ${gate.limit} triggers a short cooldown.`
+            : `Instagram fetch is available — ${gate.count} of ${gate.limit} calls used in the current pacing window (cache-served fetches are free and don't count).${
+                gate.usagePct > 0
+                  ? ` Meta's own hourly quota is at ${gate.usagePct}% — crossing 75% opens a 5-minute cooldown.`
+                  : ""
+              } Crossing ${gate.limit} window calls triggers a 1-minute breather.`
         }
       >
         <Gauge size={12} aria-hidden />
-        {gate.coolingDown ? `Meta cooling · ${mmss}` : `Meta ${gate.count}/${gate.limit}`}
+        {gate.coolingDown
+          ? `Meta cooling · ${mmss}`
+          : `Meta ${gate.count}/${gate.limit}${gate.usagePct > 0 ? ` · ${gate.usagePct}%` : ""}`}
       </span>
     </>
   );
