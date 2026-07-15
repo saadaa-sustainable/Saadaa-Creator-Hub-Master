@@ -402,7 +402,7 @@ export async function fetchOnboardingKpis(
     scope(
       (supabase as any)
         .from("posts")
-        .select("inf_id, collab_number, collab_id, post_id")
+        .select("id, inf_id, collab_number, collab_id, post_id")
         .eq("workflow_status", "Reach Out")
         .limit(20000),
     ),
@@ -427,7 +427,11 @@ export async function fetchOnboardingKpis(
     // No collab until an order is mapped — key reach-out rows by post_id, never
     // a fabricated "-C1".
     if (inf && cn != null) return `${inf}-C${cn}`;
-    return (r.post_id as string) ?? JSON.stringify(r);
+    // Pending reach-outs have NULL post_id — key by the bigserial id so two
+    // pending reach-outs of the SAME creator stay two collabs (the old
+    // JSON.stringify fallback collapsed them: Pending read 2362 vs 2443 rows).
+    if (r.post_id) return r.post_id as string;
+    return r.id != null ? `id:${r.id}` : JSON.stringify(r);
   };
 
   const normalizeOrderId = (raw: unknown) =>
