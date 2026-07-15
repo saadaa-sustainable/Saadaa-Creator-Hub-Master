@@ -18,7 +18,9 @@ import {
 import { monthKeyIST } from "@/lib/budget-versions";
 import {
   CampaignCreateSchema,
+  computeRowCompTotal,
   computeRowEstGarment,
+  computeRowTotal,
   computeTotals,
   INFLUENCER_TIERS,
   MIN_GARMENTS_FIXED,
@@ -181,6 +183,21 @@ async function applyCampaignEdit(
     .eq("campaign_id", campaignId);
   if (deleteErr) return { ok: false, error: deleteErr.message };
 
+  // Replacement lines stay attached to the campaign's V0 version (the "first
+  // created budget") — without this an edit would orphan the Budget tab's
+  // tier lines. The V0 amount/creators follow the edit too: V0 IS the
+  // sanctioned budget, and this edit is the sanctioned change to it.
+  const { data: v0Row } = await supabase
+    .from("campaign_budget_versions")
+    .select("id")
+    .eq("campaign_id", campaignId)
+    .eq("version_number", 0)
+    .maybeSingle();
+  const v0Id = (v0Row as { id?: number } | null)?.id ?? null;
+
+  const { allocated: editAllocated, totalAll: editTotalAll } = computeTotals(
+    input.budgetRows,
+  );
   const budgetRows = input.budgetRows.map((r) => ({
     campaign_id: campaignId,
     month_label: monthLabel,
@@ -191,12 +208,23 @@ async function applyCampaignEdit(
     avg_comp: r.avgComp,
     min_garments: r.minGarments,
     max_garments: r.maxGarments,
+    est_garment_cost: computeRowEstGarment(r),
+    total_cost: computeRowCompTotal(r),
+    total_with_garments: computeRowTotal(r),
+    version_id: v0Id,
   }));
 
   const { error: insertErr } = await supabase
     .from("campaign_budget")
     .insert(budgetRows);
   if (insertErr) return { ok: false, error: insertErr.message };
+
+  if (v0Id != null) {
+    await supabase
+      .from("campaign_budget_versions")
+      .update({ amount: editTotalAll, num_creators: editAllocated })
+      .eq("id", v0Id);
+  }
 
   return { ok: true };
 }
@@ -515,6 +543,40 @@ export async function editCampaign(
   const snapshot = await fetchCampaignSnapshot(supabase, id);
   if (snapshot.error || !snapshot.campaign) {
     return { ok: false, error: snapshot.error ?? `Campaign ${id} not found.` };
+  }
+
+  // A campaign still PENDING APPROVAL isn't live yet — nothing sanctioned to
+  // protect, so edits apply DIRECTLY to the submission (campaigns row, budget
+  // lines, and its pending V0 version all update in place). No approval
+  // request round-trip; the Global Admins simply decide on the edited numbers.
+  const campaignStatus = String(
+    (snapshot.campaign as { status?: string | null }).status ?? "",
+  ).toLowerCase();
+  if (campaignStatus.startsWith("pending")) {
+    const applied = await applyCampaignEdit(supabase, id, v, totalAll);
+    if (!applied.ok) return { ok: false, error: applied.error };
+
+    await logApprovalEvent(supabase, {
+      actionType: "Campaign Edit",
+      action: "Edited (pre-approval)",
+      entityId: id,
+      actor,
+      notes: `Pending campaign updated directly (not yet approved). New budget: ₹${new Intl.NumberFormat("en-IN").format(totalAll)}.`,
+    });
+
+    revalidateTag("campaigns");
+    revalidatePath("/campaigns");
+    revalidatePath("/campaigns/new");
+    revalidatePath("/approvals");
+    revalidateTag("approvals-count");
+    revalidatePath("/budget");
+
+    return {
+      ok: true,
+      campaignId: id,
+      totalBudget: totalAll,
+      message: `Campaign "${id} - ${v.campaignName}" updated. It's still awaiting approval — the Global Admins will decide on these new numbers (₹${new Intl.NumberFormat("en-IN").format(totalAll)}).`,
+    };
   }
 
   const { data: pendingEdit, error: pendingErr } = await (supabase as any)
