@@ -88,6 +88,7 @@ const POSTS_COLS_BASE = [
   "deliverable_index",
   "collab_number",
   "reachout_direction",
+  "collab_type",
 ].join(",");
 
 // Extended set — adds the ads_status column once the Ad Status stage seeds
@@ -663,9 +664,12 @@ export async function fetchDashboardData(
     const effectivePay = idx > 1 ? parentPay : payLow;
     const isSettled = effectivePay === "done" || effectivePay === "paid";
     const isPaymentPending = isPaymentPendingStatus(effectivePay);
+    const isBarterCollab =
+      String(p.collab_type ?? "").trim().toLowerCase() === "barter";
     let stuckLabel: string;
     if (bucketKey === "reachOut") stuckLabel = "Not yet onboarded";
     else if (bucketKey === "onBoard") stuckLabel = "Not yet posted";
+    else if (isBarterCollab) stuckLabel = "Barter — no payment";
     else if (isSettled) stuckLabel = "Settled";
     else if (isPaymentPending) stuckLabel = "Payment pending";
     else stuckLabel = "Payment not ready";
@@ -702,7 +706,7 @@ export async function fetchDashboardData(
     };
   };
   const bucket = (
-    cond: (s: string, pay: string, isChild: boolean) => boolean,
+    cond: (s: string, pay: string, isChild: boolean, isBarter: boolean) => boolean,
     bucketKey: "reachOut" | "onBoard" | "posted" | "paid",
   ) =>
     posts
@@ -713,6 +717,7 @@ export async function fetchDashboardData(
           String(p.workflow_status ?? "").toLowerCase(),
           String(p.payment_status ?? "").toLowerCase(),
           isChild,
+          String(p.collab_type ?? "").trim().toLowerCase() === "barter",
         );
       })
       .sort((a, b) => {
@@ -730,7 +735,7 @@ export async function fetchDashboardData(
   // True bucket total (the full count, before the 4-card preview slice) — drives
   // the column-header badge so it shows the real count, not just the 4 shown.
   const bucketCount = (
-    cond: (s: string, pay: string, isChild: boolean) => boolean,
+    cond: (s: string, pay: string, isChild: boolean, isBarter: boolean) => boolean,
   ) =>
     posts.filter((p) => {
       const isChild =
@@ -739,6 +744,7 @@ export async function fetchDashboardData(
         String(p.workflow_status ?? "").toLowerCase(),
         String(p.payment_status ?? "").toLowerCase(),
         isChild,
+        String(p.collab_type ?? "").trim().toLowerCase() === "barter",
       );
     }).length;
 
@@ -746,9 +752,11 @@ export async function fetchDashboardData(
     reachOut: bucketCount((s) => s.includes("reach out") || s === ""),
     onBoard: bucketCount((s) => s.includes("on board")),
     posted: bucketCount((s) => s.includes("posted") || s.includes("delivered")),
+    // Pure-Barter collabs carry no cash payment — never in the Payment column.
     paid: bucketCount(
-      (s, pay, isChild) =>
+      (s, pay, isChild, isBarter) =>
         !isChild &&
+        !isBarter &&
         (s.includes("posted") || s.includes("delivered")) &&
         (isPaymentPendingStatus(pay) || pay === "done" || pay === "paid"),
     ),
@@ -765,10 +773,12 @@ export async function fetchDashboardData(
       "posted",
     ),
     // Payment column — only payment-ready or settled PARENT collabs. Posted
-    // collabs still waiting for completed forms or creator acceptance stay out.
+    // collabs still waiting for completed forms or creator acceptance stay
+    // out, and pure-Barter collabs (no cash payment) never enter.
     paid: bucket(
-      (s, pay, isChild) =>
+      (s, pay, isChild, isBarter) =>
         !isChild &&
+        !isBarter &&
         (s.includes("posted") || s.includes("delivered")) &&
         (isPaymentPendingStatus(pay) || pay === "done" || pay === "paid"),
       "paid",

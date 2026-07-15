@@ -97,9 +97,14 @@ function stagesForPost(post: MyPost): StageKey[] {
       isPaymentPendingStatus(paymentStatus) ||
       paymentStatus === "done" ||
       paymentStatus === "paid";
+    // Pure-Barter collabs carry no cash payment — never in the Payment column.
+    const isPureBarter =
+      (post.collab_type ?? "").trim().toLowerCase() === "barter";
     // Posted column: all deliverables (parent + child).
     // Payment column: parent only, after eligibility created a ledger state.
-    return isParent && paymentTracked ? ["posted", "payment"] : ["posted"];
+    return isParent && paymentTracked && !isPureBarter
+      ? ["posted", "payment"]
+      : ["posted"];
   }
   return [];
 }
@@ -109,6 +114,7 @@ function paymentPending(post: MyPost): boolean {
     post.deliverable_index == null || Number(post.deliverable_index) === 1;
   return (
     isParent &&
+    (post.collab_type ?? "").trim().toLowerCase() !== "barter" &&
     (post.workflow_status === "Posted" ||
       post.workflow_status === "Delivered") &&
     isPaymentPendingStatus(post.payment_status)
