@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -8,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleAlert,
+  Eye,
   Grid3X3,
   List as ListIcon,
   X,
@@ -238,6 +240,7 @@ function CampaignGroup({
   canApprove: boolean;
 }) {
   const accent = accentFor(g.campaignId);
+  const [overviewOpen, setOverviewOpen] = useState(false);
   return (
     <section
       className="budget-camp rounded-2xl bg-bg-white border border-border overflow-hidden"
@@ -258,14 +261,24 @@ function CampaignGroup({
             <CircleAlert size={11} aria-hidden /> Over budget
           </span>
         )}
-        <div className="ml-auto flex flex-wrap items-baseline gap-4 text-[0.72rem] tabular-nums">
-          <HeadStat label="Allocated" value={formatRupees(g.allocated)} />
-          <HeadStat
-            label="Utilized"
-            value={formatRupees(g.utilized)}
-            tone={g.overBudget ? "text-danger" : "text-success"}
-          />
-          <HeadStat label="Remaining" value={formatRupees(g.remaining)} />
+        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div className="flex flex-wrap items-baseline gap-4 text-[0.72rem] tabular-nums">
+            <HeadStat label="Allocated" value={formatRupees(g.allocated)} />
+            <HeadStat
+              label="Utilized"
+              value={formatRupees(g.utilized)}
+              tone={g.overBudget ? "text-danger" : "text-success"}
+            />
+            <HeadStat label="Remaining" value={formatRupees(g.remaining)} />
+          </div>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-lg border border-border bg-bg-white px-3 py-1.5 text-[0.7rem] font-bold text-text-secondary hover:text-text-primary hover:bg-bg-surface"
+            onClick={() => setOverviewOpen(true)}
+          >
+            <Eye size={12} aria-hidden />
+            Overview
+          </button>
         </div>
         <span
           className="budget-camp__track"
@@ -297,7 +310,200 @@ function CampaignGroup({
           </tbody>
         </table>
       </div>
+      {overviewOpen && (
+        <BudgetOverviewModal g={g} onClose={() => setOverviewOpen(false)} />
+      )}
     </section>
+  );
+}
+
+/**
+ * Full budget view for one campaign-month — the Sheet View Budget grid,
+ * per version: TOTAL bar + the complete tier-line table (all columns,
+ * horizontal scroll inside its own container). Portaled to <body> — the
+ * stage wrapper's persistent transform traps in-tree overlays below the
+ * sidebar.
+ */
+function BudgetOverviewModal({
+  g,
+  onClose,
+}: {
+  g: CampaignMonthGroup;
+  onClose: () => void;
+}) {
+  const accent = accentFor(g.campaignId);
+  const allLines = g.versions.flatMap((v) => {
+    const lines = v.tierLines.length > 0 ? v.tierLines : v.draftLines;
+    return lines.map((l) => ({ v, l }));
+  });
+  const totals = allLines.reduce(
+    (acc, { v, l }) => {
+      // Pending money isn't allocated yet — totals mirror approved versions
+      // only, matching the group header math.
+      if (v.status === "pending_approval" || v.status === "rejected")
+        return acc;
+      acc.creators += Number(l.num_influencers ?? 0);
+      acc.comp += Number(l.total_cost ?? 0);
+      acc.withGarments += Number(l.total_with_garments ?? 0);
+      return acc;
+    },
+    { creators: 0, comp: 0, withGarments: 0 },
+  );
+
+  return createPortal(
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-panel modal-panel--lg budget-overview-panel"
+        style={{ "--campaign-accent": accent } as React.CSSProperties}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-head">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Eye size={16} aria-hidden />
+            <h2 className="font-semibold">Budget Overview</h2>
+            <strong className="campaign-card__id">{g.campaignId}</strong>
+            <span className="truncate text-[0.78rem] text-text-secondary">
+              {g.campaignName}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+
+        <div className="modal-body flex flex-col gap-3">
+          {/* TOTAL bar — Sheet View Budget parity */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[--accent]/30 bg-[#F0EAD6]/60 px-3.5 py-3">
+            <span className="text-[0.72rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
+              <Calendar size={13} aria-hidden className="mr-1.5 inline text-warning" />
+              This month · TOTAL
+            </span>
+            <div className="flex flex-wrap items-baseline gap-4 text-[0.72rem] tabular-nums sm:gap-6">
+              <HeadStat label="Creators" value={String(totals.creators)} />
+              <HeadStat
+                label="Comp Total"
+                value={formatRupees(totals.comp)}
+                tone="text-success"
+              />
+              <HeadStat
+                label="Garments"
+                value={formatRupees(
+                  Math.max(0, totals.withGarments - totals.comp),
+                )}
+                tone="text-warning"
+              />
+              <HeadStat
+                label="Total w/ Garments"
+                value={formatRupees(totals.withGarments)}
+              />
+              <HeadStat
+                label="Utilized (Expected)"
+                value={formatRupees(g.utilized)}
+                tone={g.overBudget ? "text-danger" : "text-success"}
+              />
+            </div>
+          </div>
+
+          <VersionExplainer compact />
+
+          {/* The whole grid — every column, horizontal scroll like the sheet. */}
+          <div className="overflow-x-auto rounded-xl border border-border bg-bg-white">
+            <table className="w-full min-w-[880px] border-collapse text-[0.76rem]">
+              <thead>
+                <tr className="bg-bg-surface text-left text-[0.58rem] uppercase tracking-[0.08em] text-text-secondary">
+                  <th className="px-3 py-2">Version</th>
+                  <th className="px-3 py-2">Tier</th>
+                  <th className="px-3 py-2">Collab Type</th>
+                  <th className="px-3 py-2 text-right">No. Influencers</th>
+                  <th className="px-3 py-2 text-right">Avg Comp ₹</th>
+                  <th className="px-3 py-2 text-right">Comp Total ₹</th>
+                  <th className="px-3 py-2 text-right">Min G</th>
+                  <th className="px-3 py-2 text-right">Max G</th>
+                  <th className="px-3 py-2 text-right">Garment Cost ₹</th>
+                  <th className="px-3 py-2 text-right">Total w/ Garments ₹</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allLines.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={11}
+                      className="px-3 py-6 text-center text-text-tertiary"
+                    >
+                      No tier lines this month — carry-forwards reuse last
+                      month&apos;s allocation.
+                    </td>
+                  </tr>
+                ) : (
+                  allLines.map(({ v, l }, i) => {
+                    const status = STATUS_CHIP[v.status] ?? STATUS_CHIP.closed;
+                    return (
+                      <tr key={`${v.id}-${l.id ?? i}`} className="border-t border-[#F0EAD6]">
+                        <td className="px-3 py-2">
+                          <VersionChip n={v.version_number} kind={v.kind} />
+                        </td>
+                        <td className="px-3 py-2">{l.tier ?? "—"}</td>
+                        <td className="px-3 py-2">{l.collab_type ?? "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {l.num_influencers ?? 0}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatRupees(Number(l.avg_comp ?? 0))}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatRupees(Number(l.total_cost ?? 0))}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {l.min_garments ?? "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {l.max_garments ?? "—"}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatRupees(Number(l.est_garment_cost ?? 0))}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums font-bold">
+                          {formatRupees(Number(l.total_with_garments ?? 0))}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={cn(
+                              "inline-block rounded-full px-2 py-0.5 text-[0.62rem] font-extrabold whitespace-nowrap",
+                              status.cls,
+                            )}
+                          >
+                            {status.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-[0.7rem] text-text-tertiary">
+            Same columns as the Sheet View Budget tab — scroll the table
+            sideways on smaller screens. Pending lines are excluded from the
+            TOTAL bar until a Global Admin approves them.
+          </p>
+        </div>
+
+        <footer className="modal-foot">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -315,6 +521,7 @@ function BudgetCampaignCard({
 }) {
   const accent = accentFor(g.campaignId);
   const pct = utilizationPct(g);
+  const [overviewOpen, setOverviewOpen] = useState(false);
   return (
     <article
       className="budget-camp-card"
@@ -363,6 +570,18 @@ function BudgetCampaignCard({
           <VersionLine key={v.id} v={v} canApprove={canApprove} />
         ))}
       </ul>
+
+      <button
+        type="button"
+        className="mt-0.5 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-bg-white px-3 py-2 text-[0.72rem] font-bold text-text-secondary hover:bg-bg-surface hover:text-text-primary"
+        onClick={() => setOverviewOpen(true)}
+      >
+        <Eye size={12} aria-hidden />
+        Overview
+      </button>
+      {overviewOpen && (
+        <BudgetOverviewModal g={g} onClose={() => setOverviewOpen(false)} />
+      )}
     </article>
   );
 }
