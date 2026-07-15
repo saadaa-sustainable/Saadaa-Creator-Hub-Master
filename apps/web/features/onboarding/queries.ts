@@ -375,12 +375,16 @@ export async function fetchOnboardingKpis(
 
   const ONBOARDED_SET = ["On Board", "Order Sent", "Posted", "Delivered"];
 
-  // When a "Reached out by" team member is selected, scope every KPI to that
-  // member's reach-outs (logged_by is the stable reach-out logger). Otherwise
-  // the KPIs reflect the whole corpus.
+  // When a team member is selected, scope every KPI to their rows — matching
+  // the SAME column the board filters on: the Submitted view's picker means
+  // "ONBOARDED BY" (onboarded_by), the work queue's means "Reached out by"
+  // (logged_by). Using logged_by on the Submitted view undercounted members
+  // who onboarded collabs that a teammate had logged (Sakshi: KPI 26 vs 29
+  // rows). Otherwise the KPIs reflect the whole corpus.
   const member = (filters.reachedOutBy ?? "").trim();
+  const memberCol = filters.submitted === "yes" ? "onboarded_by" : "logged_by";
   const scope = <T>(q: T): T =>
-    member ? ((q as any).eq("logged_by", member) as T) : q;
+    member ? ((q as any).eq(memberCol, member) as T) : q;
 
   // Collab ID model: fetch ALL deliverable rows; we group by collab_id in JS so
   // every KPI counts COLLABS (not individual deliverable rows). Avg deliverable
