@@ -495,12 +495,6 @@ function BudgetOverviewModal({
             TOTAL bar until a Global Admin approves them.
           </p>
         </div>
-
-        <footer className="modal-foot">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Close
-          </button>
-        </footer>
       </div>
     </div>,
     document.body,
