@@ -34,6 +34,24 @@ export interface ApprovalItem {
   /** Edit requests only — before/after diff so admins see what changed
    *  BEFORE deciding (same table the onboarding-edit card renders). */
   changes?: CampaignChange[];
+  /** Campaign cards only — its V0 budget is still pending with the Global
+   *  Admins, so the campaign approval stays locked (budget first). */
+  budgetPending?: boolean;
+}
+
+/** A budget version (V0 / top-up) awaiting Global Admin sign-off. */
+export interface BudgetApprovalItem {
+  versionId: number;
+  campaignId: string;
+  campaignName: string | null;
+  versionNumber: number;
+  kind: "initial" | "top_up" | "carry_forward";
+  month: string;
+  amount: number;
+  numCreators: number;
+  reason: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
 }
 
 export type ApprovalHistoryStatus =
@@ -58,6 +76,7 @@ export interface ApprovalHistoryItem {
 export interface ApprovalQueueData {
   items: ApprovalItem[];
   total: number;
+  budgets: BudgetApprovalItem[];
   onboardingEdits: OnboardingEditItem[];
   history: ApprovalHistoryItem[];
   historyTotal: number;
@@ -89,7 +108,8 @@ const historyStatus = (action: string): ApprovalHistoryStatus => {
 export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
   const svc = createServiceClient() as any;
 
-  const [campaigns, edits, onboardingEditsRes, logs] = await Promise.all([
+  const [campaigns, edits, onboardingEditsRes, logs, pendingBudgets] =
+    await Promise.all([
     svc
       .from("campaigns")
       .select(
@@ -122,6 +142,15 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
       )
       .order("timestamp", { ascending: false })
       .limit(100),
+    svc
+      .from("campaign_budget_versions")
+      .select(
+        "id, campaign_id, version_number, kind, month, amount, num_creators, note, created_by, created_at",
+      )
+      .eq("status", "pending_approval")
+      .eq("is_test", false)
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
   if (campaigns.error) {
@@ -137,6 +166,52 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
     console.error("[approvals] history query failed:", logs.error.message);
   }
 
+  // Pending budget versions (V0 + top-ups) — Global Admin queue. A campaign
+  // whose V0 sits here has its own approval locked (budget first).
+  const budgetRaw = ((pendingBudgets?.data ?? []) as Raw[]);
+  const campaignNameById = new Map<string, string>();
+  for (const r of (campaigns.data ?? []) as Raw[]) {
+    campaignNameById.set(
+      String(r.campaign_id ?? ""),
+      String(r.campaign_name ?? ""),
+    );
+  }
+  const missingNames = [
+    ...new Set(
+      budgetRaw
+        .map((r) => String(r.campaign_id ?? ""))
+        .filter((id) => id && !campaignNameById.has(id)),
+    ),
+  ];
+  if (missingNames.length > 0) {
+    const { data: extraNames } = await svc
+      .from("campaigns")
+      .select("campaign_id, campaign_name")
+      .in("campaign_id", missingNames);
+    for (const r of (extraNames ?? []) as Raw[]) {
+      campaignNameById.set(
+        String(r.campaign_id ?? ""),
+        String(r.campaign_name ?? ""),
+      );
+    }
+  }
+  const budgets: BudgetApprovalItem[] = budgetRaw.map((r) => ({
+    versionId: asNumber(r.id) ?? 0,
+    campaignId: String(r.campaign_id ?? ""),
+    campaignName: campaignNameById.get(String(r.campaign_id ?? "")) ?? null,
+    versionNumber: asNumber(r.version_number) ?? 0,
+    kind: (String(r.kind ?? "top_up") as BudgetApprovalItem["kind"]),
+    month: String(r.month ?? ""),
+    amount: asNumber(r.amount) ?? 0,
+    numCreators: asNumber(r.num_creators) ?? 0,
+    reason: asString(r.note),
+    createdBy: asString(r.created_by),
+    createdAt: asString(r.created_at),
+  }));
+  const pendingV0Campaigns = new Set(
+    budgets.filter((b) => b.versionNumber === 0).map((b) => b.campaignId),
+  );
+
   const campaignItems: ApprovalItem[] = ((campaigns.data ?? []) as Raw[]).map(
     (r) => ({
       kind: "campaign",
@@ -151,6 +226,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
       briefLink: asString(r.brief_link),
       createdBy: asString(r.created_by),
       createdAt: asString(r.created_at),
+      budgetPending: pendingV0Campaigns.has(String(r.campaign_id ?? "")),
     }),
   );
 
@@ -250,6 +326,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
   return {
     items,
     total: items.length,
+    budgets,
     onboardingEdits,
     history,
     historyTotal: history.length,

@@ -15,30 +15,30 @@ export function DashboardCostStrip({ kpis }: { kpis: CostKpis }) {
       <KpiCard
         tone="accent"
         icon={<Wallet size={16} aria-hidden />}
-        label="Budgeted Cost"
+        label="Actual (First Budget)"
         primary={<CountUpRupees value={kpis.budgetCost} />}
-        secondary={`${kpis.budgetCreators} planned creators`}
+        secondary={`${kpis.budgetCreators} planned creators · V0`}
       />
       <KpiCard
         tone="info"
         icon={<Banknote size={16} aria-hidden />}
-        label="Actual Cost"
+        label="Expected"
         primary={<CountUpRupees value={kpis.actualCost} />}
-        secondary={`${kpis.actualCreators} actual creators`}
+        secondary={`${kpis.actualCreators} onboarded creators`}
       />
       <KpiCard
-        tone={kpis.variance > 0 ? "danger" : "success"}
+        tone={kpis.actualCost > kpis.budgetCost ? "danger" : "success"}
         icon={<TrendingUp size={16} aria-hidden />}
-        label="Variance"
-        primary={<CountUpRupees value={kpis.variance} />}
-        secondary={kpis.variance > 0 ? "Over budget" : "Under budget"}
+        label="Budget Left"
+        primary={<CountUpRupees value={Math.abs(kpis.budgetCost - kpis.actualCost)} />}
+        secondary={kpis.actualCost > kpis.budgetCost ? "Over budget by this much" : "Still available"}
       />
       <KpiCard
         tone="warning"
         icon={<Target size={16} aria-hidden />}
-        label="Utilisation"
+        label="% Used"
         primary={<><CountUpInt value={kpis.utilPct} />%</>}
-        secondary="Actual ÷ budget"
+        secondary="Expected ÷ first budget"
       />
       <KpiCard
         tone="muted"

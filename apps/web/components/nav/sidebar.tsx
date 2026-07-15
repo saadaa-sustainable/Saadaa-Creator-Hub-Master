@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutGrid,
   Wallet,
+  IndianRupee,
   Rocket,
   Send,
   ArrowUpRight,
@@ -56,6 +57,12 @@ const NAV: NavSection[] = [
         show: (a) => hasPermission(a, "accounts_write"),
       },
       { label: "My Dashboard", href: "/my-dashboard", icon: UserSquare },
+      {
+        label: "Budget",
+        href: "/budget",
+        icon: IndianRupee,
+        show: (a) => hasPermission(a, "admin"),
+      },
     ],
   },
   {

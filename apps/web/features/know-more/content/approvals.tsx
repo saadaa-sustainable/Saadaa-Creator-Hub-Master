@@ -17,6 +17,24 @@ export default function ApprovalsKM() {
         </p>
       </KMSection>
 
+      <KMSection tag="Budget first, campaign second">
+        <KMList>
+          <li>
+            <strong>Budget approvals</strong> (a new campaign&apos;s V0 or a
+            top-up) are decided by <strong>Global Admins only</strong> — akshay
+            · mahesh · devesh. Admins see the cards read-only. Top-up cards
+            show the requester&apos;s reason for the increase.
+          </li>
+          <li>
+            A campaign card stays <strong>locked</strong> (&quot;Approve the
+            budget first&quot;) until its V0 budget is approved; rejecting a V0
+            rejects the campaign with it. All other approvals (campaign,
+            campaign edits, onboarding edits) belong to the Admins — Global
+            Admins can do those too.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Page layout">
         <KMList>
           <li>

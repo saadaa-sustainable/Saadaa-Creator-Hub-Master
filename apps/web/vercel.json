@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/warehouse-sync",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/budget-rollover",
+      "schedule": "45 18 * * *"
     }
   ]
 }

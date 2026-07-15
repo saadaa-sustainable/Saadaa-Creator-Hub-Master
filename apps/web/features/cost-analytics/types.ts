@@ -26,11 +26,28 @@ export interface CostBreakdownRow extends CostRowBase {
   garmentCost: number; // total_with_garments - budgetCost
 }
 
+/** One budget version inside a campaign's expandable division. */
+export interface CampaignVersionRow {
+  versionNumber: number;
+  kind: "initial" | "carry_forward" | "top_up";
+  /** Short month label, matching the table months (e.g. "Jul 2026"). */
+  month: string;
+  amount: number;
+  status: string;
+  /** Expected charged against this version's month (null while pending). */
+  expectedAgainst: number | null;
+  remaining: number | null;
+  note: string | null;
+  gapReason: string | null;
+}
+
 export interface CampaignTotalsRow extends CostRowBase {
   campaignId: string;
   campaignName: string;
   campaignNum: number | null;
   garmentCost: number;
+  /** The campaign's V0/V1/V2… chain — powers the version-level division. */
+  versions?: CampaignVersionRow[];
 }
 
 export interface MonthSummaryRow extends CostRowBase {

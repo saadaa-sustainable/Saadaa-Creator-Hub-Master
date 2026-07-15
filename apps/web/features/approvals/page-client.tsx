@@ -40,9 +40,21 @@ import type {
   ApprovalHistoryStatus,
   ApprovalItem,
   ApprovalQueueData,
+  BudgetApprovalItem,
 } from "./queries";
+import {
+  approveBudgetVersion,
+  rejectBudgetVersion,
+} from "@/features/budget/actions";
+import { VersionChip } from "@/features/budget/version-chip";
 
-export function ApprovalsBody({ data }: { data: ApprovalQueueData }) {
+export function ApprovalsBody({
+  data,
+  canApproveBudget = false,
+}: {
+  data: ApprovalQueueData;
+  canApproveBudget?: boolean;
+}) {
   const totalBudget = data.items.reduce((s, i) => s + (i.budget ?? 0), 0);
   const campaignCount = data.items.filter((i) => i.kind === "campaign").length;
   const editCount = data.items.filter((i) => i.kind === "edit").length;
@@ -104,19 +116,38 @@ export function ApprovalsBody({ data }: { data: ApprovalQueueData }) {
         ))}
       </div>
 
-      {data.items.length === 0 && data.onboardingEdits.length === 0 ? (
+      {data.items.length === 0 &&
+      data.onboardingEdits.length === 0 &&
+      data.budgets.length === 0 ? (
         <div className="glass-card flex flex-col items-center justify-center gap-2 rounded-[var(--radius)] border border-border bg-bg-white py-16 text-center text-text-tertiary">
           <Inbox size={28} aria-hidden />
           <p className="font-medium text-text-primary">
             Nothing awaiting approval
           </p>
           <p className="text-sm">
-            New campaigns, edit requests, and onboarding edits land here for
-            sign-off before they go live.
+            New campaigns, budget versions, edit requests, and onboarding edits
+            land here for sign-off before they go live.
           </p>
         </div>
       ) : (
         <>
+          {data.budgets.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h3 className="text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary inline-flex items-center gap-1.5">
+                <Wallet size={13} aria-hidden /> Budget approvals (
+                {data.budgets.length}) — Global Admins
+              </h3>
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                {data.budgets.map((b) => (
+                  <BudgetApprovalCard
+                    key={b.versionId}
+                    b={b}
+                    canAct={canApproveBudget}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
           {data.items.length > 0 && (
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
               {data.items.map((c) => (
@@ -158,7 +189,10 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
   const iconStyle = isEdit
     ? { background: "#F3EDFB", color: "#7B4FBF" }
     : { background: "#ECF1FB", color: "#3B6FD4" };
-  const canAct = !isEdit || c.approvalId != null;
+  // Budget first, campaign second — a campaign whose V0 budget is still with
+  // the Global Admins cannot be acted on yet (server enforces this too).
+  const budgetLocked = !isEdit && Boolean(c.budgetPending);
+  const canAct = (!isEdit || c.approvalId != null) && !budgetLocked;
 
   const approve = () => {
     start(async () => {
@@ -295,6 +329,12 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
             <Clock3 size={12} aria-hidden /> Will apply after approval
           </span>
         )}
+        {budgetLocked && (
+          <span className="inline-flex items-center gap-1 rounded-[9px] bg-[#FAF1DC] px-2.5 py-1.5 text-[0.72rem] font-bold text-[#B57514]">
+            <Clock3 size={12} aria-hidden /> Approve the budget first — V0 is
+            pending with the Global Admins
+          </span>
+        )}
         {c.notes && (
           <span className="line-clamp-1 text-[0.72rem] text-text-tertiary">
             {c.notes}
@@ -366,6 +406,181 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
           </>
         )}
       </div>
+    </article>
+  );
+}
+
+/**
+ * A pending budget version (V0 initial or a top-up) — the Global Admin queue.
+ * Admins see the card read-only ("Global Admins decide budgets"); the three
+ * budget approvers get Approve / Reject. Top-ups show the requester's reason.
+ */
+function BudgetApprovalCard({
+  b,
+  canAct,
+}: {
+  b: BudgetApprovalItem;
+  canAct: boolean;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+
+  const isInitial = b.versionNumber === 0;
+  const monthText = b.month
+    ? new Date(b.month + "T00:00:00Z").toLocaleString("en-IN", {
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      })
+    : "";
+
+  const approve = () =>
+    start(async () => {
+      const res = await approveBudgetVersion(b.versionId);
+      if (!res.ok) return void toast.error(res.error);
+      toast.success(
+        isInitial
+          ? `${b.campaignId} V0 approved — the campaign can now be approved below.`
+          : `${b.campaignId} V${b.versionNumber} approved — ${formatRupees(b.amount)} is live.`,
+      );
+      router.refresh();
+    });
+
+  const reject = () =>
+    start(async () => {
+      const res = await rejectBudgetVersion(b.versionId, reason);
+      if (!res.ok) return void toast.error(res.error);
+      toast.success(
+        isInitial
+          ? `${b.campaignId} V0 rejected — the campaign was rejected with it.`
+          : `${b.campaignId} V${b.versionNumber} rejected.`,
+      );
+      router.refresh();
+    });
+
+  return (
+    <article className="flex flex-col gap-3 rounded-[14px] border border-border bg-bg-white p-4 shadow-[0_12px_30px_rgba(23,19,16,0.04)]">
+      <div className="flex items-start gap-3">
+        <span
+          className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
+          style={{ background: "#ECF1E9", color: "#4F7C4D" }}
+        >
+          <Wallet size={16} aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="min-w-0 truncate text-[0.95rem] font-bold text-text-primary">
+              {b.campaignName ?? b.campaignId}
+            </h3>
+            <VersionChip
+              n={b.versionNumber}
+              kind={isInitial ? "initial" : "top_up"}
+            />
+            <span className="rounded-full bg-[#FAF1DC] px-2 py-0.5 text-[0.62rem] font-semibold text-[#B57514]">
+              {isInitial ? "First budget (V0)" : "Top-up"}
+            </span>
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.7rem] text-text-tertiary">
+            <span className="font-mono">{b.campaignId}</span>
+            {b.createdBy && <span>by {b.createdBy}</span>}
+            {monthText && <span>{monthText}</span>}
+            {b.createdAt && <span>{formatDate(b.createdAt)}</span>}
+          </div>
+        </div>
+      </div>
+
+      {b.reason && !isInitial && (
+        <p className="rounded-[10px] border border-[#EADFC5] bg-[#FAF1DC]/60 px-2.5 py-2 text-[0.76rem] leading-relaxed text-text-secondary">
+          <strong className="text-[#B57514]">Reason for increase:</strong>{" "}
+          {b.reason}
+        </p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <Metric icon={Wallet} label="Amount" value={formatRupees(b.amount)} />
+        <Metric
+          icon={Users}
+          label={isInitial ? "Creators" : "Adds creators"}
+          value={String(b.numCreators)}
+        />
+        <Metric icon={Calendar} label="Month" value={monthText || "-"} />
+      </div>
+
+      {!canAct && (
+        <span className="inline-flex items-center gap-1 self-start rounded-[9px] bg-[#F7F3EC] px-2.5 py-1.5 text-[0.72rem] font-semibold text-text-secondary">
+          <Clock3 size={12} aria-hidden /> Only Global Admins can decide
+          budgets
+        </span>
+      )}
+
+      {canAct && rejecting && (
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={2}
+          placeholder="Reason for rejection (sent back to the requester)"
+          className="w-full resize-y rounded-[10px] border border-danger/30 bg-danger-bg/40 px-2.5 py-1.5 text-[0.76rem] text-text-primary focus:outline-none focus:ring-2 focus:ring-danger/20"
+        />
+      )}
+
+      {canAct && (
+        <div className="mt-auto flex items-center justify-end gap-2 border-t border-border pt-3">
+          {rejecting ? (
+            <>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  setRejecting(false);
+                  setReason("");
+                }}
+                disabled={pending}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={reject}
+                disabled={pending}
+                className="inline-flex items-center gap-1.5 rounded-[9px] border border-danger/30 bg-danger-bg px-3 py-1.5 text-[0.78rem] font-semibold text-danger-text transition-colors hover:brightness-95 disabled:opacity-60"
+              >
+                {pending ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <X size={13} />
+                )}
+                Confirm reject
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setRejecting(true)}
+                disabled={pending}
+                className="inline-flex items-center gap-1.5 rounded-[9px] border border-border bg-bg-white px-3 py-1.5 text-[0.78rem] font-semibold text-danger-text transition-colors hover:bg-danger-bg/40 disabled:opacity-60"
+              >
+                <X size={13} /> Reject
+              </button>
+              <button
+                type="button"
+                onClick={approve}
+                disabled={pending}
+                className="btn-primary-cta disabled:opacity-60"
+              >
+                {pending ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Check size={13} />
+                )}
+                Approve budget
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </article>
   );
 }

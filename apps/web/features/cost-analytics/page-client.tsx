@@ -18,8 +18,11 @@ import {
   Users,
   Wallet,
   type LucideIcon,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { VersionChip, VersionExplainer } from "@/features/budget/version-chip";
 import { formatRupees } from "@/lib/formatters";
 import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -372,37 +375,33 @@ function KpiStrip({ kpis }: { kpis: CostKpis }) {
       <HeroKpi
         color="#7B4FBF"
         icon={<Wallet size={16} aria-hidden />}
-        label="Budget Cost"
+        label="Actual (First Budget)"
         rupees
         value={kpis.budgetCost}
-        sub={
-          kpis.totalWithGarments > kpis.budgetCost
-            ? `${formatRupees(kpis.totalWithGarments)} incl. garments`
-            : "Compensation budget"
-        }
-        info="Planned compensation budget for campaigns in scope"
+        sub="The V0 budget the campaign was created with"
+        info="The first created budget (V0) of each campaign in scope — this is the sanctioned money"
       />
       <HeroKpi
         color="#B57514"
         icon={<IndianRupee size={16} aria-hidden />}
-        label="Actual Cost"
+        label="Expected"
         rupees
         value={kpis.actualCost}
-        sub={`${kpis.utilPct}% utilised`}
-        info="Actual compensation committed via onboarded collabs"
+        sub={`${kpis.utilPct}% of the budget used`}
+        info="What onboarded collabs commit us to spend: commercial + order value (Barter + Paid) or order value only (Barter)"
       />
       <HeroKpi
         color={remaining >= 0 ? "#4F7C4D" : "#C0392B"}
         icon={<Target size={16} aria-hidden />}
-        label="Remaining"
+        label="Budget Left"
         rupees
         value={Math.max(0, remaining)}
         sub={
           remaining >= 0
-            ? `${100 - kpis.utilPct}% of budget left`
-            : "Budget exhausted"
+            ? `${Math.max(0, 100 - kpis.utilPct)}% still available`
+            : `Over by ${formatRupees(Math.abs(remaining))}`
         }
-        info="Budget cost minus actual cost"
+        info="First budget minus expected — what's still available to spend"
       />
       <HeroKpi
         color={overBudget ? "#C0392B" : "#4F7C4D"}
@@ -413,17 +412,17 @@ function KpiStrip({ kpis }: { kpis: CostKpis }) {
             <TrendingDown size={16} aria-hidden />
           )
         }
-        label="Variance"
+        label={overBudget ? "Over Budget By" : "Within Budget"}
         rupees
         value={Math.abs(kpis.variance)}
         sub={
           kpis.variance === 0
-            ? "On budget"
+            ? "Exactly on budget"
             : overBudget
-              ? `${variancePct}% over`
-              : `${variancePct}% under`
+              ? `${variancePct}% more than planned`
+              : `${variancePct}% below the plan`
         }
-        info="Actual minus budget — positive means over budget"
+        info="How far expected spend is from the first budget — plain difference, no jargon"
       />
     </div>
   );
@@ -436,7 +435,7 @@ function KpiStrip({ kpis }: { kpis: CostKpis }) {
 function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
   if (rows.length === 0) {
     return (
-      <Card title="Budget vs Actual" icon={Banknote}>
+      <Card title="First Budget vs Expected" icon={Banknote}>
         <Empty msg="No campaign data yet." />
       </Card>
     );
@@ -447,7 +446,7 @@ function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
   );
   return (
     <Card
-      title="Budget vs Actual"
+      title="First Budget vs Expected"
       icon={Banknote}
       subtitle="Side-by-side per campaign"
     >
@@ -484,7 +483,7 @@ function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
               <div className="space-y-1">
                 <div
                   className="h-2 rounded-full bg-[#E8EEFB] overflow-hidden"
-                  title={`Budget: ${formatRupees(r.budgetCost)}`}
+                  title={`First budget (V0): ${formatRupees(r.budgetCost)}`}
                 >
                   <div
                     className="bento-bar h-full bg-[#3B6FD4] transition-all duration-500"
@@ -496,7 +495,7 @@ function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
                     "h-2 rounded-full overflow-hidden",
                     over ? "bg-danger-bg" : "bg-success-bg",
                   )}
-                  title={`Actual: ${formatRupees(r.actualCost)}`}
+                  title={`Expected: ${formatRupees(r.actualCost)}`}
                 >
                   <div
                     className={cn(
@@ -514,15 +513,15 @@ function BudgetVsActualChart({ rows }: { rows: CampaignTotalsRow[] }) {
       <div className="flex items-center gap-3 text-[0.55rem] uppercase tracking-[0.05em] font-extrabold text-text-tertiary mt-1">
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-sm bg-[#3B6FD4]" />
-          Budget
+          First Budget
         </span>
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-sm bg-success" />
-          Actual under
+          Expected (within)
         </span>
         <span className="inline-flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-sm bg-danger" />
-          Actual over
+          Expected (over)
         </span>
       </div>
     </Card>
@@ -599,7 +598,7 @@ function AlertsCard({
     );
   }
   return (
-    <Card title="Alerts" icon={AlertTriangle} subtitle="Variance + under-spend">
+    <Card title="Alerts" icon={AlertTriangle} subtitle="Over budget + money sitting unused">
       <div className="flex flex-col gap-3 text-[0.7rem]">
         {overBudget.length > 0 && (
           <div>
@@ -619,7 +618,7 @@ function AlertsCard({
                     </span>
                   </span>
                   <span className="text-danger font-extrabold tabular">
-                    +{formatRupees(r.variance)} ({r.utilPct}%)
+                    over by {formatRupees(r.variance)} ({r.utilPct}%)
                   </span>
                 </li>
               ))}
@@ -629,7 +628,7 @@ function AlertsCard({
         {underUtilised.length > 0 && (
           <div>
             <div className="text-[0.55rem] uppercase tracking-[0.06em] font-extrabold text-warning mb-1">
-              Under-utilised ({underUtilised.length})
+              Money sitting unused ({underUtilised.length})
             </div>
             <ul className="flex flex-col gap-1">
               {underUtilised.map((r) => (
@@ -730,54 +729,138 @@ function CampaignTotalsTable({ rows }: { rows: CampaignTotalsRow[] }) {
     <Card
       title="Campaign Totals"
       icon={Target}
-      subtitle={`${rows.length} campaigns · uses campaigns.total_budget`}
+      subtitle={`${rows.length} campaigns · click ▸ for the version split (V0 / V1 / V2…)`}
     >
-      <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+      <VersionExplainer compact />
+      <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0 mt-2">
         <table className="w-full text-[0.65rem] sm:text-xs min-w-[720px]">
           <thead>
             <tr className="text-text-tertiary uppercase tracking-[0.06em] text-[0.5rem] sm:text-[0.55rem] font-extrabold border-b border-border">
+              <th className="pb-2 w-6" aria-label="Expand" />
               <th className="text-left pb-2 pr-3">Campaign Name</th>
               <th className="text-left pb-2 px-1.5">Campaign ID</th>
-              <th className="text-center pb-2 px-1.5">Budget C</th>
-              <th className="text-center pb-2 px-1.5">Actual C</th>
-              <th className="text-right pb-2 px-1.5">Budget ₹</th>
-              <th className="text-right pb-2 px-1.5">Actual ₹</th>
-              <th className="text-right pb-2 px-1.5">Variance</th>
-              <th className="text-center pb-2 pl-1.5">% Utilised</th>
+              <th className="text-center pb-2 px-1.5">Planned C</th>
+              <th className="text-center pb-2 px-1.5">Onboarded C</th>
+              <th className="text-right pb-2 px-1.5">Actual (First Budget) ₹</th>
+              <th className="text-right pb-2 px-1.5">Expected ₹</th>
+              <th className="text-right pb-2 px-1.5">Budget Left</th>
+              <th className="text-center pb-2 pl-1.5">% Used</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr
-                key={r.campaignId}
-                className="border-t border-border hover:bg-bg-muted/40 transition-colors"
-              >
-                <td className="py-1.5 pr-3 font-extrabold text-text-primary truncate max-w-[180px]">
-                  {r.campaignName}
-                </td>
-                <td className="py-1.5 px-1.5 font-bold text-text-secondary tabular">
-                  {r.campaignId}
-                </td>
-                <td className="py-1.5 px-1.5 text-center tabular text-text-secondary">
-                  {r.budgetCreators || "—"}
-                </td>
-                <td className="py-1.5 px-1.5 text-center tabular text-text-primary font-bold">
-                  {r.actualCreators || "—"}
-                </td>
-                <td className="py-1.5 px-1.5 text-right tabular text-text-secondary">
-                  {r.budgetCost > 0 ? formatRupees(r.budgetCost) : "—"}
-                </td>
-                <td className="py-1.5 px-1.5 text-right tabular text-text-primary font-bold">
-                  {r.actualCost > 0 ? formatRupees(r.actualCost) : "—"}
-                </td>
-                <VarianceCell value={r.variance} />
-                <UtilCell pct={r.utilPct} />
-              </tr>
+              <CampaignTotalsRowItem key={r.campaignId} r={r} />
             ))}
           </tbody>
         </table>
       </div>
     </Card>
+  );
+}
+
+const VERSION_KIND_TEXT: Record<string, string> = {
+  initial: "First created budget",
+  carry_forward: "Carry-forward",
+  top_up: "Top-up (new money)",
+};
+
+function CampaignTotalsRowItem({ r }: { r: CampaignTotalsRow }) {
+  const [open, setOpen] = useState(false);
+  const versions = r.versions ?? [];
+  const expandable = versions.length > 0;
+  return (
+    <>
+      <tr className="border-t border-border hover:bg-bg-muted/40 transition-colors">
+        <td className="py-1.5">
+          {expandable && (
+            <button
+              type="button"
+              className="text-text-tertiary hover:text-text-primary"
+              onClick={() => setOpen((o) => !o)}
+              aria-label={open ? "Hide versions" : "Show versions"}
+            >
+              {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
+          )}
+        </td>
+        <td className="py-1.5 pr-3 font-extrabold text-text-primary truncate max-w-[180px]">
+          {r.campaignName}
+        </td>
+        <td className="py-1.5 px-1.5 font-bold text-text-secondary tabular">
+          {r.campaignId}
+        </td>
+        <td className="py-1.5 px-1.5 text-center tabular text-text-secondary">
+          {r.budgetCreators || "—"}
+        </td>
+        <td className="py-1.5 px-1.5 text-center tabular text-text-primary font-bold">
+          {r.actualCreators || "—"}
+        </td>
+        <td className="py-1.5 px-1.5 text-right tabular text-text-secondary">
+          {r.budgetCost > 0 ? formatRupees(r.budgetCost) : "—"}
+        </td>
+        <td className="py-1.5 px-1.5 text-right tabular text-text-primary font-bold">
+          {r.actualCost > 0 ? formatRupees(r.actualCost) : "—"}
+        </td>
+        <VarianceCell value={r.variance} />
+        <UtilCell pct={r.utilPct} />
+      </tr>
+      {open && expandable && (
+        <tr className="border-t border-border bg-bg-muted/30">
+          <td />
+          <td colSpan={8} className="py-2 pr-3">
+            <table className="w-full text-[0.64rem] sm:text-[0.7rem] min-w-[560px]">
+              <thead>
+                <tr className="text-text-tertiary uppercase tracking-[0.06em] text-[0.5rem] font-extrabold">
+                  <th className="text-left pb-1 pr-2">Version</th>
+                  <th className="text-left pb-1 px-1.5">What it is</th>
+                  <th className="text-left pb-1 px-1.5">Month</th>
+                  <th className="text-right pb-1 px-1.5">Amount</th>
+                  <th className="text-right pb-1 px-1.5">Expected against it</th>
+                  <th className="text-right pb-1 pl-1.5">Left</th>
+                </tr>
+              </thead>
+              <tbody>
+                {versions.map((v) => (
+                  <tr
+                    key={v.versionNumber}
+                    className="border-t border-border/60"
+                  >
+                    <td className="py-1 pr-2">
+                      <VersionChip n={v.versionNumber} kind={v.kind} />
+                    </td>
+                    <td className="py-1 px-1.5 text-text-secondary">
+                      {VERSION_KIND_TEXT[v.kind] ?? v.kind}
+                      {v.gapReason && (
+                        <span
+                          className="block text-[0.6rem] text-warning truncate max-w-[240px]"
+                          title={v.gapReason}
+                        >
+                          Why unused: {v.gapReason}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-1 px-1.5 tabular">{v.month}</td>
+                    <td className="py-1 px-1.5 text-right tabular font-bold">
+                      {formatRupees(v.amount)}
+                    </td>
+                    <td className="py-1 px-1.5 text-right tabular">
+                      {v.expectedAgainst == null
+                        ? v.status === "pending_approval"
+                          ? "pending approval"
+                          : "—"
+                        : formatRupees(v.expectedAgainst)}
+                    </td>
+                    <td className="py-1 pl-1.5 text-right tabular text-text-secondary">
+                      {v.remaining == null ? "—" : formatRupees(v.remaining)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -800,12 +883,12 @@ function MonthSummary({ rows }: { rows: MonthSummaryRow[] }) {
           <thead>
             <tr className="text-text-tertiary uppercase tracking-[0.06em] text-[0.5rem] sm:text-[0.55rem] font-extrabold border-b border-border">
               <th className="text-left pb-2 pr-3">Month</th>
-              <th className="text-center pb-2 px-1.5">Budget C</th>
-              <th className="text-center pb-2 px-1.5">Actual C</th>
-              <th className="text-right pb-2 px-1.5">Budget ₹</th>
-              <th className="text-right pb-2 px-1.5">Actual ₹</th>
-              <th className="text-right pb-2 px-1.5">Variance</th>
-              <th className="text-center pb-2 pl-1.5">% Utilised</th>
+              <th className="text-center pb-2 px-1.5">Planned C</th>
+              <th className="text-center pb-2 px-1.5">Onboarded C</th>
+              <th className="text-right pb-2 px-1.5">Actual (First Budget) ₹</th>
+              <th className="text-right pb-2 px-1.5">Expected ₹</th>
+              <th className="text-right pb-2 px-1.5">Budget Left</th>
+              <th className="text-center pb-2 pl-1.5">% Used</th>
             </tr>
           </thead>
           <tbody>
@@ -863,11 +946,11 @@ function CampaignBreakdown({ rows }: { rows: CostBreakdownRow[] }) {
               <th className="text-left pb-2 px-1.5">Campaign ID</th>
               <th className="text-center pb-2 px-1.5">Tier</th>
               <th className="text-center pb-2 px-1.5">Collab</th>
-              <th className="text-center pb-2 px-1.5">Budget C</th>
-              <th className="text-center pb-2 px-1.5">Actual C</th>
-              <th className="text-right pb-2 px-1.5">Budget ₹</th>
-              <th className="text-right pb-2 px-1.5">Actual ₹</th>
-              <th className="text-right pb-2 pl-1.5">Variance</th>
+              <th className="text-center pb-2 px-1.5">Planned C</th>
+              <th className="text-center pb-2 px-1.5">Onboarded C</th>
+              <th className="text-right pb-2 px-1.5">Actual (First Budget) ₹</th>
+              <th className="text-right pb-2 px-1.5">Expected ₹</th>
+              <th className="text-right pb-2 pl-1.5">Budget Left</th>
             </tr>
           </thead>
           <tbody>
@@ -932,12 +1015,12 @@ function TierBreakdown({ rows }: { rows: TierSummaryRow[] }) {
           <thead>
             <tr className="text-text-tertiary uppercase tracking-[0.06em] text-[0.5rem] sm:text-[0.55rem] font-extrabold border-b border-border">
               <th className="text-left pb-2 pr-3">Tier</th>
-              <th className="text-center pb-2 px-1.5">Budget C</th>
-              <th className="text-center pb-2 px-1.5">Actual C</th>
-              <th className="text-right pb-2 px-1.5">Budget ₹</th>
-              <th className="text-right pb-2 px-1.5">Actual ₹</th>
-              <th className="text-right pb-2 px-1.5">Variance</th>
-              <th className="text-center pb-2 pl-1.5">% Utilised</th>
+              <th className="text-center pb-2 px-1.5">Planned C</th>
+              <th className="text-center pb-2 px-1.5">Onboarded C</th>
+              <th className="text-right pb-2 px-1.5">Actual (First Budget) ₹</th>
+              <th className="text-right pb-2 px-1.5">Expected ₹</th>
+              <th className="text-right pb-2 px-1.5">Budget Left</th>
+              <th className="text-center pb-2 pl-1.5">% Used</th>
             </tr>
           </thead>
           <tbody>
@@ -1031,6 +1114,11 @@ function Empty({ msg }: { msg: string }) {
   return <p className="text-[0.7rem] text-text-tertiary">{msg}</p>;
 }
 
+/**
+ * "Budget Left" cell — `value` is the internal variance (expected − budget),
+ * so what's LEFT is its negation. Green = money still available; red = the
+ * campaign is over its budget by that amount.
+ */
 function VarianceCell({ value }: { value: number }) {
   if (value === 0) {
     return (
@@ -1044,8 +1132,9 @@ function VarianceCell({ value }: { value: number }) {
         "py-1.5 px-1.5 text-right tabular font-extrabold",
         over ? "text-danger" : "text-success",
       )}
+      title={over ? "Over budget by this amount" : "Still available to spend"}
     >
-      {over ? "+" : "−"}
+      {over ? "over by " : ""}
       {formatRupees(Math.abs(value))}
     </td>
   );

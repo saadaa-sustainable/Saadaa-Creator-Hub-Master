@@ -326,6 +326,31 @@ export async function resolveGlobalAdminEmails(): Promise<string[]> {
 }
 
 /**
+ * Resolve the budget approvers — ONLY the true Global Admins (the role that
+ * carries `budget_approve`). Unlike resolveGlobalAdminEmails this must NOT
+ * include the "Admin" role: budget approval emails go to akshay/mahesh/devesh.
+ */
+export async function resolveBudgetApproverEmails(): Promise<string[]> {
+  try {
+    const supabase = createServiceClient();
+    const { data } = await (supabase as any)
+      .from("user_access")
+      .select("email, role, active")
+      .eq("active", true)
+      .eq("role", "Global Admin");
+    return Array.from(
+      new Set(
+        ((data ?? []) as Array<{ email: string | null }>)
+          .map((u) => (u.email ?? "").trim().toLowerCase())
+          .filter((e) => e.length > 0 && e.includes("@")),
+      ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Resolve active Accounts-team email addresses from user_access (best-effort).
  * Returns a de-duped, lower-cased list; empty array on any error or no match.
  * "Accounts team" = active rows whose role is one of the accounts labels. The

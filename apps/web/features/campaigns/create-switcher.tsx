@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, PlusCircle } from "lucide-react";
+import { FileText, PiggyBank, PlusCircle } from "lucide-react";
 import type { CampaignListRow } from "./queries";
 import { CampaignCreateForm } from "./create-form";
 import { ExistingCampaigns } from "./existing-campaigns";
 import { BulkAssignCampaignPanel } from "./bulk-assign-panel";
+import { BudgetTopUpForm } from "./topup-form";
 import type {
   AssignableCampaign,
   UnassignedReachOut,
@@ -27,7 +28,7 @@ export function CampaignCreateSwitcher({
   unassigned = [],
   assignableCampaigns = [],
 }: CampaignCreateSwitcherProps) {
-  const [mode, setMode] = useState<"create" | "existing">("create");
+  const [mode, setMode] = useState<"create" | "topup" | "existing">("create");
 
   return (
     <div className="campaign-create-switcher">
@@ -49,6 +50,16 @@ export function CampaignCreateSwitcher({
         <button
           type="button"
           role="tab"
+          aria-selected={mode === "topup"}
+          className={mode === "topup" ? "is-active" : ""}
+          onClick={() => setMode("topup")}
+        >
+          <PiggyBank size={14} />
+          Add Budget (Existing)
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={mode === "existing"}
           className={mode === "existing" ? "is-active" : ""}
           onClick={() => setMode("existing")}
@@ -61,6 +72,8 @@ export function CampaignCreateSwitcher({
 
       {mode === "create" ? (
         <CampaignCreateForm />
+      ) : mode === "topup" ? (
+        <BudgetTopUpForm campaigns={campaigns} />
       ) : (
         <div className="space-y-4">
           <ExistingCampaigns campaigns={campaigns} canManage={canManage} />

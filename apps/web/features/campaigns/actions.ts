@@ -11,9 +11,11 @@ import { formatDate } from "@/lib/formatters";
 import {
   NOTIFICATION_TYPES,
   notifyActorConfirmation,
+  resolveBudgetApproverEmails,
   resolveGlobalAdminEmails,
   sendNotification,
 } from "@/lib/notifications";
+import { monthKeyIST } from "@/lib/budget-versions";
 import {
   CampaignCreateSchema,
   computeRowEstGarment,
@@ -301,12 +303,70 @@ export async function submitCampaign(
     },
   ]);
 
+  // V0 — the campaign's FIRST CREATED BUDGET version (kind 'initial'),
+  // pending Global Admin approval. The campaign's own approval stays locked
+  // until this V0 is approved (budget first, campaign second). The RPC's
+  // freshly-inserted campaign_budget lines adopt this version.
+  const { data: v0Row, error: v0Err } = await (supabase as any)
+    .from("campaign_budget_versions")
+    .insert({
+      campaign_id: row.campaign_id,
+      version_number: 0,
+      kind: "initial",
+      month: monthKeyIST(new Date()),
+      amount: totalAll,
+      num_creators: allocated,
+      status: "pending_approval",
+      note: "First created budget",
+      created_by: actor.name || actor.email,
+    })
+    .select("id")
+    .single();
+  if (v0Err) {
+    console.error("[campaigns] V0 version insert failed:", v0Err.message);
+  } else if (v0Row?.id) {
+    await (supabase as any)
+      .from("campaign_budget")
+      .update({ version_id: v0Row.id })
+      .eq("campaign_id", row.campaign_id)
+      .is("version_id", null);
+    // Mirror the campaign's Test Mode stamp onto its version so test
+    // campaigns never surface on the Budget tab.
+    const { data: campRow } = await (supabase as any)
+      .from("campaigns")
+      .select("is_test")
+      .eq("campaign_id", row.campaign_id)
+      .maybeSingle();
+    if ((campRow as { is_test?: boolean } | null)?.is_test) {
+      await (supabase as any)
+        .from("campaign_budget_versions")
+        .update({ is_test: true })
+        .eq("id", v0Row.id);
+    }
+  }
+
   await logApprovalEvent(supabase, {
     actionType: "Campaign",
     action: "Submitted",
     entityId: row.campaign_id,
     actor,
     notes: "New campaign submitted for approval.",
+  });
+
+  // Budget approvers get their own heads-up — the V0 needs them first.
+  after(async () => {
+    const approvers = await resolveBudgetApproverEmails();
+    if (approvers.length === 0) return;
+    await sendNotification({
+      type: NOTIFICATION_TYPES.CAMPAIGN_CREATED,
+      to: approvers,
+      subject: `Budget approval needed · ${row.campaign_id} V0 — ₹${new Intl.NumberFormat("en-IN").format(totalAll)}`,
+      title: "Budget approval needed",
+      subtitle: `CAMPAIGN ID: ${row.campaign_id}`,
+      htmlBody: `<p style="margin:0 0 10px;">${v.campaignName} was just created with a first budget (V0) of <strong>INR ${new Intl.NumberFormat("en-IN").format(totalAll)}</strong> for ${allocated} creators.</p><p style="margin:0;">Approve or reject it on the <strong>Budget</strong> tab — the campaign itself stays locked until the budget is decided.</p>`,
+      plainBody: `${v.campaignName} (${row.campaign_id}) needs its V0 budget of INR ${new Intl.NumberFormat("en-IN").format(totalAll)} approved on the Budget tab. The campaign stays locked until then.`,
+      collabId: row.campaign_id,
+    });
   });
 
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
@@ -807,6 +867,31 @@ export async function approveCampaign(
   if (!id) return { ok: false, error: "Campaign ID is required." };
 
   const supabase = createServiceClient();
+
+  // Budget first, campaign second — the campaign cannot go live while its V0
+  // budget is undecided (server-enforced; the UI also disables the button).
+  const { data: v0Row } = await (supabase as any)
+    .from("campaign_budget_versions")
+    .select("status")
+    .eq("campaign_id", id)
+    .eq("version_number", 0)
+    .maybeSingle();
+  const v0Status = (v0Row as { status?: string } | null)?.status;
+  if (v0Status === "pending_approval") {
+    return {
+      ok: false,
+      error:
+        "Approve the budget first — this campaign's V0 budget is still pending with the Global Admins (Budget tab).",
+    };
+  }
+  if (v0Status === "rejected") {
+    return {
+      ok: false,
+      error:
+        "This campaign's V0 budget was rejected — the campaign cannot be approved.",
+    };
+  }
+
   const now = new Date().toISOString();
   const { data, error } = await (supabase as any)
     .from("campaigns")

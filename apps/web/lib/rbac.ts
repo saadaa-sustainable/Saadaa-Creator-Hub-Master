@@ -25,10 +25,13 @@ export type PermissionKey =
   | "offboarding_write"
   | "system_config"
   | "role_mgmt"
+  | "budget_approve"
   | "admin";
 
 export const PERMISSION_DESCRIPTIONS: Record<PermissionKey, string> = {
   admin: "Full administrative access — invite users, manage roles, edit everything",
+  budget_approve:
+    "Approve campaign budget versions (initial V0 + top-ups) — Global Admins only; NOT implied by admin",
   campaign_create: "Create campaigns",
   campaign_edit: "Edit, close + reopen campaigns",
   reachout_outbound: "Submit Outbound Reach Out form",
@@ -137,7 +140,15 @@ export function hasPermission(
 ): boolean {
   if (actor.permissions && actor.permissions.length > 0) {
     if (actor.permissions.includes(key)) return true;
-    if (actor.permissions.includes("admin") && key !== "admin") return true;
+    // `admin` implies every scope EXCEPT budget approval — that one belongs
+    // to Global Admins only and must be granted explicitly (the "Admin" role
+    // carries `admin` but must never approve budgets).
+    if (
+      actor.permissions.includes("admin") &&
+      key !== "admin" &&
+      key !== "budget_approve"
+    )
+      return true;
     return false;
   }
 

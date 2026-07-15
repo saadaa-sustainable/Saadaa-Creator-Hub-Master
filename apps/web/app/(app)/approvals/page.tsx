@@ -18,18 +18,23 @@ export const metadata = { title: "Approvals" };
 export default async function ApprovalsPage() {
   const actor = await getActor();
   if (!actor || !hasPermission(actor, "admin")) redirect("/dashboard");
+  const canApproveBudget = hasPermission(actor, "budget_approve");
 
   return (
     <div className="onboarding-stage approvals-stage">
       <PageHeader icon={ShieldCheck} title="Approvals" knowMore="approvals" />
       <Suspense fallback={<TableSkeleton rows={4} />}>
-        <ApprovalsData />
+        <ApprovalsData canApproveBudget={canApproveBudget} />
       </Suspense>
     </div>
   );
 }
 
-async function ApprovalsData() {
+async function ApprovalsData({
+  canApproveBudget,
+}: {
+  canApproveBudget: boolean;
+}) {
   const data = await fetchApprovalQueue();
-  return <ApprovalsBody data={data} />;
+  return <ApprovalsBody data={data} canApproveBudget={canApproveBudget} />;
 }

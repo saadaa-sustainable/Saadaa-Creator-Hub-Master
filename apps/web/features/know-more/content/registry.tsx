@@ -8,6 +8,7 @@ import AccountsHubKM from "./accounts-hub";
 import AdStatusKM from "./ad-status";
 import ApprovalsKM from "./approvals";
 import AuditLogKM from "./audit-log";
+import BudgetKM from "./budget";
 import CampaignsKM from "./campaigns";
 import ComplianceKM from "./compliance";
 import CostAnalyticsKM from "./cost-analytics";
@@ -58,6 +59,7 @@ export const KM_REGISTRY: Record<string, ComponentType> = {
   errors: ErrorsKM,
   "audit-log": AuditLogKM,
   approvals: ApprovalsKM,
+  budget: BudgetKM,
   "issue-desk": IssueDeskKM,
   sheets: SheetsKM,
   "user-panel": UserPanelKM,

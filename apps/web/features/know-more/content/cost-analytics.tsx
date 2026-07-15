@@ -5,8 +5,36 @@ export default function CostAnalyticsKM() {
     <>
       <KMHeader
         title="Cost Analytics"
-        subtitle="Budget vs Actual by month × campaign × tier. KPIs roll up to a workspace view; alerts surface under- and over-utilised campaigns."
+        subtitle="Actual (first created budget) vs Expected (committed spend) by month × campaign × tier — with the V0/V1/V2 version split per campaign."
       />
+
+      <KMSection tag="Actual vs Expected (2026-07-15 definitions)">
+        <KMList>
+          <li>
+            <strong>Actual</strong> = the campaign&apos;s <strong>first
+            created budget</strong> (its V0 version) — the sanctioned money.
+          </li>
+          <li>
+            <strong>Expected</strong> = what onboarded collabs commit us to
+            spend: <KMCode>Barter + Paid → commercial + order value</KMCode>,{" "}
+            <KMCode>Barter → order value only</KMCode>. Order value is the
+            Shopify order total for the collab&apos;s Order ID; a collab lands
+            in its onboarding month.
+          </li>
+          <li>
+            <strong>Budget Left</strong> = Actual − Expected (the old
+            &quot;Variance&quot; jargon is gone — red means over budget by
+            that amount).
+          </li>
+          <li>
+            <strong>Version split</strong> — every campaign row in Campaign
+            Totals expands (▸) into its V0 / carry-forward / top-up chain with
+            the Expected charged against each version&apos;s month. Hover a
+            V-chip for what it means; carry-forwards show the admin&apos;s
+            &quot;why unused&quot; note when written.
+          </li>
+        </KMList>
+      </KMSection>
 
       <KMSection tag="Equal-split sourcing rule">
         <KMCallout tone="info">

@@ -78,6 +78,30 @@ export default function CampaignsKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Add Budget (Existing) — top-ups">
+        <KMList>
+          <li>
+            The third tab adds a <strong>new budget version</strong> to a live
+            campaign: pick the campaign (a green note shows how much it still
+            has left this month), enter only the additional creators, the
+            budget lines and a mandatory <strong>reason for the increase</strong>
+            — everything else is auto-filled and locked.
+          </li>
+          <li>
+            Submitting mints the campaign&apos;s next version number (the
+            disclaimer computes it live — V1 if the first budget was used up in
+            its own month, V2 if a carry-forward already exists, and so on) as{" "}
+            <KMCode>Pending Approval</KMCode> for the Global Admins. Money and
+            the creator cap only move after approval.
+          </li>
+          <li>
+            Creating a NEW campaign also creates its <strong>V0</strong> (first
+            created budget) version — the campaign approval stays locked until
+            a Global Admin approves the V0 on the Budget tab or Approvals.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Edit campaign">
         <p>
           Each campaign card and the detail modal carry an <strong>Edit</strong>{" "}

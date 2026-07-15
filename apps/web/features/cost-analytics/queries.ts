@@ -37,6 +37,9 @@ const POSTS_SELECT = [
   "deliverable_index",
   "inf_id",
   "username",
+  "collab_type",
+  "order_id",
+  "is_test",
 ].join(",");
 
 const ACTUAL_STATUSES = new Set([
@@ -173,10 +176,39 @@ export async function fetchCostAnalyticsData(): Promise<CostAnalyticsData> {
     return emptyData();
   }
 
-  // Voided (offboarded) collabs are excluded from cost analytics.
+  // Voided (offboarded) + Test-Mode collabs are excluded from cost analytics.
   const posts = ((postsData ?? []) as Array<Record<string, unknown>>).filter(
-    (p) => !isVoidedStatus(p.workflow_status as string | null),
+    (p) =>
+      !isVoidedStatus(p.workflow_status as string | null) && !p.is_test,
   );
+
+  // ── Shopify order values — the "order value" half of Expected ────────────
+  // Expected per collab: Barter → order value; Barter + Paid → commercial +
+  // order value. Order value = shopify_orders.total_price keyed by the order
+  // NUMBER on the collab's parent row.
+  const parentOrderIds = [
+    ...new Set(
+      posts
+        .filter(
+          (p) =>
+            p.deliverable_index == null || Number(p.deliverable_index) === 1,
+        )
+        .map((p) => String(p.order_id ?? "").replace(/^#+/, "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  const orderValueByNumber = new Map<string, number>();
+  for (let i = 0; i < parentOrderIds.length; i += 500) {
+    const slice = parentOrderIds.slice(i, i + 500);
+    const { data: orders } = await (supabase as any)
+      .from("shopify_orders")
+      .select("order_id, total_price")
+      .in("order_id", slice);
+    for (const o of (orders ?? []) as Array<Record<string, unknown>>) {
+      const k = String(o.order_id ?? "").replace(/^#+/, "").trim();
+      if (k) orderValueByNumber.set(k, Number(o.total_price ?? 0) || 0);
+    }
+  }
 
   // Pull creators to map inf_id → followers/category for tier resolution.
   const infIds = [
@@ -273,12 +305,15 @@ export async function fetchCostAnalyticsData(): Promise<CostAnalyticsData> {
       Number(b.total_with_garments ?? 0) - Number(b.total_cost ?? 0);
   }
 
-  // Aggregate actuals.
+  // Aggregate EXPECTED spend (the field is still named actualCost for legacy
+  // shape-compat; the UI labels it "Expected").
   //
   // commercial_amount is equal-split across all deliverables of a collab
-  // (parent + children sum to the originally-agreed total). So actualCost
-  // sums commercial_amount across ALL rows. actualCreators still counts
-  // parent rows only (one creator per collab, not per deliverable).
+  // (parent + children sum to the originally-agreed total), so the commercial
+  // half sums across ALL rows. The ORDER VALUE half is added once per collab
+  // at its parent row (pure-Barter collabs have commercial 0, so they
+  // contribute order value only — exactly the definition). actualCreators
+  // still counts parent rows only (one creator per collab).
   for (const p of posts) {
     const status = statusKey(p.workflow_status);
     if (!ACTUAL_STATUSES.has(status)) continue;
@@ -292,7 +327,11 @@ export async function fetchCostAnalyticsData(): Promise<CostAnalyticsData> {
     const row = getOrCreate(month, campaignId, tier, "");
     const isParent =
       p.deliverable_index == null || Number(p.deliverable_index) === 1;
-    if (isParent) row.actualCreators += 1;
+    if (isParent) {
+      row.actualCreators += 1;
+      const orderKey = String(p.order_id ?? "").replace(/^#+/, "").trim();
+      if (orderKey) row.actualCost += orderValueByNumber.get(orderKey) ?? 0;
+    }
     row.actualCost += Number(p.commercial_amount ?? 0);
   }
 
@@ -349,18 +388,84 @@ export async function fetchCostAnalyticsData(): Promise<CostAnalyticsData> {
   const tierSummary = [...tierMap.values()].map(finalize);
   tierSummary.sort((a, b) => tierOrder[a.tier] - tierOrder[b.tier]);
 
-  // ── Campaign Totals (one row per campaign — uses campaigns.total_budget
-  //    as authoritative budget so campaigns without per-tier breakdown still
-  //    contribute to the KPI strip and alerts) ──────────────────────────────
+  // ── Budget versions (V0 / carry-forwards / top-ups) ─────────────────────
+  // "Actual" = the FIRST CREATED BUDGET (V0). The per-version division lets
+  // each campaign row expand into its chain with the Expected charged against
+  // each version's month.
+  const { data: versionRows } = await (supabase as any)
+    .from("campaign_budget_versions")
+    .select(
+      "campaign_id, version_number, kind, month, amount, status, note, gap_reason",
+    )
+    .eq("is_test", false)
+    .order("version_number");
+  const versionsByCampaign = new Map<
+    string,
+    Array<Record<string, unknown>>
+  >();
+  for (const v of (versionRows ?? []) as Array<Record<string, unknown>>) {
+    const id = String(v.campaign_id ?? "");
+    const list = versionsByCampaign.get(id) ?? [];
+    list.push(v);
+    versionsByCampaign.set(id, list);
+  }
+
+  // Expected per campaign per month (short label, same format as row months).
+  const expectedByCampaignMonth = new Map<string, number>();
+  for (const r of allRows) {
+    const k = `${r.campaignId}||${r.month}`;
+    expectedByCampaignMonth.set(
+      k,
+      (expectedByCampaignMonth.get(k) ?? 0) + r.actualCost,
+    );
+  }
+  const shortMonth = (isoMonth: unknown): string =>
+    new Date(String(isoMonth)).toLocaleString("en-US", {
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+
+  // ── Campaign Totals (one row per campaign). Budget = V0 first-created
+  //    budget when the campaign has versions; legacy fallbacks otherwise. ───
   const campaignTotalsMap = new Map<string, CampaignTotalsRow>();
   for (const c of campaignsMap.values()) {
+    const versions = versionsByCampaign.get(c.campaign_id) ?? [];
+    const v0 = versions.find((v) => Number(v.version_number) === 0);
     campaignTotalsMap.set(c.campaign_id, {
       campaignId: c.campaign_id,
       campaignName: c.campaign_name,
       campaignNum: c.campaign_num,
       garmentCost: 0,
       ...emptyRow(),
-      budgetCost: c.total_budget,
+      budgetCost: v0 ? Number(v0.amount ?? 0) : c.total_budget,
+      versions: versions.map((v) => {
+        const monthShort = shortMonth(v.month);
+        const expectedAgainst =
+          expectedByCampaignMonth.get(`${c.campaign_id}||${monthShort}`) ?? 0;
+        const amount = Number(v.amount ?? 0);
+        const status = String(v.status ?? "");
+        return {
+          versionNumber: Number(v.version_number ?? 0),
+          kind: String(v.kind ?? "top_up") as
+            | "initial"
+            | "carry_forward"
+            | "top_up",
+          month: monthShort,
+          amount,
+          status,
+          expectedAgainst:
+            status === "pending_approval" || status === "rejected"
+              ? null
+              : expectedAgainst,
+          remaining:
+            status === "pending_approval" || status === "rejected"
+              ? null
+              : Math.max(0, amount - expectedAgainst),
+          note: (v.note as string | null) ?? null,
+          gapReason: (v.gap_reason as string | null) ?? null,
+        };
+      }),
     });
   }
   for (const r of allRows) {
@@ -371,9 +476,8 @@ export async function fetchCostAnalyticsData(): Promise<CostAnalyticsData> {
     t.actualCost += r.actualCost;
     t.totalWithGarments += r.totalWithGarments;
     t.garmentCost += r.garmentCost;
-    // If campaigns.total_budget was 0/missing, fall back to per-tier sum.
-    // We still expose total_with_garments separately for the "incl. garments"
-    // KPI line.
+    // If neither V0 nor campaigns.total_budget provided a figure, fall back
+    // to the per-tier sum so the row still participates in KPIs/alerts.
     if (t.budgetCost === 0) t.budgetCost += r.budgetCost;
   }
   const campaignTotals = [...campaignTotalsMap.values()].map(finalize);
