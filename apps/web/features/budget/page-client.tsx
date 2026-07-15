@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronRight,
   CircleAlert,
+  Grid3X3,
+  List as ListIcon,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -40,6 +42,16 @@ const STATUS_CHIP: Record<string, { label: string; cls: string }> = {
   rejected: { label: "Rejected", cls: "bg-danger-bg text-danger" },
 };
 
+/** Same rotating accent family the Existing Campaigns cards use. */
+const CAMPAIGN_ACCENTS = ["#B57514", "#3B6FD4", "#4F7C4D", "#7B4FBF"];
+function accentFor(campaignId: string): string {
+  const seed = parseInt(campaignId.replace(/\D/g, ""), 10) || 0;
+  return CAMPAIGN_ACCENTS[Math.abs(seed) % CAMPAIGN_ACCENTS.length];
+}
+
+const BUDGET_VIEW_STORAGE_KEY = "creatorhub:budget:view";
+type ViewMode = "list" | "cards";
+
 export function BudgetPageClient({
   data,
   canApprove,
@@ -48,6 +60,15 @@ export function BudgetPageClient({
   canApprove: boolean;
 }) {
   const [month, setMonth] = useState<string>(data.defaultMonth ?? "");
+  const [view, setView] = useState<ViewMode>("list");
+  useEffect(() => {
+    const stored = window.localStorage.getItem(BUDGET_VIEW_STORAGE_KEY);
+    if (stored === "cards" || stored === "list") setView(stored);
+  }, []);
+  const switchView = (v: ViewMode) => {
+    setView(v);
+    window.localStorage.setItem(BUDGET_VIEW_STORAGE_KEY, v);
+  };
   const active: BudgetMonth | undefined = useMemo(
     () => data.months.find((m) => m.key === month) ?? data.months[0],
     [data.months, month],
@@ -118,9 +139,56 @@ export function BudgetPageClient({
 
           <VersionExplainer />
 
-          {active.groups.map((g) => (
-            <CampaignGroup key={g.campaignId} g={g} canApprove={canApprove} />
-          ))}
+          {/* Toolbar — row/card toggle (same shell as the workflow stages). */}
+          <div className="stage-board-toolbar">
+            <div className="stage-board-toolbar__copy">
+              <span>
+                {active.groups.length} campaign
+                {active.groups.length === 1 ? "" : "s"}
+              </span>
+              <strong>
+                {view === "list" ? "Row view" : "Card view"} · {active.label}
+              </strong>
+            </div>
+            <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === "list"}
+                className={cn(view === "list" && "active")}
+                onClick={() => switchView("list")}
+              >
+                <ListIcon size={12} aria-hidden />
+                Rows
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === "cards"}
+                className={cn(view === "cards" && "active")}
+                onClick={() => switchView("cards")}
+              >
+                <Grid3X3 size={12} aria-hidden />
+                Cards
+              </button>
+            </div>
+          </div>
+
+          {view === "list" ? (
+            active.groups.map((g) => (
+              <CampaignGroup key={g.campaignId} g={g} canApprove={canApprove} />
+            ))
+          ) : (
+            <div className="budget-card-grid">
+              {active.groups.map((g) => (
+                <BudgetCampaignCard
+                  key={g.campaignId}
+                  g={g}
+                  canApprove={canApprove}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -145,15 +213,21 @@ function Kpi({
         tone,
       )}
     >
-      <span className="block text-[0.6rem] font-extrabold uppercase tracking-[0.08em] text-text-secondary">
+      <span className="block text-[clamp(0.54rem,0.5rem+0.15vw,0.62rem)] font-extrabold uppercase tracking-[0.08em] text-text-secondary">
         {label}
       </span>
-      <b className="block text-[1.25rem] leading-tight tabular-nums text-text-primary">
+      <b className="block text-[clamp(1rem,0.85rem+0.6vw,1.3rem)] leading-tight tabular-nums text-text-primary">
         {value}
       </b>
       {sub && <span className="text-[0.68rem] text-text-tertiary">{sub}</span>}
     </div>
   );
+}
+
+function utilizationPct(g: CampaignMonthGroup): number {
+  return g.allocated > 0
+    ? Math.min(100, Math.round((g.utilized / g.allocated) * 100))
+    : 0;
 }
 
 function CampaignGroup({
@@ -163,15 +237,19 @@ function CampaignGroup({
   g: CampaignMonthGroup;
   canApprove: boolean;
 }) {
+  const accent = accentFor(g.campaignId);
   return (
-    <section className="rounded-2xl bg-bg-white border border-border overflow-hidden">
-      <header className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 border-b border-border bg-[#FCFAF6]">
-        <h3 className="text-[0.9rem] font-bold text-text-primary">
-          {g.campaignId}
+    <section
+      className="budget-camp rounded-2xl bg-bg-white border border-border overflow-hidden"
+      style={{ "--campaign-accent": accent } as React.CSSProperties}
+    >
+      <header className="budget-camp__head flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 border-b border-border">
+        <h3 className="budget-camp__title font-bold text-text-primary">
+          <strong className="campaign-card__id">{g.campaignId}</strong>
           {g.campaignName ? (
             <span className="font-semibold text-text-secondary">
               {" "}
-              · {g.campaignName}
+              {g.campaignName}
             </span>
           ) : null}
         </h3>
@@ -189,6 +267,13 @@ function CampaignGroup({
           />
           <HeadStat label="Remaining" value={formatRupees(g.remaining)} />
         </div>
+        <span
+          className="budget-camp__track"
+          aria-hidden
+          title={`${utilizationPct(g)}% of this month's allocation utilized`}
+        >
+          <span style={{ width: `${utilizationPct(g)}%` }} />
+        </span>
       </header>
 
       <div className="overflow-x-auto">
@@ -213,6 +298,184 @@ function CampaignGroup({
         </table>
       </div>
     </section>
+  );
+}
+
+/**
+ * Card view — one card per campaign, in the Existing Campaigns visual
+ * language (rotating accent, id row, utilization progress). Versions render
+ * as compact lines with the same approve/reject + gap-reason controls.
+ */
+function BudgetCampaignCard({
+  g,
+  canApprove,
+}: {
+  g: CampaignMonthGroup;
+  canApprove: boolean;
+}) {
+  const accent = accentFor(g.campaignId);
+  const pct = utilizationPct(g);
+  return (
+    <article
+      className="budget-camp-card"
+      style={
+        {
+          "--campaign-accent": accent,
+          "--campaign-progress": `${pct}%`,
+        } as React.CSSProperties
+      }
+    >
+      <header className="campaign-card__id-row">
+        <strong className="campaign-card__id">{g.campaignId}</strong>
+        {g.overBudget ? (
+          <span className="chip-over inline-flex items-center gap-1 rounded-full bg-danger-bg px-2 py-0.5 text-[0.62rem] font-extrabold text-danger">
+            <CircleAlert size={10} aria-hidden /> Over budget
+          </span>
+        ) : (
+          <span className="campaign-status-pill">{pct}% used</span>
+        )}
+      </header>
+      <h3 className="budget-camp-card__name">{g.campaignName ?? "—"}</h3>
+
+      <span className="budget-camp__track" aria-hidden>
+        <span style={{ width: `${pct}%` }} />
+      </span>
+
+      <div className="budget-camp-card__stats">
+        <div>
+          <span>Allocated</span>
+          <strong>{formatRupees(g.allocated)}</strong>
+        </div>
+        <div>
+          <span>Utilized</span>
+          <strong className={g.overBudget ? "text-danger" : "text-success"}>
+            {formatRupees(g.utilized)}
+          </strong>
+        </div>
+        <div>
+          <span>Remaining</span>
+          <strong>{formatRupees(g.remaining)}</strong>
+        </div>
+      </div>
+
+      <ul className="budget-camp-card__versions">
+        {g.versions.map((v) => (
+          <VersionLine key={v.id} v={v} canApprove={canApprove} />
+        ))}
+      </ul>
+    </article>
+  );
+}
+
+/** Compact per-version line for the card view — same actions as the row view. */
+function VersionLine({
+  v,
+  canApprove,
+}: {
+  v: BudgetVersionRow;
+  canApprove: boolean;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState("");
+  const status = STATUS_CHIP[v.status] ?? STATUS_CHIP.closed;
+  const isPending = v.status === "pending_approval";
+
+  const approve = () =>
+    start(async () => {
+      const res = await approveBudgetVersion(v.id);
+      if (!res.ok) return void toast.error(res.error);
+      toast.success(
+        `${v.campaign_id} V${v.version_number} approved — ${formatRupees(Number(v.amount))} is live.`,
+      );
+      router.refresh();
+    });
+
+  const reject = () =>
+    start(async () => {
+      const res = await rejectBudgetVersion(v.id, reason);
+      if (!res.ok) return void toast.error(res.error);
+      toast.success(`${v.campaign_id} V${v.version_number} rejected.`);
+      setRejecting(false);
+      router.refresh();
+    });
+
+  return (
+    <li className="budget-camp-card__vline">
+      <div className="flex flex-wrap items-center gap-2">
+        <VersionChip n={v.version_number} kind={v.kind} />
+        <span className="text-[0.74rem] font-semibold text-text-primary">
+          {KIND_LABEL[v.kind] ?? v.kind}
+        </span>
+        <span className="ml-auto tabular-nums text-[0.78rem] font-bold">
+          {formatRupees(Number(v.amount))}
+        </span>
+        <span
+          className={cn(
+            "inline-block rounded-full px-2 py-0.5 text-[0.62rem] font-extrabold whitespace-nowrap",
+            status.cls,
+          )}
+        >
+          {status.label}
+        </span>
+      </div>
+      {v.note && (
+        <span
+          className="block truncate text-[0.68rem] text-text-tertiary"
+          title={v.note}
+        >
+          {v.kind === "top_up" ? "Reason: " : ""}
+          {v.note}
+        </span>
+      )}
+      {v.kind === "carry_forward" && <GapReason v={v} />}
+      {canApprove && isPending && !rejecting && (
+        <span className="mt-1 flex gap-1.5">
+          <button
+            type="button"
+            disabled={pending}
+            onClick={approve}
+            className="inline-flex items-center gap-1 rounded-lg border border-[#d9b115] bg-accent px-3 py-1.5 text-[0.7rem] font-extrabold text-text-primary disabled:opacity-60"
+          >
+            <Check size={12} aria-hidden /> Approve
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setRejecting(true)}
+            className="inline-flex items-center gap-1 rounded-lg border border-[#EFC9C2] bg-bg-white px-3 py-1.5 text-[0.7rem] font-bold text-danger disabled:opacity-60"
+          >
+            <X size={12} aria-hidden /> Reject
+          </button>
+        </span>
+      )}
+      {canApprove && isPending && rejecting && (
+        <span className="mt-1 flex items-center gap-1.5">
+          <input
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Why? (sent to the requester)"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-bg-white px-2 py-1.5 text-[0.7rem]"
+          />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={reject}
+            className="rounded-lg border border-[#EFC9C2] bg-danger-bg px-2.5 py-1.5 text-[0.7rem] font-extrabold text-danger disabled:opacity-60"
+          >
+            Confirm
+          </button>
+          <button
+            type="button"
+            onClick={() => setRejecting(false)}
+            className="text-[0.7rem] text-text-tertiary"
+          >
+            Cancel
+          </button>
+        </span>
+      )}
+    </li>
   );
 }
 
