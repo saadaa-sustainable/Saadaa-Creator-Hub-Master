@@ -117,9 +117,9 @@ function MetaGatePill() {
       <span
         className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10.5px] font-bold tabular-nums"
         style={tone}
-        title={`The Meta access token expires in ${d} day${d === 1 ? "" : "s"}${expiresText ? ` (${expiresText})` : ""}. It does NOT renew itself — generate a fresh long-lived token before then or Instagram fetching stops.`}
+        title={`Meta data access ends in ${d} day${d === 1 ? "" : "s"}${expiresText ? ` (${expiresText})` : ""}. Meta's debugger shows the token as "Expires: Never" — but its Data Access window still closes on that date and Instagram fetching stops. Re-authenticate / regenerate the token before then to reset the 90-day window.`}
       >
-        Token {d}d
+        Meta access {d}d
       </span>
     );
   })();
