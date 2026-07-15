@@ -103,6 +103,8 @@ export async function approveBudgetVersion(
       year: "numeric",
       timeZone: "UTC",
     });
+    // total_cost / est_garment_cost / total_with_garments are GENERATED
+    // ALWAYS columns — the DB derives them; writing them errors.
     const rows = draftLines.map((l) => ({
       campaign_id: v.campaign_id,
       month_label: monthText,
@@ -111,11 +113,8 @@ export async function approveBudgetVersion(
       campaign_name: l.campaign_name ?? null,
       num_influencers: Number(l.num_influencers ?? 0),
       avg_comp: Number(l.avg_comp ?? 0),
-      total_cost: Number(l.total_cost ?? 0),
       min_garments: Number(l.min_garments ?? 2),
       max_garments: Number(l.max_garments ?? 3),
-      est_garment_cost: Number(l.est_garment_cost ?? 0),
-      total_with_garments: Number(l.total_with_garments ?? 0),
       version_id: v.id,
     }));
     const { error: linesErr } = await (supabase as any)

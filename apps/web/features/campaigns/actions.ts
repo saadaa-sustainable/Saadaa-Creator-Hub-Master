@@ -18,9 +18,7 @@ import {
 import { monthKeyIST } from "@/lib/budget-versions";
 import {
   CampaignCreateSchema,
-  computeRowCompTotal,
   computeRowEstGarment,
-  computeRowTotal,
   computeTotals,
   INFLUENCER_TIERS,
   MIN_GARMENTS_FIXED,
@@ -198,6 +196,9 @@ async function applyCampaignEdit(
   const { allocated: editAllocated, totalAll: editTotalAll } = computeTotals(
     input.budgetRows,
   );
+  // total_cost / est_garment_cost / total_with_garments are GENERATED ALWAYS
+  // columns — the DB derives them from num_influencers/avg_comp/max_garments;
+  // writing them errors ("cannot insert a non-DEFAULT value").
   const budgetRows = input.budgetRows.map((r) => ({
     campaign_id: campaignId,
     month_label: monthLabel,
@@ -208,9 +209,6 @@ async function applyCampaignEdit(
     avg_comp: r.avgComp,
     min_garments: r.minGarments,
     max_garments: r.maxGarments,
-    est_garment_cost: computeRowEstGarment(r),
-    total_cost: computeRowCompTotal(r),
-    total_with_garments: computeRowTotal(r),
     version_id: v0Id,
   }));
 
