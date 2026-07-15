@@ -17,6 +17,8 @@ interface MetaGateState {
   /** Days until the MAIN Meta token expires (null = never / unknown). */
   tokenDaysLeft: number | null;
   tokenExpiresAt: number | null;
+  /** When the token was issued — the last renewal date. */
+  tokenIssuedAt: number | null;
 }
 
 /** Fired by the Reach Out forms right after a Fetch completes so the header
@@ -103,6 +105,13 @@ function MetaGatePill() {
           year: "numeric",
         })
       : "";
+    const issuedText = gate.tokenIssuedAt
+      ? new Date(gate.tokenIssuedAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "";
     const tone =
       d <= 3
         ? { background: "#FDECEA", borderColor: "rgba(192,57,43,0.4)", color: "#C0392B" }
@@ -117,7 +126,7 @@ function MetaGatePill() {
       <span
         className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10.5px] font-bold tabular-nums"
         style={tone}
-        title={`Meta data access ends in ${d} day${d === 1 ? "" : "s"}${expiresText ? ` (${expiresText})` : ""}. Meta's debugger shows the token as "Expires: Never" — but its Data Access window still closes on that date and Instagram fetching stops. Re-authenticate / regenerate the token before then to reset the 90-day window.`}
+        title={`Meta data access ends in ${d} day${d === 1 ? "" : "s"}${expiresText ? ` (${expiresText})` : ""}.${issuedText ? ` Last renewed ${issuedText}.` : ""} Meta's debugger shows the token as "Expires: Never" — but its Data Access window still closes on that date and Instagram fetching stops. Re-authenticate / regenerate the token before then to reset the 90-day window.`}
       >
         Meta access {d}d
       </span>

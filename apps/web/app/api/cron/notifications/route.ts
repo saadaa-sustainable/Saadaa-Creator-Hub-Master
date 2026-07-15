@@ -8,9 +8,11 @@ import { getCampaignAutoCloseEnabled } from "@/features/settings/actions";
 import {
   NOTIFICATION_TYPES,
   resolveAccountsTeamEmails,
+  resolveBudgetApproverEmails,
   resolveGlobalAdminEmails,
   sendNotification,
 } from "@/lib/notifications";
+import { getMetaTokenExpiry } from "@/lib/meta-token";
 
 /**
  * Daily TIME-BASED (cron) email notifications — Wave 7 follow-up.
@@ -202,6 +204,7 @@ export async function GET(req: NextRequest) {
   }
 
   const sent: Record<string, number> = {
+    meta_token_renewal: 0,
     pending_onboarding: 0,
     posting_pending: 0,
     content_reminder: 0,
@@ -219,6 +222,83 @@ export async function GET(req: NextRequest) {
     resolveGlobalAdminEmails(),
     buildNameToEmailMap(supabase),
   ]);
+
+  // ── 0. Meta token renewal countdown ────────────────────────────────────────
+  // One email per day to the Global Admins across the LAST THREE DAYS of the
+  // Meta token's Data Access window (e.g. expiry 10 Sep → 8th, 9th and 10th).
+  // Meta's debugger shows the token as "Expires: Never", but the Data Access
+  // window is the clock that actually stops Instagram fetching. Deduped via an
+  // app_settings date stamp so re-runs never double-send.
+  try {
+    const expiry = await getMetaTokenExpiry();
+    if (expiry?.expiresAt != null) {
+      const wholeDaysLeft = Math.floor(
+        (expiry.expiresAt - Date.now()) / 86_400_000,
+      );
+      if (wholeDaysLeft >= 0 && wholeDaysLeft <= 2) {
+        const todayIst = new Date(Date.now() + 5.5 * 3_600_000)
+          .toISOString()
+          .slice(0, 10);
+        const { data: lastRow } = await (supabase as any)
+          .from("app_settings")
+          .select("value")
+          .eq("key", "meta_token_renewal_alert_last")
+          .maybeSingle();
+        const alreadySentToday =
+          String((lastRow as { value?: unknown } | null)?.value ?? "").trim() ===
+          todayIst;
+        const approvers = await resolveBudgetApproverEmails();
+        if (!alreadySentToday && approvers.length > 0) {
+          const dateText = new Date(expiry.expiresAt).toLocaleDateString(
+            "en-IN",
+            { day: "numeric", month: "long", year: "numeric" },
+          );
+          const issuedText = expiry.issuedAt
+            ? new Date(expiry.issuedAt).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })
+            : null;
+          const urgency =
+            wholeDaysLeft === 0
+              ? "TODAY"
+              : wholeDaysLeft === 1
+                ? "tomorrow"
+                : `in ${wholeDaysLeft} days`;
+          const r = await sendNotification({
+            type: NOTIFICATION_TYPES.META_TOKEN_RENEWAL,
+            to: approvers,
+            subject: `Meta token renewal needed — Instagram fetching stops ${urgency} (${dateText})`,
+            title: "Meta token renewal needed",
+            subtitle: `DATA ACCESS ENDS: ${dateText}`,
+            htmlBody: `<p style="margin:0 0 12px;">The Meta access token's <strong>Data Access window ends ${urgency}</strong> (${dateText})${issuedText ? ` — it was last renewed on <strong>${issuedText}</strong>` : ""}. When it ends, every Instagram fetch in CreatorHub stops — Reach Out profile fetches, post lookups and partnership checks all fail until the token is renewed.</p>
+<p style="margin:0 0 8px;"><strong>What to do (takes ~5 minutes):</strong></p>
+<ol style="margin:0 0 12px;padding-left:18px;">
+<li>Log in to Meta / Graph API Explorer with the account that owns the token (Mahesh's).</li>
+<li>Generate a fresh long-lived access token with the same permissions (instagram_basic, instagram_manage_insights, business_management…).</li>
+<li>Update <strong>META_GRAPH_API_TOKEN</strong> in Vercel env and redeploy — or hand the new token to the tech team to swap.</li>
+</ol>
+<p style="margin:0;font-size:12px;color:#9A9384;">Note: Meta's debugger shows the token as "Expires: Never" — that's the token string. The Data Access window is the separate 90-day clock this alert counts. The header pill in CreatorHub shows the live countdown.</p>`,
+            plainBody: `The Meta token's Data Access window ends ${urgency} (${dateText}). Instagram fetching in CreatorHub stops when it does. Renew: generate a fresh long-lived token with the same permissions and update META_GRAPH_API_TOKEN in Vercel.`,
+          });
+          if (r.ok) {
+            sent.meta_token_renewal = approvers.length;
+            await (supabase as any).from("app_settings").upsert(
+              {
+                key: "meta_token_renewal_alert_last",
+                value: todayIst,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "key" },
+            );
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[cron] meta_token_renewal failed:", err);
+  }
 
   // ── 1. Pending Onboarding ───────────────────────────────────────────────────
   // Reach Out posts whose reach_out_date is older than the window AND not yet

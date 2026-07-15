@@ -80,6 +80,8 @@ export interface MetaTokenExpiry {
   expiresAt: number | null;
   /** Days left (ceil), null when the token never expires or is unknown. */
   daysLeft: number | null;
+  /** Epoch ms the token was ISSUED — i.e. the last renewal date. */
+  issuedAt: number | null;
   checkedAt: number;
 }
 
@@ -112,6 +114,7 @@ export async function getMetaTokenExpiry(): Promise<MetaTokenExpiry | null> {
         cached = {
           expiresAt: typeof o.expiresAt === "number" ? o.expiresAt : null,
           daysLeft: null,
+          issuedAt: typeof o.issuedAt === "number" ? o.issuedAt : null,
           checkedAt: o.checkedAt,
         };
       }
@@ -136,7 +139,11 @@ export async function getMetaTokenExpiry(): Promise<MetaTokenExpiry | null> {
       { cache: "no-store", signal: AbortSignal.timeout(6000) },
     );
     const json = (await res.json()) as {
-      data?: { expires_at?: number; data_access_expires_at?: number };
+      data?: {
+        expires_at?: number;
+        data_access_expires_at?: number;
+        issued_at?: number;
+      };
     };
     if (res.ok && json.data) {
       // Two clocks: the token's own expiry and the data-access window —
@@ -150,6 +157,10 @@ export async function getMetaTokenExpiry(): Promise<MetaTokenExpiry | null> {
       const next: MetaTokenExpiry = {
         expiresAt: candidates.length ? Math.min(...candidates) : null,
         daysLeft: null,
+        issuedAt:
+          typeof json.data.issued_at === "number" && json.data.issued_at > 0
+            ? json.data.issued_at * 1000
+            : null,
         checkedAt: now,
       };
       await (svc as any).from("app_settings").upsert(
@@ -157,6 +168,7 @@ export async function getMetaTokenExpiry(): Promise<MetaTokenExpiry | null> {
           key: KEY_EXPIRY,
           value: JSON.stringify({
             expiresAt: next.expiresAt,
+            issuedAt: next.issuedAt,
             checkedAt: next.checkedAt,
           }),
           updated_at: new Date().toISOString(),

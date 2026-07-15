@@ -35,5 +35,6 @@ export async function GET() {
     tokenMode: token && main && token !== main ? "temporary" : "main",
     tokenDaysLeft: expiry?.daysLeft ?? null,
     tokenExpiresAt: expiry?.expiresAt ?? null,
+    tokenIssuedAt: expiry?.issuedAt ?? null,
   });
 }

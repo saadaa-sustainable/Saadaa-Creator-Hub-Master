@@ -62,6 +62,9 @@ export const NOTIFICATION_TYPES = {
   ACCOUNTS_PAYABLE_DIGEST: "accounts_payable_digest",
   CAMPAIGN_ENDING: "campaign_ending",
   USER_INVITATION: "user_invitation",
+  /** Daily countdown to Global Admins over the last 3 days of the Meta
+   *  token's Data Access window (the clock that stops Instagram fetching). */
+  META_TOKEN_RENEWAL: "meta_token_renewal",
 } as const;
 
 export type NotificationType =
