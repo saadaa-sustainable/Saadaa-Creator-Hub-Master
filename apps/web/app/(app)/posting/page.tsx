@@ -10,6 +10,7 @@ import {
   fetchPostingKpis,
   fetchPostingTable,
 } from "@/features/posting/queries";
+import { TodayCounter } from "@/features/reach-out/today-counter";
 import type { PostingFilters } from "@/features/posting/types";
 import { assertPermission } from "@/lib/rbac.server";
 
@@ -27,6 +28,10 @@ export default async function PostingPage({
   return (
     <div className="onboarding-stage">
       <PageHeader icon={Send} title="Posting" knowMore="posting" />
+
+      <Suspense fallback={null}>
+        <TodayCounter kind="posted" />
+      </Suspense>
 
       <PostingFiltersBar initial={params} options={options} />
 

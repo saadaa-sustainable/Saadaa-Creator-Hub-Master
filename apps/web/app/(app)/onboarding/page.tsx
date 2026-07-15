@@ -10,6 +10,7 @@ import {
   fetchOnboardingKpis,
   fetchOnboardingTable,
 } from "@/features/onboarding/queries";
+import { TodayCounter } from "@/features/reach-out/today-counter";
 import type { OnboardingFilters } from "@/features/onboarding/types";
 
 export const metadata = { title: "Onboarding" };
@@ -25,6 +26,10 @@ export default async function OnboardingPage({
   return (
     <div className="onboarding-stage">
       <PageHeader icon={UserRoundCheck} title="Onboarding" knowMore="onboarding" />
+
+      <Suspense fallback={null}>
+        <TodayCounter kind="onboarded" />
+      </Suspense>
 
       <OnboardingFiltersBar initial={params} options={options} />
 

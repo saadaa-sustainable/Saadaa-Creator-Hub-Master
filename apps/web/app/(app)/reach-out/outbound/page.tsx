@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { ArrowUpRight, Send } from "lucide-react";
 import { getActor } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
 import { PageHeader } from "@/components/ui/page-header";
 import { OutboundForm } from "@/features/reach-out/outbound-form";
 import { HistoricCreatorButton } from "@/features/reach-out/historic-creator-modal";
+import { TodayReachoutCounter } from "@/features/reach-out/today-counter";
 import { fetchCampaignsForSelect } from "@/features/reach-out/queries";
 
 export const metadata = { title: "Reach Out — Outbound" };
@@ -35,6 +37,9 @@ export default async function Page({ searchParams }: PageProps) {
         knowMore="reach-out-outbound"
         actions={<HistoricCreatorButton />}
       />
+      <Suspense fallback={null}>
+        <TodayReachoutCounter direction="outbound" />
+      </Suspense>
       <OutboundForm
         campaigns={campaigns}
         initialCampaignId={initialCampaignId}
