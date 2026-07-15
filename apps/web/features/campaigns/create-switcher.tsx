@@ -45,7 +45,10 @@ export function CampaignCreateSwitcher({
           onClick={() => setMode("create")}
         >
           <PlusCircle size={14} />
-          Create Campaign
+          <span className="seg-label">
+            <span className="hidden min-[620px]:inline">Create Campaign</span>
+            <span className="min-[620px]:hidden">Create</span>
+          </span>
         </button>
         <button
           type="button"
@@ -55,7 +58,12 @@ export function CampaignCreateSwitcher({
           onClick={() => setMode("topup")}
         >
           <PiggyBank size={14} />
-          Add Budget (Existing)
+          <span className="seg-label">
+            <span className="hidden min-[620px]:inline">
+              Add Budget (Existing)
+            </span>
+            <span className="min-[620px]:hidden">Add Budget</span>
+          </span>
         </button>
         <button
           type="button"
@@ -65,8 +73,13 @@ export function CampaignCreateSwitcher({
           onClick={() => setMode("existing")}
         >
           <FileText size={14} />
-          Existing Campaigns
-          <span>{campaigns.length}</span>
+          <span className="seg-label">
+            <span className="hidden min-[620px]:inline">
+              Existing Campaigns
+            </span>
+            <span className="min-[620px]:hidden">Existing</span>
+          </span>
+          <span className="seg-count">{campaigns.length}</span>
         </button>
       </div>
 
