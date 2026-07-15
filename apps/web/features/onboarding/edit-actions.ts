@@ -292,11 +292,42 @@ async function applyOnboardingEdit(
   // If the order id changed, re-derive ALL order details from the new order and
   // apply them to every deliverable (email, tracking, products, state/city).
   if (after.order_id && after.order_id !== (before.order_id ?? "")) {
-    const { data: ord } = await supabase
+    let { data: ord } = await supabase
       .from("shopify_orders")
       .select("email, tracking_id, garments_sent, address, fulfillment")
       .eq("order_id", after.order_id)
       .maybeSingle();
+    // Fresh order the 3-hr bulk sync hasn't picked up yet → pull it live
+    // (same on-demand path the onboarding submit uses). Without this the
+    // edit would apply with no order data and the Expected budget would
+    // count ₹0 order value for the collab until the next cron.
+    if (
+      !ord &&
+      process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SERVICE_KEY
+    ) {
+      try {
+        await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sync-shopify-orders?order_id=${encodeURIComponent(after.order_id)}`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
+              apikey: process.env.SUPABASE_SERVICE_KEY,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+        const retry = await supabase
+          .from("shopify_orders")
+          .select("email, tracking_id, garments_sent, address, fulfillment")
+          .eq("order_id", after.order_id)
+          .maybeSingle();
+        ord = retry.data;
+      } catch (err) {
+        console.error("[onboarding-edit] on-demand Shopify pull failed:", err);
+      }
+    }
     if (ord) {
       if (ord.email != null) patch.email = ord.email;
       if (ord.tracking_id != null) patch.tracking_id = ord.tracking_id;
@@ -370,5 +401,10 @@ export async function decideOnboardingEdit(
   revalidatePath("/approvals");  revalidateTag("approvals-count");
   revalidatePath("/onboarding");
   revalidateTag("posts");
+  // Commercial / order-id edits move the Expected budget the moment they're
+  // approved — refresh every surface that shows it.
+  revalidatePath("/budget");
+  revalidatePath("/cost-analytics");
+  revalidatePath("/dashboard");
   return { ok: true };
 }
