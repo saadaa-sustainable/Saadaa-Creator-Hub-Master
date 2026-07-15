@@ -232,6 +232,9 @@ export default function ReachOutOutboundKM() {
         primes downstream avatars / tier badges. Typo submits create stuck rows
         the cron can never enrich.
       </KMCallout>
+          <KMSection tag="Today board">
+        <p>Under the header, the <strong>Today · Outbound</strong> board shows every team member's reach-outs logged today (e.g. Tanvi · 10), sorted highest first with a total. Resets at midnight IST; updates the moment a submit lands.</p>
+      </KMSection>
     </>
   );
 }

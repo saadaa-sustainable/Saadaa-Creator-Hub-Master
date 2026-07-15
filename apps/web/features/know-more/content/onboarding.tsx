@@ -323,6 +323,9 @@ export default function OnboardingKM() {
         re-created from scratch and any per-child posting data on prior children
         is lost.
       </KMCallout>
+          <KMSection tag="Today board">
+        <p>Under the header, the <strong>Today · Onboarded</strong> board counts each member's collabs onboarded today — a multi-deliverable collab counts once. Resets at midnight IST.</p>
+      </KMSection>
     </>
   );
 }

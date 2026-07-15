@@ -252,6 +252,9 @@ export default function PostingKM() {
         any Posted rows that slipped through with NULL post_date, decoding from
         the shortcode automatically.
       </KMCallout>
+          <KMSection tag="Today board">
+        <p>Under the header, the <strong>Today · Posted</strong> board counts each member's deliverables posted today. Resets at midnight IST.</p>
+      </KMSection>
     </>
   );
 }

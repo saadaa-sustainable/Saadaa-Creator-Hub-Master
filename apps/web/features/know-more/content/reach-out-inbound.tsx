@@ -182,6 +182,9 @@ export default function ReachOutInboundKM() {
           </li>
         </KMList>
       </KMSection>
+          <KMSection tag="Today board">
+        <p>Under the header, the <strong>Today · Inbound</strong> board shows every team member's inbound reach-outs logged today, sorted highest first with a total. Resets at midnight IST.</p>
+      </KMSection>
     </>
   );
 }
