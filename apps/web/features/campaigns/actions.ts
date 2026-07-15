@@ -175,12 +175,6 @@ async function applyCampaignEdit(
       timeZone: "Asia/Kolkata",
     });
 
-  const { error: deleteErr } = await supabase
-    .from("campaign_budget")
-    .delete()
-    .eq("campaign_id", campaignId);
-  if (deleteErr) return { ok: false, error: deleteErr.message };
-
   // Replacement lines stay attached to the campaign's V0 version (the "first
   // created budget") — without this an edit would orphan the Budget tab's
   // tier lines. The V0 amount/creators follow the edit too: V0 IS the
@@ -212,10 +206,33 @@ async function applyCampaignEdit(
     version_id: v0Id,
   }));
 
+  // INSERT the replacements FIRST, then delete the old rows by id — a failed
+  // insert must leave the campaign's existing lines untouched (a delete-first
+  // ordering once wiped IFC004's budget when the insert errored mid-edit).
+  const { data: oldRows } = await supabase
+    .from("campaign_budget")
+    .select("id")
+    .eq("campaign_id", campaignId);
+  const oldIds = ((oldRows ?? []) as Array<{ id: number }>).map((r) => r.id);
+
   const { error: insertErr } = await supabase
     .from("campaign_budget")
     .insert(budgetRows);
   if (insertErr) return { ok: false, error: insertErr.message };
+
+  if (oldIds.length > 0) {
+    const { error: deleteErr } = await supabase
+      .from("campaign_budget")
+      .delete()
+      .in("id", oldIds);
+    if (deleteErr) {
+      // New rows are in; old ones lingered — loud log, but the edit stands.
+      console.error(
+        `[campaigns] stale budget rows not removed for ${campaignId}:`,
+        deleteErr.message,
+      );
+    }
+  }
 
   if (v0Id != null) {
     await supabase
