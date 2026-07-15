@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireActor } from "@/lib/auth";
 import { checkMetaGate } from "@/lib/meta-rate-limit";
 import { META_BATCH_SIZE } from "@/lib/meta-graph";
-import { resolveMetaToken } from "@/lib/meta-token";
+import { getMetaTokenExpiry, resolveMetaToken } from "@/lib/meta-token";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +19,11 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const gate = await checkMetaGate();
-  const token = await resolveMetaToken();
+  const [gate, token, expiry] = await Promise.all([
+    checkMetaGate(),
+    resolveMetaToken(),
+    getMetaTokenExpiry(),
+  ]);
   const main = process.env.META_GRAPH_API_TOKEN?.trim() || null;
 
   return NextResponse.json({
@@ -30,5 +33,7 @@ export async function GET() {
     limit: META_BATCH_SIZE,
     usagePct: gate.usagePct,
     tokenMode: token && main && token !== main ? "temporary" : "main",
+    tokenDaysLeft: expiry?.daysLeft ?? null,
+    tokenExpiresAt: expiry?.expiresAt ?? null,
   });
 }

@@ -14,6 +14,9 @@ interface MetaGateState {
   limit: number;
   usagePct: number;
   tokenMode: "main" | "temporary";
+  /** Days until the MAIN Meta token expires (null = never / unknown). */
+  tokenDaysLeft: number | null;
+  tokenExpiresAt: number | null;
 }
 
 /** Fired by the Reach Out forms right after a Fetch completes so the header
@@ -90,8 +93,40 @@ function MetaGatePill() {
     gate.retryAfterSec % 60,
   ).padStart(2, "0")}`;
 
+  const tokenPill = (() => {
+    if (gate.tokenDaysLeft == null) return null;
+    const d = gate.tokenDaysLeft;
+    const expiresText = gate.tokenExpiresAt
+      ? new Date(gate.tokenExpiresAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        })
+      : "";
+    const tone =
+      d <= 3
+        ? { background: "#FDECEA", borderColor: "rgba(192,57,43,0.4)", color: "#C0392B" }
+        : d <= 10
+          ? { background: "#FAF1DC", borderColor: "rgba(181,117,20,0.4)", color: "#B57514" }
+          : {
+              background: "var(--bg-surface, #F5F1EC)",
+              borderColor: "var(--border, #E7E2D2)",
+              color: "#6E695E",
+            };
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10.5px] font-bold tabular-nums"
+        style={tone}
+        title={`The Meta access token expires in ${d} day${d === 1 ? "" : "s"}${expiresText ? ` (${expiresText})` : ""}. It does NOT renew itself — generate a fresh long-lived token before then or Instagram fetching stops.`}
+      >
+        Token {d}d
+      </span>
+    );
+  })();
+
   return (
     <>
+      {tokenPill}
       {gate.tokenMode === "temporary" && (
         <span
           className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10.5px] font-bold"

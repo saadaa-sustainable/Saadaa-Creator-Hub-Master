@@ -66,3 +66,108 @@ export async function resolveMetaToken(): Promise<string | null> {
   cache = { temp, at: now };
   return temp ?? envTemp(now) ?? main;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Token expiry — "how many days until the MAIN token needs renewing?"
+// ─────────────────────────────────────────────────────────────────────────────
+
+const KEY_EXPIRY = "meta_token_expiry";
+/** Re-ask Meta once a day; the answer only moves by the clock in between. */
+const EXPIRY_RECHECK_MS = 24 * 60 * 60 * 1000;
+
+export interface MetaTokenExpiry {
+  /** Epoch ms when the token stops working (null = never / unknown). */
+  expiresAt: number | null;
+  /** Days left (ceil), null when the token never expires or is unknown. */
+  daysLeft: number | null;
+  checkedAt: number;
+}
+
+/**
+ * Days remaining on the MAIN Meta token, via Meta's own `debug_token`
+ * introspection (the token inspects itself). Long-lived user tokens run
+ * ~60 days and do NOT auto-renew — this powers the header countdown so a
+ * fresh token gets staged before fetching dies. Cached in app_settings
+ * (`meta_token_expiry` JSON) and re-checked at most once a day; any failure
+ * serves the last known answer.
+ */
+export async function getMetaTokenExpiry(): Promise<MetaTokenExpiry | null> {
+  const main = process.env.META_GRAPH_API_TOKEN?.trim();
+  if (!main) return null;
+  const now = Date.now();
+  const svc = createServiceClient();
+
+  // Serve the cached answer while it's fresh enough.
+  let cached: MetaTokenExpiry | null = null;
+  try {
+    const { data } = await (svc as any)
+      .from("app_settings")
+      .select("value")
+      .eq("key", KEY_EXPIRY)
+      .maybeSingle();
+    const raw = (data as { value: unknown } | null)?.value;
+    if (typeof raw === "string" && raw) {
+      const o = JSON.parse(raw) as Partial<MetaTokenExpiry>;
+      if (typeof o.checkedAt === "number") {
+        cached = {
+          expiresAt: typeof o.expiresAt === "number" ? o.expiresAt : null,
+          daysLeft: null,
+          checkedAt: o.checkedAt,
+        };
+      }
+    }
+  } catch {
+    // fall through to a live check
+  }
+  const withDays = (e: MetaTokenExpiry): MetaTokenExpiry => ({
+    ...e,
+    daysLeft:
+      e.expiresAt != null
+        ? Math.max(0, Math.ceil((e.expiresAt - now) / 86_400_000))
+        : null,
+  });
+  if (cached && now - cached.checkedAt < EXPIRY_RECHECK_MS) {
+    return withDays(cached);
+  }
+
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/debug_token?input_token=${encodeURIComponent(main)}&access_token=${encodeURIComponent(main)}`,
+      { cache: "no-store", signal: AbortSignal.timeout(6000) },
+    );
+    const json = (await res.json()) as {
+      data?: { expires_at?: number; data_access_expires_at?: number };
+    };
+    if (res.ok && json.data) {
+      // Two clocks: the token's own expiry and the data-access window —
+      // whichever ends first is when fetching stops. 0 = never.
+      const candidates = [
+        json.data.expires_at,
+        json.data.data_access_expires_at,
+      ]
+        .map((v) => (typeof v === "number" && v > 0 ? v * 1000 : null))
+        .filter((v): v is number => v != null);
+      const next: MetaTokenExpiry = {
+        expiresAt: candidates.length ? Math.min(...candidates) : null,
+        daysLeft: null,
+        checkedAt: now,
+      };
+      await (svc as any).from("app_settings").upsert(
+        {
+          key: KEY_EXPIRY,
+          value: JSON.stringify({
+            expiresAt: next.expiresAt,
+            checkedAt: next.checkedAt,
+          }),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "key" },
+      );
+      return withDays(next);
+    }
+  } catch (err) {
+    console.warn("[meta-token] expiry check failed:", err);
+  }
+  // Meta unreachable — last known beats nothing.
+  return cached ? withDays(cached) : null;
+}
