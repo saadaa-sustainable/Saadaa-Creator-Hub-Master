@@ -397,21 +397,22 @@ function PostingListRow({
           <dd>{r.ads_usage_rights || "—"}</dd>
         </div>
         <div>
-          <dt>Delivery</dt>
-          {/* dd default CSS is nowrap+ellipsis — that clipped the pill. */}
-          <dd className="!whitespace-normal !overflow-visible">
-            <span className="block tabular">
-              {formatDate(r.est_delivery) ?? "—"}
-            </span>
+          {/* Pill rides the label row — the value line stays a single clean
+              date and the chip box never overflows. */}
+          <dt className="flex items-center justify-between gap-1">
+            Delivery
             {postingOverdue(r) && (
               <span
-                className="overdue-pill overdue-pill--stack"
+                className="overdue-pill overdue-pill--tiny"
                 title="Estimated delivery date has passed and this deliverable is not posted yet."
               >
-                <AlertTriangle size={8} aria-hidden />
+                <AlertTriangle size={7} aria-hidden />
                 Overdue
               </span>
             )}
+          </dt>
+          <dd className={postingOverdue(r) ? "!text-danger-text" : undefined}>
+            {formatDate(r.est_delivery) ?? "—"}
           </dd>
         </div>
         <div>

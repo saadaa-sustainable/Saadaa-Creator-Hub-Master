@@ -17091,3 +17091,9 @@ input[type="date"]::-webkit-clear-button {
 .overdue-pill--stack {
   margin-top: 0.22rem;
 }
+.overdue-pill--tiny {
+  font-size: 0.46rem;
+  padding: 0.1rem 0.34rem;
+  gap: 0.14rem;
+  letter-spacing: 0.05em;
+}
