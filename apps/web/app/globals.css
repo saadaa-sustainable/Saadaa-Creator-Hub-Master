@@ -14976,6 +14976,13 @@ body:has(.km-backdrop) {
 
 .stage-campaign-row .campaign-list-row__stats {
   gap: 0.42rem;
+  /* Chips keep a readable minimum (label + overdue pill + one-line date);
+     when the row runs out of room the strip scrolls sideways instead of
+     squeezing content out of its boxes. */
+  grid-template-columns: repeat(4, minmax(124px, 1fr));
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
 }
 
 .stage-campaign-row .campaign-list-row__stats > div {
@@ -17096,4 +17103,5 @@ input[type="date"]::-webkit-clear-button {
   padding: 0.1rem 0.34rem;
   gap: 0.14rem;
   letter-spacing: 0.05em;
+  flex-shrink: 0;
 }
