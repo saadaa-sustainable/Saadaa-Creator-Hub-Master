@@ -111,9 +111,10 @@ export function FunnelBody({
         }}
         refreshing={refreshing}
       />
-      {rowsOpen && team && (
+      {rowsOpen && (
         <TeamRowsDrawer
           team={team}
+          teams={data.teams}
           source={source}
           onClose={() => setRowsOpen(false)}
         />
@@ -192,13 +193,10 @@ function FilterRow({
           <button
             type="button"
             onClick={onViewRows}
-            disabled={!team}
-            title={team ? `View ${team}'s row-level data` : "Select a team member first"}
+            title={team ? `View ${team}'s row-level data` : "View all row-level data"}
             className={cn(
               "inline-flex h-[2.85rem] w-full items-center justify-center gap-1.5 rounded-[0.65rem] border px-3 text-[0.82rem] font-extrabold transition-all sm:w-auto",
-              team
-                ? "border-[#2C2420] bg-[#2C2420] text-[#F0C61E] hover:shadow-md active:scale-[0.98]"
-                : "border-border bg-bg-surface text-text-tertiary cursor-not-allowed opacity-70",
+              "border-[#2C2420] bg-[#2C2420] text-[#F0C61E] hover:shadow-md active:scale-[0.98]",
             )}
           >
             <Rows3 size={14} aria-hidden /> View rows

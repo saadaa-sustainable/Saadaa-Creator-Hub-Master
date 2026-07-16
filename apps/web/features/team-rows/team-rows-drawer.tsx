@@ -10,6 +10,7 @@ import { createPortal } from "react-dom";
 import {
   Instagram,
   Search,
+  Users,
   X,
   ExternalLink,
   Loader2,
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { extractShortcode, postDateFromUrl } from "@/lib/instagram-shortcode";
 import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { fetchTeamRows, type TeamRow } from "./actions";
@@ -628,13 +630,18 @@ function RowDetailModal({
 // ── Drawer ──────────────────────────────────────────────────────────────────
 export function TeamRowsDrawer({
   team,
+  teams = [],
   onClose,
   source = "historic",
 }: {
+  /** Initial team-member filter — "" opens on All team. */
   team: string;
+  /** Member options for the in-drawer Team filter. */
+  teams?: string[];
   onClose: () => void;
   source?: "historic" | "live";
 }) {
+  const [member, setMember] = useState(team);
   const [rows, setRows] = useState<TeamRow[] | null>(null);
   const [q, setQ] = useState("");
   const [stage, setStage] = useState<FilterKey>("all");
@@ -643,25 +650,26 @@ export function TeamRowsDrawer({
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => setMember(team), [team]);
   useEffect(() => {
     let alive = true;
     setRows(null);
-    fetchTeamRows(team, source).then((r) => alive && setRows(r));
+    fetchTeamRows(member, source).then((r) => alive && setRows(r));
     return () => {
       alive = false;
     };
-  }, [team, source]);
+  }, [member, source]);
   // Backlog fill saved inside the detail modal → refetch so the drawer + stage
   // counts reflect the new data without reopening.
   const reload = () => {
-    fetchTeamRows(team, source).then((r) => setRows(r));
+    fetchTeamRows(member, source).then((r) => setRows(r));
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !selected && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose, selected]);
-  useEffect(() => setVisible(PAGE), [q, stage]);
+  useEffect(() => setVisible(PAGE), [q, stage, member]);
 
   // Compute data-quality flags: junk post_link (counts as posted but isn't a
   // real URL) + cross-creator duplicate reels (same shortcode on another
@@ -728,7 +736,7 @@ export function TeamRowsDrawer({
       className="modal-backdrop modal-backdrop--onboarding"
       role="dialog"
       aria-modal="true"
-      aria-label={`${team} — rows`}
+      aria-label={`${member || "All team"} — rows`}
       onClick={onClose}
     >
       <div
@@ -739,10 +747,14 @@ export function TeamRowsDrawer({
         <header className="modal-head campaign-detail-head ad-detail-head team-rows-modal__head">
           <div className="min-w-0">
             <div className="campaign-card__id-row">
-              <span className="campaign-card__id">Historic Rows</span>
-              <span className="campaign-card__status">Team Member</span>
+              <span className="campaign-card__id">
+                {source === "live" ? "Live Rows" : "Historic Rows"}
+              </span>
+              <span className="campaign-card__status">
+                {member ? "Team Member" : "All Team"}
+              </span>
             </div>
-            <h2>{team}</h2>
+            <h2>{member || "All team"}</h2>
             <p className="campaign-detail-subtitle">
               {rows == null
                 ? "Loading rows"
@@ -763,22 +775,46 @@ export function TeamRowsDrawer({
 
         <div className="modal-body campaign-detail-body ad-detail-body team-rows-modal__body">
           <section className="campaign-detail-section team-rows-modal__filters">
-            <div className="relative">
-              <Search
-                size={13}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
-                aria-hidden
-              />
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search creator, POST ID, campaign, order..."
-                className={cn(
-                  "h-9 w-full rounded-full border border-border",
-                  "bg-bg-white pl-8 pr-3 text-[0.75rem]",
-                  "focus:border-[#DCD6C4] focus:outline-none",
-                )}
-              />
+            <div
+              className={cn(
+                "grid gap-2",
+                teams.length > 0 && "sm:grid-cols-[1fr_200px]",
+              )}
+            >
+              <div className="relative">
+                <Search
+                  size={13}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary"
+                  aria-hidden
+                />
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search creator, POST ID, campaign, order..."
+                  className={cn(
+                    "h-9 w-full rounded-full border border-border",
+                    "bg-bg-white pl-8 pr-3 text-[0.75rem]",
+                    "focus:border-[#DCD6C4] focus:outline-none",
+                  )}
+                />
+              </div>
+              {teams.length > 0 && (
+                <div className="min-w-0">
+                  <span className="sr-only">
+                    <Users size={10} aria-hidden /> Team
+                  </span>
+                  <SearchableSelect
+                    value={member}
+                    onChange={setMember}
+                    options={[
+                      { value: "", label: "All team" },
+                      ...teams.map((t) => ({ value: t, label: t })),
+                    ]}
+                    placeholder="All team"
+                    searchPlaceholder="Search team…"
+                  />
+                </div>
+              )}
             </div>
             <div className="team-rows-modal__chips">
               {STAGE_FILTERS.map((f) => (

@@ -88,7 +88,9 @@ const LIVE_COLS = [
 
 /**
  * Fetch every row owned by `team` (matches the dashboards' team keying:
- * `logged_by ?? onboarded_by`), newest first. `source`:
+ * `logged_by ?? onboarded_by`), newest first — or EVERY row when `team` is
+ * empty (the drawer opens on "All team" by default and filters in-modal).
+ * `source`:
  *   - "historic" → the denormalised `historic_posts` archive (Historic Analytics).
  *   - "live"     → the live `posts` pipeline (main Dashboard) + a `creators` join
  *                  for the fields `posts` doesn't denormalise.
@@ -100,23 +102,35 @@ export async function fetchTeamRows(
 ): Promise<TeamRow[]> {
   await assertPermission("performance_view");
   const t = (team ?? "").trim();
-  if (!t) return [];
   const supabase = createServiceClient();
   // logged_by = team, OR (logged_by null AND onboarded_by = team) — mirrors the
   // `logged_by ?? onboarded_by` bucket rule so the drawer set matches the KPIs.
-  const orFilter = `logged_by.eq.${t},and(logged_by.is.null,onboarded_by.eq.${t})`;
-  const { data, error } = await (supabase as any)
-    .from(source === "historic" ? "historic_posts" : "posts")
-    .select(source === "historic" ? HISTORIC_COLS : LIVE_COLS)
-    .or(orFilter)
-    .order("post_date", { ascending: false, nullsFirst: false })
-    .order("reach_out_date", { ascending: false, nullsFirst: false })
-    .limit(8000);
-  if (error) {
-    console.error("[team-rows] fetch failed:", error.message);
-    return [];
+  // Empty team → no owner filter (all rows). Paged in 1000-row chunks so the
+  // all-team set (~11k historic rows) beats PostgREST's max-rows response cap.
+  const orFilter = t
+    ? `logged_by.eq.${t},and(logged_by.is.null,onboarded_by.eq.${t})`
+    : null;
+  const rows: TeamRow[] = [];
+  const CHUNK = 1000;
+  const MAX_ROWS = 20_000;
+  for (let from = 0; from < MAX_ROWS; from += CHUNK) {
+    let query = (supabase as any)
+      .from(source === "historic" ? "historic_posts" : "posts")
+      .select(source === "historic" ? HISTORIC_COLS : LIVE_COLS);
+    if (orFilter) query = query.or(orFilter);
+    const { data, error } = await query
+      .order("post_date", { ascending: false, nullsFirst: false })
+      .order("reach_out_date", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: false })
+      .range(from, from + CHUNK - 1);
+    if (error) {
+      console.error("[team-rows] fetch failed:", error.message);
+      return rows;
+    }
+    const chunk = (data ?? []) as TeamRow[];
+    rows.push(...chunk);
+    if (chunk.length < CHUNK) break;
   }
-  const rows = (data ?? []) as TeamRow[];
 
   // Join creators by inf_id: the fresher profile_pic (both sources) and, for the
   // live source, the denormalised creator fields `posts` lacks.

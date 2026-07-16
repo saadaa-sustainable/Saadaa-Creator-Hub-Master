@@ -159,9 +159,10 @@ export function InternalDashboardBody({
         }}
         refreshing={refreshing}
       />
-      {rowsOpen && team && (
+      {rowsOpen && (
         <TeamRowsDrawer
           team={team}
+          teams={data.teams}
           source={source}
           onClose={() => setRowsOpen(false)}
         />
@@ -310,17 +311,14 @@ function FilterRow({
           <button
             type="button"
             onClick={onViewRows}
-            disabled={!team}
             title={
               team
                 ? `View ${team}'s row-level data`
-                : "Select a team member first"
+                : "View all row-level data"
             }
             className={cn(
               "inline-flex items-center justify-center gap-1.5 px-3.5 h-9 rounded-full text-[0.72rem] font-extrabold border transition-all",
-              team
-                ? "bg-[#2C2420] text-[#F0C61E] border-[#2C2420] hover:scale-[1.03] hover:shadow-md active:scale-[0.97]"
-                : "bg-bg-surface text-text-tertiary border-border cursor-not-allowed opacity-70",
+              "bg-[#2C2420] text-[#F0C61E] border-[#2C2420] hover:scale-[1.03] hover:shadow-md active:scale-[0.97]",
             )}
           >
             <Rows3 size={12} aria-hidden /> View rows
