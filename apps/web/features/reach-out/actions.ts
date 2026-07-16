@@ -17,6 +17,7 @@ import {
   type MetaDiscoveryResult,
 } from "@/lib/meta-graph";
 import { checkMetaGate, recordMetaUsage } from "@/lib/meta-rate-limit";
+import { rehostAvatar } from "@/lib/avatar-rehost";
 import { logSystemError } from "@/lib/system-errors";
 import { checkReachoutAllowed } from "./guards";
 import {
@@ -702,6 +703,21 @@ function persistFetches(
   if (rows.length === 0) return;
   after(async () => {
     try {
+      // Meta returns SIGNED fbcdn URLs that die within days — re-host each
+      // avatar into the public `avatars` bucket and persist the durable URL
+      // (instagram_cache + the creator row). Best-effort per hit; a failed
+      // re-host keeps the raw URL, never blocks the cache write.
+      await Promise.all(
+        rows.map(async (row) => {
+          const hosted = await rehostAvatar(row.username, row.profile_pic);
+          if (!hosted) return;
+          row.profile_pic = hosted;
+          await (supabase as any)
+            .from("creators")
+            .update({ profile_pic: hosted })
+            .eq("username", row.username);
+        }),
+      );
       await (supabase as any)
         .from("instagram_cache")
         .upsert(rows, { onConflict: "username" });
