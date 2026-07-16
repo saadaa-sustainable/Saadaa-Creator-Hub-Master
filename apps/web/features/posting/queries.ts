@@ -232,7 +232,7 @@ export const fetchPostingFilterOptions = unstable_cache(
       supabase.from("creators").select("category").limit(2000),
       (supabase as any)
         .from("posts")
-        .select("onboarded_by, content_type, workflow_status")
+        .select("onboarded_by, posted_by, content_type, workflow_status")
         .in("workflow_status", ["On Board", "Order Sent", "Posted"])
         .limit(20000),
     ]);
@@ -242,12 +242,16 @@ export const fetchPostingFilterOptions = unstable_cache(
       if (c.category) tiers.add(c.category);
     });
 
-    // Team members who onboarded + content types among the posting candidates.
+    // Team members who onboarded OR posted + content types among the posting
+    // candidates — a member who only submitted posts (e.g. filled someone
+    // else's collab) must still appear in the picker.
     const teamMembers = new Set<string>();
     const contentTypes = new Set<string>();
     ((posts.data ?? []) as any[]).forEach((p) => {
       const ob = (p.onboarded_by ?? "").trim();
       if (ob) teamMembers.add(ob);
+      const pb = (p.posted_by ?? "").trim();
+      if (pb) teamMembers.add(pb);
       const ct = (p.content_type ?? "").trim();
       if (ct) contentTypes.add(ct);
     });
@@ -286,18 +290,24 @@ export async function fetchPostingKpis(
 
   const PIPELINE_SET = ["On Board", "Order Sent", "Posted"];
 
-  // When an "Onboarded by" team member is selected, scope every KPI to that
-  // member's onboarded collabs. Otherwise the KPIs reflect the whole pipeline.
+  // When a team member is selected, KPIs scope per STAGE (same attribution
+  // rule as the rows list): Posts Due = deliverables THEY onboarded still in
+  // the queue; Submitted = posts THEY submitted (posted_by, falling back to
+  // the onboarder on rows from before posted_by existed). Otherwise the KPIs
+  // reflect the whole pipeline.
   const member = (filters.onboardedBy ?? "").trim();
 
   // One row = one post_id (deliverable). Fetch every pipeline deliverable and
-  // count rows by submission state — Posted vs not-yet-Posted.
+  // count rows by submission state — Posted vs not-yet-Posted. Member scoping
+  // happens per-row below (Due vs Submitted key on different columns).
   let q = (supabase as any)
     .from("posts")
-    .select("workflow_status, post_date, est_delivery")
+    .select("workflow_status, post_date, est_delivery, onboarded_by, posted_by")
     .in("workflow_status", PIPELINE_SET)
     .limit(20000);
-  if (member) q = q.eq("onboarded_by", member);
+  if (member) {
+    q = q.or(`onboarded_by.eq.${member},posted_by.eq.${member}`);
+  }
   const { data, error } = await q;
 
   if (error) throw error;
@@ -310,7 +320,10 @@ export async function fetchPostingKpis(
 
   for (const r of rows) {
     const status = String(r.workflow_status ?? "").trim();
+    const onboardedBy = String(r.onboarded_by ?? "").trim();
+    const postedBy = String(r.posted_by ?? "").trim() || onboardedBy;
     if (status === "Posted") {
+      if (member && postedBy !== member) continue;
       totalPostsSubmitted++;
       const postDate = r.post_date ? new Date(String(r.post_date)) : null;
       const estDelivery = r.est_delivery
@@ -326,6 +339,7 @@ export async function fetchPostingKpis(
         delayedPosts++;
       }
     } else {
+      if (member && onboardedBy !== member) continue;
       totalPostsDue++;
     }
   }
