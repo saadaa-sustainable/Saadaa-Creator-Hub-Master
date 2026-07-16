@@ -23,7 +23,7 @@ import { cn } from "@/lib/cn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { extractShortcode, postDateFromUrl } from "@/lib/instagram-shortcode";
 import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
-import { fetchTeamRows, type TeamRow } from "./actions";
+import { fetchTeamRowsPage, type TeamRow } from "./actions";
 import { historicBacklogPosting } from "./backlog-actions";
 import { OrderCreationModal } from "@/features/onboarding/order-form";
 
@@ -715,6 +715,7 @@ export function TeamRowsDrawer({
 }) {
   const [member, setMember] = useState(team);
   const [rows, setRows] = useState<TeamRow[] | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
   const [q, setQ] = useState("");
   const [stage, setStage] = useState<FilterKey>("all");
   const [visible, setVisible] = useState(PAGE);
@@ -723,10 +724,30 @@ export function TeamRowsDrawer({
 
   useEffect(() => setMounted(true), []);
   useEffect(() => setMember(team), [team]);
+  // Two-phase load: paint the first 1000 rows immediately, then append the
+  // rest (fetched with parallel chunks server-side) in the background — the
+  // all-team historic set is ~11k rows and one monolithic fetch kept the
+  // drawer on a spinner for many seconds.
   useEffect(() => {
     let alive = true;
     setRows(null);
-    fetchTeamRows(member, source).then((r) => alive && setRows(r));
+    setTotal(null);
+    (async () => {
+      const first = await fetchTeamRowsPage(member, source, 0, 1000);
+      if (!alive) return;
+      setRows(first.rows);
+      setTotal(first.total);
+      if (first.total > first.rows.length) {
+        const rest = await fetchTeamRowsPage(
+          member,
+          source,
+          first.rows.length,
+          first.total - first.rows.length,
+        );
+        if (!alive) return;
+        setRows((cur) => [...(cur ?? []), ...rest.rows]);
+      }
+    })();
     return () => {
       alive = false;
     };
@@ -734,7 +755,10 @@ export function TeamRowsDrawer({
   // Backlog fill saved inside the detail modal → refetch so the drawer + stage
   // counts reflect the new data without reopening.
   const reload = () => {
-    fetchTeamRows(member, source).then((r) => setRows(r));
+    fetchTeamRowsPage(member, source, 0, 20_000).then((r) => {
+      setRows(r.rows);
+      setTotal(r.total);
+    });
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !selected && onClose();
@@ -830,7 +854,9 @@ export function TeamRowsDrawer({
             <p className="campaign-detail-subtitle">
               {rows == null
                 ? "Loading rows"
-                : `${filtered.length.toLocaleString("en-IN")} rows`}
+                : total != null && rows.length < total
+                  ? `${filtered.length.toLocaleString("en-IN")} rows — loading ${(total - rows.length).toLocaleString("en-IN")} more…`
+                  : `${filtered.length.toLocaleString("en-IN")} rows`}
             </p>
           </div>
           <div className="modal-head__actions">

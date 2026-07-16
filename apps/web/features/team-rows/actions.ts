@@ -96,53 +96,93 @@ const LIVE_COLS = [
  *                  for the fields `posts` doesn't denormalise.
  * Capped high — the drawer paginates rendering client-side.
  */
-export async function fetchTeamRows(
+export interface TeamRowsPage {
+  rows: TeamRow[];
+  /** Exact matching-row count (from the first page's count query). */
+  total: number;
+}
+
+/**
+ * One page of team rows. All the 1000-row PostgREST chunks inside the page are
+ * fetched IN PARALLEL (a count query first sizes the fan-out), and the creators
+ * join runs its 500-id chunks in parallel too — the all-team historic set
+ * (~11k rows) is ~2 sequential DB phases instead of ~23 serial round trips.
+ * The drawer paints page one (1000 rows) immediately and appends the rest from
+ * a second call in the background.
+ */
+export async function fetchTeamRowsPage(
   team: string,
   source: "historic" | "live" = "historic",
-): Promise<TeamRow[]> {
+  offset = 0,
+  limit = 1000,
+): Promise<TeamRowsPage> {
   await assertPermission("performance_view");
   const t = (team ?? "").trim();
   const supabase = createServiceClient();
+  const table = source === "historic" ? "historic_posts" : "posts";
+  const cols = source === "historic" ? HISTORIC_COLS : LIVE_COLS;
   // logged_by = team, OR (logged_by null AND onboarded_by = team) — mirrors the
   // `logged_by ?? onboarded_by` bucket rule so the drawer set matches the KPIs.
-  // Empty team → no owner filter (all rows). Paged in 1000-row chunks so the
-  // all-team set (~11k historic rows) beats PostgREST's max-rows response cap.
+  // Empty team → no owner filter (all rows).
   const orFilter = t
     ? `logged_by.eq.${t},and(logged_by.is.null,onboarded_by.eq.${t})`
     : null;
-  const rows: TeamRow[] = [];
+
+  // Exact count sizes the parallel fan-out (and gives the drawer its total).
+  let countQuery = (supabase as any)
+    .from(table)
+    .select("id", { count: "exact", head: true });
+  if (orFilter) countQuery = countQuery.or(orFilter);
+  const { count, error: countErr } = await countQuery;
+  if (countErr) {
+    console.error("[team-rows] count failed:", countErr.message);
+    return { rows: [], total: 0 };
+  }
+  const total = count ?? 0;
+  const end = Math.min(offset + limit, total, 20_000);
+  if (offset >= end) return { rows: [], total };
+
+  // All 1000-row chunks of this page in parallel. Stable order: the shared
+  // sort has an id tie-break so parallel ranges never overlap or shuffle.
   const CHUNK = 1000;
-  const MAX_ROWS = 20_000;
-  for (let from = 0; from < MAX_ROWS; from += CHUNK) {
-    let query = (supabase as any)
-      .from(source === "historic" ? "historic_posts" : "posts")
-      .select(source === "historic" ? HISTORIC_COLS : LIVE_COLS);
-    if (orFilter) query = query.or(orFilter);
-    const { data, error } = await query
-      .order("post_date", { ascending: false, nullsFirst: false })
-      .order("reach_out_date", { ascending: false, nullsFirst: false })
-      .order("id", { ascending: false })
-      .range(from, from + CHUNK - 1);
-    if (error) {
-      console.error("[team-rows] fetch failed:", error.message);
-      return rows;
+  const starts: number[] = [];
+  for (let from = offset; from < end; from += CHUNK) starts.push(from);
+  const chunkResults = await Promise.all(
+    starts.map((from) => {
+      let query = (supabase as any).from(table).select(cols);
+      if (orFilter) query = query.or(orFilter);
+      return query
+        .order("post_date", { ascending: false, nullsFirst: false })
+        .order("reach_out_date", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: false })
+        .range(from, Math.min(from + CHUNK, end) - 1);
+    }),
+  );
+  const rows: TeamRow[] = [];
+  for (const res of chunkResults) {
+    if (res.error) {
+      console.error("[team-rows] fetch failed:", res.error.message);
+      continue;
     }
-    const chunk = (data ?? []) as TeamRow[];
-    rows.push(...chunk);
-    if (chunk.length < CHUNK) break;
+    rows.push(...((res.data ?? []) as TeamRow[]));
   }
 
   // Join creators by inf_id: the fresher profile_pic (both sources) and, for the
-  // live source, the denormalised creator fields `posts` lacks.
+  // live source, the denormalised creator fields `posts` lacks. Chunks parallel.
   const infIds = [...new Set(rows.map((r) => r.inf_id).filter(Boolean))] as string[];
+  const idChunks: string[][] = [];
+  for (let i = 0; i < infIds.length; i += 500) idChunks.push(infIds.slice(i, i + 500));
+  const creatorResults = await Promise.all(
+    idChunks.map((chunk) =>
+      (supabase as any)
+        .from("creators")
+        .select("inf_id,profile_pic,category,gender,followers,avg_likes,er")
+        .in("inf_id", chunk),
+    ),
+  );
   const byId = new Map<string, Record<string, unknown>>();
-  for (let i = 0; i < infIds.length; i += 500) {
-    const chunk = infIds.slice(i, i + 500);
-    const { data: creators } = await (supabase as any)
-      .from("creators")
-      .select("inf_id,profile_pic,category,gender,followers,avg_likes,er")
-      .in("inf_id", chunk);
-    for (const c of (creators ?? []) as Array<Record<string, unknown>>) {
+  for (const res of creatorResults) {
+    for (const c of ((res.data ?? []) as Array<Record<string, unknown>>)) {
       byId.set(c.inf_id as string, c);
     }
   }
@@ -159,5 +199,5 @@ export async function fetchTeamRows(
       r.engaged_rate = (c?.er as number) ?? null;
     }
   }
-  return rows;
+  return { rows, total };
 }
