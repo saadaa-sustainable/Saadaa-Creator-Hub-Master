@@ -14978,8 +14978,12 @@ body:has(.km-backdrop) {
   gap: 0.42rem;
   /* Chips keep a readable minimum (label + overdue pill + one-line date);
      when the row runs out of room the strip scrolls sideways instead of
-     squeezing content out of its boxes. */
+     squeezing content out of its boxes. min-width/max-width pin the strip
+     inside its grid track — without them the track clips it and the
+     scrollbar never appears (min-width:0 ladder). */
   grid-template-columns: repeat(4, minmax(124px, 1fr));
+  min-width: 0;
+  max-width: 100%;
   overflow-x: auto;
   scrollbar-width: thin;
   padding-bottom: 2px;
