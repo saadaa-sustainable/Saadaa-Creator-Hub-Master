@@ -445,10 +445,10 @@ function OnboardingListRow({
             </span>
             {overdue && (
               <span
-                className="ob-card-overdue"
+                className="overdue-pill overdue-pill--stack"
                 title="Estimated delivery date has passed and this post is not marked Posted yet."
               >
-                <AlertTriangle size={7} aria-hidden />
+                <AlertTriangle size={8} aria-hidden />
                 Overdue
               </span>
             )}
@@ -925,10 +925,10 @@ function OnboardingOverviewModal({
                   {formatDate(row.est_delivery) ?? "—"}
                   {isOverdue(row) && (
                     <span
-                      className="ob-card-overdue"
+                      className="overdue-pill overdue-pill--inline"
                       title="Estimated delivery date has passed and this post is not marked Posted yet."
                     >
-                      <AlertTriangle size={7} aria-hidden />
+                      <AlertTriangle size={8} aria-hidden />
                       Overdue
                     </span>
                   )}

@@ -17064,3 +17064,30 @@ input[type="date"]::-webkit-clear-button {
     right: 1rem;
   }
 }
+
+/* ── Overdue pill — shared red marker (list rows, overviews, drawers).
+   Compact fit-content pill; never stretches to its container. ─────────── */
+.overdue-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.24rem;
+  width: fit-content;
+  vertical-align: middle;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  background: #fdecea;
+  border: 1px solid rgba(192, 57, 43, 0.32);
+  color: #c0392b;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+.overdue-pill--inline {
+  margin-left: 0.4rem;
+}
+.overdue-pill--stack {
+  margin-top: 0.22rem;
+}

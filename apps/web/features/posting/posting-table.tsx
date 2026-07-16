@@ -405,10 +405,10 @@ function PostingListRow({
             </span>
             {postingOverdue(r) && (
               <span
-                className="ob-card-overdue"
+                className="overdue-pill overdue-pill--stack"
                 title="Estimated delivery date has passed and this deliverable is not posted yet."
               >
-                <AlertTriangle size={7} aria-hidden />
+                <AlertTriangle size={8} aria-hidden />
                 Overdue
               </span>
             )}

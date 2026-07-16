@@ -172,10 +172,10 @@ export function PostingOverviewModal({
                       .includes("delivered") &&
                     isPastDue(row.est_delivery, row.reach_out_date) && (
                       <span
-                        className="ob-card-overdue"
+                        className="overdue-pill overdue-pill--inline"
                         title="Estimated delivery date has passed and this deliverable is not posted yet."
                       >
-                        <AlertTriangle size={7} aria-hidden />
+                        <AlertTriangle size={8} aria-hidden />
                         Overdue
                       </span>
                     )}
