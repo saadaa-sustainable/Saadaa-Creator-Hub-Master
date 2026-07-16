@@ -9,7 +9,10 @@ import { isValidUrl } from "@/lib/validators";
  * - postDate: optional input. Server decodes from postLink shortcode when
  *   blank (instant, no API — see lib/instagram-shortcode.ts). Fallback to today.
  * - postLink: required URL.
- * - downloadLink: MANDATORY for every post (drive link to the content asset).
+ * - downloadLink: no longer a form field (2026-07-16) — the Drive automation
+ *   uploads the reel to Saadaa All Collabs/{collab}/{post}.mp4 on submit and
+ *   auto-fills posts.download_link. Kept optional here so resubmits carry an
+ *   existing manual link through unchanged.
  * - rawDump: optional raw-footage drive link.
  *
  * Partnership Key is no longer a form field (2026-07-02): the partnership-ad
@@ -28,8 +31,9 @@ export const PostingSchema = z.object({
   downloadLink: z
     .string()
     .trim()
-    .min(1, "Drive Download Link required")
-    .refine((v) => isValidUrl(v), "Download link must be a valid URL"),
+    .optional()
+    .default("")
+    .refine((v) => !v || isValidUrl(v), "Download link must be a valid URL"),
   rawDump: z
     .string()
     .trim()

@@ -9,9 +9,7 @@ import {
   Send,
   Loader2,
   Link as LinkIcon,
-  Download,
   X,
-  AlertCircle,
   AlertTriangle,
   CalendarCheck,
   ShieldCheck,
@@ -27,7 +25,6 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { MissingFieldsAlert } from "@/components/ui/missing-fields-alert";
-import { InfoTooltip } from "@/components/ui/info-tooltip";
 import {
   extractShortcode,
   postDateFromUrl,
@@ -95,7 +92,6 @@ export function PostingModal({
   const [partnershipState, setPartnershipState] = useState<string | null>(null);
   const [flowActive, setFlowActive] = useState(false);
 
-  const requiresDownload = adsUsageRights === "Yes";
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const {
@@ -130,7 +126,6 @@ export function PostingModal({
     postId: "Post ID",
     postDate: "Post Date",
     postLink: "Post Link",
-    downloadLink: "Download Link",
     rawDump: "Raw Dump",
     adsUsageRights: "Ads Usage Rights",
   };
@@ -564,62 +559,11 @@ export function PostingModal({
                     {postUrlWarning}
                   </div>
                 )}
-                {requiresDownload && (
-                  <div className="alert alert-warning pt-grid-full pt-alert-tight">
-                    <AlertCircle size={13} />
-                    Ads Rights = <strong>Yes</strong>. Drive link required.
-                  </div>
-                )}
-
-                <div className="form-floating relative">
-                  <input
-                    type="url"
-                    className="form-control"
-                    id="pt_downloadLink"
-                    placeholder=" "
-                    {...register("downloadLink")}
-                  />
-                  <label htmlFor="pt_downloadLink">
-                    <Download size={11} className="inline mr-1" />
-                    Drive Link <span className="req">*</span>
-                  </label>
-                  <InfoTooltip
-                    title="Drive link checklist"
-                    label="How to fill the Drive Link"
-                    side="top"
-                    align="end"
-                    className="drive-info-icon"
-                    contentClassName="drive-help-popover"
-                    content={
-                      <>
-                        <ol className="drive-popover__list">
-                          <li>
-                            Download the post video / Reel from Instagram.
-                          </li>
-                          <li>
-                            Upload it to the brand <strong>Google Drive</strong>{" "}
-                            folder.
-                          </li>
-                          <li>
-                            Set sharing to <em>Anyone with the link</em>.
-                          </li>
-                          <li>Paste the shareable Drive link here.</li>
-                        </ol>
-                        <div className="drive-popover__warn">
-                          <AlertTriangle size={11} aria-hidden />
-                          <strong>Mandatory</strong> for every post.
-                        </div>
-                      </>
-                    }
-                  />
-                  {errors.downloadLink && (
-                    <small className="field-error">
-                      {errors.downloadLink.message}
-                    </small>
-                  )}
-                </div>
-
-                <div className="form-floating">
+                {/* Drive Link input removed (2026-07-16): the reel auto-files
+                into Saadaa All Collabs/{collab}/{post}.mp4 on submit and
+                posts.download_link auto-fills with that Drive link. Resubmits
+                keep any existing manual link (defaultValues carry it). */}
+                <div className="form-floating pt-grid-full">
                   <input
                     type="url"
                     className="form-control"

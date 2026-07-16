@@ -85,16 +85,17 @@ export default function PostingKM() {
             <KMCode>/p/</KMCode> shortcode with no username to verify against.
           </li>
           <li>
-            <strong>Field rows</strong> — Post Link, Post Date,{" "}
-            <strong>Download Link (mandatory, red *)</strong>, Raw Footage Dump
-            (with a portalled, collision-safe Drive info popover explaining
-            folder structure). It stays inside the viewport and no longer
-            overlaps the modal header or fields. The Drive Download Link is now
-            required on <strong>every</strong> post (not just ad posts) — the
-            content asset must always be captured. There is no Partnership Key
-            input anymore — the partnership request is sent automatically after
-            submit (see Partnership popup below), and the creator&apos;s live
-            status shows as a pill in the modal header.
+            <strong>Field rows</strong> — Post Link, Post Date, Raw Footage
+            Dump. There is <strong>no Drive Link input anymore</strong> — on
+            submit the reel&apos;s video is captured automatically and filed
+            into Google Drive under{" "}
+            <KMCode>Saadaa All Collabs/&#123;Collab ID&#125;</KMCode> named by
+            Post ID, and the row&apos;s Download Link fills itself with that
+            Drive link (an existing manually-saved link is never overwritten).
+            There is no Partnership Key input anymore — the partnership request
+            is sent automatically after submit (see Partnership popup below),
+            and the creator&apos;s live status shows as a pill in the modal
+            header.
           </li>
         </KMList>
       </KMSection>
@@ -240,9 +241,9 @@ export default function PostingKM() {
           </li>
           <li>
             Red <KMCode>MissingFieldsAlert</KMCode> sits above the submit button
-            — lists every required field still empty (Post Date, Post Link,
-            Download Link). Uses Zod <KMCode>safeParse(watch())</KMCode> so all
-            blockers surface in a single pass.
+            — lists every required field still empty (Post Date, Post Link).
+            Uses Zod <KMCode>safeParse(watch())</KMCode> so all blockers
+            surface in a single pass.
           </li>
         </KMList>
       </KMSection>
