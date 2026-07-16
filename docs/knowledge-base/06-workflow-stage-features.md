@@ -163,6 +163,8 @@ Count COLLABS (grouped by `collab_id`): totalOnboarded, pendingOnboardings (Reac
 
 Records the live post (link, date, download/raw links), flips `workflow_status='Posted'`, attempts the eligibility-gated draft payment init, then hands over to the **blocking partnership popup** (auto-invite). Route `/posting`, gate `posting_submit`. **Counts are PER POST_ID** (one deliverable per row — no collab grouping).
 
+**Per-stage member attribution (2026-07-16, `9e0985d`):** with a member selected, the rows list AND KPIs split by stage — work queue / Posts Due key on `onboarded_by`, Submitted view / Submitted + Delayed KPIs key on `posted_by` (fallback `onboarded_by` for pre-stamp rows). The member dropdown unions `posted_by` so someone who only submitted posts still appears. Onboarding page equivalent: queue = `logged_by`, Submitted = `onboarded_by`.
+
 ### Server action
 
 | Action                                                     | Gate               | Notes                                                                                                                                                      |
