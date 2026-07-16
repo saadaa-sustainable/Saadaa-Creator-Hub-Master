@@ -10,6 +10,7 @@ import {
   Send,
   SlashSquare,
 } from "lucide-react";
+import { isPastDue } from "@/lib/workflow";
 import { Avatar, DeactivatedBadge, WorkflowStatusPill } from "@/components/ui";
 import { formatDate, formatFollowers, formatRupees } from "@/lib/formatters";
 import { shopifyOrderAdminUrl } from "@/lib/shopify";
@@ -255,11 +256,11 @@ export function collabDeliverableBreakdown(
 }
 
 export function isOverdue(r: OnboardingRow): boolean {
-  if (!r.est_delivery) return false;
-  if (r.workflow_status === "Posted") return false;
-  const d = new Date(r.est_delivery);
-  if (Number.isNaN(d.getTime())) return false;
-  return d.getTime() < Date.now();
+  const status = String(r.workflow_status ?? "").toLowerCase();
+  if (status.includes("posted") || status.includes("delivered")) return false;
+  // Shared rule (lib/workflow): overdue from the day AFTER est_delivery;
+  // no est date → >15 days since reach-out fallback. Same as the KPI tiles.
+  return isPastDue(r.est_delivery, r.reach_out_date);
 }
 
 export function isOnboarded(r: OnboardingRow): boolean {

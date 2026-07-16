@@ -438,9 +438,17 @@ function OnboardingListRow({
         </div>
         <div>
           <dt>Delivery</dt>
-          <dd>
+          <dd className="whitespace-nowrap">
             {formatDate(r.est_delivery) ?? "—"}
-            {overdue ? " · overdue" : ""}
+            {overdue && (
+              <span
+                className="ob-card-overdue"
+                title="Estimated delivery date has passed and this post is not marked Posted yet."
+              >
+                <AlertTriangle size={7} aria-hidden />
+                Overdue
+              </span>
+            )}
           </dd>
         </div>
       </dl>

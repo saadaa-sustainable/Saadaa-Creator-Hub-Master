@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
   Clock3,
@@ -23,6 +24,7 @@ import {
 } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import { useLiveSearch } from "@/lib/live-search";
+import { isPastDue } from "@/lib/workflow";
 import {
   AdsRightsCell,
   CollabIdBadge,
@@ -40,6 +42,14 @@ import type { PostingRow } from "./types";
 export interface PostingTableProps {
   rows: PostingRow[];
   initialView?: "list" | "cards";
+}
+
+
+/** Est-delivery-anchored overdue — same shared rule as the KPI tiles. */
+function postingOverdue(r: PostingRow): boolean {
+  const status = String(r.workflow_status ?? "").toLowerCase();
+  if (status.includes("posted") || status.includes("delivered")) return false;
+  return isPastDue(r.est_delivery, r.reach_out_date);
 }
 
 export function PostingTable({
@@ -387,6 +397,21 @@ function PostingListRow({
           <dd>{r.ads_usage_rights || "—"}</dd>
         </div>
         <div>
+          <dt>Delivery</dt>
+          <dd className="whitespace-nowrap">
+            {formatDate(r.est_delivery) ?? "—"}
+            {postingOverdue(r) && (
+              <span
+                className="ob-card-overdue"
+                title="Estimated delivery date has passed and this deliverable is not posted yet."
+              >
+                <AlertTriangle size={7} aria-hidden />
+                Overdue
+              </span>
+            )}
+          </dd>
+        </div>
+        <div>
           <dt>Post Date</dt>
           <dd>{formatDate(r.post_date) ?? "—"}</dd>
         </div>
@@ -667,6 +692,23 @@ function PostingCard({
           <span className="ob-card-meta-label">Onboarded</span>
           <span className="ob-card-meta-val tabular">
             {formatDate(r.onboard_date) ?? "—"}
+          </span>
+        </div>
+        <div className="ob-card-meta">
+          <span className="ob-card-meta-label">Est. Delivery</span>
+          <span className="ob-card-meta-val ob-card-delivery-val tabular">
+            {formatDate(r.est_delivery) ?? "—"}
+            {postingOverdue(r) && (
+              <button
+                type="button"
+                className="ob-card-overdue"
+                aria-label="Estimated delivery date has passed and this deliverable is not posted yet."
+                data-tooltip="Estimated delivery date has passed and this deliverable is not posted yet."
+              >
+                <AlertTriangle size={7} aria-hidden />
+                Overdue
+              </button>
+            )}
           </span>
         </div>
         <div className="ob-card-meta">
