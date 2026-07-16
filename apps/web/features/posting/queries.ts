@@ -131,25 +131,8 @@ export async function fetchPostingTable(
     rows = rows.filter((r) => !ADS_YES(r.ads_usage_rights));
   }
 
-  // Free-text search (in-memory) — id / name / username / IG URL / post link.
-  const needle = (filters.q ?? "").trim().toLowerCase();
-  if (needle) {
-    rows = rows.filter((r) => {
-      const fields = [
-        r.post_id,
-        r.post_id_short,
-        r.collab_id,
-        r.order_id,
-        r.campaign?.campaign_id,
-        r.campaign?.campaign_name,
-        r.creator?.inf_name,
-        r.creator?.username,
-        r.creator?.instagram_link,
-        r.post_link,
-      ];
-      return fields.some((f) => String(f ?? "").toLowerCase().includes(needle));
-    });
-  }
+  // Free-text search is applied CLIENT-SIDE in PostingTable (lib/live-search)
+  // — instant, no server round trip per keystroke.
 
   const missingProfileUsernames = [
     ...new Set(
@@ -302,7 +285,9 @@ export async function fetchPostingKpis(
   // happens per-row below (Due vs Submitted key on different columns).
   let q = (supabase as any)
     .from("posts")
-    .select("workflow_status, post_date, est_delivery, onboarded_by, posted_by")
+    .select(
+      "workflow_status, post_date, est_delivery, onboarded_by, posted_by, reach_out_date, deliverable_index, post_link",
+    )
     .in("workflow_status", PIPELINE_SET)
     .limit(20000);
   if (member) {
@@ -317,6 +302,13 @@ export async function fetchPostingKpis(
   let totalPostsDue = 0; // post_ids yet to be submitted (not Posted)
   let totalPostsSubmitted = 0; // post_ids Posted
   let delayedPosts = 0; // Posted post_ids whose post_date > est_delivery
+  // Funnel-parity Overdue (same formula as the Dashboard Funnel/Internal
+  // tiles): PARENT rows (one collab = 1) onboarded but not posted, reached out
+  // more than 15 days ago. Matches the Overdue tile count on the dashboards.
+  let overdue = 0;
+  const OVERDUE_DAYS = 15;
+  const DAY_MS = 86_400_000;
+  const now = Date.now();
 
   for (const r of rows) {
     const status = String(r.workflow_status ?? "").trim();
@@ -341,6 +333,24 @@ export async function fetchPostingKpis(
     } else {
       if (member && onboardedBy !== member) continue;
       totalPostsDue++;
+      const isParent =
+        r.deliverable_index == null || Number(r.deliverable_index) === 1;
+      const reach = r.reach_out_date
+        ? new Date(String(r.reach_out_date)).getTime()
+        : NaN;
+      const looksPosted =
+        !!r.post_date ||
+        /instagram\.com|youtube\.com|youtu\.be|^https?:/i.test(
+          String(r.post_link ?? ""),
+        );
+      if (
+        isParent &&
+        !Number.isNaN(reach) &&
+        !looksPosted &&
+        (now - reach) / DAY_MS > OVERDUE_DAYS
+      ) {
+        overdue++;
+      }
     }
   }
 
@@ -353,5 +363,6 @@ export async function fetchPostingKpis(
     totalPostsSubmitted,
     completionRate,
     delayedPosts,
+    overdue,
   };
 }

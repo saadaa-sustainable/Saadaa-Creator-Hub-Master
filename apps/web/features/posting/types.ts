@@ -75,6 +75,8 @@ export interface PostingKpi {
   completionRate: number;
   /** Submitted post_ids whose post_date is after est_delivery. */
   delayedPosts: number;
+  /** Funnel-parity Overdue: parent rows onboarded >15 days ago with no post yet. */
+  overdue: number;
 }
 
 export interface PostingFilters {

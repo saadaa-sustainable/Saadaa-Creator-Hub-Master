@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+
+import { useSearchParams } from "next/navigation";import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   Check,
   ChevronDown,
@@ -21,6 +22,7 @@ import {
   workflowStatusLabel,
 } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import { useLiveSearch } from "@/lib/live-search";
 import {
   AdsRightsCell,
   CollabIdBadge,
@@ -41,9 +43,33 @@ export interface PostingTableProps {
 }
 
 export function PostingTable({
-  rows,
+  rows: allRows,
   initialView = "list",
 }: PostingTableProps) {
+  // Instant free-text search — client-side over the full loaded set (the
+  // filter bar broadcasts keystrokes via lib/live-search). Same fields the
+  // server needle used to match.
+  const searchParams = useSearchParams();
+  const liveQ = useLiveSearch("posting", searchParams.get("q") ?? "");
+  const rows = useMemo<PostingRow[]>(() => {
+    const needle = liveQ.trim().toLowerCase();
+    if (!needle) return allRows;
+    return allRows.filter((r) => {
+      const fields = [
+        r.post_id,
+        r.post_id_short,
+        r.collab_id,
+        r.order_id,
+        r.campaign?.campaign_id,
+        r.campaign?.campaign_name,
+        r.creator?.inf_name,
+        r.creator?.username,
+        r.creator?.instagram_link,
+        r.post_link,
+      ];
+      return fields.some((f) => String(f ?? "").toLowerCase().includes(needle));
+    });
+  }, [allRows, liveQ]);
   const [selected, setSelected] = useState<PostingRow | null>(null);
   const [overviewRow, setOverviewRow] = useState<PostingRow | null>(null);
   const [view, setView] = useState<"list" | "cards">(initialView);

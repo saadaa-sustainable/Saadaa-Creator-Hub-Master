@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   Calendar,
-  Ghost,
   Hourglass,
   Instagram,
   PackageCheck,
@@ -19,7 +18,10 @@ import { Rows3 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
-import { TeamRowsDrawer } from "@/features/team-rows/team-rows-drawer";
+import {
+  TeamRowsDrawer,
+  type FilterKey,
+} from "@/features/team-rows/team-rows-drawer";
 import { FunnelChart } from "./funnel-chart";
 import type { FunnelData, FunnelMetrics, FunnelPeriodMode } from "./types";
 
@@ -55,6 +57,7 @@ export function FunnelBody({
   const [team, setTeam] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
   const [rowsOpen, setRowsOpen] = useState(false);
+  const [drawerStage, setDrawerStage] = useState<FilterKey>("all");
 
   const buckets = mode === "month" ? data.byMonth : data.byWeek;
   const teamBuckets = mode === "month" ? data.byMonthTeam : data.byWeekTeam;
@@ -103,7 +106,10 @@ export function FunnelBody({
         teams={data.teams}
         onModeChange={setMode}
         onTeamChange={setTeam}
-        onViewRows={() => setRowsOpen(true)}
+        onViewRows={() => {
+          setDrawerStage("all");
+          setRowsOpen(true);
+        }}
         onRefresh={() => {
           setRefreshing(true);
           router.refresh();
@@ -116,11 +122,18 @@ export function FunnelBody({
           team={team}
           teams={data.teams}
           source={source}
+          initialStage={drawerStage}
           onClose={() => setRowsOpen(false)}
         />
       )}
 
-      <KpiStrip totals={totals} />
+      <KpiStrip
+        totals={totals}
+        onSelect={(stage) => {
+          setDrawerStage(stage);
+          setRowsOpen(true);
+        }}
+      />
 
       <FunnelChart totals={totals} />
 
@@ -231,13 +244,21 @@ function FilterRow({
  * 2-up phone pairing). Colors keep the previous tone semantics:
  * info→indigo, warning→amber, success→green, muted→gray, danger→red.
  */
-function KpiStrip({ totals }: { totals: FunnelMetrics }) {
+function KpiStrip({
+  totals,
+  onSelect,
+}: {
+  totals: FunnelMetrics;
+  /** KPI tile click → open the rows view pre-filtered to that bucket. */
+  onSelect?: (stage: FilterKey) => void;
+}) {
   const cards: Array<{
     label: string;
     value: number;
     color: string;
     icon: React.ReactNode;
     secondary: string;
+    stage: FilterKey;
   }> = [
     {
       label: "Reach",
@@ -245,6 +266,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       color: "#3B6FD4",
       icon: <Send size={14} aria-hidden />,
       secondary: "contacted",
+      stage: "all",
     },
     {
       label: "Onboarded",
@@ -252,6 +274,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       color: "#3B6FD4",
       icon: <Users size={14} aria-hidden />,
       secondary: "onboarding complete",
+      stage: "onboarded",
     },
     {
       label: "Barter",
@@ -259,6 +282,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       color: "#B57514",
       icon: <PackageCheck size={14} aria-hidden />,
       secondary: "barter sent",
+      stage: "barter",
     },
     {
       label: "Delivered",
@@ -266,13 +290,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       color: "#4F7C4D",
       icon: <Truck size={14} aria-hidden />,
       secondary: "orders delivered",
-    },
-    {
-      label: "Ghosted",
-      value: totals.g,
-      color: "#9A9384",
-      icon: <Ghost size={14} aria-hidden />,
-      secondary: "no response",
+      stage: "delivered",
     },
     {
       label: "Pending",
@@ -280,6 +298,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       color: "#B57514",
       icon: <Hourglass size={14} aria-hidden />,
       secondary: "awaiting action",
+      stage: "due",
     },
     {
       label: "Overdue",
@@ -287,6 +306,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       color: "#C0392B",
       icon: <AlertTriangle size={14} aria-hidden />,
       secondary: "needs attention",
+      stage: "overdue",
     },
     {
       label: "All Posted",
@@ -294,6 +314,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       color: "#3B6FD4",
       icon: <Instagram size={14} aria-hidden />,
       secondary: "posted content",
+      stage: "posted",
     },
     {
       label: "Curated Posted",
@@ -301,6 +322,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
       color: "#4F7C4D",
       icon: <ShieldCheck size={14} aria-hidden />,
       secondary: "curated set",
+      stage: "posted",
     },
   ];
   return (
@@ -313,6 +335,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
           label={c.label}
           value={c.value}
           sub={c.secondary}
+          onClick={onSelect ? () => onSelect(c.stage) : undefined}
         />
       ))}
     </div>

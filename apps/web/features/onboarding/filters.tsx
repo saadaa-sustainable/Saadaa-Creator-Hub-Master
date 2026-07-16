@@ -5,6 +5,7 @@ import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubmissionToggle } from "@/components/ui";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { dispatchLiveSearch, syncSearchParam } from "@/lib/live-search";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { OnboardingFilters } from "./types";
 
@@ -71,20 +72,19 @@ export function OnboardingFiltersBar({
     [params, router, startTransition],
   );
 
-  // Debounced free-text search → `q` URL param (300ms after the last keystroke).
+  // Instant search: broadcast every keystroke to the table (client-side
+  // filtering over the already-loaded rows — no server round trip), and only
+  // mirror the value into the URL for shareable links (history.replaceState,
+  // never router.replace: that re-ran the whole server page per search).
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const onSearch = useCallback(
-    (value: string) => {
-      if (searchTimer.current) clearTimeout(searchTimer.current);
-      searchTimer.current = setTimeout(
-        () => setParam("q", value.trim() || undefined),
-        300,
-      );
-    },
-    [setParam],
-  );
+  const onSearch = useCallback((value: string) => {
+    dispatchLiveSearch("onboarding", value);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => syncSearchParam(value), 400);
+  }, []);
 
   const clearAll = () => {
+    dispatchLiveSearch("onboarding", "");
     const next = new URLSearchParams(params.toString());
     FILTER_KEYS.forEach((k) => next.delete(k));
     startTransition(() =>

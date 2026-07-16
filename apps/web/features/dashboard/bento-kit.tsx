@@ -189,6 +189,7 @@ export function HeroKpi({
   sub,
   info,
   rupees = false,
+  onClick,
 }: {
   color: string;
   icon: ReactNode;
@@ -199,13 +200,31 @@ export function HeroKpi({
   info?: string;
   /** ₹ compact formatting (en-IN grouping) for spend tiles. */
   rupees?: boolean;
+  /** Makes the tile clickable (e.g. opens the matching row-level view). */
+  onClick?: () => void;
 }) {
   const resolvedInfo =
     info ??
     KPI_DEFINITIONS[label] ??
     `${sub}. This number includes records matching the filters currently applied to this view.`;
   return (
-    <div className="bento-tile relative overflow-hidden rounded-[16px] border border-border bg-bg-white p-3.5">
+    <div
+      className={`bento-tile relative overflow-hidden rounded-[16px] border border-border bg-bg-white p-3.5${onClick ? " cursor-pointer transition-shadow hover:shadow-md hover:border-[#DCD6C4]" : ""}`}
+      {...(onClick
+        ? {
+            role: "button" as const,
+            tabIndex: 0,
+            onClick,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            },
+            title: `${label} — click to view the rows behind this number`,
+          }
+        : {})}
+    >
       <span
         className="absolute inset-x-0 top-0 h-[3px]"
         style={{ background: color }}
@@ -221,7 +240,9 @@ export function HeroKpi({
         <span className="truncate text-[0.64rem] font-bold uppercase tracking-[0.05em]">
           {label}
         </span>
-        <InfoDot text={resolvedInfo} title={label} />
+        <span onClick={(e) => e.stopPropagation()}>
+          <InfoDot text={resolvedInfo} title={label} />
+        </span>
       </div>
       <div className="text-[1.7rem] font-bold leading-none tabular-nums text-text-primary">
         {rupees && "₹"}

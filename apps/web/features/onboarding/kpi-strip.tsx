@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   CheckCircle2,
   Clapperboard,
   HourglassIcon,
@@ -78,6 +79,13 @@ export function OnboardingKpiStrip({ kpi }: { kpi: OnboardingKpi }) {
           label="Pending Email"
           primary={String(kpi.pendingEmail)}
           secondary="Collab email not sent"
+        />
+        <KpiCard
+          tone="warning"
+          icon={<AlertTriangle size={16} aria-hidden />}
+          label="Overdue"
+          primary={String(kpi.overdue)}
+          secondary=">15 days, no post yet"
         />
       </div>
     </section>

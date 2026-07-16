@@ -66,18 +66,27 @@ const STAGE_META: Record<Stage, { label: string; cls: string; accent: string }> 
 };
 /** Board stages + derived buckets: "posted_no_order" (posted content whose
  *  order_id was never mapped = posted-but-not-onboarded), "due" (onboarded,
- *  awaiting the post) and "issues" (data-quality flags). */
-type FilterKey =
+ *  awaiting the post), "issues" (data-quality flags), and the KPI-parity
+ *  buckets ("onboarded" / "barter" / "overdue") that mirror the Funnel /
+ *  Internal Dashboard tile formulas exactly, so a KPI tile click opens the
+ *  same count it shows. */
+export type FilterKey =
   | Stage
   | "all"
   | "posted_no_order"
   | "due"
-  | "issues";
+  | "issues"
+  | "onboarded"
+  | "barter"
+  | "overdue";
 const STAGE_FILTERS: Array<{ key: FilterKey; label: string }> = [
   { key: "all", label: "All" },
   { key: "reach", label: "Reach Out" },
   { key: "onboard", label: "Onboard" },
+  { key: "onboarded", label: "Onboarded (KPI)" },
   { key: "due", label: "Due" },
+  { key: "overdue", label: "Overdue" },
+  { key: "barter", label: "Barter" },
   { key: "posted", label: "Posted" },
   { key: "posted_no_order", label: "Posted · No Order" },
   { key: "delivered", label: "Delivered" },
@@ -85,6 +94,36 @@ const STAGE_FILTERS: Array<{ key: FilterKey; label: string }> = [
 ];
 function hasOrder(r: TeamRow): boolean {
   return !!(r.order_id ?? "").trim();
+}
+// ── KPI-parity helpers — SAME formulas as funnel/internal queries.ts ────────
+const OVERDUE_DAYS = 15;
+const DAY_MS = 86_400_000;
+function isParentRow(r: TeamRow): boolean {
+  return r.deliverable_index == null || Number(r.deliverable_index) === 1;
+}
+function kpiStatus(r: TeamRow): string {
+  return String(r.workflow_status ?? "").trim().toLowerCase();
+}
+function kpiIsOnboarded(r: TeamRow): boolean {
+  const s = kpiStatus(r);
+  return s !== "" && s !== "reach out";
+}
+function kpiIsPosted(r: TeamRow): boolean {
+  const s = kpiStatus(r);
+  return (
+    contentLinkOk(r.post_link) ||
+    s.includes("posted") ||
+    s.includes("delivered") ||
+    !!(r.post_date ?? "").trim()
+  );
+}
+function kpiIsOverdue(r: TeamRow): boolean {
+  if (!isParentRow(r)) return false;
+  const reach = r.reach_out_date ? new Date(r.reach_out_date).getTime() : NaN;
+  if (Number.isNaN(reach)) return false;
+  const s = kpiStatus(r);
+  const pend = kpiIsOnboarded(r) && !kpiIsPosted(r) && !s.includes("ghost");
+  return pend && (Date.now() - reach) / DAY_MS > OVERDUE_DAYS;
 }
 function matchesFilter(r: TeamRow, f: FilterKey): boolean {
   if (f === "all" || f === "issues") return true; // "issues" handled by _issue flag
@@ -94,6 +133,16 @@ function matchesFilter(r: TeamRow, f: FilterKey): boolean {
   }
   // Onboarded (On Board / Order Sent) but the post hasn't landed → content due.
   if (f === "due") return stageOf(r) === "onboard";
+  // KPI-parity buckets — parent rows only (one collab = 1), same as the tiles.
+  if (f === "onboarded")
+    return isParentRow(r) && !!r.reach_out_date && kpiIsOnboarded(r);
+  if (f === "barter")
+    return (
+      isParentRow(r) &&
+      !!r.reach_out_date &&
+      String(r.collab_type ?? "").trim().toLowerCase() === "barter"
+    );
+  if (f === "overdue") return kpiIsOverdue(r);
   return stageOf(r) === f;
 }
 
@@ -706,6 +755,7 @@ export function TeamRowsDrawer({
   teams = [],
   onClose,
   source = "historic",
+  initialStage = "all",
 }: {
   /** Initial team-member filter — "" opens on All team. */
   team: string;
@@ -713,12 +763,14 @@ export function TeamRowsDrawer({
   teams?: string[];
   onClose: () => void;
   source?: "historic" | "live";
+  /** Stage chip pre-selected on open — KPI tiles pass their matching bucket. */
+  initialStage?: FilterKey;
 }) {
   const [member, setMember] = useState(team);
   const [rows, setRows] = useState<TeamRow[] | null>(null);
   const [total, setTotal] = useState<number | null>(null);
   const [q, setQ] = useState("");
-  const [stage, setStage] = useState<FilterKey>("all");
+  const [stage, setStage] = useState<FilterKey>(initialStage);
   const [visible, setVisible] = useState(PAGE);
   const [selected, setSelected] = useState<TeamRow | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -956,7 +1008,14 @@ export function TeamRowsDrawer({
               </div>
             ) : filtered.length === 0 ? (
               <div className="team-rows-modal__state">
-                No rows match.
+                {total != null && rows.length < total ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    No match yet — still loading the remaining rows…
+                  </span>
+                ) : (
+                  "No rows match."
+                )}
               </div>
             ) : (
               <div className="team-rows-modal__cards">

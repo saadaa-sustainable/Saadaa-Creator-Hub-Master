@@ -24,7 +24,10 @@ import { cn } from "@/lib/cn";
 import { HeroKpi, InfoDot } from "@/features/dashboard/bento-kit";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { FunnelChart } from "@/features/funnel/funnel-chart";
-import { TeamRowsDrawer } from "@/features/team-rows/team-rows-drawer";
+import {
+  TeamRowsDrawer,
+  type FilterKey,
+} from "@/features/team-rows/team-rows-drawer";
 import type { FunnelMetrics } from "@/features/funnel/types";
 import type { InternalDashboardData } from "./types";
 
@@ -66,6 +69,7 @@ export function InternalDashboardBody({
   const [team, setTeam] = useState<string>("");
   const [refreshing, setRefreshing] = useState(false);
   const [rowsOpen, setRowsOpen] = useState(false);
+  const [drawerStage, setDrawerStage] = useState<FilterKey>("all");
 
   const monthOptions = useMemo(
     () => data.byMonth.map((b) => b.key),
@@ -151,7 +155,10 @@ export function InternalDashboardBody({
         onMonthChange={setMonth}
         onWeekChange={setWeek}
         onTeamChange={setTeam}
-        onViewRows={() => setRowsOpen(true)}
+        onViewRows={() => {
+          setDrawerStage("all");
+          setRowsOpen(true);
+        }}
         onRefresh={() => {
           setRefreshing(true);
           router.refresh();
@@ -164,11 +171,18 @@ export function InternalDashboardBody({
           team={team}
           teams={data.teams}
           source={source}
+          initialStage={drawerStage}
           onClose={() => setRowsOpen(false)}
         />
       )}
 
-      <KpiStrip totals={scoped.totals} />
+      <KpiStrip
+        totals={scoped.totals}
+        onSelect={(stage) => {
+          setDrawerStage(stage);
+          setRowsOpen(true);
+        }}
+      />
 
       {/* ── Bento layout — desktop 12-col mosaic, mobile 1-col stack ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 bento-stagger">
@@ -354,7 +368,16 @@ function FilterRow({
 // amber, risk red (gold stays CTA-only, so no gold here).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function KpiStrip({ totals }: { totals: FunnelMetrics }) {
+function KpiStrip({
+  totals,
+  onSelect,
+}: {
+  totals: FunnelMetrics;
+  /** KPI tile click → open the rows view pre-filtered to that bucket. */
+  onSelect?: (stage: FilterKey) => void;
+}) {
+  const open = (stage: FilterKey) =>
+    onSelect ? () => onSelect(stage) : undefined;
   return (
     <div className="acc-kpi-grid acc-kpi-grid--9 bento-stagger max-[480px]:grid-cols-2!">
       <HeroKpi
@@ -363,6 +386,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
         label="Reach"
         value={totals.r}
         sub="Total outreach"
+        onClick={open("all")}
       />
       <HeroKpi
         color="#7B4FBF"
@@ -370,6 +394,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
         label="Onboarded"
         value={totals.o}
         sub={`${pct(totals.o, totals.r)}% of reach`}
+        onClick={open("onboarded")}
       />
       <HeroKpi
         color="#B57514"
@@ -377,6 +402,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
         label="Barter"
         value={totals.b}
         sub={`${pct(totals.b, totals.o)}% barter mix`}
+        onClick={open("barter")}
       />
       <HeroKpi
         color="#4F7C4D"
@@ -384,15 +410,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
         label="Delivered"
         value={totals.d}
         sub={`${pct(totals.d, totals.o)}% delivery rate`}
-      />
-      {/* Ghosted stays neutral grey — matches the Funnel page's Ghosted hue
-          (red would read as an actionable failure; ghosting is attrition). */}
-      <HeroKpi
-        color="#9A9384"
-        icon={<Clock size={14} aria-hidden />}
-        label="Ghosted"
-        value={totals.g}
-        sub={totals.g > 0 ? "Lost touch" : "—"}
+        onClick={open("delivered")}
       />
       <HeroKpi
         color="#B57514"
@@ -400,6 +418,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
         label="Pending"
         value={totals.pend}
         sub="Awaiting post"
+        onClick={open("due")}
       />
       <HeroKpi
         color="#C0392B"
@@ -407,6 +426,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
         label="Overdue"
         value={totals.overdue}
         sub=">15 days"
+        onClick={open("overdue")}
       />
       <HeroKpi
         color="#3B6FD4"
@@ -414,6 +434,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
         label="All Posted"
         value={totals.p}
         sub="Deliverables live"
+        onClick={open("posted")}
       />
       <HeroKpi
         color="#4F7C4D"
@@ -421,6 +442,7 @@ function KpiStrip({ totals }: { totals: FunnelMetrics }) {
         label="Curated"
         value={totals.p}
         sub={`${pct(totals.p, totals.o)}% post rate`}
+        onClick={open("posted")}
       />
     </div>
   );

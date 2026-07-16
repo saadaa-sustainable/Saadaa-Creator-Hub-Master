@@ -112,6 +112,8 @@ export interface OnboardingKpi {
   shopifyMatched: number;
   /** Count of onboarded collabs that have an order_id entered. */
   shopifyWithOrderId: number;
+  /** Funnel-parity Overdue: parent rows onboarded >15 days ago with no post yet. */
+  overdue: number;
 }
 
 export interface OnboardingFilters {

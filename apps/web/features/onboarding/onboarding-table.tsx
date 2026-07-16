@@ -29,7 +29,9 @@ import {
   formatRupees,
   workflowStatusLabel,
 } from "@/lib/formatters";
+import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
+import { useLiveSearch } from "@/lib/live-search";
 import { shopifyOrderAdminUrl } from "@/lib/shopify";
 import {
   DeliverablesChip,
@@ -58,9 +60,33 @@ export interface OnboardingTableProps {
 }
 
 export function OnboardingTable({
-  rows,
+  rows: allRows,
   initialView = "list",
 }: OnboardingTableProps) {
+  // Instant free-text search — applied here (client) over the full loaded set;
+  // the filter bar broadcasts keystrokes via lib/live-search. Same fields the
+  // server needle used to match.
+  const searchParams = useSearchParams();
+  const liveQ = useLiveSearch("onboarding", searchParams.get("q") ?? "");
+  const rows = useMemo<OnboardingRow[]>(() => {
+    const needle = liveQ.trim().toLowerCase();
+    if (!needle) return allRows;
+    return allRows.filter((r) => {
+      const fields = [
+        r.post_id,
+        r.post_id_short,
+        r.collab_id,
+        r.order_id,
+        r.campaign?.campaign_id,
+        r.campaign?.campaign_name,
+        r.creator?.inf_name,
+        r.creator?.username,
+        r.creator?.instagram_link,
+        r.email,
+      ];
+      return fields.some((f) => String(f ?? "").toLowerCase().includes(needle));
+    });
+  }, [allRows, liveQ]);
   const [orderRow, setOrderRow] = useState<OnboardingRow | null>(null);
   const [overviewRow, setOverviewRow] = useState<OnboardingRow | null>(null);
   const [collabEmail, setCollabEmail] = useState<{

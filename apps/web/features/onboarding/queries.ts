@@ -102,27 +102,9 @@ export async function fetchOnboardingTable(
 
   let rows = (data ?? []) as unknown as OnboardingRow[];
 
-  // Free-text search (in-memory across the fetched page) — id / name / username
-  // / IG URL / email. Cross-table OR search is awkward in PostgREST, so we filter
-  // the bounded result set here (same pattern as Accounts Hub).
-  const needle = (filters.q ?? "").trim().toLowerCase();
-  if (needle) {
-    rows = rows.filter((r) => {
-      const fields = [
-        r.post_id,
-        r.post_id_short,
-        r.collab_id,
-        r.order_id,
-        r.campaign?.campaign_id,
-        r.campaign?.campaign_name,
-        r.creator?.inf_name,
-        r.creator?.username,
-        r.creator?.instagram_link,
-        r.email,
-      ];
-      return fields.some((f) => String(f ?? "").toLowerCase().includes(needle));
-    });
-  }
+  // Free-text search is applied CLIENT-SIDE in OnboardingTable (lib/live-search)
+  // — instant, no server round trip per keystroke. `filters.q` only seeds the
+  // table's initial value from a shared URL.
 
   // Prior-collab history for the Reach Out rows — gives the team a glance at how
   // many times a creator collaborated before + the next C the onboard will mint.
@@ -394,7 +376,7 @@ export async function fetchOnboardingKpis(
       (supabase as any)
         .from("posts")
         .select(
-          "inf_id, collab_number, collab_id, ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped",
+          "inf_id, collab_number, collab_id, ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped, workflow_status, reach_out_date, post_link, post_date, deliverable_index",
         )
         .in("workflow_status", ONBOARDED_SET)
         .limit(20000),
@@ -492,6 +474,32 @@ export async function fetchOnboardingKpis(
   const totalOnboarded = collabs.size;
   const pendingOnboardings = pendingCollabKeys.size;
 
+  // Funnel-parity Overdue (same formula as the Dashboard Funnel/Internal
+  // tiles): PARENT rows onboarded but not posted, reached out more than 15
+  // days ago. Counted over the deliverable rows (parent-only ⇒ one per collab).
+  const OVERDUE_DAYS = 15;
+  const DAY_MS = 86_400_000;
+  const nowMs = Date.now();
+  let overdue = 0;
+  for (const r of onboardedDeliverables) {
+    const isParent =
+      r.deliverable_index == null || Number(r.deliverable_index) === 1;
+    if (!isParent) continue;
+    const reach = r.reach_out_date
+      ? new Date(String(r.reach_out_date)).getTime()
+      : NaN;
+    if (Number.isNaN(reach)) continue;
+    const status = String(r.workflow_status ?? "").trim().toLowerCase();
+    const looksPosted =
+      status.includes("posted") ||
+      status.includes("delivered") ||
+      !!r.post_date ||
+      /instagram\.com|youtube\.com|youtu\.be|^https?:/i.test(
+        String(r.post_link ?? ""),
+      );
+    if (!looksPosted && (nowMs - reach) / DAY_MS > OVERDUE_DAYS) overdue++;
+  }
+
   let adRightsSelected = 0;
   let pendingEmail = 0;
   let reelsSum = 0;
@@ -530,5 +538,6 @@ export async function fetchOnboardingKpis(
       withOrderId > 0 ? round1((shopifyMatched / withOrderId) * 100) : 0,
     shopifyMatched,
     shopifyWithOrderId: withOrderId,
+    overdue,
   };
 }
