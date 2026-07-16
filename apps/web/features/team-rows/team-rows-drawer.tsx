@@ -640,6 +640,7 @@ function RowDetailModal({
             <Field label="Commercial" value={fmtMoney(row.commercial_amount)} />
             <Field label="Reach-out By" value={dash(row.logged_by)} />
             <Field label="Onboard By" value={dash(row.onboarded_by)} />
+            <Field label="Posted By" value={dash(row.posted_by)} />
             <Field label="Agency" value={dash(row.agency_name)} />
           </Group>
           <Group title="Links & Notes">

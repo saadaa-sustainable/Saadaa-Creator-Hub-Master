@@ -199,7 +199,13 @@ export async function submitHistoricOnboarding(
       .map((garment) => garment.trim())
       .filter(Boolean).length ||
     null;
-  const onboardedBy = await attributionName(actor);
+  // Attribution rule (2026-07-16): the historic onboarding stays credited to
+  // the row's ORIGINAL owner (the person who reached out — logged_by). Only
+  // the posting fill stamps its actual submitter (posted_by). Fallback to the
+  // acting user when the row never recorded who logged it.
+  const onboardedBy =
+    (typeof parent.logged_by === "string" && parent.logged_by.trim()) ||
+    (await attributionName(actor));
 
   // §6.2 deliverable expansion — the parent historic row is deliverable #1;
   // the remaining (total - 1) spawn as new historic rows.

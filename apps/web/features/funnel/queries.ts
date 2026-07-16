@@ -10,6 +10,7 @@ const POSTS_SELECT = [
   "order_status",
   "onboarded_by",
   "logged_by",
+  "posted_by",
   "campaign_id",
   "deliverable_index",
   "post_link",
@@ -142,10 +143,17 @@ export async function fetchFunnelData(
     // Team = row owner (sheet CALLOUT BY = logged_by, always set). onboarded_by
     // is only set on onboarded rows since 2026-07-08, so keying on it here
     // under-counted every team member (Vijaydeep 228 vs ~2,052 reach-outs).
+    // Reach-out + onboarding metrics stay with the row owner; ONLY the Posted
+    // metric follows posted_by (whoever submitted the post — e.g. a historic
+    // backlog fill by a different member), falling back to the row owner.
     const team = String(row.logged_by ?? row.onboarded_by ?? "").trim();
+    const postTeam = String(
+      row.posted_by ?? row.logged_by ?? row.onboarded_by ?? "",
+    ).trim();
     const isParent =
       row.deliverable_index == null || Number(row.deliverable_index) === 1;
     if (team) teamsSet.add(team);
+    if (postTeam) teamsSet.add(postTeam);
 
     const reachDate = parseDate(row.reach_out_date);
     const postDate = parseDate(row.post_date);
@@ -214,9 +222,9 @@ export async function fetchFunnelData(
       addMetrics(byMonth.get(mKey)!, delta);
       addMetrics(byWeek.get(wKey)!, delta);
 
-      if (team) {
-        bumpTeamBucket(byMonthTeam, mKey, team, delta);
-        bumpTeamBucket(byWeekTeam, wKey, team, delta);
+      if (postTeam) {
+        bumpTeamBucket(byMonthTeam, mKey, postTeam, delta);
+        bumpTeamBucket(byWeekTeam, wKey, postTeam, delta);
       }
     }
   }

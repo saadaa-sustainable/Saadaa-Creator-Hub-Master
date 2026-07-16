@@ -53,6 +53,7 @@ export interface TeamRow {
   post_number: number | null;
   collab_number: number | null;
   deliverable_index: number | null;
+  posted_by: string | null;
   /** Fresher avatar from the creators table (scrape-updated) — preferred over
    *  the archive's frozen profile_pic. Both are usually fbcdn URLs; the UI
    *  renders them raw with referrerPolicy=no-referrer and falls back to initials. */
@@ -66,7 +67,7 @@ const HISTORIC_COLS = [
   "content_type", "collab_type", "commercial_amount", "payment_status",
   "order_id", "tracking_id", "order_status", "garment_qty", "garments_sent",
   "reach_out_date", "onboard_date", "post_date", "est_delivery", "post_link",
-  "download_link", "email", "onboarded_by", "logged_by", "agency_name",
+  "download_link", "email", "onboarded_by", "logged_by", "posted_by", "agency_name",
   "influencer_category", "gender", "followers", "avg_likes", "engaged_rate",
   "profile_pic", "state", "city", "notes", "post_number", "collab_number",
   "deliverable_index",
@@ -82,7 +83,7 @@ const LIVE_COLS = [
   "collab_type", "commercial_amount", "payment_status", "order_id", "tracking_id",
   "order_status", "garment_qty", "garments_sent", "reach_out_date", "onboard_date",
   "post_date", "est_delivery", "post_link", "download_link", "email",
-  "onboarded_by", "logged_by", "agency_name", "state", "city", "notes",
+  "onboarded_by", "logged_by", "posted_by", "agency_name", "state", "city", "notes",
   "post_number", "collab_number", "deliverable_index",
 ].join(",");
 
@@ -124,8 +125,10 @@ export async function fetchTeamRowsPage(
   // logged_by = team, OR (logged_by null AND onboarded_by = team) — mirrors the
   // `logged_by ?? onboarded_by` bucket rule so the drawer set matches the KPIs.
   // Empty team → no owner filter (all rows).
+  // posted_by matches too: a member who back-filled another member's row sees
+  // it in their set (their Posted KPI credits it).
   const orFilter = t
-    ? `logged_by.eq.${t},and(logged_by.is.null,onboarded_by.eq.${t})`
+    ? `logged_by.eq.${t},and(logged_by.is.null,onboarded_by.eq.${t}),posted_by.eq.${t}`
     : null;
 
   // Exact count sizes the parallel fan-out (and gives the drawer its total).

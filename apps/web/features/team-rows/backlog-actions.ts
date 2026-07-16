@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertPermission } from "@/lib/rbac.server";
+import { attributionName } from "@/lib/impersonation";
 import { createServiceClient } from "@/lib/supabase/server";
 import { postDateFromUrl } from "@/lib/instagram-shortcode";
 import { isContentLink } from "@/lib/workflow";
@@ -43,7 +44,7 @@ export async function historicBacklogPosting(input: {
   downloadLink?: string;
   rawDump?: string;
 }): Promise<BacklogPostingResult> {
-  await assertPermission("posting_submit");
+  const actor = await assertPermission("posting_submit");
   const id = Number(input.id);
   const postLink = (input.postLink ?? "").trim();
   if (!Number.isFinite(id) || id <= 0)
@@ -72,6 +73,9 @@ export async function historicBacklogPosting(input: {
     post_link: postLink,
     post_date: postDate,
     workflow_status: "Posted",
+    // Per-stage attribution: the posting fill belongs to whoever submits it —
+    // reach-out keeps logged_by, onboarding keeps onboarded_by.
+    posted_by: await attributionName(actor),
   };
   const downloadLink = (input.downloadLink ?? "").trim();
   const rawDump = (input.rawDump ?? "").trim();

@@ -18,6 +18,7 @@ const POSTS_SELECT = [
   "order_status",
   "onboarded_by",
   "logged_by",
+  "posted_by",
   "campaign_id",
   "deliverable_index",
 ].join(",");
@@ -131,15 +132,21 @@ export async function fetchInternalDashboardData(
     const status = statusKey(row.workflow_status);
     const collab = statusKey(row.collab_type);
     const orderStatus = statusKey(row.order_status);
-    // Team = the row owner (sheet CALLOUT BY = logged_by, set on every row).
-    // onboarded_by is only set on ACTUALLY-onboarded rows since 2026-07-08, so
-    // keying on it here under-counted every team member's reach/pipeline (e.g.
-    // Vijaydeep 228 instead of ~2,052). onboarded_by is the fallback.
+    // Attribution (2026-07-16 rule): the reach-out AND onboarding credit stay
+    // with the row's original owner (sheet CALLOUT BY = logged_by, set on
+    // every row; onboarded_by is the fallback for legacy rows that only
+    // recorded the onboarder). ONLY the Posted metric follows posted_by — the
+    // person who actually submitted the post (historic backlog fill stamps
+    // it) — falling back to the row owner when never stamped.
     const team = String(row.logged_by ?? row.onboarded_by ?? "").trim();
+    const postTeam = String(
+      row.posted_by ?? row.logged_by ?? row.onboarded_by ?? "",
+    ).trim();
     const campaign = String(row.campaign_id ?? "").trim();
     const isParent =
       row.deliverable_index == null || Number(row.deliverable_index) === 1;
     if (team) teamsSet.add(team);
+    if (postTeam) teamsSet.add(postTeam);
 
     const reachDate = parseDate(row.reach_out_date);
     const postDate = parseDate(row.post_date);
@@ -195,6 +202,7 @@ export async function fetchInternalDashboardData(
 
     // Posted (link/status/date), bucketed by post_date when present, else the
     // reach-out date so link-without-date rows still land in a team bucket.
+    // Credits the post submitter (posted_by), falling back to onboarder/logger.
     const postBucketDate = postDate ?? reachDate;
     if (isPostedRow && postBucketDate) {
       const delta: Partial<FunnelMetrics> = { p: 1 };
@@ -205,9 +213,9 @@ export async function fetchInternalDashboardData(
       if (!byWeek.has(wKey)) byWeek.set(wKey, emptyMetrics());
       addMetrics(byMonth.get(mKey)!, delta);
       addMetrics(byWeek.get(wKey)!, delta);
-      if (team) {
-        bumpTeam(byMonthTeam, mKey, team, delta);
-        bumpTeam(byWeekTeam, wKey, team, delta);
+      if (postTeam) {
+        bumpTeam(byMonthTeam, mKey, postTeam, delta);
+        bumpTeam(byWeekTeam, wKey, postTeam, delta);
       }
       if (campaign) {
         bumpTeam(byMonthCampaign, mKey, campaign, delta);
