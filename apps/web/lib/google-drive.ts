@@ -124,6 +124,87 @@ async function ensureCollabFolder(
 }
 
 /**
+ * End-to-end Drive self-test for /api/drive-health — proves the RUNTIME can
+ * do everything a posting submit needs: read env, mint a delegated token,
+ * see the parent folder, create/reuse a folder, upload a file, delete it.
+ * Only touches its own scrap file inside a "_healthcheck" folder.
+ */
+export async function driveHealthcheck(): Promise<{
+  configured: boolean;
+  token: boolean;
+  parentFolder: string | null;
+  uploadOk: boolean;
+  cleanupOk: boolean;
+  error?: string;
+}> {
+  const out = {
+    configured: isDriveConfigured(),
+    token: false,
+    parentFolder: null as string | null,
+    uploadOk: false,
+    cleanupOk: false,
+    error: undefined as string | undefined,
+  };
+  if (!out.configured) {
+    out.error = "Drive env vars missing on this runtime";
+    return out;
+  }
+  const token = await getDriveToken();
+  if (!token) {
+    out.error = "token grant failed (key/impersonation)";
+    return out;
+  }
+  out.token = true;
+
+  const parent = process.env.DRIVE_COLLABS_FOLDER_ID!.trim();
+  const meta = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${parent}?fields=name`,
+    { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) },
+  );
+  if (!meta.ok) {
+    out.error = `parent folder not visible (HTTP ${meta.status})`;
+    return out;
+  }
+  out.parentFolder = ((await meta.json()) as { name?: string }).name ?? null;
+
+  const link = await uploadCollabVideo(
+    "_healthcheck",
+    `healthcheck-${Date.now()}.txt`,
+    new TextEncoder().encode("CreatorHub drive-health OK").buffer as ArrayBuffer,
+    "text/plain",
+  );
+  out.uploadOk = Boolean(link);
+  if (!link) {
+    out.error = "upload failed";
+    return out;
+  }
+
+  // Delete the scrap file we just made (find by link-independent search).
+  try {
+    const q = encodeURIComponent(
+      `name contains 'healthcheck-' and trashed = false`,
+    );
+    const list = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&pageSize=10`,
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000) },
+    );
+    const files = ((await list.json()) as { files?: Array<{ id: string }> })
+      .files ?? [];
+    for (const f of files) {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(8000),
+      });
+    }
+    out.cleanupOk = true;
+  } catch {
+    out.cleanupOk = false;
+  }
+  return out;
+}
+
+/**
  * Upload a collab video: Saadaa All Collabs / {collabId} / {fileName}.
  * Overwrites nothing — an existing same-named file is reused (its link is
  * returned) so re-submits never duplicate. Returns the webViewLink.
