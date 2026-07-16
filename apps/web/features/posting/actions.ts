@@ -321,32 +321,36 @@ export async function submitPosting(input: unknown) {
             );
             if (hosted) patch.post_thumbnail = hosted;
           }
-          // Mirror the VIDEO — downloaded ONCE, used twice:
-          //   1. avatars bucket → the lightbox plays it natively in-app
-          //      (Instagram embeds refuse inline playback on licensed-music
-          //      reels — "Watch on Instagram").
-          //   2. Google Drive → Saadaa All Collabs/{collab_id}/{post_id}.mp4,
-          //      replacing the team's manual download-and-reupload; the Drive
-          //      link auto-fills the row's empty Download Link.
-          if (probe.node.mediaType === "VIDEO" && probe.node.mediaUrl) {
-            const video = await fetchCdnFile(probe.node.mediaUrl, {
-              maxBytes: 45_000_000,
+          // Mirror the MEDIA — downloaded ONCE, used twice. EVERY deliverable
+          // type files into the collab's Drive folder (a 3-deliverable collab
+          // = three files in Saadaa All Collabs/{collab_id}/):
+          //   reels  → {post_id}.mp4 (also bucket-mirrored so the lightbox
+          //             plays natively — embeds refuse licensed-music reels)
+          //   static → {post_id}.jpg (first frame for carousels)
+          // The Drive link auto-fills the row's empty Download Link.
+          const isVideo = probe.node.mediaType === "VIDEO";
+          if (probe.node.mediaUrl) {
+            const media = await fetchCdnFile(probe.node.mediaUrl, {
+              maxBytes: isVideo ? 45_000_000 : 10_000_000,
               timeoutMs: 60_000,
             });
-            if (video) {
-              const hostedVideo = await uploadToAvatarsBucket(
-                `post-media/${postId}.mp4`,
-                video.buf,
-                video.contentType || "video/mp4",
-              );
-              if (hostedVideo) patch.post_media = hostedVideo;
+            if (media) {
+              if (isVideo) {
+                const hostedVideo = await uploadToAvatarsBucket(
+                  `post-media/${postId}.mp4`,
+                  media.buf,
+                  media.contentType || "video/mp4",
+                );
+                if (hostedVideo) patch.post_media = hostedVideo;
+              }
 
               if (collabKey) {
+                const ext = isVideo ? "mp4" : "jpg";
                 const driveLink = await uploadCollabVideo(
                   collabKey,
-                  `${postId}.mp4`,
-                  video.buf,
-                  video.contentType || "video/mp4",
+                  `${postId}.${ext}`,
+                  media.buf,
+                  media.contentType || (isVideo ? "video/mp4" : "image/jpeg"),
                 );
                 if (driveLink && !downloadLink) {
                   patch.download_link = driveLink;
