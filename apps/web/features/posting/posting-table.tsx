@@ -398,8 +398,11 @@ function PostingListRow({
         </div>
         <div>
           <dt>Delivery</dt>
-          <dd className="whitespace-nowrap">
-            {formatDate(r.est_delivery) ?? "—"}
+          {/* dd default CSS is nowrap+ellipsis — that clipped the pill. */}
+          <dd className="!whitespace-normal !overflow-visible">
+            <span className="block tabular">
+              {formatDate(r.est_delivery) ?? "—"}
+            </span>
             {postingOverdue(r) && (
               <span
                 className="ob-card-overdue"

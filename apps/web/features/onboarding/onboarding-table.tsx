@@ -438,8 +438,11 @@ function OnboardingListRow({
         </div>
         <div>
           <dt>Delivery</dt>
-          <dd className="whitespace-nowrap">
-            {formatDate(r.est_delivery) ?? "—"}
+          {/* dd default CSS is nowrap+ellipsis — that clipped the pill. */}
+          <dd className="!whitespace-normal !overflow-visible">
+            <span className="block tabular">
+              {formatDate(r.est_delivery) ?? "—"}
+            </span>
             {overdue && (
               <span
                 className="ob-card-overdue"
@@ -917,7 +920,20 @@ function OnboardingOverviewModal({
             />
             <OverviewItem
               label="Est. Delivery"
-              value={formatDate(row.est_delivery) ?? "—"}
+              value={
+                <>
+                  {formatDate(row.est_delivery) ?? "—"}
+                  {isOverdue(row) && (
+                    <span
+                      className="ob-card-overdue"
+                      title="Estimated delivery date has passed and this post is not marked Posted yet."
+                    >
+                      <AlertTriangle size={7} aria-hidden />
+                      Overdue
+                    </span>
+                  )}
+                </>
+              }
               mono
             />
             <OverviewItem

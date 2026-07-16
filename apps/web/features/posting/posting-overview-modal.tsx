@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
+  AlertTriangle,
   CalendarCheck,
   Download,
   ExternalLink,
@@ -16,6 +17,7 @@ import {
 import { PartnershipKeyEdit, WorkflowStatusPill } from "@/components/ui";
 import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { formatDate, formatRupees } from "@/lib/formatters";
+import { isPastDue } from "@/lib/workflow";
 import { cn } from "@/lib/cn";
 import {
   collabDeliverableCount,
@@ -155,6 +157,30 @@ export function PostingOverviewModal({
             <OverviewItem
               label="Onboarded"
               value={formatDate(row.onboard_date) ?? "—"}
+              mono
+            />
+            <OverviewItem
+              label="Est. Delivery"
+              value={
+                <>
+                  {formatDate(row.est_delivery) ?? "—"}
+                  {!String(row.workflow_status ?? "")
+                    .toLowerCase()
+                    .includes("posted") &&
+                    !String(row.workflow_status ?? "")
+                      .toLowerCase()
+                      .includes("delivered") &&
+                    isPastDue(row.est_delivery, row.reach_out_date) && (
+                      <span
+                        className="ob-card-overdue"
+                        title="Estimated delivery date has passed and this deliverable is not posted yet."
+                      >
+                        <AlertTriangle size={7} aria-hidden />
+                        Overdue
+                      </span>
+                    )}
+                </>
+              }
               mono
             />
             {row.onboarded_by && (
