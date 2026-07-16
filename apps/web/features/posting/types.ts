@@ -33,6 +33,8 @@ export interface PostingRow {
   post_link?: string | null;
   /** Durable re-hosted post cover (post-thumbs/{post_id}.jpg). */
   post_thumbnail?: string | null;
+  /** Durable re-hosted reel video (post-media/{post_id}.mp4) — native playback. */
+  post_media?: string | null;
   download_link?: string | null;
   raw_dump?: string | null;
   partnership_id?: string | null;

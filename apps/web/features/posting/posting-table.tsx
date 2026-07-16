@@ -302,6 +302,7 @@ function PostingListRow({
         <InstagramPreviewCard
           link={r.post_link}
           pic={r.post_thumbnail ?? r.creator?.profile_pic}
+          mediaUrl={r.post_media}
           username={r.creator?.username}
           size={46}
         />
@@ -439,6 +440,7 @@ function CollabGroupSection({
       >
         <InstagramPreviewCard
           pic={rep.post_thumbnail ?? rep.creator?.profile_pic}
+          mediaUrl={rep.post_media}
           username={rep.creator?.username}
           size={46}
         />
@@ -552,6 +554,7 @@ function PostingCard({
         <InstagramPreviewCard
           link={r.post_link}
           pic={r.post_thumbnail ?? r.creator?.profile_pic}
+          mediaUrl={r.post_media}
           username={r.creator?.username}
           size={44}
           className="ob-card-avatar"

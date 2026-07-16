@@ -31,20 +31,22 @@ export async function rehostAvatar(
 export async function rehostImage(
   path: string,
   srcUrl: string | null | undefined,
+  opts: { maxBytes?: number; timeoutMs?: number } = {},
 ): Promise<string | null> {
   const src = (srcUrl ?? "").trim();
   if (!src || !path) return null;
   // Already durable (our bucket or any non-Instagram host) — nothing to do.
   if (!/fbcdn\.net|cdninstagram\.com/i.test(src)) return null;
+  const maxBytes = opts.maxBytes ?? 5_000_000;
 
   try {
     const res = await fetch(src, {
       cache: "no-store",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 8000),
     });
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
-    if (buf.byteLength === 0 || buf.byteLength > 5_000_000) return null;
+    if (buf.byteLength === 0 || buf.byteLength > maxBytes) return null;
 
     const supabase = createServiceClient();
     const { error } = await (supabase as any).storage

@@ -306,13 +306,31 @@ export async function submitPosting(input: unknown) {
             shortcodeForThumb,
           );
           await recordMetaUsage(1, probe.usagePct ?? 0);
-          const src = probe.node?.thumbnailUrl ?? probe.node?.mediaUrl;
-          if (probe.status !== "ok" || !src) return;
-          const hosted = await rehostImage(`post-thumbs/${postId}.jpg`, src);
-          if (!hosted) return;
+          if (probe.status !== "ok" || !probe.node) return;
+          const patch: Record<string, string> = {};
+          const thumbSrc = probe.node.thumbnailUrl ?? probe.node.mediaUrl;
+          if (thumbSrc) {
+            const hosted = await rehostImage(
+              `post-thumbs/${postId}.jpg`,
+              thumbSrc,
+            );
+            if (hosted) patch.post_thumbnail = hosted;
+          }
+          // Mirror the VIDEO too — Instagram embeds refuse inline playback on
+          // licensed-music reels ("Watch on Instagram"); a bucket copy lets
+          // the lightbox play natively in-app, always. 45MB cap, best-effort.
+          if (probe.node.mediaType === "VIDEO" && probe.node.mediaUrl) {
+            const hostedVideo = await rehostImage(
+              `post-media/${postId}.mp4`,
+              probe.node.mediaUrl,
+              { maxBytes: 45_000_000, timeoutMs: 60_000 },
+            );
+            if (hostedVideo) patch.post_media = hostedVideo;
+          }
+          if (Object.keys(patch).length === 0) return;
           await (supabase as any)
             .from("posts")
-            .update({ post_thumbnail: hosted })
+            .update(patch)
             .eq("post_id", postId);
         } catch (e) {
           console.warn(`[posting] thumbnail capture ${postId}:`, e);

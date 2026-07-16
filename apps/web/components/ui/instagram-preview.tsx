@@ -27,10 +27,15 @@ export function InstagramEmbedLightbox({
   shortcode,
   label,
   onClose,
+  mediaUrl,
 }: {
   shortcode: string;
   label: string;
   onClose: () => void;
+  /** Durable mirrored video (post-media/{post_id}.mp4) — when present the
+   *  lightbox plays it NATIVELY in-app instead of the Instagram embed, which
+   *  refuses inline playback on licensed-music reels ("Watch on Instagram"). */
+  mediaUrl?: string | null;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -68,7 +73,8 @@ export function InstagramEmbedLightbox({
         >
           <div className="min-w-0">
             <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary">
-              <Instagram size={12} aria-hidden /> Live Instagram embed
+              <Instagram size={12} aria-hidden />{" "}
+              {mediaUrl ? "Post preview" : "Live Instagram embed"}
             </span>
             <h2 className="text-sm font-extrabold text-text-primary truncate">
               {label}
@@ -79,21 +85,38 @@ export function InstagramEmbedLightbox({
           </button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto" style={{ padding: 0 }}>
-          <iframe
-            src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
-            title="Instagram post preview"
-            loading="lazy"
-            scrolling="no"
-            allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
-            allowFullScreen
-            style={{
-              width: "100%",
-              height: "min(82dvh, 680px)",
-              border: 0,
-              background: "#fff",
-              display: "block",
-            }}
-          />
+          {mediaUrl ? (
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <video
+              src={mediaUrl}
+              controls
+              autoPlay
+              playsInline
+              style={{
+                width: "100%",
+                height: "min(82dvh, 680px)",
+                background: "#000",
+                display: "block",
+                objectFit: "contain",
+              }}
+            />
+          ) : (
+            <iframe
+              src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
+              title="Instagram post preview"
+              loading="lazy"
+              scrolling="no"
+              allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
+              allowFullScreen
+              style={{
+                width: "100%",
+                height: "min(82dvh, 680px)",
+                border: 0,
+                background: "#fff",
+                display: "block",
+              }}
+            />
+          )}
         </div>
         <div className="shrink-0 p-3 text-end">
           <a
@@ -123,12 +146,15 @@ export function InstagramPreviewCard({
   username,
   size = 60,
   className,
+  mediaUrl,
 }: {
   link?: string | null;
   pic?: string | null;
   username?: string | null;
   size?: number;
   className?: string;
+  /** Mirrored video for native in-app playback (see InstagramEmbedLightbox). */
+  mediaUrl?: string | null;
 }) {
   const shortcode = extractShortcode(link ?? "");
   const [open, setOpen] = useState(false);
@@ -197,6 +223,7 @@ export function InstagramPreviewCard({
         <InstagramEmbedLightbox
           shortcode={shortcode}
           label={username ?? ""}
+          mediaUrl={mediaUrl}
           onClose={() => setOpen(false)}
         />
       )}
