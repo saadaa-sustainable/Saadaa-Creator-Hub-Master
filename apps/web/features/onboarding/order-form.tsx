@@ -42,6 +42,7 @@ import {
   listOpenCampaigns,
   type OnboardableCreator,
 } from "./actions";
+import { submitHistoricOnboarding } from "@/features/team-rows/historic-onboarding-actions";
 import { CONTENT_CODES } from "../reach-out/content-codes";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import {
@@ -73,6 +74,14 @@ interface OnboardingFormProps {
   lockCreatorInfId?: string;
   /** Display label for the locked creator (name or @handle). */
   lockCreatorLabel?: string;
+  /**
+   * Historic fill mode: onboard a HISTORIC reach-out row (historic_posts.id)
+   * from the Historic Analytics row drawer. Same form, same rules — submit
+   * routes to submitHistoricOnboarding and there is NO collab-email phase.
+   */
+  historicRowId?: number;
+  /** Called after a successful save (historic mode uses it to refetch the drawer). */
+  onSaved?: () => void;
   open: boolean;
   onClose: () => void;
 }
@@ -102,9 +111,12 @@ export function OrderCreationModal({
   repeatMode = false,
   lockCreatorInfId,
   lockCreatorLabel,
+  historicRowId,
+  onSaved,
   open,
   onClose,
 }: OnboardingFormProps) {
+  const historicMode = historicRowId != null;
   const router = useRouter();
   const [submitting, startSubmit] = useTransition();
   const [, startLookup] = useTransition();
@@ -146,8 +158,9 @@ export function OrderCreationModal({
       // The bigserial row id identifies a reach-out row (post_id still NULL,
       // minted at onboarding). It MUST be in form state, else the resolver +
       // missing-fields check validate id=undefined and demand a Post ID that
-      // doesn't exist yet ("Kindly fill the Post ID column").
-      id,
+      // doesn't exist yet ("Kindly fill the Post ID column"). Historic mode
+      // targets the historic_posts row id instead.
+      id: historicRowId ?? id,
       postId: repeatMode ? "PENDING" : postId,
       agency: initial?.agency ?? "",
       collabType: initial?.collabType ?? "Barter",
@@ -294,16 +307,20 @@ export function OrderCreationModal({
       return;
     }
     startSubmit(async () => {
-      const res = repeatMode
-        ? await submitRepeatCollab({
-            ...values,
-            infId: repeatInfId,
-            campaignId: repeatCampaignId,
-            contentType: repeatContentType,
-          })
-        : // Reach-out rows are onboarded by their bigserial `id` (post_id is
-          // NULL until onboarding mints it); already-minted rows pass postId.
-          await submitOnboarding({ ...values, id, postId });
+      const res = historicMode
+        ? // Historic fill: same form + rules against the historic_posts row;
+          // no collab-email phase.
+          await submitHistoricOnboarding({ ...values, id: historicRowId })
+        : repeatMode
+          ? await submitRepeatCollab({
+              ...values,
+              infId: repeatInfId,
+              campaignId: repeatCampaignId,
+              contentType: repeatContentType,
+            })
+          : // Reach-out rows are onboarded by their bigserial `id` (post_id is
+            // NULL until onboarding mints it); already-minted rows pass postId.
+            await submitOnboarding({ ...values, id, postId });
       if (!res.ok) {
         toast.error(res.error);
         return;
@@ -314,6 +331,14 @@ export function OrderCreationModal({
           ? `${label} onboarded. ${res.childrenSpawned} deliverable row(s) spawned.`
           : `${label} onboarded.`;
       toast.success(msg);
+      if (historicMode) {
+        // Historic flow ends at the save — no collab email. Hand control back
+        // to the drawer so it refetches the row set.
+        onSaved?.();
+        onClose();
+        router.refresh();
+        return;
+      }
       // Capture the minted post_id so the inline collab-email phase can target
       // it (a reach-out onboard arrives with postId undefined).
       setSavedPostId(res.postId);
@@ -416,11 +441,21 @@ export function OrderCreationModal({
             <h2 className="font-semibold">
               {repeatMode
                 ? "New Collab — Existing Creator"
-                : "Onboarding Configuration"}
+                : historicMode
+                  ? "Onboarding — Historic Record"
+                  : "Onboarding Configuration"}
             </h2>
             {!repeatMode && (
               <span className="chip text-[10px] tabular">
                 {postIdShort ?? postId ?? "Pending"}
+              </span>
+            )}
+            {historicMode && (
+              <span
+                className="text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5 bg-warning-bg text-warning-text"
+                title="This onboarding fills the historic record — no collaboration email is sent to the creator."
+              >
+                Historic
               </span>
             )}
             {collabId && (

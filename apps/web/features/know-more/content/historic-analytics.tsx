@@ -87,6 +87,32 @@ export default function HistoricAnalyticsKM() {
         </KMCallout>
       </KMSection>
 
+      <KMSection tag="Completing the full flow (onboard, then post)">
+        <KMList>
+          <li>
+            Open a row that is still at <strong>Reach Out</strong> (no order) —
+            a <strong>Complete onboarding</strong> box appears. It opens the{" "}
+            <strong>same form as the live Onboarding stage</strong>: Shopify
+            order lookup + validation, collab type + commercials (Barter locks
+            to ₹0), deliverable counts, ads usage rights, order status, bank
+            details — everything except the collaboration email to the creator,
+            which is deliberately not sent for historic records.
+          </li>
+          <li>
+            Saving mints the collab the same way the live flow does — it{" "}
+            <strong>continues the creator&apos;s existing numbering</strong>{" "}
+            (never reuses an existing C or P). Extra deliverables become new
+            historic rows sharing the same Collab ID. Bank / agency / state
+            also sync to the creator profile.
+          </li>
+          <li>
+            The row flips to <KMCode>On Board</KMCode>. Reopen it and the{" "}
+            <strong>Fill posting backlog</strong> box below completes the flow
+            to Posted.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Filling the posting backlog">
         <KMList>
           <li>

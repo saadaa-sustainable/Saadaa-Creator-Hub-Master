@@ -16,6 +16,7 @@ import {
   Loader2,
   Eye,
   AlertTriangle,
+  ClipboardCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
@@ -24,6 +25,7 @@ import { extractShortcode, postDateFromUrl } from "@/lib/instagram-shortcode";
 import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { fetchTeamRows, type TeamRow } from "./actions";
 import { historicBacklogPosting } from "./backlog-actions";
+import { OrderCreationModal } from "@/features/onboarding/order-form";
 
 // ── stage bucketing (mirrors the dashboard column logic) ───────────────────
 type Stage = "reach" | "onboard" | "posted" | "delivered" | "closed";
@@ -373,6 +375,67 @@ function BacklogFillSection({
   );
 }
 
+/**
+ * Historic full-flow fill — step 1 of "reach out → onboard → posting" for
+ * historic rows whose posting link has arrived but the record never left
+ * Reach Out. Opens the SAME onboarding form as the live Onboarding stage
+ * (Shopify order gate, deliverable expansion, collab mint continuing from the
+ * creator's existing numbering) — just with no collab email to the creator.
+ * Once onboarded, the posting-backlog fill below completes the flow.
+ */
+function HistoricOnboardSection({
+  row,
+  onSaved,
+}: {
+  row: FlaggedRow;
+  onSaved: () => void;
+}) {
+  const [formOpen, setFormOpen] = useState(false);
+  // Only pure reach-out rows: no order yet, not already onboarded.
+  const needsOnboard = !hasOrder(row) && stageOf(row) === "reach";
+  if (!needsOnboard || row.id == null) return null;
+
+  return (
+    <div className="rounded-xl border border-border bg-bg-surface px-3 py-2.5 flex flex-col gap-2">
+      <span className="text-[0.62rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary">
+        Complete onboarding
+      </span>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <span className="text-[0.68rem] text-text-secondary flex-1">
+          This historic row is still at Reach Out. Run the full onboarding here
+          — same form as the Onboarding stage, no collab email — then fill the
+          post link below to finish the flow.
+        </span>
+        <button
+          type="button"
+          className="acc-export-bar__btn acc-export-bar__btn--primary shrink-0"
+          onClick={() => setFormOpen(true)}
+        >
+          <ClipboardCheck size={12} aria-hidden /> Onboard this row
+        </button>
+      </div>
+      {formOpen && (
+        <OrderCreationModal
+          historicRowId={row.id}
+          postIdShort={row.post_id_short ?? row.post_id ?? undefined}
+          creatorName={row.username}
+          username={row.username}
+          initial={{
+            collabType:
+              row.collab_type === "Barter" || row.collab_type === "Barter + Paid"
+                ? row.collab_type
+                : undefined,
+            commercials: row.commercial_amount ?? undefined,
+          }}
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          onSaved={onSaved}
+        />
+      )}
+    </div>
+  );
+}
+
 function RowDetailModal({
   row,
   source = "historic",
@@ -470,7 +533,16 @@ function RowDetailModal({
             </div>
           )}
           {source === "historic" && row.id != null && (
-            <BacklogFillSection row={row} onUpdated={onUpdated} />
+            <>
+              <HistoricOnboardSection
+                row={row}
+                onSaved={() => {
+                  onUpdated?.();
+                  onClose();
+                }}
+              />
+              <BacklogFillSection row={row} onUpdated={onUpdated} />
+            </>
           )}
           <section className="campaign-detail-overview ad-detail-overview">
             <div className="campaign-detail-allocation-card ad-detail-profile-card">
