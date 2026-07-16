@@ -33,12 +33,21 @@ export async function rehostImage(
   srcUrl: string | null | undefined,
   opts: { maxBytes?: number; timeoutMs?: number } = {},
 ): Promise<string | null> {
+  const fetched = await fetchCdnFile(srcUrl, opts);
+  if (!fetched) return null;
+  return uploadToAvatarsBucket(path, fetched.buf, fetched.contentType);
+}
+
+/** Download a signed Instagram CDN file (size-capped). Null on any failure. */
+export async function fetchCdnFile(
+  srcUrl: string | null | undefined,
+  opts: { maxBytes?: number; timeoutMs?: number } = {},
+): Promise<{ buf: ArrayBuffer; contentType: string } | null> {
   const src = (srcUrl ?? "").trim();
-  if (!src || !path) return null;
+  if (!src) return null;
   // Already durable (our bucket or any non-Instagram host) — nothing to do.
   if (!/fbcdn\.net|cdninstagram\.com/i.test(src)) return null;
   const maxBytes = opts.maxBytes ?? 5_000_000;
-
   try {
     const res = await fetch(src, {
       cache: "no-store",
@@ -47,14 +56,27 @@ export async function rehostImage(
     if (!res.ok) return null;
     const buf = await res.arrayBuffer();
     if (buf.byteLength === 0 || buf.byteLength > maxBytes) return null;
+    return {
+      buf,
+      contentType: res.headers.get("content-type") ?? "image/jpeg",
+    };
+  } catch {
+    return null;
+  }
+}
 
+/** Upload into the public `avatars` bucket, returning the durable URL. */
+export async function uploadToAvatarsBucket(
+  path: string,
+  buf: ArrayBuffer,
+  contentType: string,
+): Promise<string | null> {
+  if (!path) return null;
+  try {
     const supabase = createServiceClient();
     const { error } = await (supabase as any).storage
       .from("avatars")
-      .upload(path, buf, {
-        contentType: res.headers.get("content-type") ?? "image/jpeg",
-        upsert: true,
-      });
+      .upload(path, buf, { contentType, upsert: true });
     if (error) {
       console.warn(`[avatar-rehost] upload ${path}: ${error.message}`);
       return null;
