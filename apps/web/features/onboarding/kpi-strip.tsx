@@ -85,7 +85,7 @@ export function OnboardingKpiStrip({ kpi }: { kpi: OnboardingKpi }) {
           icon={<AlertTriangle size={16} aria-hidden />}
           label="Overdue"
           primary={String(kpi.overdue)}
-          secondary=">15 days, no post yet"
+          secondary="Past est. delivery, no post"
         />
       </div>
     </section>

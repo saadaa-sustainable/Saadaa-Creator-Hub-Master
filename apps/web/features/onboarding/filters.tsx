@@ -29,6 +29,7 @@ const FILTER_KEYS = [
   "reachedOutBy",
   "contentType",
   "collabType",
+  "overdue",
   "reachoutDateFrom",
   "reachoutDateTo",
   "submitted",
@@ -178,6 +179,15 @@ export function OnboardingFiltersBar({
             { label: "All collab types", value: "" },
             { label: "Barter", value: "Barter" },
             { label: "Barter + Paid", value: "Barter + Paid" },
+          ]}
+        />
+        <FilterSelect
+          label="Delivery"
+          value={initial.overdue ?? ""}
+          onChange={(v) => setParam("overdue", v)}
+          options={[
+            { label: "All deliveries", value: "" },
+            { label: "Overdue only", value: "yes" },
           ]}
         />
         <label className="onboarding-filter-field">

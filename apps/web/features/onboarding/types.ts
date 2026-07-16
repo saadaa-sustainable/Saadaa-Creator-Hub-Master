@@ -119,6 +119,8 @@ export interface OnboardingKpi {
 export interface OnboardingFilters {
   /** Free-text search across post/collab id, name, username, IG URL, email. */
   q?: string;
+  /** "yes" → only rows past their promised delivery (est_delivery-anchored). */
+  overdue?: string;
   campaign?: string;
   statusFilter?: string;
   creatorTier?: string;

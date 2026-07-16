@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { isContentLink, isVoidedStatus } from "@/lib/workflow";
+import { isContentLink, isPastDue, isVoidedStatus } from "@/lib/workflow";
 import type { FunnelData, FunnelMetrics, FunnelPeriodBucket } from "./types";
 
 const POSTS_SELECT = [
@@ -14,6 +14,7 @@ const POSTS_SELECT = [
   "campaign_id",
   "deliverable_index",
   "post_link",
+  "est_delivery",
 ].join(",");
 
 const MIN_DATE = new Date("2020-01-01").getTime();
@@ -178,8 +179,9 @@ export async function fetchFunnelData(
       const isDelivered = orderStatus === "delivered";
       const isPosted = isPostedRow;
       const isPend = isOnboarded && !isPosted && !isGhost;
-      const daysSinceReach = (now - reachDate.getTime()) / DAY_MS;
-      const isOverdue = isPend && daysSinceReach > OVERDUE_DAYS;
+      // Overdue anchors on the promised est_delivery (day after); rows
+      // without one fall back to >15 days since reach-out (lib/workflow).
+      const isOverdue = isPend && isPastDue(row.est_delivery, row.reach_out_date, now);
 
       const delta: Partial<FunnelMetrics> = {
         r: 1,

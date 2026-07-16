@@ -46,6 +46,7 @@ export interface PostingRow {
   collab_id?: string | null;
   inf_id?: string | null;
   est_delivery?: string | null;
+  reach_out_date?: string | null;
   campaign: Pick<CampaignsRow, "campaign_id" | "campaign_name"> | null;
   creator: Pick<
     CreatorsRow,
@@ -82,6 +83,8 @@ export interface PostingKpi {
 export interface PostingFilters {
   /** Free-text search across post/collab id, name, username, IG URL, post link. */
   q?: string;
+  /** "yes" → only rows past their promised delivery (est_delivery-anchored). */
+  overdue?: string;
   campaign?: string;
   statusFilter?: string;
   creatorTier?: string;

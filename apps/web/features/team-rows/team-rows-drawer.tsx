@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { extractShortcode, postDateFromUrl } from "@/lib/instagram-shortcode";
+import { isPastDue } from "@/lib/workflow";
 import { InstagramPreviewCard } from "@/components/ui/instagram-preview";
 import { fetchTeamRowsPage, type TeamRow } from "./actions";
 import { historicBacklogPosting } from "./backlog-actions";
@@ -96,8 +97,6 @@ function hasOrder(r: TeamRow): boolean {
   return !!(r.order_id ?? "").trim();
 }
 // ── KPI-parity helpers — SAME formulas as funnel/internal queries.ts ────────
-const OVERDUE_DAYS = 15;
-const DAY_MS = 86_400_000;
 function isParentRow(r: TeamRow): boolean {
   return r.deliverable_index == null || Number(r.deliverable_index) === 1;
 }
@@ -119,11 +118,11 @@ function kpiIsPosted(r: TeamRow): boolean {
 }
 function kpiIsOverdue(r: TeamRow): boolean {
   if (!isParentRow(r)) return false;
-  const reach = r.reach_out_date ? new Date(r.reach_out_date).getTime() : NaN;
-  if (Number.isNaN(reach)) return false;
   const s = kpiStatus(r);
   const pend = kpiIsOnboarded(r) && !kpiIsPosted(r) && !s.includes("ghost");
-  return pend && (Date.now() - reach) / DAY_MS > OVERDUE_DAYS;
+  // Est-delivery anchored (day after), >15d-since-reach fallback — the same
+  // lib/workflow rule the KPI tiles use.
+  return pend && isPastDue(r.est_delivery, r.reach_out_date);
 }
 function matchesFilter(r: TeamRow, f: FilterKey): boolean {
   if (f === "all" || f === "issues") return true; // "issues" handled by _issue flag
@@ -183,9 +182,18 @@ function fmtMoney(n: number | null): string {
 
 
 // ── Row card ────────────────────────────────────────────────────────────────
-function RowCard({ row, onOpen }: { row: FlaggedRow; onOpen: () => void }) {
+function RowCard({
+  row,
+  source = "historic",
+  onOpen,
+}: {
+  row: FlaggedRow;
+  source?: "historic" | "live";
+  onOpen: () => void;
+}) {
   const stage = stageOf(row);
   const meta = STAGE_META[stage];
+  const overdue = kpiIsOverdue(row);
   const igUrl = row.username
     ? `https://www.instagram.com/${row.username}/`
     : null;
@@ -212,8 +220,20 @@ function RowCard({ row, onOpen }: { row: FlaggedRow; onOpen: () => void }) {
             {meta.label}
           </span>
           <span className="text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5 bg-bg-surface text-text-tertiary border border-border">
-            Historic
+            {source === "live" ? "Live" : "Historic"}
           </span>
+          {overdue && (
+            <span
+              className="inline-flex items-center gap-0.5 text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5 bg-danger-bg text-danger-text border border-danger-text/40"
+              title={
+                row.est_delivery
+                  ? `Past the promised delivery date (${fmtDate(row.est_delivery)}) with no post yet`
+                  : "No est. delivery recorded — more than 15 days since reach-out with no post yet"
+              }
+            >
+              <AlertTriangle size={9} aria-hidden /> Overdue
+            </span>
+          )}
           {row._issue && (
             <span
               className="inline-flex items-center gap-0.5 text-[0.55rem] font-extrabold uppercase rounded-full px-1.5 py-0.5 bg-danger-bg text-danger-text border border-danger-text/40"
@@ -240,6 +260,17 @@ function RowCard({ row, onOpen }: { row: FlaggedRow; onOpen: () => void }) {
         <span className="text-[0.58rem] text-text-tertiary">
           {fmtDate(row.post_date ?? row.reach_out_date)}
         </span>
+        {row.est_delivery && stage !== "posted" && stage !== "delivered" && (
+          <span
+            className={cn(
+              "text-[0.56rem] font-bold",
+              overdue ? "text-danger-text" : "text-text-tertiary",
+            )}
+            title="Estimated content delivery date promised at onboarding"
+          >
+            Est. delivery {fmtDate(row.est_delivery)}
+          </span>
+        )}
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -541,7 +572,9 @@ function RowDetailModal({
               >
                 {meta.label}
               </span>
-              <span className="campaign-card__status tabular">Historic</span>
+              <span className="campaign-card__status tabular">
+                {source === "live" ? "Live" : "Historic"}
+              </span>
             </div>
             <h2>@{dash(row.username)}</h2>
             <p className="campaign-detail-subtitle">
@@ -1023,6 +1056,7 @@ export function TeamRowsDrawer({
                   <RowCard
                     key={`${r.post_id_short ?? r.post_id ?? "row"}-${i}`}
                     row={r}
+                    source={source}
                     onOpen={() => setSelected(r)}
                   />
                 ))}

@@ -60,6 +60,29 @@ export const ONBOARDED_ACTIVE_STATUSES = [
 ] as const;
 
 /** True when a workflow_status counts toward the campaign onboarding cap. */
+export const OVERDUE_FALLBACK_DAYS = 15;
+const DAY_MS = 86_400_000;
+
+/**
+ * Overdue anchor rule (2026-07-16): a collab counts overdue only when its
+ * PROMISED date has passed — est_delivery when one was set (overdue from the
+ * day AFTER it), else the legacy >15-days-since-reach-out fallback for rows
+ * that never recorded an est date. Callers must already have excluded
+ * posted/ghosted rows. Shared by the Funnel/Internal tiles, the rows-drawer
+ * Overdue chip, and the Onboarding/Posting stage KPIs — keep them identical.
+ */
+export function isPastDue(
+  estDelivery: unknown,
+  reachOut: unknown,
+  now: number = Date.now(),
+): boolean {
+  const est = estDelivery ? new Date(String(estDelivery)).getTime() : NaN;
+  if (!Number.isNaN(est)) return now >= est + DAY_MS;
+  const reach = reachOut ? new Date(String(reachOut)).getTime() : NaN;
+  if (Number.isNaN(reach)) return false;
+  return (now - reach) / DAY_MS > OVERDUE_FALLBACK_DAYS;
+}
+
 export function isOnboardedActive(status: string | null | undefined): boolean {
   return (
     status === "On Board" ||

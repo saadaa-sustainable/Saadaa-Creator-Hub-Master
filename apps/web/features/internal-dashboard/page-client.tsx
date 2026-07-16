@@ -425,7 +425,7 @@ function KpiStrip({
         icon={<AlertTriangle size={14} aria-hidden />}
         label="Overdue"
         value={totals.overdue}
-        sub=">15 days"
+        sub="Past promised delivery"
         onClick={open("overdue")}
       />
       <HeroKpi

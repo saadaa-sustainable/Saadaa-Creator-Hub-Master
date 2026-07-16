@@ -10,6 +10,15 @@ import type { TierLine } from "./types";
  * exact same split everywhere a version is decided.
  */
 export function TierLinesTable({ lines }: { lines: TierLine[] }) {
+  const totals = lines.reduce(
+    (acc, l) => {
+      acc.creators += Number(l.num_influencers ?? 0);
+      acc.comp += Number(l.total_cost ?? 0);
+      acc.total += Number(l.total_with_garments ?? 0);
+      return acc;
+    },
+    { creators: 0, comp: 0, total: 0 },
+  );
   return (
     <div className="overflow-x-auto rounded-lg border border-border bg-bg-white">
       <table className="w-full min-w-[640px] border-collapse text-[0.74rem]">
@@ -55,6 +64,24 @@ export function TierLinesTable({ lines }: { lines: TierLine[] }) {
             </tr>
           ))}
         </tbody>
+        <tfoot>
+          <tr className="border-t-2 border-[#E7E2D2] bg-bg-surface font-bold text-text-primary">
+            <td className="px-3 py-1.5" colSpan={2}>
+              TOTAL
+            </td>
+            <td className="px-3 py-1.5 text-right tabular-nums">
+              {totals.creators}
+            </td>
+            <td className="px-3 py-1.5" />
+            <td className="px-3 py-1.5 text-right tabular-nums">
+              {formatRupees(totals.comp)}
+            </td>
+            <td className="px-3 py-1.5" colSpan={3} />
+            <td className="px-3 py-1.5 text-right tabular-nums">
+              {formatRupees(totals.total)}
+            </td>
+          </tr>
+        </tfoot>
       </table>
     </div>
   );

@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isPastDue } from "@/lib/workflow";
 import type { OnboardingFilters, OnboardingKpi, OnboardingRow } from "./types";
 
 /**
@@ -101,6 +102,19 @@ export async function fetchOnboardingTable(
   if (error) throw error;
 
   let rows = (data ?? []) as unknown as OnboardingRow[];
+
+  // Overdue only — same rule as the Overdue KPI (est_delivery day-after
+  // anchor, >15d-since-reach fallback): onboarded rows not yet posted whose
+  // promise has lapsed. Reach Out rows never match (not onboarded yet).
+  if (filters.overdue === "yes") {
+    rows = rows.filter((r) => {
+      const status = String(r.workflow_status ?? "").trim().toLowerCase();
+      if (status === "" || status === "reach out") return false;
+      const posted =
+        status.includes("posted") || status.includes("delivered");
+      return !posted && isPastDue(r.est_delivery, r.reach_out_date);
+    });
+  }
 
   // Free-text search is applied CLIENT-SIDE in OnboardingTable (lib/live-search)
   // — instant, no server round trip per keystroke. `filters.q` only seeds the
@@ -376,7 +390,7 @@ export async function fetchOnboardingKpis(
       (supabase as any)
         .from("posts")
         .select(
-          "inf_id, collab_number, collab_id, ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped, workflow_status, reach_out_date, post_link, post_date, deliverable_index",
+          "inf_id, collab_number, collab_id, ads_usage_rights, reels, static_posts, stories, order_id, collab_email_sent_at, collab_email_skipped, workflow_status, reach_out_date, post_link, post_date, deliverable_index, est_delivery",
         )
         .in("workflow_status", ONBOARDED_SET)
         .limit(20000),
@@ -475,20 +489,15 @@ export async function fetchOnboardingKpis(
   const pendingOnboardings = pendingCollabKeys.size;
 
   // Funnel-parity Overdue (same formula as the Dashboard Funnel/Internal
-  // tiles): PARENT rows onboarded but not posted, reached out more than 15
-  // days ago. Counted over the deliverable rows (parent-only ⇒ one per collab).
-  const OVERDUE_DAYS = 15;
-  const DAY_MS = 86_400_000;
+  // tiles): PARENT rows onboarded but not posted whose promised est_delivery
+  // has passed (day after); rows without one fall back to >15 days since
+  // reach-out (lib/workflow isPastDue). One per collab (parent-only).
   const nowMs = Date.now();
   let overdue = 0;
   for (const r of onboardedDeliverables) {
     const isParent =
       r.deliverable_index == null || Number(r.deliverable_index) === 1;
     if (!isParent) continue;
-    const reach = r.reach_out_date
-      ? new Date(String(r.reach_out_date)).getTime()
-      : NaN;
-    if (Number.isNaN(reach)) continue;
     const status = String(r.workflow_status ?? "").trim().toLowerCase();
     const looksPosted =
       status.includes("posted") ||
@@ -497,7 +506,8 @@ export async function fetchOnboardingKpis(
       /instagram\.com|youtube\.com|youtu\.be|^https?:/i.test(
         String(r.post_link ?? ""),
       );
-    if (!looksPosted && (nowMs - reach) / DAY_MS > OVERDUE_DAYS) overdue++;
+    if (!looksPosted && isPastDue(r.est_delivery, r.reach_out_date, nowMs))
+      overdue++;
   }
 
   let adRightsSelected = 0;

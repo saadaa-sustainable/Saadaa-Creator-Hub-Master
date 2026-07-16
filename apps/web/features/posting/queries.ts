@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isPastDue } from "@/lib/workflow";
 import type { PostingFilters, PostingKpi, PostingRow } from "./types";
 
 /**
@@ -68,6 +69,7 @@ export async function fetchPostingTable(
       partnership_id,
       partnership_status,
       est_delivery,
+      reach_out_date,
       deliverable_index,
       deliverable_type,
       collab_number,
@@ -129,6 +131,19 @@ export async function fetchPostingTable(
     rows = rows.filter((r) => ADS_YES(r.ads_usage_rights));
   } else if (adsFilter === "no") {
     rows = rows.filter((r) => !ADS_YES(r.ads_usage_rights));
+  }
+
+  // Overdue only — same rule as the Overdue KPI (est_delivery day-after
+  // anchor, >15d-since-reach fallback), applied to not-yet-posted rows.
+  if (filters.overdue === "yes") {
+    rows = rows.filter((r) => {
+      const status = String(r.workflow_status ?? "").trim().toLowerCase();
+      const posted =
+        status.includes("posted") ||
+        status.includes("delivered") ||
+        !!r.post_date;
+      return !posted && isPastDue(r.est_delivery, r.reach_out_date);
+    });
   }
 
   // Free-text search is applied CLIENT-SIDE in PostingTable (lib/live-search)
@@ -303,11 +318,10 @@ export async function fetchPostingKpis(
   let totalPostsSubmitted = 0; // post_ids Posted
   let delayedPosts = 0; // Posted post_ids whose post_date > est_delivery
   // Funnel-parity Overdue (same formula as the Dashboard Funnel/Internal
-  // tiles): PARENT rows (one collab = 1) onboarded but not posted, reached out
-  // more than 15 days ago. Matches the Overdue tile count on the dashboards.
+  // tiles): PARENT rows (one collab = 1) not yet posted whose promised
+  // est_delivery has passed (day after); no est date → >15 days since
+  // reach-out fallback (lib/workflow isPastDue).
   let overdue = 0;
-  const OVERDUE_DAYS = 15;
-  const DAY_MS = 86_400_000;
   const now = Date.now();
 
   for (const r of rows) {
@@ -335,20 +349,12 @@ export async function fetchPostingKpis(
       totalPostsDue++;
       const isParent =
         r.deliverable_index == null || Number(r.deliverable_index) === 1;
-      const reach = r.reach_out_date
-        ? new Date(String(r.reach_out_date)).getTime()
-        : NaN;
       const looksPosted =
         !!r.post_date ||
         /instagram\.com|youtube\.com|youtu\.be|^https?:/i.test(
           String(r.post_link ?? ""),
         );
-      if (
-        isParent &&
-        !Number.isNaN(reach) &&
-        !looksPosted &&
-        (now - reach) / DAY_MS > OVERDUE_DAYS
-      ) {
+      if (isParent && !looksPosted && isPastDue(r.est_delivery, r.reach_out_date, now)) {
         overdue++;
       }
     }
