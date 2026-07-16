@@ -203,8 +203,9 @@ function RowCard({
       style={{ borderLeft: `3px solid ${meta.accent}` }}
     >
       <InstagramPreviewCard
-        pic={row.creator_pic ?? row.profile_pic}
+        pic={row.post_thumbnail ?? row.creator_pic ?? row.profile_pic}
         link={row.post_link}
+        mediaUrl={row.post_media}
         username={row.username}
         size={60}
       />
@@ -630,8 +631,9 @@ function RowDetailModal({
             <div className="campaign-detail-allocation-card ad-detail-profile-card">
               <div className="ad-detail-avatar-frame">
                 <InstagramPreviewCard
-                  pic={row.creator_pic ?? row.profile_pic}
+                  pic={row.post_thumbnail ?? row.creator_pic ?? row.profile_pic}
                   link={row.post_link}
+                  mediaUrl={row.post_media}
                   username={row.username}
                   size={84}
                 />

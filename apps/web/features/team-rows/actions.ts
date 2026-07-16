@@ -54,6 +54,10 @@ export interface TeamRow {
   collab_number: number | null;
   deliverable_index: number | null;
   posted_by: string | null;
+  /** Live rows only — mirrored reel video + cover (posts.post_media/_thumbnail).
+   *  Historic rows have no mirrors; the lightbox falls back to the IG embed. */
+  post_media?: string | null;
+  post_thumbnail?: string | null;
   /** Fresher avatar from the creators table (scrape-updated) — preferred over
    *  the archive's frozen profile_pic. Both are usually fbcdn URLs; the UI
    *  renders them raw with referrerPolicy=no-referrer and falls back to initials. */
@@ -84,7 +88,7 @@ const LIVE_COLS = [
   "order_status", "garment_qty", "garments_sent", "reach_out_date", "onboard_date",
   "post_date", "est_delivery", "post_link", "download_link", "email",
   "onboarded_by", "logged_by", "posted_by", "agency_name", "state", "city", "notes",
-  "post_number", "collab_number", "deliverable_index",
+  "post_number", "collab_number", "deliverable_index", "post_media", "post_thumbnail",
 ].join(",");
 
 /**

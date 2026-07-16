@@ -84,7 +84,8 @@ export function PostingOverviewModal({
             <div className="ob-overview-head">
               <InstagramPreviewCard
                 link={row.post_link}
-                pic={row.creator?.profile_pic}
+                pic={row.post_thumbnail ?? row.creator?.profile_pic}
+                mediaUrl={row.post_media}
                 username={row.creator?.username}
                 size={56}
               />
