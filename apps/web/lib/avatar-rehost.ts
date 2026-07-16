@@ -18,9 +18,22 @@ export async function rehostAvatar(
   username: string,
   srcUrl: string | null | undefined,
 ): Promise<string | null> {
-  const src = (srcUrl ?? "").trim();
   const user = (username ?? "").trim().toLowerCase();
-  if (!src || !user) return null;
+  if (!user) return null;
+  return rehostImage(`${user}.jpg`, srcUrl);
+}
+
+/**
+ * Generic mirror: download `srcUrl` (a signed Instagram CDN link) and store
+ * it at `path` inside the public `avatars` bucket, returning the durable
+ * public URL. Also used for POST thumbnails (`post-thumbs/{post_id}.jpg`).
+ */
+export async function rehostImage(
+  path: string,
+  srcUrl: string | null | undefined,
+): Promise<string | null> {
+  const src = (srcUrl ?? "").trim();
+  if (!src || !path) return null;
   // Already durable (our bucket or any non-Instagram host) — nothing to do.
   if (!/fbcdn\.net|cdninstagram\.com/i.test(src)) return null;
 
@@ -34,7 +47,6 @@ export async function rehostAvatar(
     if (buf.byteLength === 0 || buf.byteLength > 5_000_000) return null;
 
     const supabase = createServiceClient();
-    const path = `${user}.jpg`;
     const { error } = await (supabase as any).storage
       .from("avatars")
       .upload(path, buf, {
@@ -42,7 +54,7 @@ export async function rehostAvatar(
         upsert: true,
       });
     if (error) {
-      console.warn(`[avatar-rehost] upload ${user}: ${error.message}`);
+      console.warn(`[avatar-rehost] upload ${path}: ${error.message}`);
       return null;
     }
     const { data } = (supabase as any).storage
@@ -51,7 +63,7 @@ export async function rehostAvatar(
     return (data?.publicUrl as string | undefined) ?? null;
   } catch (e) {
     console.warn(
-      `[avatar-rehost] ${user}: ${e instanceof Error ? e.name : "failed"}`,
+      `[avatar-rehost] ${path}: ${e instanceof Error ? e.name : "failed"}`,
     );
     return null;
   }

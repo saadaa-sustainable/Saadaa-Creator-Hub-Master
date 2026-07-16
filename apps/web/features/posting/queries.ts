@@ -61,6 +61,7 @@ export async function fetchPostingTable(
       order_status,
       tracking_id,
       post_link,
+      post_thumbnail,
       download_link,
       raw_dump,
       partnership_id,

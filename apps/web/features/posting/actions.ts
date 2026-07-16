@@ -18,6 +18,7 @@ import {
 } from "@/lib/instagram-shortcode";
 import { fetchPostByShortcode, isMetaGraphConfigured } from "@/lib/meta-graph";
 import { checkMetaGate, recordMetaUsage } from "@/lib/meta-rate-limit";
+import { rehostImage } from "@/lib/avatar-rehost";
 import { PostingSchema } from "./schema";
 
 export type PostingResult =
@@ -193,12 +194,16 @@ export async function submitPosting(input: unknown) {
   // approval. The corrected onboarding (e.g. a fixed order_id) must be ratified
   // before any -P{n} deliverable can be marked Posted.
   let collabKey: string | null = null;
+  let postUsername: string | null = null;
   {
     const { data: postRow } = await (supabase as any)
       .from("posts")
-      .select("collab_id, inf_id, collab_number, collab_type, bank_name, bank_number, ifsc")
+      .select(
+        "collab_id, inf_id, collab_number, collab_type, bank_name, bank_number, ifsc, username",
+      )
       .eq("post_id", postId)
       .maybeSingle();
+    postUsername = (postRow?.username as string | null) ?? null;
     collabKey =
       (postRow?.collab_id as string | null) ||
       (postRow?.inf_id
@@ -283,6 +288,38 @@ export async function submitPosting(input: unknown) {
     .eq("post_id", postId);
 
   if (updErr) return { ok: false as const, error: updErr.message };
+
+  // Capture the POST's cover image (fire-and-forget): probe the creator's
+  // recent media for this shortcode and mirror thumbnail_url into storage —
+  // Meta's link is signed and dies in days, the bucket copy doesn't. Skips
+  // quietly when the gate is cooling; the UI falls back to the avatar.
+  {
+    const shortcodeForThumb = extractShortcode(postLink);
+    const handleForThumb = (postUsername ?? "").trim();
+    if (shortcodeForThumb && handleForThumb) {
+      after(async () => {
+        try {
+          const gate = await checkMetaGate();
+          if (gate.coolingDown) return;
+          const probe = await fetchPostByShortcode(
+            handleForThumb,
+            shortcodeForThumb,
+          );
+          await recordMetaUsage(1, probe.usagePct ?? 0);
+          const src = probe.node?.thumbnailUrl ?? probe.node?.mediaUrl;
+          if (probe.status !== "ok" || !src) return;
+          const hosted = await rehostImage(`post-thumbs/${postId}.jpg`, src);
+          if (!hosted) return;
+          await (supabase as any)
+            .from("posts")
+            .update({ post_thumbnail: hosted })
+            .eq("post_id", postId);
+        } catch (e) {
+          console.warn(`[posting] thumbnail capture ${postId}:`, e);
+        }
+      });
+    }
+  }
 
   // Bank details supplied in the posting form → stamp them on EVERY deliverable
   // of the collab (payments read them from the representative row). Covers

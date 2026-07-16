@@ -31,6 +31,8 @@ export interface PostingRow {
   order_status?: string | null;
   tracking_id?: PostsRow["tracking_id"];
   post_link?: string | null;
+  /** Durable re-hosted post cover (post-thumbs/{post_id}.jpg). */
+  post_thumbnail?: string | null;
   download_link?: string | null;
   raw_dump?: string | null;
   partnership_id?: string | null;

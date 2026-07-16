@@ -301,7 +301,7 @@ function PostingListRow({
       <div className="stage-campaign-identity">
         <InstagramPreviewCard
           link={r.post_link}
-          pic={r.creator?.profile_pic}
+          pic={r.post_thumbnail ?? r.creator?.profile_pic}
           username={r.creator?.username}
           size={46}
         />
@@ -438,7 +438,7 @@ function CollabGroupSection({
         aria-expanded={expanded}
       >
         <InstagramPreviewCard
-          pic={rep.creator?.profile_pic}
+          pic={rep.post_thumbnail ?? rep.creator?.profile_pic}
           username={rep.creator?.username}
           size={46}
         />
@@ -551,7 +551,7 @@ function PostingCard({
       <div className="ob-card-head">
         <InstagramPreviewCard
           link={r.post_link}
-          pic={r.creator?.profile_pic}
+          pic={r.post_thumbnail ?? r.creator?.profile_pic}
           username={r.creator?.username}
           size={44}
           className="ob-card-avatar"
