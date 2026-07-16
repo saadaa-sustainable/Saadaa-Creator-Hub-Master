@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import {
   Calendar,
   Check,
+  ChevronDown,
+  ChevronRight,
   Clock3,
   ExternalLink,
   Eye,
@@ -23,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { formatDate, formatRupees } from "@/lib/formatters";
+import { TierLinesTable } from "@/features/budget/tier-lines-table";
 import {
   approveCampaign,
   approveCampaignEditRequest,
@@ -426,6 +429,9 @@ function BudgetApprovalCard({
   const [pending, start] = useTransition();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
+  // The split defaults open — a Global Admin should see what they're
+  // sanctioning without an extra click.
+  const [splitOpen, setSplitOpen] = useState(true);
 
   const isInitial = b.versionNumber === 0;
   const monthText = b.month
@@ -507,6 +513,26 @@ function BudgetApprovalCard({
         />
         <Metric icon={Calendar} label="Month" value={monthText || "-"} />
       </div>
+
+      {b.tierLines.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setSplitOpen((o) => !o)}
+            className="inline-flex items-center gap-1 self-start text-[0.68rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary hover:text-text-primary"
+            aria-expanded={splitOpen}
+          >
+            {splitOpen ? (
+              <ChevronDown size={12} aria-hidden />
+            ) : (
+              <ChevronRight size={12} aria-hidden />
+            )}
+            Budget split · {b.tierLines.length} tier
+            {b.tierLines.length > 1 ? "s" : ""}
+          </button>
+          {splitOpen && <TierLinesTable lines={b.tierLines} />}
+        </div>
+      )}
 
       {!canAct && (
         <span className="inline-flex items-center gap-1 self-start rounded-[9px] bg-[#F7F3EC] px-2.5 py-1.5 text-[0.72rem] font-semibold text-text-secondary">

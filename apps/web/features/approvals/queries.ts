@@ -5,6 +5,7 @@ import {
   type OnboardingEditItem,
 } from "@/features/onboarding/edit-fields";
 import { buildCampaignChanges, type CampaignChange } from "./campaign-diff";
+import type { TierLine } from "@/features/budget/types";
 
 export type { OnboardingEditItem };
 
@@ -52,6 +53,10 @@ export interface BudgetApprovalItem {
   reason: string | null;
   createdBy: string | null;
   createdAt: string | null;
+  /** The budget split behind this version — campaign_budget tier lines for a
+   *  V0, the parked draft `lines` for a pending top-up. Shown on the approval
+   *  card so Global Admins see exactly what they're sanctioning. */
+  tierLines: TierLine[];
 }
 
 export type ApprovalHistoryStatus =
@@ -145,7 +150,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
     svc
       .from("campaign_budget_versions")
       .select(
-        "id, campaign_id, version_number, kind, month, amount, num_creators, note, created_by, created_at",
+        "id, campaign_id, version_number, kind, month, amount, num_creators, note, created_by, created_at, lines",
       )
       .eq("status", "pending_approval")
       .eq("is_test", false)
@@ -195,19 +200,47 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
       );
     }
   }
-  const budgets: BudgetApprovalItem[] = budgetRaw.map((r) => ({
-    versionId: asNumber(r.id) ?? 0,
-    campaignId: String(r.campaign_id ?? ""),
-    campaignName: campaignNameById.get(String(r.campaign_id ?? "")) ?? null,
-    versionNumber: asNumber(r.version_number) ?? 0,
-    kind: (String(r.kind ?? "top_up") as BudgetApprovalItem["kind"]),
-    month: String(r.month ?? ""),
-    amount: asNumber(r.amount) ?? 0,
-    numCreators: asNumber(r.num_creators) ?? 0,
-    reason: asString(r.note),
-    createdBy: asString(r.created_by),
-    createdAt: asString(r.created_at),
-  }));
+  // Budget split behind each pending version: a V0's tier lines already live
+  // in campaign_budget (linked by version_id at submit); a pending top-up
+  // parks its draft lines in the version's `lines` jsonb until approval.
+  const pendingIds = budgetRaw
+    .map((r) => asNumber(r.id))
+    .filter((n): n is number => n != null && n > 0);
+  const linesByVersion = new Map<number, TierLine[]>();
+  if (pendingIds.length > 0) {
+    const { data: budgetLines } = await svc
+      .from("campaign_budget")
+      .select(
+        "id, version_id, tier, collab_type, num_influencers, avg_comp, total_cost, min_garments, max_garments, est_garment_cost, total_with_garments",
+      )
+      .in("version_id", pendingIds);
+    for (const l of (budgetLines ?? []) as Raw[]) {
+      const vid = asNumber(l.version_id);
+      if (vid == null) continue;
+      const list = linesByVersion.get(vid) ?? [];
+      list.push(l as unknown as TierLine);
+      linesByVersion.set(vid, list);
+    }
+  }
+  const budgets: BudgetApprovalItem[] = budgetRaw.map((r) => {
+    const versionId = asNumber(r.id) ?? 0;
+    const stored = linesByVersion.get(versionId) ?? [];
+    const drafts = Array.isArray(r.lines) ? (r.lines as TierLine[]) : [];
+    return {
+      versionId,
+      campaignId: String(r.campaign_id ?? ""),
+      campaignName: campaignNameById.get(String(r.campaign_id ?? "")) ?? null,
+      versionNumber: asNumber(r.version_number) ?? 0,
+      kind: (String(r.kind ?? "top_up") as BudgetApprovalItem["kind"]),
+      month: String(r.month ?? ""),
+      amount: asNumber(r.amount) ?? 0,
+      numCreators: asNumber(r.num_creators) ?? 0,
+      reason: asString(r.note),
+      createdBy: asString(r.created_by),
+      createdAt: asString(r.created_at),
+      tierLines: stored.length > 0 ? stored : drafts,
+    };
+  });
   const pendingV0Campaigns = new Set(
     budgets.filter((b) => b.versionNumber === 0).map((b) => b.campaignId),
   );
