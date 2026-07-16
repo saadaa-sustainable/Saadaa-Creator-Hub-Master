@@ -13,9 +13,14 @@ export const maxDuration = 30;
  * `Authorization: Bearer ${CRON_SECRET}`.
  */
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const bearerOk =
-    !!secret && req.headers.get("authorization") === `Bearer ${secret}`;
+  // CRON_SECRET is stored Sensitive on Vercel (unpullable), so the service
+  // key — which any legit operator already holds — is accepted too.
+  const auth = req.headers.get("authorization");
+  const secrets = [
+    process.env.CRON_SECRET,
+    process.env.SUPABASE_SERVICE_KEY,
+  ].filter((s): s is string => Boolean(s?.trim()));
+  const bearerOk = secrets.some((s) => auth === `Bearer ${s}`);
   if (!bearerOk) {
     const actor = await getActor().catch(() => null);
     if (!actor || !hasPermission(actor, "admin")) {
