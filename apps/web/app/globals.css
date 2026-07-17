@@ -12141,12 +12141,19 @@ body:has(.km-backdrop) {
 /* Kanban board — 3 columns, horizontal scroll on small screens. */
 .acc-kanban {
   display: grid;
-  grid-template-columns: repeat(3, minmax(320px, 1fr));
+  /* 4 lanes in ONE row (Onboarded · Posted · Payments · Partial) — the strip
+     scrolls sideways when tight, same pattern as the Stage Snapshot board. */
+  grid-template-columns: repeat(4, minmax(300px, 1fr));
   gap: 14px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
 }
 @media (max-width: 1024px) {
   .acc-kanban {
-    grid-template-columns: repeat(3, 320px);
+    grid-template-columns: repeat(4, 320px);
     overflow-x: auto;
     padding-bottom: 8px;
     scroll-snap-type: x mandatory;

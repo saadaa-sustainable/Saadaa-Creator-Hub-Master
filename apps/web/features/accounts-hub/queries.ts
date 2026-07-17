@@ -555,7 +555,7 @@ export async function fetchPayableEligiblePosts(): Promise<
     .from("posts")
     .select(
       `
-      post_id, post_id_short, commercial_amount, campaign_id, workflow_status,
+      post_id, post_id_short, commercial_amount, campaign_id, workflow_status, collab_type,
       ads_usage_rights, partnership_id, ad_partnership_valid, partnership_status, partnership_approved_at, deliverable_index,
       post_link, post_date, inf_id, collab_number, collab_id,
       creator:creators ( username, inf_name, profile_pic )
@@ -615,9 +615,16 @@ export async function fetchPayableEligiblePosts(): Promise<
     }
   }
 
-  // Return one representative row per ready collab.
+  // Return one representative row per ready collab. Pure Barter (₹0 cash)
+  // collabs are never payable — they must not appear in the payment dropdown
+  // or the CSV template.
   return Array.from(repByCollab.entries())
     .filter(([key]) => readyKeys.has(key))
+    .filter(([key, r]) => {
+      const pureBarter =
+        String(r.collab_type ?? "").trim().toLowerCase() === "barter";
+      return !pureBarter && (collabTotal.get(key) ?? 0) > 0;
+    })
     .map(([key, r]) => ({
       post_id: r.post_id,
       post_id_short: r.post_id_short ?? null,

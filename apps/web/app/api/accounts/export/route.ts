@@ -57,6 +57,9 @@ export async function GET(request: Request) {
     return true;
   });
 
+  // Match Status (UTR ↔ ledger verification) only means something once money
+  // moved — the Due worklist is pre-payment, so the column is dropped there.
+  const withMatch = mode !== "due";
   const header = [
     "Post ID",
     "Collab ID",
@@ -72,7 +75,7 @@ export async function GET(request: Request) {
     "Status",
     "Due Date",
     "Estimated Payable Date",
-    "Match Status",
+    ...(withMatch ? ["Match Status"] : []),
     "Logged By",
     "Created At",
   ];
@@ -117,7 +120,7 @@ export async function GET(request: Request) {
         r.payment?.status ?? "",
         r.payment?.due_date ?? "",
         r.payment?.estimated_payable_date ?? "",
-        matchStatus,
+        ...(withMatch ? [matchStatus] : []),
         r.payment?.logged_by ?? "",
         r.payment?.created_at ?? "",
       ]
