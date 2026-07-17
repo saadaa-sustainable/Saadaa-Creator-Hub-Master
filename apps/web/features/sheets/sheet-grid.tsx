@@ -236,6 +236,9 @@ export function SheetGrid({
     x: number;
     y: number;
   } | null>(null);
+  // Funnel/tint changes re-filter (client) or re-fetch (server) a big grid —
+  // run them as transitions so the click paints immediately (INP fix).
+  const [, startFilterTransition] = useTransition();
   // Server mode: whole-table option lists for the open funnel menu (the
   // loaded page alone hides values living on other pages).
   const [serverMenuOptions, setServerMenuOptions] = useState<
@@ -1078,7 +1081,9 @@ export function SheetGrid({
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setTintFilter(opt.id)}
+                  onClick={() =>
+                    startFilterTransition(() => setTintFilter(opt.id))
+                  }
                   aria-pressed={tintFilter === opt.id}
                   title={
                     opt.id === "green"
@@ -1125,7 +1130,9 @@ export function SheetGrid({
           {colFilters.size > 0 && (
             <button
               type="button"
-              onClick={() => setColFilters(new Map())}
+              onClick={() =>
+                startFilterTransition(() => setColFilters(new Map()))
+              }
               title="Remove every column filter"
               className="inline-flex items-center gap-1 px-2 h-8 rounded-lg border border-[--accent] bg-[--accent]/10 text-text-primary text-[0.62rem] font-extrabold hover:bg-[--accent]/20 transition-colors"
             >
@@ -1750,22 +1757,30 @@ export function SheetGrid({
           loading={isServer && serverMenuOptions === null}
           selected={colFilters.get(filterMenu.key) ?? null}
           onToggle={(value, allValues) =>
-            toggleFilterValue(filterMenu.key, value, allValues)
+            startFilterTransition(() =>
+              toggleFilterValue(filterMenu.key, value, allValues),
+            )
           }
           onBulk={(values, mode, allValues) =>
-            bulkFilterValues(filterMenu.key, values, mode, allValues)
+            startFilterTransition(() =>
+              bulkFilterValues(filterMenu.key, values, mode, allValues),
+            )
           }
           onOnly={(value) =>
-            setColFilters((prev) =>
-              new Map(prev).set(filterMenu.key, new Set([value])),
+            startFilterTransition(() =>
+              setColFilters((prev) =>
+                new Map(prev).set(filterMenu.key, new Set([value])),
+              ),
             )
           }
           onClear={() =>
-            setColFilters((prev) => {
-              const next = new Map(prev);
-              next.delete(filterMenu.key);
-              return next;
-            })
+            startFilterTransition(() =>
+              setColFilters((prev) => {
+                const next = new Map(prev);
+                next.delete(filterMenu.key);
+                return next;
+              }),
+            )
           }
           onClose={() => setFilterMenu(null)}
         />
