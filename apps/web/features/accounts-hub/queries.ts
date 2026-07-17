@@ -21,8 +21,10 @@ import type { AccountsFilters, AccountsKpi, AccountsRow } from "./types";
  * Service-role client used because page-level RBAC has already gated access.
  * Filter options are derived from the same dataset (no extra fetches).
  */
+// Reach Out intentionally absent — no order/payment yet (types.ts). Keeping it
+// in the fetch pulled the whole 2.5k reach-out corpus into the 2000-row cap and
+// silently dropped the OLDEST rows — including real payable Posted collabs.
 const PAYABLE_STAGES = [
-  "Reach Out",
   "On Board",
   "Order Sent",
   "Posted",
@@ -97,7 +99,7 @@ export async function fetchAccountsHubData(
 
   const { data: postsRaw, error: postsErr } = await postsQuery
     .order("reach_out_date", { ascending: false, nullsFirst: false })
-    .limit(2000);
+    .limit(5000);
 
   if (postsErr) throw postsErr;
   const allDeliverables = (postsRaw ?? []) as Array<
@@ -224,6 +226,12 @@ export async function fetchAccountsHubData(
     (p) =>
       p.post_id &&
       payableStages.has(p.workflow_status as string) &&
+      // Pure Barter = ₹0 cash — never draft a payment for it (a ₹0 "Not Due"
+      // row put barter collabs in every payment surface; cleaned 2026-07-17).
+      String((p as Record<string, unknown>).collab_type ?? "")
+        .trim()
+        .toLowerCase() !== "barter" &&
+      Number(p.commercial_amount ?? 0) > 0 &&
       !paymentsByPostId.has(p.post_id!),
   );
 

@@ -51,15 +51,20 @@ export async function fetchBudgetPage(): Promise<BudgetPageData> {
     linesByVersion.set(vid, list);
   }
 
-  const rows: BudgetVersionRow[] = versions.map((v) => ({
-    ...v,
-    amount: Number(v.amount ?? 0),
-    campaignName: nameById.get(v.campaign_id) ?? null,
-    tierLines: linesByVersion.get(v.id) ?? [],
-    draftLines: Array.isArray((v as unknown as { lines?: unknown }).lines)
-      ? ((v as unknown as { lines: TierLine[] }).lines)
-      : [],
-  }));
+  const rows: BudgetVersionRow[] = versions
+    // Rejected versions never carried money — they clutter the Budget tab
+    // (a campaign whose V0 was rejected showed as a ₹0 group). They stay
+    // visible in Approvals history; the Budget tab shows live money only.
+    .filter((v) => v.status !== "rejected")
+    .map((v) => ({
+      ...v,
+      amount: Number(v.amount ?? 0),
+      campaignName: nameById.get(v.campaign_id) ?? null,
+      tierLines: linesByVersion.get(v.id) ?? [],
+      draftLines: Array.isArray((v as unknown as { lines?: unknown }).lines)
+        ? ((v as unknown as { lines: TierLine[] }).lines)
+        : [],
+    }));
 
   // month → campaign → rows
   const byMonth = new Map<string, Map<string, BudgetVersionRow[]>>();

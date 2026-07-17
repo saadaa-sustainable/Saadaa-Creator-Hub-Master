@@ -14,7 +14,7 @@ import { buildCampaignChanges } from "./campaign-diff";
  * admin decided on. Opened by clicking the history row.
  */
 export interface ApprovalHistoryDetail {
-  kind: "onboarding_edit" | "campaign_edit";
+  kind: "onboarding_edit" | "campaign_edit" | "budget" | "log_entry";
   entityId: string;
   status: string | null;
   requestedBy: string | null;
@@ -113,6 +113,74 @@ export async function getApprovalHistoryDetail(input: {
         changes,
       },
     };
+  }
+
+  if (type.includes("budget")) {
+    // Budget log entity_id format: "IFC006 · V0" (or "version #123").
+    const m = /^(\S+)\s+·\s+V(\d+)$/.exec(entityId);
+    if (m) {
+      const { data } = await supabase
+        .from("campaign_budget_versions")
+        .select(
+          "campaign_id, version_number, kind, month, amount, num_creators, status, note, gap_reason, created_by, approved_by, approved_at",
+        )
+        .eq("campaign_id", m[1])
+        .eq("version_number", Number(m[2]))
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) {
+        const rupees = (n: unknown) =>
+          `₹${Number(n ?? 0).toLocaleString("en-IN")}`;
+        const monthText = data.month
+          ? new Date(`${String(data.month).slice(0, 10)}T00:00:00Z`).toLocaleString(
+              "en-IN",
+              { month: "long", year: "numeric", timeZone: "UTC" },
+            )
+          : null;
+        const changes = [
+          { label: "Amount", before: null, after: rupees(data.amount) },
+          { label: "Version", before: null, after: `V${data.version_number}` },
+          {
+            label: "Kind",
+            before: null,
+            after:
+              data.kind === "initial"
+                ? "First budget"
+                : data.kind === "carry_forward"
+                  ? "Carry-forward"
+                  : "Top-up",
+          },
+          ...(monthText
+            ? [{ label: "Month", before: null, after: monthText }]
+            : []),
+          ...(Number(data.num_creators ?? 0) > 0
+            ? [
+                {
+                  label: "Creators",
+                  before: null,
+                  after: String(data.num_creators),
+                },
+              ]
+            : []),
+          ...(data.gap_reason
+            ? [{ label: "Gap reason", before: null, after: data.gap_reason }]
+            : []),
+        ];
+        return {
+          ok: true,
+          detail: {
+            kind: "budget",
+            entityId,
+            status: data.status ?? null,
+            requestedBy: data.created_by ?? null,
+            decidedBy: data.approved_by ?? null,
+            reason: data.note ?? null,
+            changes,
+          },
+        };
+      }
+    }
   }
 
   return { ok: false, error: "No stored detail for this entry type." };

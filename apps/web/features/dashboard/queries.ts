@@ -413,7 +413,10 @@ export async function fetchDashboardData(
     const isChild =
       p.deliverable_index != null && Number(p.deliverable_index) > 1;
     if (!isChild) {
+      const isPureBarter =
+        String(p.collab_type ?? "").trim().toLowerCase() === "barter";
       if (
+        !isPureBarter &&
         (statusLow.includes("posted") || statusLow.includes("delivered")) &&
         isPaymentPendingStatus(payStatus)
       ) {

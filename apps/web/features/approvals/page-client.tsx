@@ -841,22 +841,32 @@ function HistoryRow({ item }: { item: ApprovalHistoryItem }) {
   const [detail, setDetail] = useState<ApprovalHistoryDetail | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Every entry opens the detail popup. When no richer stored record exists
+  // (e.g. a straight campaign approval with no edit request), the popup shows
+  // the log row's own facts instead of a dead-end toast.
+  const fallbackDetail = (): ApprovalHistoryDetail => ({
+    kind: "log_entry",
+    entityId: item.entityId,
+    status: item.action ?? item.status ?? null,
+    requestedBy: null,
+    decidedBy: item.actor ?? null,
+    reason: item.notes ?? null,
+    changes: [
+      { label: "Type", before: null, after: item.actionType },
+      { label: "Action", before: null, after: item.action },
+      ...(item.at
+        ? [{ label: "When", before: null, after: formatDate(item.at) ?? "" }]
+        : []),
+    ],
+  });
   const openDetail = () => {
-    if (!isEdit && !item.actionType.toLowerCase().includes("campaign")) {
-      toast.info("No stored detail for this entry.");
-      return;
-    }
     setLoading(true);
     getApprovalHistoryDetail({
       actionType: item.actionType,
       entityId: item.entityId,
     }).then((res) => {
       setLoading(false);
-      if (!res.ok) {
-        toast.info(res.error);
-        return;
-      }
-      setDetail(res.detail);
+      setDetail(res.ok ? res.detail : fallbackDetail());
     });
   };
 
@@ -942,7 +952,11 @@ function HistoryDetailModal({
             <h2 className="font-semibold">
               {detail.kind === "onboarding_edit"
                 ? "Onboarding Edit"
-                : "Campaign Edit"}{" "}
+                : detail.kind === "campaign_edit"
+                  ? "Campaign Edit"
+                  : detail.kind === "budget"
+                    ? "Budget Version"
+                    : "Approval Entry"}{" "}
               — {detail.entityId}
             </h2>
             <p className="text-[0.66rem] text-text-secondary">
