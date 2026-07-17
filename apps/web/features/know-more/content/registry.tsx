@@ -9,6 +9,7 @@ import AdStatusKM from "./ad-status";
 import ApprovalsKM from "./approvals";
 import AuditLogKM from "./audit-log";
 import BudgetKM from "./budget";
+import CalendarKM from "./calendar";
 import CampaignsKM from "./campaigns";
 import ComplianceKM from "./compliance";
 import CostAnalyticsKM from "./cost-analytics";
@@ -36,6 +37,7 @@ import UserPanelKM from "./user-panel";
 
 export const KM_REGISTRY: Record<string, ComponentType> = {
   dashboard: DashboardKM,
+  calendar: CalendarKM,
   campaigns: CampaignsKM,
   "reach-out-outbound": ReachOutOutboundKM,
   "reach-out-inbound": ReachOutInboundKM,

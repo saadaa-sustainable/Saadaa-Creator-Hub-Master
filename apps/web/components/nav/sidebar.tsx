@@ -26,6 +26,7 @@ import {
   LogOut,
   X,
   type LucideIcon,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { hasPermission } from "@/lib/rbac";
@@ -111,6 +112,7 @@ const NAV: NavSection[] = [
         icon: UserMinus,
         show: (a) => hasPermission(a, "offboarding_write"),
       },
+      { label: "Calendar", href: "/calendar", icon: CalendarDays },
     ],
   },
   {

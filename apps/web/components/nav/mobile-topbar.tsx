@@ -20,6 +20,7 @@ const SECTION_TITLES: Array<[string, string]> = [
   ["/journey", "Influencer Journey"],
   ["/my-dashboard", "My Dashboard"],
   ["/offboarding", "Offboarding"],
+  ["/calendar", "Calendar"],
   ["/onboarding", "Creator Onboarding"],
   ["/order-status", "Order Status"],
   ["/orders", "Orders"],
