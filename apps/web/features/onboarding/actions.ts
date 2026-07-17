@@ -527,30 +527,40 @@ export async function submitOnboarding(
   ]);
 
   // Garment-limit flag (2026-07-17 spec): an order exceeding the campaign's
-  // max garment quantity (highest max_garments across its budget tiers) is
-  // FLAGGED to the Error Panel — the onboarding submit itself is never
-  // blocked. Best-effort via after().
+  // max garment quantity for THIS COLLAB TYPE is FLAGGED to the Error Panel —
+  // the onboarding submit itself is never blocked. Campaign budget lines carry
+  // collab_type Barter / Paid: an onboarded "Barter + Paid" collab is judged
+  // against the campaign's PAID lines, a pure Barter collab against its
+  // Barter lines (fallback: max across all lines when no type matches).
   {
     const campaignIdForFlag = String(parent.campaign_id ?? "").trim();
     const qtyNum = Number(garmentQty ?? 0);
     if (campaignIdForFlag && qtyNum > 0) {
+      const lineType = v.collabType === "Barter" ? "barter" : "paid";
       after(async () => {
         try {
           const { data: capRows } = await (supabase as any)
             .from("campaign_budget")
-            .select("max_garments")
+            .select("max_garments, collab_type")
             .eq("campaign_id", campaignIdForFlag);
+          const rows = (capRows ?? []) as Array<{
+            max_garments: number | null;
+            collab_type: string | null;
+          }>;
+          const typed = rows.filter(
+            (r) =>
+              String(r.collab_type ?? "").trim().toLowerCase() === lineType,
+          );
+          const pool = typed.length > 0 ? typed : rows;
           const maxAllowed = Math.max(
             0,
-            ...((capRows ?? []) as Array<{ max_garments: number | null }>).map(
-              (r) => Number(r.max_garments ?? 0),
-            ),
+            ...pool.map((r) => Number(r.max_garments ?? 0)),
           );
           if (maxAllowed > 0 && qtyNum > maxAllowed) {
             await logSystemError({
               type: "garment_limit_exceeded",
               key: postIdBase,
-              message: `Order ${v.orderId} carries ${qtyNum} garments — campaign ${campaignIdForFlag} allows max ${maxAllowed}. Onboarding was saved; review the order.`,
+              message: `Order ${v.orderId} carries ${qtyNum} garments — campaign ${campaignIdForFlag} allows max ${maxAllowed} for ${v.collabType} collabs. Onboarding was saved; review the order.`,
               source: "submitOnboarding",
             });
           }
