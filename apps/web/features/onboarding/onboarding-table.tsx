@@ -400,9 +400,14 @@ function OnboardingListRow({
           <p>
             @{r.creator?.username ?? "—"} · {r.post_id_short ?? r.post_id} ·{" "}
             {collabIdLabel(r)}
-            {attributionLabel(r) && <> · {attributionLabel(r)}</>}
-            {ageLabel(r) && <> · {ageLabel(r)}</>}
           </p>
+          {(attributionLabel(r) || ageLabel(r)) && (
+            <p>
+              {attributionLabel(r)}
+              {attributionLabel(r) && ageLabel(r) ? " · " : ""}
+              {ageLabel(r)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -437,11 +442,10 @@ function OnboardingListRow({
           <dd>{r.collab_type ?? "—"}</dd>
         </div>
         <div>
-          {/* Pill rides the label row — the value line stays a single clean
-              date and the chip box never overflows. */}
-          <dt className="flex items-center justify-between gap-1">
-            Delivery
-            {overdue && (
+          {/* Overdue REPLACES the label — the pill can never clip at narrow
+              chip widths, and the red date doubles the signal. */}
+          <dt className="flex items-center gap-1">
+            {overdue ? (
               <span
                 className="overdue-pill overdue-pill--tiny"
                 title="Estimated delivery date has passed and this post is not marked Posted yet."
@@ -449,6 +453,8 @@ function OnboardingListRow({
                 <AlertTriangle size={7} aria-hidden />
                 Overdue
               </span>
+            ) : (
+              "Delivery"
             )}
           </dt>
           <dd className={overdue ? "!text-danger-text" : undefined}>

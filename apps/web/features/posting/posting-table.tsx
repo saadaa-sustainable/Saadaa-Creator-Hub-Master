@@ -357,11 +357,14 @@ function PostingListRow({
           <p>
             @{r.creator?.username ?? "—"} · {r.post_id_short ?? r.post_id} ·{" "}
             {collabIdLabel(r)}
-            {postingAttributionLabel(r) && (
-              <> · {postingAttributionLabel(r)}</>
-            )}
-            {postingAgeLabel(r) && <> · {postingAgeLabel(r)}</>}
           </p>
+          {(postingAttributionLabel(r) || postingAgeLabel(r)) && (
+            <p>
+              {postingAttributionLabel(r)}
+              {postingAttributionLabel(r) && postingAgeLabel(r) ? " · " : ""}
+              {postingAgeLabel(r)}
+            </p>
+          )}
         </div>
       </div>
 
@@ -397,11 +400,10 @@ function PostingListRow({
           <dd>{r.ads_usage_rights || "—"}</dd>
         </div>
         <div>
-          {/* Pill rides the label row — the value line stays a single clean
-              date and the chip box never overflows. */}
-          <dt className="flex items-center justify-between gap-1">
-            Delivery
-            {postingOverdue(r) && (
+          {/* Overdue REPLACES the label — the pill can never clip at narrow
+              chip widths, and the red date doubles the signal. */}
+          <dt className="flex items-center gap-1">
+            {postingOverdue(r) ? (
               <span
                 className="overdue-pill overdue-pill--tiny"
                 title="Estimated delivery date has passed and this deliverable is not posted yet."
@@ -409,6 +411,8 @@ function PostingListRow({
                 <AlertTriangle size={7} aria-hidden />
                 Overdue
               </span>
+            ) : (
+              "Delivery"
             )}
           </dt>
           <dd className={postingOverdue(r) ? "!text-danger-text" : undefined}>
