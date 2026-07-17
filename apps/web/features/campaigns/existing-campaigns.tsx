@@ -772,6 +772,31 @@ export function ExistingCampaigns({
                   <span>{campaignWindowLabel(campaign)}</span>
                 </div>
 
+                {campaign.rejection && (
+                  <div className="mt-1 rounded-[10px] border border-danger-text/25 bg-danger-bg/60 px-2.5 py-2 text-[0.72rem] leading-relaxed text-text-secondary">
+                    <span className="mr-1.5 inline-flex items-center rounded-full bg-danger-text px-2 py-0.5 text-[0.58rem] font-extrabold uppercase tracking-[0.05em] text-white">
+                      {campaign.rejection.kind === "budget"
+                        ? "Budget approval rejected"
+                        : "Campaign rejected"}
+                    </span>
+                    {campaign.rejection.reason && (
+                      <span className="text-text-primary">
+                        {campaign.rejection.reason}
+                      </span>
+                    )}
+                    {campaign.rejection.by && (
+                      <span className="text-text-tertiary">
+                        {" "}
+                        — {campaign.rejection.by}
+                      </span>
+                    )}
+                    <span className="mt-0.5 block text-[0.66rem] text-text-tertiary">
+                      Edit the campaign to fix it and re-apply for budget
+                      approval.
+                    </span>
+                  </div>
+                )}
+
                 <footer className="campaign-card__actions">
                   <div className="campaign-card__primary-actions">
                     <button

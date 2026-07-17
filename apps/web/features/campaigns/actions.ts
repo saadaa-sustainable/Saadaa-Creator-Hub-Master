@@ -594,6 +594,77 @@ export async function editCampaign(
     };
   }
 
+  // A REJECTED campaign can be fixed and RE-APPLIED: edits apply directly
+  // (nothing sanctioned to protect), the rejected V0 flips back to
+  // pending_approval carrying the edited numbers, and the campaign returns to
+  // the Pending Approval queue — budget first, as always.
+  if (campaignStatus.includes("reject")) {
+    const applied = await applyCampaignEdit(supabase, id, v, totalAll);
+    if (!applied.ok) return { ok: false, error: applied.error };
+
+    const { data: v0Row } = await (supabase as any)
+      .from("campaign_budget_versions")
+      .select("id, note")
+      .eq("campaign_id", id)
+      .eq("version_number", 0)
+      .maybeSingle();
+    if (v0Row?.id != null) {
+      await (supabase as any)
+        .from("campaign_budget_versions")
+        .update({
+          status: "pending_approval",
+          note: "Re-applied after rejection (campaign edited)",
+          approved_by: null,
+          approved_at: null,
+        })
+        .eq("id", v0Row.id);
+    }
+    await (supabase as any)
+      .from("campaigns")
+      .update({ status: "Pending Approval" })
+      .eq("campaign_id", id);
+
+    await logApprovalEvent(supabase, {
+      actionType: "Budget",
+      action: "Submitted",
+      entityId: `${id} · V0`,
+      actor,
+      notes: `Re-applied for budget approval after rejection. New budget: ₹${new Intl.NumberFormat("en-IN").format(totalAll)}.`,
+    });
+
+    after(async () => {
+      try {
+        const approvers = await resolveBudgetApproverEmails();
+        if (approvers.length > 0) {
+          await sendNotification({
+            type: NOTIFICATION_TYPES.CAMPAIGN_CREATED,
+            to: approvers,
+            subject: `Budget re-applied — ${id} V0 (₹${new Intl.NumberFormat("en-IN").format(totalAll)})`,
+            title: "Budget re-applied after rejection",
+            subtitle: `CAMPAIGN: ${id}`,
+            htmlBody: `<p style="margin:0 0 12px;">${id} was rejected earlier, has been edited, and is <strong>re-applying for budget approval</strong> with a first budget of <strong>₹${new Intl.NumberFormat("en-IN").format(totalAll)}</strong>. Review it on the Approvals page.</p>`,
+          });
+        }
+      } catch (err) {
+        console.error("[campaigns] re-apply notification failed:", err);
+      }
+    });
+
+    revalidateTag("campaigns");
+    revalidatePath("/campaigns");
+    revalidatePath("/campaigns/new");
+    revalidatePath("/approvals");
+    revalidateTag("approvals-count");
+    revalidatePath("/budget");
+
+    return {
+      ok: true,
+      campaignId: id,
+      totalBudget: totalAll,
+      message: `Campaign "${id} - ${v.campaignName}" updated and re-applied for budget approval (₹${new Intl.NumberFormat("en-IN").format(totalAll)}). The Global Admins have been notified.`,
+    };
+  }
+
   const { data: pendingEdit, error: pendingErr } = await (supabase as any)
     .from("campaign_approval_requests")
     .select("id")

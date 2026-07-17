@@ -24,6 +24,14 @@ export interface CampaignListRow {
   /** Reach-out creators assigned to the campaign before onboarding. */
   reachout_creator_rows?: CampaignCreatorListRow[];
   budget_rows?: CampaignBudgetListRow[];
+  /** Latest rejection (rejected campaigns only): was it the BUDGET that was
+   *  rejected or the campaign itself, why, by whom, when. */
+  rejection?: {
+    kind: "budget" | "campaign";
+    reason: string | null;
+    by: string | null;
+    at: string | null;
+  } | null;
 }
 
 export interface CampaignBudgetListRow {
@@ -181,6 +189,41 @@ export const fetchCampaigns = unstable_cache(
     );
     const ids = campaignRows.map((c) => c.campaign_id).filter(Boolean);
     if (ids.length === 0) return campaignRows;
+
+    // Rejection context — rejected campaigns show WHY (and whether it was the
+    // budget or the campaign that got rejected) right on the card.
+    const rejectedIds = campaignRows
+      .filter((c) => String(c.status ?? "").toLowerCase().includes("reject"))
+      .map((c) => c.campaign_id);
+    const rejectionByCampaign = new Map<
+      string,
+      { kind: "budget" | "campaign"; reason: string | null; by: string | null; at: string | null }
+    >();
+    if (rejectedIds.length > 0) {
+      const { data: logs } = await (supabase as any)
+        .from("approval_logs")
+        .select("action_type, action, entity_id, admin_name, admin_email, notes, timestamp")
+        .ilike("action", "%reject%")
+        .order("timestamp", { ascending: false })
+        .limit(300);
+      for (const log of (logs ?? []) as Array<Record<string, unknown>>) {
+        const entity = String(log.entity_id ?? "");
+        const campaignId = entity.split("·")[0]?.trim() ?? entity.trim();
+        if (!rejectedIds.includes(campaignId)) continue;
+        if (rejectionByCampaign.has(campaignId)) continue; // newest wins
+        rejectionByCampaign.set(campaignId, {
+          kind: String(log.action_type ?? "").toLowerCase().includes("budget")
+            ? "budget"
+            : "campaign",
+          reason: (log.notes as string | null) ?? null,
+          by:
+            (log.admin_name as string | null) ??
+            (log.admin_email as string | null) ??
+            null,
+          at: (log.timestamp as string | null) ?? null,
+        });
+      }
+    }
 
     const { data: budgetData, error: budgetError } = await (supabase as any)
       .from("campaign_budget")
@@ -355,6 +398,7 @@ export const fetchCampaigns = unstable_cache(
         creator_rows: onboardedCreators,
         reachout_creator_rows: reachoutCreators,
         creators_used: onboardedCreators.length,
+        rejection: rejectionByCampaign.get(campaign.campaign_id) ?? null,
       };
     });
   },
