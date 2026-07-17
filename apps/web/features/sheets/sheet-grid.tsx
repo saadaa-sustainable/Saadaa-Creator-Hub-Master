@@ -41,6 +41,8 @@ import {
   Type as TypeIcon,
   X,
   type LucideIcon,
+  Filter,
+  Scissors,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
@@ -217,6 +219,22 @@ export function SheetGrid({
     table.columns[0]?.key ? [table.columns[0].key] : [],
   ); // ordered
   const [showColsMenu, setShowColsMenu] = useState(false);
+  // Clip long text at the column edge (no … ellipsis) — WO-parity toggle.
+  const [clip, setClip] = useState(false);
+  // Row-tint filter: all rows / green (Posted) / white (not posted yet).
+  const [tintFilter, setTintFilter] = useState<"all" | "green" | "white">(
+    "all",
+  );
+  // Per-column value filters (Google-Sheets-style funnel per header). Map
+  // colKey → the SET of tokens the user keeps; absent column = unfiltered.
+  const [colFilters, setColFilters] = useState<Map<string, Set<string>>>(
+    new Map(),
+  );
+  const [filterMenu, setFilterMenu] = useState<{
+    key: string;
+    x: number;
+    y: number;
+  } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Default-pin the table's first (identifier) column on every tab switch so
@@ -431,17 +449,143 @@ export function SheetGrid({
 
   const normalizedQuery = search.trim().toLowerCase();
 
-  const filteredRows = useMemo(() => {
-    // Server mode: rows arrive pre-filtered from Postgres — pass through.
-    if (isServer || !normalizedQuery) return rows;
-    return rows.filter((r) => {
+  // Green row = the collab reached Posted/Delivered (CreatorHub's "edit done").
+  const hasStatusCol = useMemo(
+    () => mergedAll.some((c) => c.key === "workflow_status"),
+    [mergedAll],
+  );
+  const isPostedRow = useCallback((row: SheetRow): boolean => {
+    const st = String(row.workflow_status ?? "").toLowerCase();
+    return st.includes("posted") || st.includes("delivered");
+  }, []);
+
+  // Raw cell value as the filter token ("" for blank/null) — what the funnel
+  // dropdown lists and what row matching compares against.
+  const filterToken = useCallback((col: ColDef, row: SheetRow): string => {
+    const v = resolveValue(col, row);
+    return v == null ? "" : String(v).trim();
+  }, []);
+
+  const matchesSearch = useCallback(
+    (r: SheetRow) => {
+      if (!normalizedQuery) return true;
       for (const c of cols) {
         const v = String(resolveValue(c, r) ?? "").toLowerCase();
         if (v.includes(normalizedQuery)) return true;
       }
       return false;
+    },
+    [normalizedQuery, cols],
+  );
+
+  const filteredRows = useMemo(() => {
+    // Server mode pre-filters by q in Postgres; funnel filters + the tint
+    // filter still apply client-side over the loaded page.
+    const active = Array.from(colFilters.entries())
+      .map(([key, values]) => ({
+        col: mergedAll.find((c) => c.key === key),
+        values,
+      }))
+      .filter((f): f is { col: ColDef; values: Set<string> } => !!f.col);
+    const needSearch = !isServer && !!normalizedQuery;
+    if (!needSearch && active.length === 0 && tintFilter === "all") return rows;
+    return rows.filter((r) => {
+      if (needSearch && !matchesSearch(r)) return false;
+      if (tintFilter !== "all") {
+        const posted = isPostedRow(r);
+        if (tintFilter === "green" ? !posted : posted) return false;
+      }
+      for (const f of active)
+        if (!f.values.has(filterToken(f.col, r))) return false;
+      return true;
     });
-  }, [rows, normalizedQuery, cols, isServer]);
+  }, [
+    rows,
+    normalizedQuery,
+    cols,
+    isServer,
+    colFilters,
+    mergedAll,
+    matchesSearch,
+    filterToken,
+    tintFilter,
+    isPostedRow,
+  ]);
+
+  // Options for one column's funnel = distinct values over rows that pass the
+  // search + every OTHER column's filter (Google-Sheets behaviour), with counts.
+  const filterOptionsFor = useCallback(
+    (key: string): { value: string; count: number }[] => {
+      const col = mergedAll.find((c) => c.key === key);
+      if (!col) return [];
+      const others = Array.from(colFilters.entries())
+        .filter(([k]) => k !== key)
+        .map(([k, values]) => ({
+          col: mergedAll.find((c) => c.key === k),
+          values,
+        }))
+        .filter((f): f is { col: ColDef; values: Set<string> } => !!f.col);
+      const counts = new Map<string, number>();
+      for (const r of rows) {
+        if (!isServer && !matchesSearch(r)) continue;
+        let ok = true;
+        for (const f of others)
+          if (!f.values.has(filterToken(f.col, r))) {
+            ok = false;
+            break;
+          }
+        if (!ok) continue;
+        const t = filterToken(col, r);
+        counts.set(t, (counts.get(t) ?? 0) + 1);
+      }
+      return Array.from(counts.entries())
+        .map(([value, count]) => ({ value, count }))
+        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
+    },
+    [rows, mergedAll, colFilters, matchesSearch, filterToken, isServer],
+  );
+
+  const toggleFilterValue = useCallback(
+    (key: string, value: string, allValues: string[]) => {
+      setColFilters((prev) => {
+        const next = new Map(prev);
+        // Absent column = "everything selected"; materialise the full set first.
+        const cur = new Set(next.get(key) ?? allValues);
+        if (cur.has(value)) cur.delete(value);
+        else cur.add(value);
+        // Back to "all selected" → drop the filter entirely.
+        if (allValues.every((v) => cur.has(v))) next.delete(key);
+        else next.set(key, cur);
+        return next;
+      });
+    },
+    [],
+  );
+
+  // Bulk check/uncheck — powers search-scoped Select all / Clear all and
+  // shift-click ranges (Google-Sheets semantics).
+  const bulkFilterValues = useCallback(
+    (
+      key: string,
+      values: string[],
+      mode: "add" | "remove" | "replace",
+      allValues: string[],
+    ) => {
+      setColFilters((prev) => {
+        const next = new Map(prev);
+        const cur =
+          mode === "replace"
+            ? new Set(values)
+            : new Set(next.get(key) ?? allValues);
+        if (mode === "add") for (const v of values) cur.add(v);
+        else if (mode === "remove") for (const v of values) cur.delete(v);
+        if (allValues.every((v) => cur.has(v))) next.delete(key);
+        else next.set(key, cur);
+        return next;
+      });
+    },
+    [],
+  );
 
   const sortedRows = useMemo(() => {
     // Server mode: rows arrive pre-sorted from Postgres — pass through.
@@ -839,6 +983,79 @@ export function SheetGrid({
             )}
           </label>
 
+          {/* Row-tint filter — All / Green (Posted) / White (not posted). */}
+          {hasStatusCol && (
+            <div
+              className="inline-flex items-center h-8 rounded-lg border border-border bg-bg-white overflow-hidden"
+              role="group"
+              aria-label="Filter rows by posted tint"
+            >
+              {(
+                [
+                  { id: "all", label: "All" },
+                  { id: "green", label: "Green" },
+                  { id: "white", label: "White" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setTintFilter(opt.id)}
+                  aria-pressed={tintFilter === opt.id}
+                  title={
+                    opt.id === "green"
+                      ? "Only Posted/Delivered rows (green)"
+                      : opt.id === "white"
+                        ? "Only rows not posted yet"
+                        : "All rows"
+                  }
+                  className={cn(
+                    "px-2 h-full text-[0.62rem] font-extrabold transition-colors",
+                    tintFilter === opt.id
+                      ? opt.id === "green"
+                        ? "bg-[#4CAF7D]/15 text-[#2F8C5C]"
+                        : "bg-bg-muted/70 text-text-primary"
+                      : "text-text-secondary hover:bg-bg-muted/40",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Clip long text (no ellipsis) */}
+          <button
+            type="button"
+            onClick={() => setClip((c) => !c)}
+            title={
+              clip
+                ? "Show the … ellipsis on long text"
+                : "Clip long text at the column edge (no ellipsis)"
+            }
+            aria-pressed={clip}
+            className={cn(
+              "inline-flex items-center gap-1 px-2 h-8 rounded-lg border text-[0.62rem] font-extrabold transition-colors",
+              clip
+                ? "border-[--accent] bg-accent text-text-primary"
+                : "border-border bg-bg-white text-text-secondary hover:bg-bg-muted/40 hover:border-[--accent]/40",
+            )}
+          >
+            <Scissors size={11} aria-hidden /> Clip
+          </button>
+
+          {colFilters.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setColFilters(new Map())}
+              title="Remove every column filter"
+              className="inline-flex items-center gap-1 px-2 h-8 rounded-lg border border-[--accent] bg-[--accent]/10 text-text-primary text-[0.62rem] font-extrabold hover:bg-[--accent]/20 transition-colors"
+            >
+              <Filter size={11} aria-hidden fill="currentColor" />
+              {colFilters.size} filter{colFilters.size > 1 ? "s" : ""} · clear
+            </button>
+          )}
+
           {/* Density toggle */}
           <button
             type="button"
@@ -1154,6 +1371,41 @@ export function SheetGrid({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            const rect = (
+                              e.currentTarget as HTMLElement
+                            ).getBoundingClientRect();
+                            setFilterMenu((cur) =>
+                              cur?.key === c.key
+                                ? null
+                                : {
+                                    key: c.key,
+                                    x: Math.min(
+                                      rect.left,
+                                      window.innerWidth - 290,
+                                    ),
+                                    y: rect.bottom + 4,
+                                  },
+                            );
+                          }}
+                          aria-label={`Filter ${c.label}`}
+                          title="Filter this column (Google-Sheets style)"
+                          className={cn(
+                            "shrink-0 inline-flex items-center justify-center w-4 h-4 rounded transition-all",
+                            colFilters.has(c.key)
+                              ? "text-[--accent] bg-[--accent]/15 opacity-100"
+                              : "text-text-tertiary opacity-0 group-hover:opacity-70 hover:!opacity-100 hover:text-text-primary",
+                          )}
+                        >
+                          <Filter
+                            size={9}
+                            aria-hidden
+                            fill={colFilters.has(c.key) ? "currentColor" : "none"}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             togglePin(c.key);
                           }}
                           aria-label={
@@ -1193,12 +1445,14 @@ export function SheetGrid({
                   row[table.pk] == null ? "" : String(row[table.pk]);
                 const isChecked = selectKey !== "" && selectedRows.has(selectKey);
                 const isRowSelected = selected?.row === rowIdx;
+                const isGreenRow = hasStatusCol && isPostedRow(row);
                 return (
                   <tr
                     key={`${rowKey}-${rowIdx}`}
                     className={cn(
                       "transition-colors border-b border-border/50 last:border-b-0 group",
                       rowIdx % 2 === 0 ? "bg-bg-white" : "bg-bg-surface/20",
+                      isGreenRow && "!bg-[#4CAF7D]/10",
                       isChecked
                         ? "!bg-danger-bg/50"
                         : isRowSelected
@@ -1279,6 +1533,7 @@ export function SheetGrid({
                           isEditing={isEditing}
                           padY={rowPadY}
                           textSize={cellTextSize}
+                          clip={clip}
                           search={normalizedQuery}
                           recentEdit={recentEdit}
                           isPinned={isPinned}
@@ -1399,6 +1654,37 @@ export function SheetGrid({
               next,
             )
           }
+        />
+      )}
+
+      {filterMenu && (
+        <ColumnFilterMenu
+          colLabel={
+            mergedAll.find((c) => c.key === filterMenu.key)?.label ??
+            filterMenu.key
+          }
+          anchor={filterMenu}
+          options={filterOptionsFor(filterMenu.key)}
+          selected={colFilters.get(filterMenu.key) ?? null}
+          onToggle={(value, allValues) =>
+            toggleFilterValue(filterMenu.key, value, allValues)
+          }
+          onBulk={(values, mode, allValues) =>
+            bulkFilterValues(filterMenu.key, values, mode, allValues)
+          }
+          onOnly={(value) =>
+            setColFilters((prev) =>
+              new Map(prev).set(filterMenu.key, new Set([value])),
+            )
+          }
+          onClear={() =>
+            setColFilters((prev) => {
+              const next = new Map(prev);
+              next.delete(filterMenu.key);
+              return next;
+            })
+          }
+          onClose={() => setFilterMenu(null)}
         />
       )}
 
@@ -1733,6 +2019,7 @@ function Cell({
   isEditing,
   padY,
   textSize,
+  clip = false,
   search,
   recentEdit,
   isPinned,
@@ -1755,6 +2042,7 @@ function Cell({
   isEditing: boolean;
   padY: string;
   textSize: string;
+  clip?: boolean;
   search: string;
   recentEdit?: RecentEdit;
   isPinned?: boolean;
@@ -1820,7 +2108,8 @@ function Cell({
   };
 
   const baseCell = cn(
-    "px-2 whitespace-nowrap truncate border-r border-border/30 last:border-r-0 transition-all relative",
+    "px-2 whitespace-nowrap border-r border-border/30 last:border-r-0 transition-all relative",
+    clip ? "overflow-hidden text-clip" : "truncate",
     padY,
     textSize,
     canEdit && !isEditing && "cursor-pointer",
@@ -2147,4 +2436,186 @@ function toCsv(cols: ColDef[], rows: SheetRow[]): string {
     cols.map((c) => escape(resolveValue(c, r))).join(","),
   );
   return [header, ...lines].join("\n");
+}
+
+/**
+ * Google-Sheets-style per-column value filter (ported from Workflow Optimizer):
+ * search inside the funnel, search-scoped Select/Clear all, shift-click
+ * ranges, per-value "only", blank grouping, value counts.
+ */
+function ColumnFilterMenu({
+  colLabel,
+  anchor,
+  options,
+  selected,
+  onToggle,
+  onBulk,
+  onOnly,
+  onClear,
+  onClose,
+}: {
+  colLabel: string;
+  anchor: { x: number; y: number };
+  options: { value: string; count: number }[];
+  /** null = no filter on this column (i.e. everything selected). */
+  selected: Set<string> | null;
+  onToggle: (value: string, allValues: string[]) => void;
+  /** Bulk check/uncheck — search-scoped Select/Clear all + shift-click ranges. */
+  onBulk: (values: string[], mode: "add" | "remove" | "replace", allValues: string[]) => void;
+  onOnly: (value: string) => void;
+  onClear: () => void;
+  onClose: () => void;
+}) {
+  const [q, setQ] = useState("");
+  // Shift-click range anchor — index into the VISIBLE list of the last plain click.
+  const [lastIdx, setLastIdx] = useState<number | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  // Search changes reorder/renumber the visible list — drop the range anchor.
+  useEffect(() => { setLastIdx(null); }, [q]);
+
+  const allValues = useMemo(() => options.map((o) => o.value), [options]);
+  const nq = q.trim().toLowerCase();
+  // ALL search matches (select-all scope) — display is capped separately below.
+  const matches = useMemo(
+    () =>
+      nq
+        ? options.filter((o) => (o.value || "(blanks)").toLowerCase().includes(nq))
+        : options,
+    [options, nq],
+  );
+  const visible = useMemo(() => matches.slice(0, 400), [matches]);
+  const isChecked = (v: string) => (selected ? selected.has(v) : true);
+  const selectedCount = selected ? selected.size : options.length;
+
+  // Google-Sheets semantics: with a search typed, Select all / Clear all act on
+  // the SEARCH RESULTS only; with no search they act on the whole list.
+  // One deliberate deviation: with NO filter yet (everything checked), search +
+  // "Select all N" REPLACES the selection with the matches — otherwise it would
+  // be a no-op and every row stays selected (the exact confusion reported).
+  const selectAll = () => {
+    if (nq) onBulk(matches.map((o) => o.value), selected ? "add" : "replace", allValues);
+    else onClear();
+  };
+  const clearAll = () => {
+    if (nq) onBulk(matches.map((o) => o.value), "remove", allValues);
+    else onOnly("__none__");
+  };
+
+  const handleOptionClick = (e: React.MouseEvent, idx: number, value: string) => {
+    if (e.shiftKey && lastIdx !== null && lastIdx !== idx) {
+      // Range takes the CLICKED item's new state: unchecked target → check the
+      // whole range, checked target → uncheck it (spreadsheet convention).
+      const [a, b] = lastIdx < idx ? [lastIdx, idx] : [idx, lastIdx];
+      const range = visible.slice(a, b + 1).map((o) => o.value);
+      onBulk(range, isChecked(value) ? "remove" : "add", allValues);
+    } else {
+      onToggle(value, allValues);
+    }
+    setLastIdx(idx);
+  };
+
+  return createPortal(
+    <div
+      data-modal-overlay
+      className="fixed inset-0 z-[600]"
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        role="dialog"
+        aria-label={`Filter ${colLabel}`}
+        onClick={(e) => e.stopPropagation()}
+        style={{ position: "fixed", left: anchor.x, top: Math.min(anchor.y, window.innerHeight - 380) }}
+        className="w-[280px] max-h-[360px] flex flex-col rounded-xl border border-border bg-bg-white shadow-xl text-[0.7rem]"
+      >
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border">
+          <span className="font-extrabold text-text-primary truncate">
+            <Filter size={10} aria-hidden className="inline mr-1 text-[--accent]" />
+            {colLabel}
+          </span>
+          <span className="text-text-tertiary tabular shrink-0">
+            {selectedCount}/{options.length}
+          </span>
+        </div>
+        <div className="px-2 pt-2">
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search values…"
+            className="w-full h-7 px-2 rounded-lg border border-border bg-bg-white text-[0.7rem] outline-none focus:border-[--accent]"
+          />
+        </div>
+        <div className="flex items-center gap-3 px-3 py-1.5 text-[0.62rem] font-extrabold">
+          <button type="button" onClick={selectAll} className="text-[--accent] hover:underline">
+            {nq ? `Select all ${matches.length}` : "Select all"}
+          </button>
+          <button
+            type="button"
+            onClick={clearAll}
+            className="text-text-tertiary hover:text-text-primary hover:underline"
+          >
+            {nq ? `Clear ${matches.length}` : "Clear all"}
+          </button>
+          {selected && (
+            <button
+              type="button"
+              onClick={() => {
+                onClear();
+                onClose();
+              }}
+              className="ml-auto text-text-tertiary hover:text-danger hover:underline"
+            >
+              Remove filter
+            </button>
+          )}
+        </div>
+        <div className="flex-1 overflow-y-auto px-1 pb-1">
+          {visible.length === 0 && (
+            <div className="px-3 py-4 text-text-tertiary">No values match.</div>
+          )}
+          {visible.map((o, idx) => (
+            <div
+              key={o.value || "blank"}
+              className="group/opt flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-bg-muted/50 cursor-pointer select-none"
+              onClick={(e) => handleOptionClick(e, idx, o.value)}
+            >
+              <input
+                type="checkbox"
+                readOnly
+                checked={isChecked(o.value)}
+                className="h-3.5 w-3.5 accent-[--accent] pointer-events-none"
+              />
+              <span className={cn("flex-1 truncate", o.value ? "text-text-primary" : "text-text-tertiary italic")}>
+                {o.value || "(blanks)"}
+              </span>
+              <span className="text-text-tertiary tabular text-[0.6rem]">{o.count}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOnly(o.value);
+                }}
+                className="opacity-0 group-hover/opt:opacity-100 text-[0.58rem] font-extrabold text-[--accent] hover:underline shrink-0"
+              >
+                only
+              </button>
+            </div>
+          ))}
+          {matches.length > 400 && (
+            <div className="px-3 py-1.5 text-[0.6rem] text-text-tertiary">
+              Showing first 400 values — type to narrow. Select/Clear all still cover every match.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 }
