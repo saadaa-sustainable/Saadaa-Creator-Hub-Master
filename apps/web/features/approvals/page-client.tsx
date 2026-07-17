@@ -283,11 +283,10 @@ function RowActions({
         type="button"
         onClick={onReject}
         disabled={pending || disabled}
-        title="Reject"
-        aria-label="Reject"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-border bg-bg-white text-danger-text transition-colors hover:bg-danger-bg/40 disabled:opacity-50"
+        className="inline-flex h-7 items-center gap-1 rounded-[8px] border border-border bg-bg-white px-2.5 text-[0.7rem] font-bold text-danger-text transition-colors hover:bg-danger-bg/40 disabled:opacity-50"
       >
-        <X size={13} aria-hidden />
+        <X size={12} aria-hidden />
+        Reject
       </button>
       <button
         type="button"
