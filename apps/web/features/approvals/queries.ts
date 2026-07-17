@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import {
+  ONBOARDING_EDIT_DIFF_LABELS,
   ONBOARDING_EDIT_FIELD_LABELS,
   type OnboardingEditField,
   type OnboardingEditItem,
@@ -351,7 +352,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
     const changes = editFields
       .map((f) => ({
         field: f,
-        label: ONBOARDING_EDIT_FIELD_LABELS[f],
+        label: ONBOARDING_EDIT_DIFF_LABELS[f],
         before: String(before[f] ?? "").trim(),
         after: String(after[f] ?? "").trim(),
       }))

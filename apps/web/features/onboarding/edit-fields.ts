@@ -28,6 +28,21 @@ export const ONBOARDING_EDIT_FIELD_LABELS: Record<OnboardingEditField, string> =
     ifsc: "IFSC Code",
   };
 
+/**
+ * Diff labels — the editable form fields PLUS the order-level fields that an
+ * Order ID change re-derives from Shopify (captured into before/after at
+ * apply time so approvals + history show the FULL impact on the posts row).
+ */
+export const ONBOARDING_EDIT_DIFF_LABELS: Record<string, string> = {
+  ...ONBOARDING_EDIT_FIELD_LABELS,
+  order_status: "Order Status",
+  tracking_id: "Tracking ID",
+  garments_sent: "Products (from order)",
+  email: "Creator Email (from order)",
+  state: "State (from order)",
+  city: "City (from order)",
+};
+
 /** Ads-usage-rights options, mirroring the onboarding form. */
 export const EDIT_ADS_USAGE_OPTIONS = [
   "",

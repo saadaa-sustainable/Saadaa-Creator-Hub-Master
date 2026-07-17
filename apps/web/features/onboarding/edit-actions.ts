@@ -12,6 +12,7 @@ import {
 } from "@/lib/notifications";
 import {
   EDITABLE_FIELDS,
+  ONBOARDING_EDIT_DIFF_LABELS,
   ONBOARDING_EDIT_FIELD_LABELS,
   type OnboardingEditField,
   type OnboardingEditForm,
@@ -210,7 +211,7 @@ export async function submitOnboardingEdit(input: {
     requester: actor.name ?? actor.email ?? "a team member",
     reason,
     changed: changed.map((f) => ({
-      label: ONBOARDING_EDIT_FIELD_LABELS[f],
+      label: ONBOARDING_EDIT_DIFF_LABELS[f] ?? ONBOARDING_EDIT_FIELD_LABELS[f],
       before: before[f] || "—",
       after: afterVals[f] || "—",
     })),
@@ -336,6 +337,44 @@ async function applyOnboardingEdit(
       const parsed = deriveStateCity(String(ord.address ?? ""));
       if (parsed.state) patch.state = parsed.state;
       if (parsed.city) patch.city = parsed.city;
+
+      // Capture the ORDER-LEVEL impact into the request's before/after so the
+      // approval card + history popup show everything the new order changed on
+      // the posts row — not just the Order ID itself.
+      const { data: repRow } = await supabase
+        .from("posts")
+        .select("email, tracking_id, garments_sent, order_status, state, city")
+        .eq("collab_id", cid)
+        .limit(1)
+        .maybeSingle();
+      const prev = (repRow ?? {}) as Record<string, unknown>;
+      const derivedKeys = [
+        "order_status",
+        "tracking_id",
+        "garments_sent",
+        "email",
+        "state",
+        "city",
+      ] as const;
+      const beforePlus: Record<string, string> = { ...before };
+      const afterPlus: Record<string, string> = { ...after };
+      let derivedChanged = false;
+      for (const k of derivedKeys) {
+        const prevV = String(prev[k] ?? "").trim();
+        const nextV =
+          k in patch && patch[k] != null ? String(patch[k]).trim() : prevV;
+        if (prevV !== nextV) {
+          beforePlus[k] = prevV;
+          afterPlus[k] = nextV;
+          derivedChanged = true;
+        }
+      }
+      if (derivedChanged && req.id != null) {
+        await supabase
+          .from("onboarding_edit_requests")
+          .update({ before: beforePlus, after: afterPlus })
+          .eq("id", req.id);
+      }
     }
   }
 

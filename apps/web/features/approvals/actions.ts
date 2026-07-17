@@ -3,6 +3,7 @@
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
 import {
+  ONBOARDING_EDIT_DIFF_LABELS,
   ONBOARDING_EDIT_FIELD_LABELS,
   type OnboardingEditField,
 } from "@/features/onboarding/edit-fields";
@@ -53,12 +54,10 @@ export async function getApprovalHistoryDetail(input: {
 
     const before = (data.before ?? {}) as Record<string, unknown>;
     const after = (data.after ?? {}) as Record<string, unknown>;
-    const fields = Object.keys(
-      ONBOARDING_EDIT_FIELD_LABELS,
-    ) as OnboardingEditField[];
+    const fields = Object.keys(ONBOARDING_EDIT_DIFF_LABELS);
     const changes = fields
       .map((f) => ({
-        label: ONBOARDING_EDIT_FIELD_LABELS[f],
+        label: ONBOARDING_EDIT_DIFF_LABELS[f],
         before: String(before[f] ?? "").trim(),
         after: String(after[f] ?? "").trim(),
       }))
