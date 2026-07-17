@@ -14983,22 +14983,43 @@ body:has(.km-backdrop) {
 
 .stage-campaign-row .campaign-list-row__stats {
   gap: 0.42rem;
-  /* Chips keep a readable minimum (label + overdue pill + one-line date);
-     when the row runs out of room the strip scrolls sideways instead of
-     squeezing content out of its boxes. min-width/max-width pin the strip
-     inside its grid track — without them the track clips it and the
-     scrollbar never appears (min-width:0 ladder). */
-  grid-template-columns: repeat(4, minmax(124px, 1fr));
   min-width: 0;
   max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  padding-bottom: 2px;
+}
+
+/* Desktop: COMPACT single-line strip — every chip (4 or 5) shares the row
+   equally and shrinks with the viewport; contents truncate inside their box.
+   No horizontal scroll, nothing escapes (user spec 2026-07-17). Scoped to
+   min-width so the ≤1024px 2-column stack below stays in charge on mobile. */
+@media (min-width: 1025px) {
+  .stage-campaign-row {
+    grid-template-columns:
+      minmax(215px, 1.1fr) minmax(128px, 0.45fr)
+      minmax(0, 1.6fr) max-content;
+    gap: 0.6rem;
+  }
+  .stage-campaign-row .campaign-list-row__stats {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+    gap: 0.34rem;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+  .stage-campaign-row .campaign-list-row__stats dt {
+    font-size: 0.52rem;
+    overflow: hidden;
+  }
+  .stage-campaign-row .campaign-list-row__stats dd {
+    font-size: 0.66rem;
+  }
+  .stage-campaign-row .campaign-list-action {
+    padding-inline: 0.46rem;
+  }
 }
 
 .stage-campaign-row .campaign-list-row__stats > div {
-  min-height: 48px;
-  padding: 0.44rem 0.5rem;
+  min-height: 46px;
+  padding: 0.4rem 0.46rem;
+  min-width: 0;
 }
 
 .stage-campaign-row .campaign-list-action {
