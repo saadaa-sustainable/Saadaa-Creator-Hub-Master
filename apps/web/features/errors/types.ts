@@ -81,6 +81,20 @@ export interface DataHealth {
   totalCreators: number;
 }
 
+export interface GarmentFlagRow {
+  id: string;
+  postId: string | null;
+  message: string;
+  createdAt: string | null;
+  username: string | null;
+  infName: string | null;
+  campaignId: string | null;
+  campaignName: string | null;
+  orderId: string | null;
+  garmentQty: number | null;
+  maxAllowed: number | null;
+}
+
 export interface ErrorPortalSummary {
   high: number; // critical
   medium: number; // warnings
@@ -91,6 +105,7 @@ export interface ErrorPortalSummary {
   metaFetchFails: number; // API itself failed (rate-limit / network / token) — type meta_fetch_failed
   metaProfileUnavailable: number; // API worked but the profile is unavailable (personal/dead/deactivated) — type meta_profile_unavailable
   blockedEmails: number; // collab emails blocked/failed the gate — retry from portal
+  garmentFlags: number; // orders exceeding the campaign's max garment quantity
 }
 
 export interface ErrorPortalData {
@@ -100,5 +115,6 @@ export interface ErrorPortalData {
   systemErrors: SystemErrorRow[]; // unresolved rows from system_errors
   missingEmails: MissingEmailRow[];
   blockedEmails: BlockedEmailRow[]; // gate-blocked / SMTP-failed collab emails
+  garmentFlags: GarmentFlagRow[]; // garment_limit_exceeded, enriched from posts
   lastScannedAt: string;
 }

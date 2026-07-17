@@ -526,6 +526,41 @@ export async function submitOnboarding(
     },
   ]);
 
+  // Garment-limit flag (2026-07-17 spec): an order exceeding the campaign's
+  // max garment quantity (highest max_garments across its budget tiers) is
+  // FLAGGED to the Error Panel — the onboarding submit itself is never
+  // blocked. Best-effort via after().
+  {
+    const campaignIdForFlag = String(parent.campaign_id ?? "").trim();
+    const qtyNum = Number(garmentQty ?? 0);
+    if (campaignIdForFlag && qtyNum > 0) {
+      after(async () => {
+        try {
+          const { data: capRows } = await (supabase as any)
+            .from("campaign_budget")
+            .select("max_garments")
+            .eq("campaign_id", campaignIdForFlag);
+          const maxAllowed = Math.max(
+            0,
+            ...((capRows ?? []) as Array<{ max_garments: number | null }>).map(
+              (r) => Number(r.max_garments ?? 0),
+            ),
+          );
+          if (maxAllowed > 0 && qtyNum > maxAllowed) {
+            await logSystemError({
+              type: "garment_limit_exceeded",
+              key: postIdBase,
+              message: `Order ${v.orderId} carries ${qtyNum} garments — campaign ${campaignIdForFlag} allows max ${maxAllowed}. Onboarding was saved; review the order.`,
+              source: "submitOnboarding",
+            });
+          }
+        } catch (err) {
+          console.error("[onboarding] garment flag failed:", err);
+        }
+      });
+    }
+  }
+
   // Sheet mirror removed 2026-05-21 — Supabase is sole source of truth.
 
   // ── Submitter confirmation (Wave 7.x) ───────────────────────────────────

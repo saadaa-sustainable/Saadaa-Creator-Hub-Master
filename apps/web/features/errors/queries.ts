@@ -6,6 +6,7 @@ import type {
   ErrorPortalData,
   ErrorPortalSummary,
   MissingEmailRow,
+  GarmentFlagRow,
   SystemErrorRow,
 } from "./types";
 
@@ -55,6 +56,7 @@ function emptyData(): ErrorPortalData {
       metaFetchFails: 0,
       metaProfileUnavailable: 0,
       blockedEmails: 0,
+      garmentFlags: 0,
     },
     health: {
       reachOut: 0,
@@ -74,6 +76,7 @@ function emptyData(): ErrorPortalData {
     systemErrors: [],
     missingEmails: [],
     blockedEmails: [],
+    garmentFlags: [],
     lastScannedAt: new Date().toISOString(),
   };
 }
@@ -362,6 +365,79 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
     }
   }
 
+  // Garment-limit flags — enriched from posts + campaigns so the popup can
+  // filter by campaign and show the order context.
+  const garmentRaw = sysErrors.filter(
+    (e) => e.type === "garment_limit_exceeded",
+  );
+  const garmentFlags: GarmentFlagRow[] = [];
+  if (garmentRaw.length > 0) {
+    const keys = [
+      ...new Set(garmentRaw.map((e) => e.key).filter((k): k is string => !!k)),
+    ];
+    const postInfo = new Map<string, Record<string, unknown>>();
+    const campNames = new Map<string, string>();
+    const campMax = new Map<string, number>();
+    if (keys.length > 0) {
+      const { data: ps } = await (supabase as any)
+        .from("posts")
+        .select(
+          "post_id, username, campaign_id, order_id, garment_qty, inf_id, creator:creators(inf_name)",
+        )
+        .in("post_id", keys);
+      for (const row of (ps ?? []) as Array<Record<string, unknown>>) {
+        postInfo.set(String(row.post_id), row);
+      }
+      const campIds = [
+        ...new Set(
+          [...postInfo.values()]
+            .map((r) => String(r.campaign_id ?? "").trim())
+            .filter(Boolean),
+        ),
+      ];
+      if (campIds.length > 0) {
+        const [{ data: cs }, { data: caps }] = await Promise.all([
+          (supabase as any)
+            .from("campaigns")
+            .select("campaign_id, campaign_name")
+            .in("campaign_id", campIds),
+          (supabase as any)
+            .from("campaign_budget")
+            .select("campaign_id, max_garments")
+            .in("campaign_id", campIds),
+        ]);
+        for (const c of (cs ?? []) as Array<Record<string, unknown>>) {
+          campNames.set(String(c.campaign_id), String(c.campaign_name ?? ""));
+        }
+        for (const c of (caps ?? []) as Array<Record<string, unknown>>) {
+          const id = String(c.campaign_id);
+          campMax.set(
+            id,
+            Math.max(campMax.get(id) ?? 0, Number(c.max_garments ?? 0)),
+          );
+        }
+      }
+    }
+    for (const e of garmentRaw) {
+      const post = e.key ? postInfo.get(e.key) : undefined;
+      const campId = post ? String(post.campaign_id ?? "").trim() : "";
+      const creator = (post?.creator ?? null) as { inf_name?: string | null } | null;
+      garmentFlags.push({
+        id: String(e.id),
+        postId: e.key ?? null,
+        message: e.message,
+        createdAt: e.created_at ?? null,
+        username: post ? ((post.username as string | null) ?? null) : null,
+        infName: creator?.inf_name ?? null,
+        campaignId: campId || null,
+        campaignName: campId ? (campNames.get(campId) ?? null) : null,
+        orderId: post ? ((post.order_id as string | null) ?? null) : null,
+        garmentQty: post ? Number(post.garment_qty ?? 0) || null : null,
+        maxAllowed: campId ? (campMax.get(campId) ?? null) : null,
+      });
+    }
+  }
+
   // Summary buckets.
   const summary: ErrorPortalSummary = {
     high: violations.filter((v) => v.severity === "HIGH").length,
@@ -377,6 +453,7 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
       (e) => e.type === "meta_profile_unavailable",
     ).length,
     blockedEmails: blockedEmails.length,
+    garmentFlags: garmentFlags.length,
   };
 
   return {
@@ -386,6 +463,7 @@ export async function fetchErrorPortalData(): Promise<ErrorPortalData> {
     systemErrors: sysErrors,
     missingEmails,
     blockedEmails,
+    garmentFlags,
     lastScannedAt: new Date().toISOString(),
   };
 }

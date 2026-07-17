@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -29,9 +29,11 @@ import {
   WifiOff,
   UserX,
   type LucideIcon,
+  PackageOpen,  X,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatDate, workflowStatusLabel } from "@/lib/formatters";
+import { createPortal } from "react-dom";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { resendBlockedCollabEmail } from "./actions";
 import type {
@@ -39,6 +41,7 @@ import type {
   BlockedEmailRow,
   ErrorPortalData,
   ErrorSeverity,
+  GarmentFlagRow,
   MissingEmailRow,
   SystemErrorRow,
 } from "./types";
@@ -56,6 +59,7 @@ export function ErrorPortalBody({ data }: { data: ErrorPortalData }) {
   const [severity, setSeverity] = useState<Severity>("all");
   const [search, setSearch] = useState("");
   const [showResolved, setShowResolved] = useState(false);
+  const [garmentOpen, setGarmentOpen] = useState(false);
 
   const normalizedQuery = search.trim().toLowerCase();
 
@@ -125,7 +129,15 @@ export function ErrorPortalBody({ data }: { data: ErrorPortalData }) {
             .getElementById("blocked-emails-card")
             ?.scrollIntoView({ behavior: "smooth", block: "start" })
         }
+        onGarmentClick={() => setGarmentOpen(true)}
       />
+
+      {garmentOpen && (
+        <GarmentFlagsModal
+          rows={data.garmentFlags}
+          onClose={() => setGarmentOpen(false)}
+        />
+      )}
 
       {/* Bento layout — desktop 12-col, mobile single */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
@@ -276,9 +288,11 @@ function formatRelativeTime(iso: string): string {
 function KpiStrip({
   summary,
   onBlockedClick,
+  onGarmentClick,
 }: {
   summary: ErrorPortalData["summary"];
   onBlockedClick: () => void;
+  onGarmentClick: () => void;
 }) {
   return (
     <div className="acc-kpi-grid">
@@ -338,6 +352,14 @@ function KpiStrip({
         label="Missing Email"
         primary={String(summary.missingEmail)}
         secondary="Onboarded, not sent"
+      />
+      <KpiTile
+        tone="warning"
+        icon={PackageOpen}
+        label="Garment Flags"
+        primary={String(summary.garmentFlags)}
+        secondary="Orders over campaign max"
+        onClick={summary.garmentFlags > 0 ? onGarmentClick : undefined}
       />
     </div>
   );
@@ -618,6 +640,164 @@ function MissingEmailsCard({ rows }: { rows: MissingEmailRow[] }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Blocked collab emails — actionable "Send again" cards
 // ─────────────────────────────────────────────────────────────────────────────
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Garment Flags popup — clickable KPI opens this: campaign-level overview +
+// campaign filter + search over the flagged orders (2026-07-17 spec).
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GarmentFlagsModal({
+  rows,
+  onClose,
+}: {
+  rows: GarmentFlagRow[];
+  onClose: () => void;
+}) {
+  const [campaign, setCampaign] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const campaigns = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      const id = r.campaignId ?? "—";
+      map.set(id, (map.get(id) ?? 0) + 1);
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [rows]);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (campaign && (r.campaignId ?? "—") !== campaign) return false;
+      if (!needle) return true;
+      return [r.username, r.infName, r.postId, r.orderId, r.campaignId, r.campaignName]
+        .some((f) => String(f ?? "").toLowerCase().includes(needle));
+    });
+  }, [rows, campaign, q]);
+
+  return createPortal(
+    <div
+      className="modal-backdrop modal-backdrop--onboarding"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Garment limit flags"
+      style={{ zIndex: 1500 }}
+      onClick={onClose}
+    >
+      <div
+        className="modal-panel modal-panel--lg modal-panel--onboarding flex flex-col"
+        style={{ maxWidth: 760, width: "94vw", maxHeight: "88dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-head shrink-0">
+          <div className="min-w-0">
+            <h2 className="font-semibold inline-flex items-center gap-2">
+              <PackageOpen size={16} aria-hidden /> Garment limit flags
+            </h2>
+            <p className="text-[0.66rem] text-text-secondary">
+              Orders that exceeded their campaign&apos;s max garment quantity —
+              onboarding was saved, review the order.
+            </p>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+        <div className="modal-body flex-1 overflow-y-auto flex flex-col gap-3">
+          {/* Campaign-level overview — one chip per campaign, click to filter */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setCampaign("")}
+              className={
+                campaign === ""
+                  ? "rounded-full bg-[#2C2420] px-2.5 py-1 text-[0.66rem] font-extrabold text-[#F0C61E]"
+                  : "rounded-full border border-border bg-bg-white px-2.5 py-1 text-[0.66rem] font-bold text-text-secondary hover:border-[#DCD6C4]"
+              }
+            >
+              All · {rows.length}
+            </button>
+            {campaigns.map(([id, count]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setCampaign(campaign === id ? "" : id)}
+                className={
+                  campaign === id
+                    ? "rounded-full bg-[#2C2420] px-2.5 py-1 text-[0.66rem] font-extrabold text-[#F0C61E]"
+                    : "rounded-full border border-border bg-bg-white px-2.5 py-1 text-[0.66rem] font-bold text-text-secondary hover:border-[#DCD6C4]"
+                }
+              >
+                {id} · {count}
+              </button>
+            ))}
+          </div>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search creator, POST ID, order, campaign…"
+            className="h-9 w-full rounded-full border border-border bg-bg-white px-3 text-[0.75rem] focus:border-[#DCD6C4] focus:outline-none"
+          />
+          {filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-text-tertiary">
+              No flagged orders match.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {filtered.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-border bg-bg-white px-3 py-2.5"
+                >
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[0.6rem] font-extrabold text-text-secondary bg-bg-surface border border-border rounded-full px-1.5 py-0.5">
+                      {r.postId ?? "—"}
+                    </span>
+                    {r.campaignId && (
+                      <span className="text-[0.6rem] font-bold text-text-tertiary">
+                        {r.campaignId}
+                        {r.campaignName ? ` · ${r.campaignName}` : ""}
+                      </span>
+                    )}
+                    <span className="overdue-pill overdue-pill--tiny">
+                      {r.garmentQty ?? "?"} vs max {r.maxAllowed ?? "?"}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[0.8rem] font-extrabold text-text-primary">
+                    {r.infName ?? (r.username ? `@${r.username}` : "—")}
+                    {r.username && r.infName ? (
+                      <span className="ml-1 font-normal text-text-tertiary">
+                        @{r.username}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="text-[0.68rem] text-text-secondary">
+                    Order {r.orderId ?? "—"}
+                    {r.createdAt
+                      ? ` · flagged ${new Date(r.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`
+                      : ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <footer className="modal-foot shrink-0">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Close
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 function BlockedEmailsCard({ rows }: { rows: BlockedEmailRow[] }) {
   return (

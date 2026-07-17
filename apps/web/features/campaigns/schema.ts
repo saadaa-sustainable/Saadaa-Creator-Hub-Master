@@ -17,7 +17,7 @@ import { isValidUrl } from "@/lib/validators";
  *   Budget row (legacy classes in parens):
  *     tier (.br-tier), collabType (.br-collab), campaignName (.br-segment readonly),
  *     numInfluencers (.br-num), avgComp (.br-avg, locked 0 when Barter),
- *     minGarments fixed 2 (.br-mingar readonly), maxGarments (.br-maxgar, default 3)
+ *     minGarments fixed 1 (.br-mingar readonly), maxGarments (.br-maxgar, default 3)
  *
  *   Server generates IFC{NNN}; client never sends one.
  */
@@ -37,7 +37,8 @@ export type CollabType = (typeof COLLAB_TYPES)[number];
 // Tracker formula constants — Budget tab cell I303 = =H*900*0.6
 export const GARMENT_UNIT_COST = 900;
 export const GARMENT_COST_FACTOR = 0.6;
-export const MIN_GARMENTS_FIXED = 2;
+// 2026-07-17 spec: minimum garment quantity is 1 (was 2).
+export const MIN_GARMENTS_FIXED = 1;
 
 export const BudgetRowSchema = z.object({
   tier: z.enum(INFLUENCER_TIERS),
