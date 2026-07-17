@@ -29,9 +29,14 @@ import { TierLinesTable } from "@/features/budget/tier-lines-table";
 import {
   approveCampaign,
   approveCampaignEditRequest,
+  fetchCampaignForEdit,
   rejectCampaign,
   rejectCampaignEditRequest,
 } from "@/features/campaigns/actions";
+import {
+  CampaignEditModal,
+  type EditTarget,
+} from "@/features/campaigns/existing-campaigns";
 import { decideOnboardingEdit } from "@/features/onboarding/edit-actions";
 import type { OnboardingEditItem } from "@/features/onboarding/edit-fields";
 import {
@@ -439,6 +444,23 @@ function BudgetApprovalCard({
   // sanctioning without an extra click.
   const [splitOpen, setSplitOpen] = useState(true);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Edit opens right here on Approvals — no /campaigns round-trip.
+  const openEdit = async () => {
+    setEditLoading(true);
+    try {
+      const res = await fetchCampaignForEdit(b.campaignId);
+      if (!res) {
+        toast.error(`Could not load ${b.campaignId} for editing.`);
+        return;
+      }
+      setEditTarget(res);
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   const isInitial = b.versionNumber === 0;
   const monthText = b.month
@@ -547,13 +569,20 @@ function BudgetApprovalCard({
           </span>
         )}
         {canAct && (
-          <a
-            href={`/campaigns?edit=${encodeURIComponent(b.campaignId)}`}
-            className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-bg-white px-2.5 py-1.5 text-[0.72rem] font-bold text-text-secondary hover:border-[#DCD6C4] hover:text-text-primary transition-colors"
-            title="Open this campaign's edit form (pending campaigns are editable directly)"
+          <button
+            type="button"
+            onClick={() => void openEdit()}
+            disabled={editLoading}
+            className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-bg-white px-2.5 py-1.5 text-[0.72rem] font-bold text-text-secondary hover:border-[#DCD6C4] hover:text-text-primary transition-colors disabled:opacity-60"
+            title="Edit this campaign without leaving Approvals"
           >
-            <FilePenLine size={12} aria-hidden /> Edit campaign
-          </a>
+            {editLoading ? (
+              <Loader2 size={12} className="animate-spin" aria-hidden />
+            ) : (
+              <FilePenLine size={12} aria-hidden />
+            )}
+            Edit campaign
+          </button>
         )}
       </div>
 
@@ -561,6 +590,17 @@ function BudgetApprovalCard({
         <BudgetCampaignOverviewModal
           b={b}
           onClose={() => setOverviewOpen(false)}
+        />
+      )}
+
+      {editTarget && (
+        <CampaignEditModal
+          target={editTarget}
+          onClose={() => setEditTarget(null)}
+          onEdited={() => {
+            setEditTarget(null);
+            router.refresh();
+          }}
         />
       )}
 

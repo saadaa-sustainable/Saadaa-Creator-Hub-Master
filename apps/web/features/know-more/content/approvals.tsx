@@ -46,6 +46,14 @@ export default function ApprovalsKM() {
             message, budget / creators / dates, and the campaign brief link.
           </li>
           <li>
+            <strong>Budget cards</strong> — amount / creators / month, the
+            tier-wise budget split (with a TOTAL row), plus{" "}
+            <strong>Campaign Overview</strong>, <strong>Campaign Brief</strong>{" "}
+            and <strong>Edit campaign</strong> buttons. Edit opens the full
+            campaign edit form <em>right here in a popup</em> — no detour to
+            the Campaigns page — and the queue refreshes when you save.
+          </li>
+          <li>
             <strong>Edit-request cards</strong> (campaign edits and onboarding
             edits) — show a <strong>Field / Before / After</strong> table of
             exactly what changes, so you can decide without opening anything

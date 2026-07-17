@@ -53,6 +53,28 @@ export default function PartnershipStatusKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Three views">
+        <p>
+          The toggle above the board switches how the same queue is drawn —
+          your choice is remembered on this device.
+        </p>
+        <KMList>
+          <li>
+            <strong>Kanban</strong> (default) — the five lanes side by side,
+            one column per permission state.
+          </li>
+          <li>
+            <strong>Cards</strong> — every creator in one flat grid; since
+            there are no lanes, each card wears its status as a colored pill.
+          </li>
+          <li>
+            <strong>List</strong> — one compact row per creator with the
+            status pill, key date, campaigns and team, and the same Resend /
+            Retry / Ad Status actions inline.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Live refresh">
         <p>
           Opening the tab quietly re-checks every <strong>Requested</strong>{" "}

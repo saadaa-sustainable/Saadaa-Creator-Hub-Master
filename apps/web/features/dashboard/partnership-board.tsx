@@ -14,7 +14,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Columns3,
   FlaskConical,
+  Grid3X3,
+  List as ListIcon,
   Loader2,
   Megaphone,
   RefreshCcw,
@@ -62,6 +65,7 @@ const LANES: Array<{
   label: string;
   icon: typeof Clock3;
   toneClass: string;
+  pillClass: string;
   empty: string;
 }> = [
   {
@@ -69,6 +73,7 @@ const LANES: Array<{
     label: "Requested",
     icon: Clock3,
     toneClass: "text-warning",
+    pillClass: "pill-warning",
     empty: "No pending partnership requests.",
   },
   {
@@ -76,6 +81,7 @@ const LANES: Array<{
     label: "Rejected",
     icon: XCircle,
     toneClass: "text-danger",
+    pillClass: "pill--danger",
     empty: "No rejected requests. Good sign.",
   },
   {
@@ -83,6 +89,7 @@ const LANES: Array<{
     label: "Accepted · Not Tested",
     icon: CheckCircle2,
     toneClass: "text-success",
+    pillClass: "pill-success",
     empty: "No accepted partnerships awaiting testing.",
   },
   {
@@ -90,6 +97,7 @@ const LANES: Array<{
     label: "Accepted & Tested",
     icon: FlaskConical,
     toneClass: "text-info",
+    pillClass: "pill--info",
     empty: "No tested partnerships yet.",
   },
   {
@@ -97,9 +105,15 @@ const LANES: Array<{
     label: "Failure on Sending",
     icon: AlertTriangle,
     toneClass: "text-danger",
+    pillClass: "pill--danger",
     empty: "No send failures. All invites went out.",
   },
 ];
+
+const LANE_BY_ID = new Map(LANES.map((l) => [l.id, l]));
+
+type BoardView = "kanban" | "cards" | "list";
+const VIEW_STORAGE_KEY = "ch-partnership-view";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -165,7 +179,28 @@ export function PartnershipBoard({
   const [cards, setCards] = useState<PartnershipCard[]>(data.cards);
   const [sweeping, setSweeping] = useState(false);
   const [resending, setResending] = useState<string | null>(null);
+  const [view, setView] = useState<BoardView>("kanban");
   const sweepStarted = useRef(false);
+
+  // Restore the last-used view (kanban is the default on first visit).
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+      if (saved === "cards" || saved === "list" || saved === "kanban") {
+        setView(saved);
+      }
+    } catch {
+      // storage unavailable — keep default
+    }
+  }, []);
+  const switchView = useCallback((v: BoardView) => {
+    setView(v);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, v);
+    } catch {
+      // storage unavailable — view still switches for this visit
+    }
+  }, []);
 
   useEffect(() => setCards(data.cards), [data.cards]);
 
@@ -519,49 +554,169 @@ export function PartnershipBoard({
         />
       </div>
 
-      {/* Kanban — 5 lanes on the shared Accounts Hub lane shell. */}
-      <div className="acc-kanban partnership-kanban bento-stagger">
-        {LANES.map((lane) => {
-          const items = lanes.get(lane.id) ?? [];
-          return (
-            <section
-              key={lane.id}
-              className="acc-kb-col"
-              aria-label={lane.label}
-            >
-              <header className="acc-kb-col__head">
-                <span className="acc-kb-col__title inline-flex items-center gap-1.5">
-                  <lane.icon size={13} className={lane.toneClass} aria-hidden />
-                  {lane.label}
-                </span>
-                <span className="acc-kb-col__count tabular">
-                  {items.length}
-                </span>
-              </header>
-              <div className="acc-kb-col__body">
-                {items.length === 0 ? (
-                  <div className="acc-kb-col__empty">{lane.empty}</div>
-                ) : (
-                  items.map((card) => (
-                    <PartnershipCardTile
-                      key={card.infId}
-                      card={card}
-                      lane={lane.id}
-                      resending={resending === card.infId}
-                      onResend={() => void resend(card)}
-                    />
-                  ))
-                )}
-              </div>
-            </section>
-          );
-        })}
+      {/* View toggle — Kanban (lanes) / Cards (flat grid) / List (rows). */}
+      <div className="stage-board-toolbar">
+        <div className="stage-board-toolbar__copy">
+          <span>
+            {cards.length} creator{cards.length === 1 ? "" : "s"}
+          </span>
+          <strong>
+            {view === "kanban"
+              ? "Kanban view"
+              : view === "cards"
+                ? "Card view"
+                : "List view"}{" "}
+            · partnership permissions
+          </strong>
+        </div>
+        <div className="ob-viewtoggle" role="tablist" aria-label="View mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "kanban"}
+            className={cn(view === "kanban" && "active")}
+            onClick={() => switchView("kanban")}
+          >
+            <Columns3 size={12} aria-hidden />
+            Kanban
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "cards"}
+            className={cn(view === "cards" && "active")}
+            onClick={() => switchView("cards")}
+          >
+            <Grid3X3 size={12} aria-hidden />
+            Cards
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "list"}
+            className={cn(view === "list" && "active")}
+            onClick={() => switchView("list")}
+          >
+            <ListIcon size={12} aria-hidden />
+            List
+          </button>
+        </div>
       </div>
+
+      {view === "kanban" && (
+        /* Kanban — 5 lanes on the shared Accounts Hub lane shell. */
+        <div className="acc-kanban partnership-kanban bento-stagger">
+          {LANES.map((lane) => {
+            const items = lanes.get(lane.id) ?? [];
+            return (
+              <section
+                key={lane.id}
+                className="acc-kb-col"
+                aria-label={lane.label}
+              >
+                <header className="acc-kb-col__head">
+                  <span className="acc-kb-col__title inline-flex items-center gap-1.5">
+                    <lane.icon
+                      size={13}
+                      className={lane.toneClass}
+                      aria-hidden
+                    />
+                    {lane.label}
+                  </span>
+                  <span className="acc-kb-col__count tabular">
+                    {items.length}
+                  </span>
+                </header>
+                <div className="acc-kb-col__body">
+                  {items.length === 0 ? (
+                    <div className="acc-kb-col__empty">{lane.empty}</div>
+                  ) : (
+                    items.map((card) => (
+                      <PartnershipCardTile
+                        key={card.infId}
+                        card={card}
+                        lane={lane.id}
+                        resending={resending === card.infId}
+                        onResend={() => void resend(card)}
+                      />
+                    ))
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {view === "cards" &&
+        (cards.length === 0 ? (
+          <PartnershipEmpty />
+        ) : (
+          /* Cards — every creator in one flat grid, lane shown as a pill. */
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {LANES.flatMap((lane) =>
+              (lanes.get(lane.id) ?? []).map((card) => (
+                <PartnershipCardTile
+                  key={card.infId}
+                  card={card}
+                  lane={lane.id}
+                  showStatus
+                  resending={resending === card.infId}
+                  onResend={() => void resend(card)}
+                />
+              )),
+            )}
+          </div>
+        ))}
+
+      {view === "list" &&
+        (cards.length === 0 ? (
+          <PartnershipEmpty />
+        ) : (
+          /* List — one compact row per creator, lane order preserved. */
+          <div className="overflow-hidden rounded-[12px] border border-border bg-bg-white">
+            {LANES.flatMap((lane) =>
+              (lanes.get(lane.id) ?? []).map((card) => (
+                <PartnershipListRow
+                  key={card.infId}
+                  card={card}
+                  lane={lane.id}
+                  resending={resending === card.infId}
+                  onResend={() => void resend(card)}
+                />
+              )),
+            )}
+          </div>
+        ))}
     </>
   );
 }
 
-function PartnershipCardTile({
+function PartnershipEmpty() {
+  return (
+    <div className="rounded-[12px] border border-dashed border-border bg-bg-white px-4 py-10 text-center text-[0.8rem] text-text-tertiary">
+      No creators match these filters.
+    </div>
+  );
+}
+
+function PartnershipStatusPill({ lane }: { lane: PartnershipBucket }) {
+  const meta = LANE_BY_ID.get(lane);
+  if (!meta) return null;
+  return (
+    <span
+      className={cn(
+        "pill inline-flex shrink-0 items-center gap-1 text-[0.62rem]",
+        meta.pillClass,
+      )}
+    >
+      <meta.icon size={10} aria-hidden />
+      {meta.label}
+    </span>
+  );
+}
+
+function PartnershipListRow({
   card,
   lane,
   resending,
@@ -571,6 +726,120 @@ function PartnershipCardTile({
   lane: PartnershipBucket;
   resending: boolean;
   onResend: () => void;
+}) {
+  const hasInfId = !card.infId.startsWith("@");
+  const ads = card.adsSummary;
+  const stamp =
+    lane === "send-failed"
+      ? { label: "Failed", value: fmtStamp(card.errorAt), tone: "text-danger" }
+      : lane === "rejected"
+        ? {
+            label: "Rejected",
+            value: fmtStamp(card.declinedAt),
+            tone: "text-danger",
+          }
+        : lane === "accepted" || lane === "accepted-tested"
+          ? {
+              label: "Accepted",
+              value: fmtStamp(card.approvedAt),
+              tone: "text-success",
+            }
+          : {
+              label: "Requested",
+              value: fmtStamp(card.sentAt),
+              tone: "text-text-secondary",
+            };
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border-soft px-3 py-2.5 last:border-b-0 hover:bg-bg-surface/60">
+      <div className="flex min-w-0 flex-1 basis-[220px] items-center gap-2.5">
+        <Avatar
+          src={card.profilePic}
+          username={card.username}
+          name={card.name}
+          size={30}
+        />
+        <div className="min-w-0">
+          <p className="truncate text-[0.8rem] font-semibold text-text-primary">
+            {card.name ?? card.username ?? card.infId}
+            <DeactivatedBadge
+              isActive={card.isActive}
+              className="ml-1.5 align-middle"
+            />
+          </p>
+          <p className="truncate text-[0.68rem] text-text-tertiary">
+            {card.username ? `@${card.username}` : "—"}
+            {card.followers != null && ` · ${formatFollowers(card.followers)}`}
+            {hasInfId && ` · ${card.infId}`}
+          </p>
+        </div>
+      </div>
+      <PartnershipStatusPill lane={lane} />
+      <div className="flex shrink-0 flex-col items-start text-[0.68rem] leading-tight sm:items-end">
+        <span className="text-text-tertiary">{stamp.label}</span>
+        <span className={cn("tabular font-semibold", stamp.tone)}>
+          {stamp.value}
+        </span>
+      </div>
+      <div className="hidden min-w-0 basis-[150px] flex-col text-[0.68rem] leading-tight lg:flex">
+        <span className="truncate text-text-secondary">
+          {card.campaigns.length > 0 ? card.campaigns.join(", ") : "—"}
+        </span>
+        <span className="truncate text-text-tertiary">
+          {card.teamMembers.length > 0 ? card.teamMembers.join(", ") : "—"}
+        </span>
+      </div>
+      {lane === "accepted-tested" && ads && (
+        <span className="pill pill--muted tabular hidden text-[0.62rem] xl:inline-flex">
+          {ads.tokens} in ads · {formatRupees(Math.round(ads.spend))}
+        </span>
+      )}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {lane === "accepted-tested" && hasInfId && (
+          <Link
+            href={
+              `/dashboard?tab=ad-status&search=${encodeURIComponent(
+                card.username ?? card.infId,
+              )}` as never
+            }
+            className="inline-flex items-center gap-1 rounded-[8px] border border-border bg-bg-surface px-2.5 py-1 text-[0.68rem] font-semibold text-text-primary transition-colors hover:bg-bg-alt"
+          >
+            <Megaphone size={11} aria-hidden />
+            Ad Status
+          </Link>
+        )}
+        {(lane === "rejected" || lane === "send-failed") && hasInfId && (
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 rounded-[8px] border border-border bg-bg-surface px-2.5 py-1 text-[0.68rem] font-semibold text-text-primary transition-colors hover:bg-bg-alt disabled:opacity-60"
+            onClick={onResend}
+            disabled={resending}
+          >
+            {resending ? (
+              <Loader2 size={11} className="animate-spin" aria-hidden />
+            ) : (
+              <Send size={11} aria-hidden />
+            )}
+            {lane === "send-failed" ? "Retry" : "Resend"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PartnershipCardTile({
+  card,
+  lane,
+  resending,
+  onResend,
+  showStatus = false,
+}: {
+  card: PartnershipCard;
+  lane: PartnershipBucket;
+  resending: boolean;
+  onResend: () => void;
+  /** Cards view — no lane context around the tile, so show the state pill. */
+  showStatus?: boolean;
 }) {
   const hasInfId = !card.infId.startsWith("@");
   const ads = card.adsSummary;
@@ -594,6 +863,12 @@ function PartnershipCardTile({
         </div>
         <DeactivatedBadge isActive={card.isActive} />
       </div>
+
+      {showStatus && (
+        <div className="mt-2">
+          <PartnershipStatusPill lane={lane} />
+        </div>
+      )}
 
       {lane === "accepted-tested" && ads && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">

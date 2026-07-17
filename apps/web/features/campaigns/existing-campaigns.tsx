@@ -7,6 +7,7 @@ import {
   useTransition,
   type CSSProperties,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -91,7 +92,7 @@ function isClosedStatus(status: string | null | undefined): boolean {
   return (status ?? "").trim().toLowerCase() === "closed";
 }
 
-interface EditTarget {
+export interface EditTarget {
   campaignId: string;
   initial: CampaignCreateInput;
 }
@@ -194,7 +195,6 @@ export function ExistingCampaigns({
     url.searchParams.delete("edit");
     window.history.replaceState(window.history.state, "", url.toString());
     openEdit(editId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -890,14 +890,22 @@ export function ExistingCampaigns({
   );
 }
 
-function CampaignEditModal({
+/**
+ * Shared edit-campaign modal — used on /campaigns and inline on Approvals
+ * budget cards. Portaled to <body> so ancestor transforms (stage wrappers)
+ * can't trap the fixed backdrop.
+ */
+export function CampaignEditModal({
   target,
   onClose,
+  onEdited,
 }: {
   target: EditTarget;
   onClose: () => void;
+  /** After a successful save — defaults to just closing. */
+  onEdited?: () => void;
 }) {
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-panel campaign-edit-modal"
@@ -924,11 +932,12 @@ function CampaignEditModal({
             mode="edit"
             campaignId={target.campaignId}
             initial={target.initial}
-            onEdited={onClose}
+            onEdited={onEdited ?? onClose}
           />
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
