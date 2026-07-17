@@ -109,14 +109,23 @@ export async function updateSheetCell(args: {
 
   const payload: Record<string, unknown> = { [args.column]: coerced };
 
-  const { error } = await (supabase as any)
+  // .select() so a key that matches no row surfaces as an error instead of a
+  // silent no-op success (bit us when posts rows with NULL post_id "updated").
+  const { data: updated, error } = await (supabase as any)
     .from(tbl.table)
     .update(payload)
-    .eq(tbl.pk, args.rowKey);
+    .eq(tbl.pk, args.rowKey)
+    .select(tbl.pk);
 
   if (error) {
     console.error(`[sheets] update ${tbl.table}.${args.column}:`, error);
     return { ok: false, error: error.message };
+  }
+  if (!updated || updated.length === 0) {
+    return {
+      ok: false,
+      error: `No row matched ${tbl.pk}=${args.rowKey} — nothing was saved`,
+    };
   }
 
   const changed = String(oldValue ?? "") !== String(coerced ?? "");

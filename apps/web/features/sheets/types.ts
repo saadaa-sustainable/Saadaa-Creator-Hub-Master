@@ -64,7 +64,9 @@ export const SHEET_TABLES: SheetTable[] = [
     id: "posts",
     label: "Posts",
     table: "posts",
-    pk: "post_id",
+    // Keyed on the bigint `id`, NOT post_id — historic-ingested reach-out rows
+    // have a NULL post_id, and updates keyed on it silently matched 0 rows.
+    pk: "id",
     description: "Per-deliverable workflow rows — Reach Out → Posted → Delivered → Paid",
     defaultSort: { col: "reach_out_date", dir: "desc" },
     deletable: true,
