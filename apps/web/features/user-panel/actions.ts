@@ -9,6 +9,7 @@ import type { UserFormPayload } from "./types";
 
 const VALID_ROLES = new Set([
   "Global Admin",
+  "Admin",
   "User",
   "Accounts Team",
   "Campaign Owner",
@@ -291,9 +292,9 @@ export async function toggleUserActive(email: string, active: boolean) {
 
 const CSV_ROLE_ALIASES: Record<
   string,
-  "Global Admin" | "User" | "Accounts Team" | "Campaign Owner"
+  "Global Admin" | "Admin" | "User" | "Accounts Team" | "Campaign Owner"
 > = {
-  admin: "Global Admin",
+  admin: "Admin",
   "global admin": "Global Admin",
   owner: "Global Admin",
   user: "User",

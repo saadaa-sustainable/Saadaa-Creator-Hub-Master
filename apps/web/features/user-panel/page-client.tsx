@@ -51,6 +51,7 @@ import { CsvInviteModal } from "./csv-invite-modal";
 
 const SYSTEM_ROLE_FALLBACK: AccessRole[] = [
   "User",
+  "Admin",
   "Global Admin",
   "Accounts Team",
 ];
@@ -840,8 +841,6 @@ function UserTable({
                     pending={isPending}
                     onEdit={() => onEdit(u)}
                     onDelete={async () => {
-                      if (!confirm(`Remove ${u.email}? This cannot be undone.`))
-                        return;
                       await act(
                         u,
                         () => deleteUser(u.email),
@@ -857,6 +856,51 @@ function UserTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+
+/** Two-click destructive confirm: first click arms (turns red, 4s), second
+ *  fires. Replaces window.confirm(), whose synchronous dialog froze the main
+ *  thread and produced multi-second INP on the delete icons. */
+function ArmedDeleteButton({
+  label,
+  armedLabel = "Click again to confirm",
+  className,
+  armedClassName,
+  onConfirm,
+  children,
+}: {
+  label: string;
+  armedLabel?: string;
+  className: string;
+  armedClassName: string;
+  onConfirm: () => void;
+  children: React.ReactNode;
+}) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button
+      type="button"
+      title={armed ? armedLabel : label}
+      className={armed ? armedClassName : className}
+      onClick={() => {
+        if (!armed) {
+          setArmed(true);
+          return;
+        }
+        setArmed(false);
+        onConfirm();
+      }}
+    >
+      {children}
+      {armed && <span className="ml-1">{armedLabel}</span>}
+    </button>
   );
 }
 
@@ -916,17 +960,17 @@ function RowActions({
               "0 16px 40px -12px rgba(22,21,19,0.28), 0 0 0 1px rgba(0,0,0,0.04)",
           }}
         >
-          <button
-            type="button"
-            onClick={() => {
+          <ArmedDeleteButton
+            label="Delete member"
+            className="w-full text-left px-2.5 py-1.5 rounded-lg text-[0.72rem] font-extrabold text-danger hover:bg-danger-bg transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
+            armedClassName="w-full text-left px-2.5 py-1.5 rounded-lg text-[0.72rem] font-extrabold text-white bg-danger-text transition-colors inline-flex items-center gap-1.5"
+            onConfirm={() => {
               setOpen(false);
               onDelete();
             }}
-            disabled={pending}
-            className="w-full text-left px-2.5 py-1.5 rounded-lg text-[0.72rem] font-extrabold text-danger hover:bg-danger-bg transition-colors disabled:opacity-50 inline-flex items-center gap-1.5"
           >
             <Trash2 size={11} aria-hidden /> Delete member
-          </button>
+          </ArmedDeleteButton>
         </div>
       )}
     </div>
@@ -954,8 +998,9 @@ function UserCard({
   const accent = roleAccent(user.role, roles);
   const pendingInvite = user.active && !user.last_login_at;
 
+  // Two-click arming happens at the button (ArmedDeleteButton) — no native
+  // confirm(): its synchronous dialog blocked the main thread (INP ~3s).
   const handleDelete = () => {
-    if (!confirm(`Remove ${user.email}? This cannot be undone.`)) return;
     startTransition(async () => {
       const res = await deleteUser(user.email);
       if (res.ok) {
@@ -1106,15 +1151,15 @@ function UserCard({
         >
           <Pencil size={10} aria-hidden />
         </button>
-        <button
-          type="button"
-          onClick={handleDelete}
-          disabled={pending}
+        <ArmedDeleteButton
+          label="Delete"
+          armedLabel="Confirm"
           className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-danger/30 bg-danger-bg text-danger hover:bg-danger/10 transition-colors disabled:opacity-50"
-          title="Delete"
+          armedClassName="inline-flex items-center justify-center h-8 px-2 rounded-lg border border-danger-text bg-danger-text text-[0.62rem] font-extrabold text-white"
+          onConfirm={handleDelete}
         >
           <Trash2 size={10} aria-hidden />
-        </button>
+        </ArmedDeleteButton>
       </footer>
     </article>
   );
@@ -1213,12 +1258,6 @@ function RolesPanel({
 
   const handleDelete = async (role: AccessRoleSummary) => {
     if (role.is_system) return;
-    if (
-      !confirm(
-        `Delete role "${role.name}"? Users still assigned to it must be moved off first.`,
-      )
-    )
-      return;
     setPendingId(role.id);
     const res = await deleteRole(role.id);
     setPendingId(null);
@@ -1384,21 +1423,30 @@ function RoleCard({
         >
           <Pencil size={11} aria-hidden /> {role.is_system ? "Tune" : "Edit"}
         </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          disabled={role.is_system || isPending}
-          className={cn(
-            "inline-flex items-center justify-center gap-1 h-9 px-2.5 rounded-lg border text-[0.7rem] font-extrabold transition-colors",
-            role.is_system
-              ? "border-border bg-bg-muted text-text-tertiary cursor-not-allowed"
-              : "border-danger/30 bg-danger-bg text-danger hover:bg-danger/10",
-            isPending && "opacity-60",
-          )}
-        >
-          {role.is_system ? <Lock size={11} aria-hidden /> : <Trash2 size={11} aria-hidden />}
-          {role.is_system ? "Locked" : "Delete"}
-        </button>
+        {role.is_system ? (
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center justify-center gap-1 h-9 px-2.5 rounded-lg border border-border bg-bg-muted text-[0.7rem] font-extrabold text-text-tertiary cursor-not-allowed"
+            title="System roles cannot be deleted"
+          >
+            <Lock size={11} aria-hidden />
+            Delete
+          </button>
+        ) : (
+          <ArmedDeleteButton
+            label="Delete role"
+            armedLabel="Confirm delete"
+            className={cn(
+              "inline-flex items-center justify-center gap-1 h-9 px-2.5 rounded-lg border border-danger/30 bg-danger-bg text-[0.7rem] font-extrabold text-danger hover:bg-danger/10 transition-colors",
+              isPending && "opacity-60",
+            )}
+            armedClassName="inline-flex items-center justify-center gap-1 h-9 px-2.5 rounded-lg border border-danger-text bg-danger-text text-[0.7rem] font-extrabold text-white"
+            onConfirm={onDelete}
+          >
+            <Trash2 size={11} aria-hidden />
+          </ArmedDeleteButton>
+        )}
       </footer>
     </article>
   );

@@ -7,11 +7,16 @@ import type {
 } from "./types";
 
 function normalizeRole(role: string | null | undefined): string {
-  const r = (role ?? "").trim().toLowerCase();
-  if (["global admin", "owner level", "owner", "admin"].includes(r))
-    return "Global Admin";
+  const raw = (role ?? "").trim();
+  const r = raw.toLowerCase();
+  // Legacy variants only — real role names (Admin, Global Admin, Accounts
+  // Team, Campaign Owner, custom roles) pass through verbatim. The old
+  // collapse of "admin" → "Global Admin" hid the Admin/Global Admin split.
+  if (["owner level", "owner"].includes(r)) return "Global Admin";
+  if (r === "admin") return "Admin";
+  if (r === "global admin") return "Global Admin";
   if (r === "accounts team") return "Accounts Team";
-  return "User";
+  return raw || "User";
 }
 
 function todayInIst(): string {
@@ -118,7 +123,9 @@ export async function fetchUserPanelData(): Promise<UserPanelData> {
   const kpis: UserPanelKpis = {
     total: users.length,
     active: users.filter((u) => u.active).length,
-    admins: users.filter((u) => u.role === "Global Admin").length,
+    admins: users.filter(
+      (u) => u.role === "Global Admin" || u.role === "Admin",
+    ).length,
     accounts: users.filter((u) => u.role === "Accounts Team").length,
     pendingInvites: users.filter((u) => u.active && !u.last_login_at).length,
     lastActiveToday: users.filter((u) => {

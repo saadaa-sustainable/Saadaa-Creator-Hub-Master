@@ -5,7 +5,7 @@
  * metadata, activity sparkline).
  */
 
-export type AccessRole = "Global Admin" | "User" | "Accounts Team";
+export type AccessRole = "Global Admin" | "Admin" | "User" | "Accounts Team" | (string & {});
 
 export interface UserRow {
   id: string;

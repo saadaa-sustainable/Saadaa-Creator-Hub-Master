@@ -599,16 +599,17 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 8. Monthly payable-cycle digest ─────────────────────────────────────────
-  // On the 12th: every collab whose payment falls in this month's 15th payout
-  // cycle and still owes money. On the 27th: the 30th cycle. ONE branded digest
+  // TWO DAYS before each payout cycle (user spec 2026-07-17): on the 13th for
+  // the 15th cycle, on the 28th for the 30th cycle — every collab whose payment
+  // falls in that cycle and still owes money. ONE branded digest
   // (full payable sheet incl. bank details) to the Accounts team + Global Admins.
   // Idempotent: a digest for the day fires at most once (guarded via email_logs).
   // Voided/offboarded collabs are excluded — their balance is no longer payable.
   try {
     const today = todayUtc();
     const dom = today.getUTCDate();
-    if (dom === 12 || dom === 27) {
-      const cycleDay = dom === 12 ? 15 : 30;
+    if (dom === 13 || dom === 28) {
+      const cycleDay = dom === 13 ? 15 : 30;
       const y = today.getUTCFullYear();
       const mo = today.getUTCMonth();
       const lastDay = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate();
