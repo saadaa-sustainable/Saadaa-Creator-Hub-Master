@@ -38,6 +38,14 @@ export default function ApprovalsKM() {
       <KMSection tag="Page layout">
         <KMList>
           <li>
+            <strong>List / Cards toggle</strong> — the queue opens as a{" "}
+            <strong>compact list</strong> by default: one row per pending item
+            with the key number (amount / fields changed) and inline Approve /
+            Reject; the chevron expands a row to the full detail (budget
+            split, before/after table, overview buttons). Switch to Cards for
+            the full-size cards; your choice is remembered on this device.
+          </li>
+          <li>
             <strong>KPI tiles</strong> — Awaiting approval · Campaigns · Σ Budget ·
             Σ Creators across the queue.
           </li>

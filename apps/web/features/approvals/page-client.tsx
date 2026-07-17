@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
@@ -12,8 +12,10 @@ import {
   ExternalLink,
   Eye,
   FilePenLine,
+  Grid3X3,
   History,
   Inbox,
+  List as ListIcon,
   Loader2,
   Megaphone,
   ShieldCheck,
@@ -56,6 +58,9 @@ import {
 } from "@/features/budget/actions";
 import { VersionChip } from "@/features/budget/version-chip";
 
+type QueueView = "list" | "cards";
+const QUEUE_VIEW_STORAGE_KEY = "ch-approvals-view";
+
 export function ApprovalsBody({
   data,
   canApproveBudget = false,
@@ -66,6 +71,31 @@ export function ApprovalsBody({
   const totalBudget = data.items.reduce((s, i) => s + (i.budget ?? 0), 0);
   const campaignCount = data.items.filter((i) => i.kind === "campaign").length;
   const editCount = data.items.filter((i) => i.kind === "edit").length;
+
+  // List is the default — compact rows, expand for the full detail.
+  const [view, setView] = useState<QueueView>("list");
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(QUEUE_VIEW_STORAGE_KEY);
+      if (saved === "cards" || saved === "list") setView(saved);
+    } catch {
+      // storage unavailable — keep default
+    }
+  }, []);
+  const switchView = (v: QueueView) => {
+    setView(v);
+    try {
+      window.localStorage.setItem(QUEUE_VIEW_STORAGE_KEY, v);
+    } catch {
+      // storage unavailable — view still switches for this visit
+    }
+  };
+  const isList = view === "list";
+  const sectionGridClass = isList
+    ? "flex flex-col gap-2"
+    : "grid grid-cols-1 gap-3 xl:grid-cols-2";
+  const pendingCount =
+    data.budgets.length + data.items.length + data.onboardingEdits.length;
 
   const tiles = [
     {
@@ -139,18 +169,55 @@ export function ApprovalsBody({
         </div>
       ) : (
         <>
+          <div className="stage-board-toolbar">
+            <div className="stage-board-toolbar__copy">
+              <span>
+                {pendingCount} pending item{pendingCount === 1 ? "" : "s"}
+              </span>
+              <strong>
+                {isList ? "List view" : "Card view"} · approval queue
+              </strong>
+            </div>
+            <div
+              className="ob-viewtoggle"
+              role="tablist"
+              aria-label="View mode"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isList}
+                className={cn(isList && "active")}
+                onClick={() => switchView("list")}
+              >
+                <ListIcon size={12} aria-hidden />
+                List
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!isList}
+                className={cn(!isList && "active")}
+                onClick={() => switchView("cards")}
+              >
+                <Grid3X3 size={12} aria-hidden />
+                Cards
+              </button>
+            </div>
+          </div>
           {data.budgets.length > 0 && (
             <section className="flex flex-col gap-2">
               <h3 className="text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary inline-flex items-center gap-1.5">
                 <Wallet size={13} aria-hidden /> Budget approvals (
                 {data.budgets.length}) — Global Admins
               </h3>
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className={sectionGridClass}>
                 {data.budgets.map((b) => (
                   <BudgetApprovalCard
                     key={b.versionId}
                     b={b}
                     canAct={canApproveBudget}
+                    variant={view}
                   />
                 ))}
               </div>
@@ -162,11 +229,12 @@ export function ApprovalsBody({
                 <Megaphone size={13} aria-hidden /> Campaign approvals (
                 {data.items.length})
               </h3>
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className={sectionGridClass}>
                 {data.items.map((c) => (
                   <ApprovalCard
                     key={`${c.kind}-${c.approvalId ?? c.campaignId}`}
                     c={c}
+                    variant={view}
                   />
                 ))}
               </div>
@@ -178,9 +246,9 @@ export function ApprovalsBody({
                 <FilePenLine size={13} aria-hidden /> Onboarding edits (
                 {data.onboardingEdits.length})
               </h3>
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <div className={sectionGridClass}>
                 {data.onboardingEdits.map((e) => (
-                  <OnboardingEditCard key={e.id} e={e} />
+                  <OnboardingEditCard key={e.id} e={e} variant={view} />
                 ))}
               </div>
             </section>
@@ -193,11 +261,90 @@ export function ApprovalsBody({
   );
 }
 
-function ApprovalCard({ c }: { c: ApprovalItem }) {
+type CardVariant = "cards" | "list";
+
+/** Compact Approve / Reject pair for list-view row headers. */
+function RowActions({
+  pending,
+  disabled = false,
+  approveLabel,
+  onApprove,
+  onReject,
+}: {
+  pending: boolean;
+  disabled?: boolean;
+  approveLabel: string;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onReject}
+        disabled={pending || disabled}
+        title="Reject"
+        aria-label="Reject"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-border bg-bg-white text-danger-text transition-colors hover:bg-danger-bg/40 disabled:opacity-50"
+      >
+        <X size={13} aria-hidden />
+      </button>
+      <button
+        type="button"
+        onClick={onApprove}
+        disabled={pending || disabled}
+        className="inline-flex h-7 items-center gap-1 rounded-[8px] bg-[#F0C61E] px-2.5 text-[0.7rem] font-bold text-[#161513] transition-colors hover:brightness-95 disabled:opacity-50"
+      >
+        {pending ? (
+          <Loader2 size={12} className="animate-spin" aria-hidden />
+        ) : (
+          <Check size={12} aria-hidden />
+        )}
+        {approveLabel}
+      </button>
+    </>
+  );
+}
+
+function RowExpandButton({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
+      title={open ? "Collapse details" : "Show details"}
+      aria-label={open ? "Collapse details" : "Show details"}
+      className="inline-flex h-7 w-7 items-center justify-center rounded-[8px] border border-border bg-bg-white text-text-secondary transition-colors hover:bg-bg-alt"
+    >
+      {open ? (
+        <ChevronDown size={13} aria-hidden />
+      ) : (
+        <ChevronRight size={13} aria-hidden />
+      )}
+    </button>
+  );
+}
+
+function ApprovalCard({
+  c,
+  variant = "cards",
+}: {
+  c: ApprovalItem;
+  variant?: CardVariant;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const isListRow = variant === "list";
+  const showBody = !isListRow || expanded;
   const isEdit = c.kind === "edit";
   const Icon = isEdit ? FilePenLine : Megaphone;
   const iconStyle = isEdit
@@ -243,7 +390,12 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
   };
 
   return (
-    <article className="flex flex-col gap-3 rounded-[14px] border border-border bg-bg-white p-4 shadow-[0_12px_30px_rgba(23,19,16,0.04)]">
+    <article
+      className={cn(
+        "flex flex-col rounded-[14px] border border-border bg-bg-white shadow-[0_12px_30px_rgba(23,19,16,0.04)]",
+        isListRow ? "gap-2 p-3" : "gap-3 p-4",
+      )}
+    >
       <div className="flex items-start gap-3">
         <span
           className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
@@ -266,6 +418,11 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
             >
               {isEdit ? "Pending edit" : "Pending campaign"}
             </span>
+            {isListRow && budgetLocked && (
+              <span className="rounded-full bg-[#FAF1DC] px-2 py-0.5 text-[0.62rem] font-bold text-[#B57514]">
+                Budget first
+              </span>
+            )}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[0.7rem] text-text-tertiary">
             <span className="font-mono">{c.campaignId}</span>
@@ -273,9 +430,33 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
             {c.createdAt && <span>{formatDate(c.createdAt)}</span>}
           </div>
         </div>
+        {isListRow && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="hidden text-[0.8rem] font-bold text-text-primary tabular-nums sm:inline">
+              {isEdit
+                ? `${c.changes?.length ?? 0} field${(c.changes?.length ?? 0) === 1 ? "" : "s"}`
+                : c.budget != null
+                  ? formatRupees(c.budget)
+                  : "—"}
+            </span>
+            {!rejecting && (
+              <RowActions
+                pending={pending}
+                disabled={!canAct}
+                approveLabel="Approve"
+                onApprove={approve}
+                onReject={() => setRejecting(true)}
+              />
+            )}
+            <RowExpandButton
+              open={expanded}
+              onToggle={() => setExpanded((o) => !o)}
+            />
+          </div>
+        )}
       </div>
 
-      {c.keyMessage && (
+      {showBody && c.keyMessage && (
         <p className="line-clamp-2 text-[0.78rem] leading-relaxed text-text-secondary">
           {c.keyMessage}
         </p>
@@ -283,7 +464,8 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
 
       {/* Edit requests: before/after diff so the admin sees exactly what
           changes BEFORE deciding — same table the onboarding-edit card uses. */}
-      {isEdit && (c.changes?.length ?? 0) > 0 ? (
+      {showBody &&
+      (isEdit && (c.changes?.length ?? 0) > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[300px] text-[0.7rem]">
             <thead>
@@ -325,10 +507,11 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
           <Metric icon={Calendar} label="Start" value={formatDate(c.startDate)} />
           <Metric icon={Calendar} label="End" value={formatDate(c.endDate)} />
         </div>
-      )}
+      ))}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {c.briefLink && /^https?:\/\//i.test(c.briefLink) && (
+      {showBody && (
+        <div className="flex flex-wrap items-center gap-2">
+          {c.briefLink && /^https?:\/\//i.test(c.briefLink) && (
           <a
             href={c.briefLink}
             target="_blank"
@@ -349,12 +532,13 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
             pending with the Global Admins
           </span>
         )}
-        {c.notes && (
-          <span className="line-clamp-1 text-[0.72rem] text-text-tertiary">
-            {c.notes}
-          </span>
-        )}
-      </div>
+          {c.notes && (
+            <span className="line-clamp-1 text-[0.72rem] text-text-tertiary">
+              {c.notes}
+            </span>
+          )}
+        </div>
+      )}
 
       {rejecting && (
         <textarea
@@ -366,7 +550,8 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
         />
       )}
 
-      <div className="mt-auto flex items-center justify-end gap-2 border-t border-border pt-3">
+      {(!isListRow || rejecting) && (
+        <div className="mt-auto flex items-center justify-end gap-2 border-t border-border pt-3">
         {rejecting ? (
           <>
             <button
@@ -419,7 +604,8 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
             </button>
           </>
         )}
-      </div>
+        </div>
+      )}
     </article>
   );
 }
@@ -432,9 +618,11 @@ function ApprovalCard({ c }: { c: ApprovalItem }) {
 function BudgetApprovalCard({
   b,
   canAct,
+  variant = "cards",
 }: {
   b: BudgetApprovalItem;
   canAct: boolean;
+  variant?: CardVariant;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -446,6 +634,9 @@ function BudgetApprovalCard({
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [editLoading, setEditLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const isListRow = variant === "list";
+  const showBody = !isListRow || expanded;
 
   // Edit opens right here on Approvals — no /campaigns round-trip.
   const openEdit = async () => {
@@ -496,7 +687,12 @@ function BudgetApprovalCard({
     });
 
   return (
-    <article className="flex flex-col gap-3 rounded-[14px] border border-border bg-bg-white p-4 shadow-[0_12px_30px_rgba(23,19,16,0.04)]">
+    <article
+      className={cn(
+        "flex flex-col rounded-[14px] border border-border bg-bg-white shadow-[0_12px_30px_rgba(23,19,16,0.04)]",
+        isListRow ? "gap-2 p-3" : "gap-3 p-4",
+      )}
+    >
       <div className="flex items-start gap-3">
         <span
           className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]"
@@ -524,25 +720,47 @@ function BudgetApprovalCard({
             {b.createdAt && <span>{formatDate(b.createdAt)}</span>}
           </div>
         </div>
+        {isListRow && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="hidden text-[0.8rem] font-bold text-text-primary tabular-nums sm:inline">
+              {formatRupees(b.amount)}
+            </span>
+            {canAct && !rejecting && (
+              <RowActions
+                pending={pending}
+                approveLabel="Approve"
+                onApprove={approve}
+                onReject={() => setRejecting(true)}
+              />
+            )}
+            <RowExpandButton
+              open={expanded}
+              onToggle={() => setExpanded((o) => !o)}
+            />
+          </div>
+        )}
       </div>
 
-      {b.reason && !isInitial && (
+      {showBody && b.reason && !isInitial && (
         <p className="rounded-[10px] border border-[#EADFC5] bg-[#FAF1DC]/60 px-2.5 py-2 text-[0.76rem] leading-relaxed text-text-secondary">
           <strong className="text-[#B57514]">Reason for increase:</strong>{" "}
           {b.reason}
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <Metric icon={Wallet} label="Amount" value={formatRupees(b.amount)} />
-        <Metric
-          icon={Users}
-          label={isInitial ? "Creators" : "Adds creators"}
-          value={String(b.numCreators)}
-        />
-        <Metric icon={Calendar} label="Month" value={monthText || "-"} />
-      </div>
+      {showBody && (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Metric icon={Wallet} label="Amount" value={formatRupees(b.amount)} />
+          <Metric
+            icon={Users}
+            label={isInitial ? "Creators" : "Adds creators"}
+            value={String(b.numCreators)}
+          />
+          <Metric icon={Calendar} label="Month" value={monthText || "-"} />
+        </div>
+      )}
 
+      {showBody && (
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -585,6 +803,7 @@ function BudgetApprovalCard({
           </button>
         )}
       </div>
+      )}
 
       {overviewOpen && (
         <BudgetCampaignOverviewModal
@@ -604,7 +823,7 @@ function BudgetApprovalCard({
         />
       )}
 
-      {b.tierLines.length > 0 && (
+      {showBody && b.tierLines.length > 0 && (
         <div className="flex flex-col gap-1.5">
           <button
             type="button"
@@ -624,7 +843,7 @@ function BudgetApprovalCard({
         </div>
       )}
 
-      {!canAct && (
+      {showBody && !canAct && (
         <span className="inline-flex items-center gap-1 self-start rounded-[9px] bg-[#F7F3EC] px-2.5 py-1.5 text-[0.72rem] font-semibold text-text-secondary">
           <Clock3 size={12} aria-hidden /> Only Global Admins can decide
           budgets
@@ -641,7 +860,7 @@ function BudgetApprovalCard({
         />
       )}
 
-      {canAct && (
+      {canAct && (!isListRow || rejecting) && (
         <div className="mt-auto flex items-center justify-end gap-2 border-t border-border pt-3">
           {rejecting ? (
             <>
@@ -723,11 +942,20 @@ function Metric({
   );
 }
 
-function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
+function OnboardingEditCard({
+  e,
+  variant = "cards",
+}: {
+  e: OnboardingEditItem;
+  variant?: CardVariant;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
+  const [expanded, setExpanded] = useState(false);
+  const isListRow = variant === "list";
+  const showBody = !isListRow || expanded;
 
   const decide = (decision: "approve" | "reject") => {
     start(async () => {
@@ -772,14 +1000,34 @@ function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
             {e.requestedBy ? ` · by ${e.requestedBy}` : ""}
           </div>
         </div>
+        {isListRow && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="hidden rounded-full bg-[#F3EDFB] px-2 py-0.5 text-[0.62rem] font-semibold text-[#6F45B4] sm:inline">
+              {e.changes.length} field{e.changes.length === 1 ? "" : "s"}
+            </span>
+            {!rejecting && (
+              <RowActions
+                pending={pending}
+                approveLabel="Approve"
+                onApprove={() => decide("approve")}
+                onReject={() => setRejecting(true)}
+              />
+            )}
+            <RowExpandButton
+              open={expanded}
+              onToggle={() => setExpanded((o) => !o)}
+            />
+          </div>
+        )}
       </header>
 
-      {e.reason && (
+      {showBody && e.reason && (
         <p className="text-[0.68rem] text-text-secondary italic">
           “{e.reason}”
         </p>
       )}
 
+      {showBody && (
       <div className="overflow-x-auto">
         <table className="w-full text-[0.66rem] min-w-[300px]">
           <thead>
@@ -806,6 +1054,7 @@ function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
           </tbody>
         </table>
       </div>
+      )}
 
       {rejecting ? (
         <div className="flex flex-col gap-2 border-t border-border pt-2.5">
@@ -845,7 +1094,7 @@ function OnboardingEditCard({ e }: { e: OnboardingEditItem }) {
             </button>
           </div>
         </div>
-      ) : (
+      ) : isListRow ? null : (
         <div className="flex items-center justify-end gap-2 border-t border-border pt-2.5">
           <button
             type="button"
