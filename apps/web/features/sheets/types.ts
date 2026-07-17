@@ -456,4 +456,8 @@ export interface SheetServerParams {
   sortKey?: string;
   sortDir?: "asc" | "desc";
   page: number;
+  /** JSON-encoded per-column funnel filters: [{key, values[]}] ("" = blanks). */
+  filters?: string;
+  /** Row-tint filter — green = Posted/Delivered, white = everything else. */
+  tint?: "green" | "white";
 }

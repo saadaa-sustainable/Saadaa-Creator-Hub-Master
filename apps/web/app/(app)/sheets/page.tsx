@@ -23,6 +23,8 @@ interface SheetsSearchParams {
   sort?: string;
   dir?: string;
   p?: string;
+  filters?: string;
+  tint?: string;
 }
 
 export default async function SheetsPage({
@@ -68,6 +70,8 @@ export default async function SheetsPage({
           sort={sort}
           dir={dir}
           p={p}
+          filters={params.filters}
+          tint={params.tint}
           canEdit={canEdit}
           canDelete={canDelete}
           currentUserEmail={currentUserEmail}
@@ -90,6 +94,8 @@ async function SheetsData({
   p,
   canEdit,
   canDelete,
+  filters,
+  tint,
   currentUserEmail,
 }: {
   tableId: string;
@@ -97,6 +103,8 @@ async function SheetsData({
   sort?: string;
   dir?: "asc" | "desc";
   p: number;
+  filters?: string;
+  tint?: string;
   canEdit: boolean;
   canDelete: boolean;
   currentUserEmail: string | null;
@@ -131,6 +139,8 @@ async function SheetsData({
     sortDir: dir,
     page: p,
     pageSize: SERVER_PAGE_SIZE,
+    filters,
+    tint,
   });
   return (
     <SheetsBody
@@ -143,7 +153,14 @@ async function SheetsData({
       currentUserEmail={currentUserEmail}
       serverMode
       serverTotal={data.rowCount}
-      serverParams={{ q, sortKey: sort, sortDir: dir, page: data.page }}
+      serverParams={{
+        q,
+        sortKey: sort,
+        sortDir: dir,
+        page: data.page,
+        filters,
+        tint: tint === "green" || tint === "white" ? tint : undefined,
+      }}
     />
   );
 }

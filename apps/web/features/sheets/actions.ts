@@ -7,7 +7,7 @@ import { sendMail } from "@/lib/email";
 import { logSystemError } from "@/lib/system-errors";
 import { createServiceClient } from "@/lib/supabase/server";
 import { serverEnv } from "@/lib/env.server";
-import { fetchSheetPage, getSheetTableById } from "./queries";
+import { fetchSheetPage, getSheetTableById, fetchSheetColumnOptions } from "./queries";
 import {
   mergeColumns,
   type ColDef,
@@ -1112,4 +1112,14 @@ export async function fetchMentionCandidates(args: {
       (u) => ({ email: u.email, name: u.name, role: u.role }),
     ),
   };
+}
+
+/** Whole-table distinct values for one column — funnel menu on server tabs. */
+export async function sheetColumnOptions(
+  tableId: string,
+  colKey: string,
+  opts: { q?: string; filters?: string; tint?: string } = {},
+): Promise<Array<{ value: string; count: number }>> {
+  await assertPermission("sheet_view");
+  return fetchSheetColumnOptions(tableId, colKey, opts);
 }

@@ -60,6 +60,7 @@ import {
   type CellCommentRow,
   type DeletionLogRow,
   type RecentEdit,
+  sheetColumnOptions,
 } from "./actions";
 import { CellCommentThread } from "./cell-comment-thread";
 import { AllCommentsPanel, type FlatComment } from "./all-comments-panel";
@@ -235,6 +236,83 @@ export function SheetGrid({
     x: number;
     y: number;
   } | null>(null);
+  // Server mode: whole-table option lists for the open funnel menu (the
+  // loaded page alone hides values living on other pages).
+  const [serverMenuOptions, setServerMenuOptions] = useState<
+    { value: string; count: number }[] | null
+  >(null);
+
+  const encodeFilters = useCallback((m: Map<string, Set<string>>): string | null => {
+    if (m.size === 0) return null;
+    return JSON.stringify(
+      Array.from(m.entries()).map(([key, values]) => ({
+        key,
+        values: Array.from(values),
+      })),
+    );
+  }, []);
+
+  // Server mode: colFilters/tint round-trip through the URL so Postgres
+  // filters the WHOLE table (page 1 of Posts showed zero green rows even
+  // though posted rows exist on later pages).
+  const hydratedFilters = useRef(false);
+  useEffect(() => {
+    if (!isServer) return;
+    hydratedFilters.current = false;
+    try {
+      const raw = serverParams?.filters;
+      const next = new Map<string, Set<string>>();
+      if (raw) {
+        for (const f of JSON.parse(raw) as Array<{ key: string; values: string[] }>) {
+          if (f?.key && Array.isArray(f.values)) next.set(f.key, new Set(f.values));
+        }
+      }
+      setColFilters(next);
+      setTintFilter(serverParams?.tint ?? "all");
+    } catch {
+      setColFilters(new Map());
+      setTintFilter("all");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table.id, isServer]);
+  useEffect(() => {
+    if (!isServer) return;
+    // Skip the hydration pass — only user changes push the URL.
+    if (!hydratedFilters.current) {
+      hydratedFilters.current = true;
+      return;
+    }
+    replaceParams({
+      filters: encodeFilters(colFilters),
+      tint: tintFilter === "all" ? null : tintFilter,
+      p: null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colFilters, tintFilter]);
+
+  // Server mode: fetch the open column's whole-table values (other filters +
+  // search applied server-side, Google-Sheets semantics).
+  useEffect(() => {
+    if (!isServer || !filterMenu) {
+      setServerMenuOptions(null);
+      return;
+    }
+    let alive = true;
+    setServerMenuOptions(null);
+    const others = new Map(colFilters);
+    others.delete(filterMenu.key);
+    sheetColumnOptions(table.id, filterMenu.key, {
+      q: serverParams?.q,
+      filters: encodeFilters(others) ?? undefined,
+      tint: tintFilter === "all" ? undefined : tintFilter,
+    }).then((opts) => {
+      if (alive) setServerMenuOptions(opts);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isServer, filterMenu?.key, table.id]);
   const gridRef = useRef<HTMLDivElement>(null);
 
   // Default-pin the table's first (identifier) column on every tab switch so
@@ -1393,7 +1471,7 @@ export function SheetGrid({
                             "shrink-0 inline-flex items-center justify-center w-4 h-4 rounded transition-all",
                             colFilters.has(c.key)
                               ? "text-[--accent] bg-[--accent]/15 opacity-100"
-                              : "text-text-tertiary opacity-0 group-hover:opacity-70 hover:!opacity-100 hover:text-text-primary",
+                              : "text-text-tertiary opacity-70 hover:!opacity-100 hover:text-text-primary",
                           )}
                         >
                           <Filter
@@ -1664,7 +1742,12 @@ export function SheetGrid({
             filterMenu.key
           }
           anchor={filterMenu}
-          options={filterOptionsFor(filterMenu.key)}
+          options={
+            isServer
+              ? (serverMenuOptions ?? [])
+              : filterOptionsFor(filterMenu.key)
+          }
+          loading={isServer && serverMenuOptions === null}
           selected={colFilters.get(filterMenu.key) ?? null}
           onToggle={(value, allValues) =>
             toggleFilterValue(filterMenu.key, value, allValues)
@@ -2447,6 +2530,7 @@ function ColumnFilterMenu({
   colLabel,
   anchor,
   options,
+  loading = false,
   selected,
   onToggle,
   onBulk,
@@ -2457,6 +2541,7 @@ function ColumnFilterMenu({
   colLabel: string;
   anchor: { x: number; y: number };
   options: { value: string; count: number }[];
+  loading?: boolean;
   /** null = no filter on this column (i.e. everything selected). */
   selected: Set<string> | null;
   onToggle: (value: string, allValues: string[]) => void;
@@ -2577,7 +2662,10 @@ function ColumnFilterMenu({
           )}
         </div>
         <div className="flex-1 overflow-y-auto px-1 pb-1">
-          {visible.length === 0 && (
+          {loading && (
+            <div className="px-3 py-4 text-text-tertiary">Loading values…</div>
+          )}
+          {!loading && visible.length === 0 && (
             <div className="px-3 py-4 text-text-tertiary">No values match.</div>
           )}
           {visible.map((o, idx) => (

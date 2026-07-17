@@ -168,6 +168,8 @@ export interface SheetPageOpts {
   sortDir?: "asc" | "desc";
   page: number;
   pageSize: number;
+  filters?: string;
+  tint?: string;
 }
 
 /**
@@ -225,6 +227,40 @@ export async function fetchSheetPage(
       ? tbl.defaultSort.dir === "asc"
       : true;
 
+  // Per-column funnel filters + the Green/White tint — applied in Postgres so
+  // server-paged tabs filter the WHOLE table, not just the loaded page.
+  const parsedFilters = parseSheetFilters(opts.filters).filter((f) =>
+    existsLive(f.key),
+  );
+  const tint =
+    opts.tint === "green" || opts.tint === "white" ? opts.tint : null;
+  const applyFilters = (q: any) => {
+    for (const f of parsedFilters) {
+      const real = f.values.filter((v) => v !== "");
+      const parts: string[] = [];
+      if (real.length > 0)
+        parts.push(
+          `${f.key}.in.(${real.map((v) => `"${String(v).replace(/"/g, '\\"')}"`).join(",")})`,
+        );
+      if (f.values.includes(""))
+        parts.push(`${f.key}.is.null`, `${f.key}.eq.""`);
+      if (parts.length > 0) q = q.or(parts.join(","));
+      else q = q.eq(f.key, "__none__");
+    }
+    if (tint && existsLive("workflow_status")) {
+      if (tint === "green") {
+        q = q.or(
+          "workflow_status.ilike.*posted*,workflow_status.ilike.*delivered*",
+        );
+      } else {
+        q = q
+          .not("workflow_status", "ilike", "%posted%")
+          .not("workflow_status", "ilike", "%delivered%");
+      }
+    }
+    return q;
+  };
+
   const runPage = async (page: number) => {
     let q = (supabase as any)
       .from(tbl.table)
@@ -235,6 +271,7 @@ export async function fetchSheetPage(
         searchableCols.map((c) => `${c.key}.ilike."*${term}*"`).join(","),
       );
     }
+    q = applyFilters(q);
     q = q.order(sortCol, { ascending });
     if (sortCol !== tbl.pk) q = q.order(tbl.pk, { ascending: true });
     return q.range(page * pageSize, page * pageSize + pageSize - 1);
@@ -260,4 +297,107 @@ export async function fetchSheetPage(
     serverMode: true,
     page,
   };
+}
+
+/** Parse the JSON funnel-filter param — [{key, values[]}]; bad input = []. */
+export function parseSheetFilters(
+  raw: string | undefined | null,
+): Array<{ key: string; values: string[] }> {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter(
+        (f) =>
+          f &&
+          typeof f.key === "string" &&
+          Array.isArray(f.values) &&
+          f.values.every((v: unknown) => typeof v === "string"),
+      )
+      .slice(0, 12);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * WHOLE-TABLE distinct values (+counts) for one column — feeds the funnel
+ * menu on server-paged tabs (the loaded page alone hid most values: a Posts
+ * page sorted by reach-out date showed only 2 of 3 statuses). Applies the
+ * search term and every OTHER column's filter (Google-Sheets semantics).
+ */
+export async function fetchSheetColumnOptions(
+  tableId: string,
+  colKey: string,
+  opts: { q?: string; filters?: string; tint?: string } = {},
+): Promise<Array<{ value: string; count: number }>> {
+  const tbl = getSheetTableById(tableId);
+  if (!tbl) return [];
+  const supabase = createServiceClient();
+  const liveKeys = await getLiveColumnKeys(tbl.table);
+  const existsLive = (key: string) =>
+    liveKeys == null || liveKeys.includes(key);
+  if (!existsLive(colKey)) return [];
+
+  const term = sanitizeSearchTerm(opts.q ?? "");
+  const searchableCols = tbl.columns.filter(
+    (c) =>
+      !c.virtual &&
+      SEARCHABLE_TYPES.has(c.type) &&
+      !SEARCH_EXCLUDED_KEY.test(c.key) &&
+      existsLive(c.key),
+  );
+  const others = parseSheetFilters(opts.filters).filter(
+    (f) => f.key !== colKey && existsLive(f.key),
+  );
+  const tint =
+    opts.tint === "green" || opts.tint === "white" ? opts.tint : null;
+
+  const counts = new Map<string, number>();
+  const CHUNK = 1000;
+  for (let from = 0; from < 50_000; from += CHUNK) {
+    let q = (supabase as any).from(tbl.table).select(colKey);
+    if (term && searchableCols.length > 0) {
+      q = q.or(
+        searchableCols.map((c) => `${c.key}.ilike."*${term}*"`).join(","),
+      );
+    }
+    for (const f of others) {
+      const real = f.values.filter((v) => v !== "");
+      const parts: string[] = [];
+      if (real.length > 0)
+        parts.push(
+          `${f.key}.in.(${real.map((v) => `"${String(v).replace(/"/g, '\\"')}"`).join(",")})`,
+        );
+      if (f.values.includes(""))
+        parts.push(`${f.key}.is.null`, `${f.key}.eq.""`);
+      if (parts.length > 0) q = q.or(parts.join(","));
+    }
+    if (tint && existsLive("workflow_status")) {
+      if (tint === "green")
+        q = q.or(
+          "workflow_status.ilike.*posted*,workflow_status.ilike.*delivered*",
+        );
+      else
+        q = q
+          .not("workflow_status", "ilike", "%posted%")
+          .not("workflow_status", "ilike", "%delivered%");
+    }
+    const { data, error } = await q.range(from, from + CHUNK - 1);
+    if (error) {
+      console.warn("[sheets] column options failed:", error.message);
+      break;
+    }
+    const rows = (data ?? []) as Array<Record<string, unknown>>;
+    for (const r of rows) {
+      const v = r[colKey];
+      const t = v == null ? "" : String(v).trim();
+      counts.set(t, (counts.get(t) ?? 0) + 1);
+    }
+    if (rows.length < CHUNK) break;
+  }
+  return Array.from(counts.entries())
+    .map(([value, count]) => ({ value, count }))
+    .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
 }
