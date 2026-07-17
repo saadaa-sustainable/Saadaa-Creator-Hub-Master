@@ -918,9 +918,12 @@ export function CampaignCreateForm({
         </div>
 
         <small className="text-muted block mt-2">
-          Garment Cost auto-computes as{" "}
-          <code className="code-chip">Max Garments × ₹900 × 0.6</code>. Total =
-          Comp Total + (Garment Cost × No.).
+          <strong className="text-text-primary">
+            We assume a per-garment cost of ₹540
+          </strong>{" "}
+          (₹900 MRP × 0.6) — Garment Cost auto-computes as{" "}
+          <code className="code-chip">Max Garments × ₹540</code>. Total = Comp
+          Total + (Garment Cost × No.).
         </small>
 
         {errors.budgetRows && typeof errors.budgetRows.message === "string" && (
