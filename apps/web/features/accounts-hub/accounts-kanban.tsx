@@ -226,6 +226,18 @@ function KanbanCard({
             <UtrCell row={row} />
           </dd>
         </div>
+        {row.post_date && (
+          <div>
+            <dt>Posted</dt>
+            <dd className="tabular">
+              {new Date(row.post_date).toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </dd>
+          </div>
+        )}
         <div>
           <dt>Due</dt>
           <dd>
