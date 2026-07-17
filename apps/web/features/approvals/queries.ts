@@ -57,6 +57,17 @@ export interface BudgetApprovalItem {
    *  V0, the parked draft `lines` for a pending top-up. Shown on the approval
    *  card so Global Admins see exactly what they're sanctioning. */
   tierLines: TierLine[];
+  /** Campaign context for the card's Overview / Brief / Edit actions. */
+  campaign: {
+    status: string | null;
+    keyMessage: string | null;
+    briefLink: string | null;
+    startDate: string | null;
+    endDate: string | null;
+    totalBudget: number | null;
+    creators: number | null;
+    createdBy: string | null;
+  } | null;
 }
 
 export type ApprovalHistoryStatus =
@@ -175,29 +186,36 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
   // whose V0 sits here has its own approval locked (budget first).
   const budgetRaw = ((pendingBudgets?.data ?? []) as Raw[]);
   const campaignNameById = new Map<string, string>();
+  const campaignInfoById = new Map<string, Raw>();
   for (const r of (campaigns.data ?? []) as Raw[]) {
     campaignNameById.set(
       String(r.campaign_id ?? ""),
       String(r.campaign_name ?? ""),
     );
+    campaignInfoById.set(String(r.campaign_id ?? ""), r);
   }
   const missingNames = [
     ...new Set(
       budgetRaw
         .map((r) => String(r.campaign_id ?? ""))
-        .filter((id) => id && !campaignNameById.has(id)),
+        .filter((id) => id && !campaignInfoById.has(id)),
     ),
   ];
   if (missingNames.length > 0) {
+    // Top-ups belong to LIVE campaigns (not in the pending fetch) — pull the
+    // same context fields for them.
     const { data: extraNames } = await svc
       .from("campaigns")
-      .select("campaign_id, campaign_name")
+      .select(
+        "campaign_id, campaign_name, status, key_message, total_budget, no_of_creators, start_date, end_date, brief_link, created_by",
+      )
       .in("campaign_id", missingNames);
     for (const r of (extraNames ?? []) as Raw[]) {
       campaignNameById.set(
         String(r.campaign_id ?? ""),
         String(r.campaign_name ?? ""),
       );
+      campaignInfoById.set(String(r.campaign_id ?? ""), r);
     }
   }
   // Budget split behind each pending version: a V0's tier lines already live
@@ -239,6 +257,20 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
       createdBy: asString(r.created_by),
       createdAt: asString(r.created_at),
       tierLines: stored.length > 0 ? stored : drafts,
+      campaign: (() => {
+        const c = campaignInfoById.get(String(r.campaign_id ?? ""));
+        if (!c) return null;
+        return {
+          status: asString(c.status),
+          keyMessage: asString(c.key_message),
+          briefLink: asString(c.brief_link),
+          startDate: asString(c.start_date),
+          endDate: asString(c.end_date),
+          totalBudget: asNumber(c.total_budget),
+          creators: asNumber(c.no_of_creators),
+          createdBy: asString(c.created_by),
+        };
+      })(),
     };
   });
   const pendingV0Campaigns = new Set(

@@ -185,6 +185,18 @@ export function ExistingCampaigns({
     }
   }, []);
 
+  // Deep link: /campaigns?edit=IFC004 (Approvals "Edit campaign" button on
+  // budget cards) auto-opens the edit modal once, then cleans the URL.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const editId = url.searchParams.get("edit");
+    if (!editId) return;
+    url.searchParams.delete("edit");
+    window.history.replaceState(window.history.state, "", url.toString());
+    openEdit(editId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const media = window.matchMedia("(max-width: 767px)");
     const sync = () => setIsMobileView(media.matches);

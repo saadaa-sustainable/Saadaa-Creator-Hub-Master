@@ -152,14 +152,20 @@ export function ApprovalsBody({
             </section>
           )}
           {data.items.length > 0 && (
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              {data.items.map((c) => (
-                <ApprovalCard
-                  key={`${c.kind}-${c.approvalId ?? c.campaignId}`}
-                  c={c}
-                />
-              ))}
-            </div>
+            <section className="flex flex-col gap-2">
+              <h3 className="text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-secondary inline-flex items-center gap-1.5">
+                <Megaphone size={13} aria-hidden /> Campaign approvals (
+                {data.items.length})
+              </h3>
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                {data.items.map((c) => (
+                  <ApprovalCard
+                    key={`${c.kind}-${c.approvalId ?? c.campaignId}`}
+                    c={c}
+                  />
+                ))}
+              </div>
+            </section>
           )}
           {data.onboardingEdits.length > 0 && (
             <section className="flex flex-col gap-2">
@@ -432,6 +438,7 @@ function BudgetApprovalCard({
   // The split defaults open — a Global Admin should see what they're
   // sanctioning without an extra click.
   const [splitOpen, setSplitOpen] = useState(true);
+  const [overviewOpen, setOverviewOpen] = useState(false);
 
   const isInitial = b.versionNumber === 0;
   const monthText = b.month
@@ -513,6 +520,49 @@ function BudgetApprovalCard({
         />
         <Metric icon={Calendar} label="Month" value={monthText || "-"} />
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOverviewOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-bg-white px-2.5 py-1.5 text-[0.72rem] font-bold text-text-secondary hover:border-[#DCD6C4] hover:text-text-primary transition-colors"
+        >
+          <Eye size={12} aria-hidden /> Campaign Overview
+        </button>
+        {b.campaign?.briefLink ? (
+          <a
+            href={b.campaign.briefLink}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-bg-white px-2.5 py-1.5 text-[0.72rem] font-bold text-text-secondary hover:border-[#DCD6C4] hover:text-text-primary transition-colors"
+          >
+            <ExternalLink size={12} aria-hidden /> Campaign Brief
+          </a>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-bg-surface px-2.5 py-1.5 text-[0.72rem] font-bold text-text-tertiary"
+            title="No brief link on this campaign"
+          >
+            <ExternalLink size={12} aria-hidden /> No brief
+          </span>
+        )}
+        {canAct && (
+          <a
+            href={`/campaigns?edit=${encodeURIComponent(b.campaignId)}`}
+            className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-bg-white px-2.5 py-1.5 text-[0.72rem] font-bold text-text-secondary hover:border-[#DCD6C4] hover:text-text-primary transition-colors"
+            title="Open this campaign's edit form (pending campaigns are editable directly)"
+          >
+            <FilePenLine size={12} aria-hidden /> Edit campaign
+          </a>
+        )}
+      </div>
+
+      {overviewOpen && (
+        <BudgetCampaignOverviewModal
+          b={b}
+          onClose={() => setOverviewOpen(false)}
+        />
+      )}
 
       {b.tierLines.length > 0 && (
         <div className="flex flex-col gap-1.5">
@@ -920,6 +970,98 @@ function HistoryRow({ item }: { item: ApprovalHistoryItem }) {
         <HistoryDetailModal detail={detail} onClose={() => setDetail(null)} />
       )}
     </>
+  );
+}
+
+function BudgetCampaignOverviewModal({
+  b,
+  onClose,
+}: {
+  b: BudgetApprovalItem;
+  onClose: () => void;
+}) {
+  const c = b.campaign;
+  const row = (label: string, value: React.ReactNode) => (
+    <div className="flex items-baseline justify-between gap-3 border-b border-border py-1.5 text-[0.78rem] last:border-b-0">
+      <span className="shrink-0 text-[0.66rem] font-extrabold uppercase tracking-[0.05em] text-text-tertiary">
+        {label}
+      </span>
+      <span className="min-w-0 text-right font-semibold text-text-primary [overflow-wrap:anywhere]">
+        {value ?? "—"}
+      </span>
+    </div>
+  );
+  return createPortal(
+    <div
+      className="modal-backdrop modal-backdrop--onboarding"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Campaign overview — ${b.campaignId}`}
+      style={{ zIndex: 1500 }}
+      onClick={onClose}
+    >
+      <div
+        className="modal-panel modal-panel--onboarding flex flex-col"
+        style={{ maxWidth: 560, width: "94vw", maxHeight: "88dvh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="modal-head shrink-0">
+          <div className="min-w-0">
+            <h2 className="font-semibold">
+              {b.campaignName ?? b.campaignId}
+            </h2>
+            <p className="text-[0.66rem] text-text-secondary">
+              {b.campaignId}
+              {c?.status ? ` · ${c.status}` : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={14} aria-hidden />
+          </button>
+        </header>
+        <div className="modal-body flex-1 overflow-y-auto">
+          {c ? (
+            <>
+              {c.keyMessage && (
+                <p className="mb-3 rounded-[10px] border border-border bg-bg-surface px-3 py-2 text-[0.78rem] leading-relaxed text-text-secondary">
+                  {c.keyMessage}
+                </p>
+              )}
+              {row("Total budget", c.totalBudget != null ? formatRupees(c.totalBudget) : "—")}
+              {row("Creators", c.creators ?? "—")}
+              {row("Start date", c.startDate ? formatDate(c.startDate) : "—")}
+              {row("End date", c.endDate ? formatDate(c.endDate) : "—")}
+              {row("Created by", c.createdBy ?? "—")}
+              {row(
+                "Brief",
+                c.briefLink ? (
+                  <a
+                    href={c.briefLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#3B6FD4] underline"
+                  >
+                    Open brief
+                  </a>
+                ) : (
+                  "—"
+                ),
+              )}
+            </>
+          ) : (
+            <p className="py-6 text-center text-sm text-text-tertiary">
+              Campaign details could not be loaded.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
