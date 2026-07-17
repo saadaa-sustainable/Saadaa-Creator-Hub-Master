@@ -75,6 +75,7 @@ export const SHEET_TABLES: SheetTable[] = [
       { key: "inf_id", label: "Inf ID", type: "text", width: 90 },
       { key: "post_id_short", label: "Short", type: "text", width: 90 },
       { key: "campaign_id", label: "Campaign", type: "text", width: 90, editable: true },
+      { key: "creator_brief_link", label: "Campaign Brief", type: "text", width: 200 },
       { key: "username", label: "Username", type: "text", width: 140 },
       {
         key: "workflow_status",
@@ -333,7 +334,7 @@ export const SHEET_TABLES: SheetTable[] = [
       { key: "commercial_amount", label: "Commercial ₹", type: "currency", width: 120 },
       { key: "followers", label: "Followers", type: "number", width: 100 },
       { key: "reach_out_date", label: "Reach Out", type: "date", width: 110 },
-      { key: "creator_brief_link", label: "Brief", type: "text", width: 200 },
+      { key: "creator_brief_link", label: "Campaign Brief", type: "text", width: 200 },
     ],
   },
   {
