@@ -7,6 +7,7 @@ import {
   normalizeChangelogDate,
 } from "@/lib/gdoc-changelog";
 import { buildChangelogPdf } from "@/lib/changelog-pdf";
+import { resolveGlobalAdminEmails } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,13 +20,14 @@ export const maxDuration = 60;
  *
  * Source of truth: the Google Doc Change Log table ("Workflow & Tools Master"
  * › "Influencer - Technical Design") — the standing registry every shippable
- * change appends to.
+ * change appends to. Recipients: every active Admin + Global Admin.
  *
  * Manual/test: GET ?date=2026-07-16 with admin session or
  * `Authorization: Bearer ${CRON_SECRET|SUPABASE_SERVICE_KEY}`.
  */
 
-const RECIPIENT = "devesh@saadaa.in";
+// Fallback when the role lookup returns nothing (never expected).
+const FALLBACK_RECIPIENT = "devesh@saadaa.in";
 
 function istDateOffset(daysBack: number): string {
   const now = new Date(Date.now() - daysBack * 86_400_000);
@@ -130,8 +132,12 @@ export async function GET(req: NextRequest) {
 </div>
 </div>`;
 
+  // All active Admins + Global Admins (resolveGlobalAdminEmails covers both).
+  const admins = await resolveGlobalAdminEmails();
+  const recipients = admins.length > 0 ? admins : [FALLBACK_RECIPIENT];
+
   const result = await sendMail({
-    to: RECIPIENT,
+    to: recipients,
     subject: `CreatorHub change log — ${dateLabel} (${entries.length} change${entries.length === 1 ? "" : "s"})`,
     htmlBody: html,
     attachments: [
@@ -148,7 +154,7 @@ export async function GET(req: NextRequest) {
       ok: result.ok,
       date: targetIso,
       entries: entries.length,
-      to: RECIPIENT,
+      to: recipients,
       error: result.error,
     },
     { status: result.ok ? 200 : 500 },
