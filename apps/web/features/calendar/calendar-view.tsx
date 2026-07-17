@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -306,8 +307,21 @@ function ScheduleView({ year, month, events, isToday }: { year: number; month: n
 }
 
 function DayPopup({ year, month, day, events, onClose }: { year: number; month: number; day: number; events: CalendarEvent[]; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center p-4" style={{ background: "rgba(22,21,19,0.45)", backdropFilter: "blur(3px)" }} onClick={onClose}>
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+  // Portal to <body> — required: `.onboarding-stage`'s rise animation keeps a
+  // transform on the page wrapper, which cages any in-tree `fixed` overlay to
+  // the content column (the sidebar stayed sharp and above the backdrop).
+  return createPortal(
+    <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4" style={{ background: "rgba(22,21,19,0.45)", backdropFilter: "blur(3px)" }} onClick={onClose}>
       <div className="w-full max-w-[440px] max-h-[80vh] overflow-y-auto rounded-[16px] bg-white border border-[#E7E2D2] shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 flex items-center justify-between px-4 py-3 border-b border-[#E7E2D2] bg-[#FDFBF7] rounded-t-[16px]">
           <p className="text-[14px] font-semibold text-[#161513]">{MONTHS[month - 1]} {day}, {year}</p>
@@ -340,6 +354,7 @@ function DayPopup({ year, month, day, events, onClose }: { year: number; month: 
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
