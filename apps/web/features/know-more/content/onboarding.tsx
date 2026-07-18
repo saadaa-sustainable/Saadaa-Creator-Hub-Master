@@ -111,6 +111,15 @@ export default function OnboardingKM() {
             ); the saved onboarding is never lost. A standalone send still lives
             on each onboarded row.
           </li>
+          <li>
+            <strong>Campaign brief must be a Drive FILE</strong> · the email
+            attaches the brief only when the campaign&apos;s brief link points
+            to a single Drive file (PDF/Doc/Slides). A{" "}
+            <strong>Drive folder link</strong> (or a Spreadsheet / non-file URL)
+            can&apos;t be attached, so the send is <strong>blocked</strong> with
+            a clear note — open the folder, then paste the single brief FILE
+            link in the campaign (Edit campaign) and retry.
+          </li>
         </KMList>
       </KMSection>
 

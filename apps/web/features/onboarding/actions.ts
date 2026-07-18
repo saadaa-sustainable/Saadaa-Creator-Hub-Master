@@ -789,6 +789,11 @@ export interface CollabEmailAttachment {
   note?: string;
 }
 
+/** A Drive FOLDER link (…/drive/…/folders/ID) — can't be attached as one file. */
+function isDriveFolderUrl(value: string): boolean {
+  return /\/folders\//i.test(value.trim());
+}
+
 // Saadaa pronunciation voice note — a fixed brand asset attached to every collab
 // email. Shared "Anyone with the link" in Drive; override the ID via env if the
 // file is ever replaced. Best-effort (does NOT gate the send).
@@ -907,22 +912,26 @@ export async function getCollabEmailPreview(
     "";
 
   const isSpreadsheetUrl = campaignBriefUrl.includes("spreadsheets");
-  const campaignBriefDriveId = isSpreadsheetUrl
-    ? null
-    : extractDriveFileId(campaignBriefUrl);
+  const isFolderUrl = isDriveFolderUrl(campaignBriefUrl);
+  const campaignBriefDriveId =
+    isSpreadsheetUrl || isFolderUrl ? null : extractDriveFileId(campaignBriefUrl);
 
   const briefStatus: CollabEmailAttachment["status"] = campaignBriefDriveId
     ? "attached"
     : campaignBriefUrl
       ? "unavailable"
       : "missing";
+  // A brief must be a single Drive FILE to attach — a folder can't be. Spell out
+  // the folder case so the fix (paste a file link in the campaign) is obvious.
   const briefNote = campaignBriefDriveId
     ? "Will be attached to the email."
-    : isSpreadsheetUrl
-      ? "Brief link is a Google Spreadsheet — update campaign with a Docs/Slides/PDF link."
-      : campaignBriefUrl
-        ? "Brief link is not a Google Drive file URL."
-        : "No campaign brief found for this campaign.";
+    : isFolderUrl
+      ? "This is a Drive FOLDER link — open the folder, then paste the single brief FILE link (PDF/Doc/Slides) in the campaign."
+      : isSpreadsheetUrl
+        ? "Brief link is a Google Spreadsheet — update the campaign with a Docs/Slides/PDF file link."
+        : campaignBriefUrl
+          ? "Brief link is not a Google Drive file URL — update the campaign brief link."
+          : "No campaign brief found for this campaign.";
 
   const attachments: CollabEmailAttachment[] = [
     {
