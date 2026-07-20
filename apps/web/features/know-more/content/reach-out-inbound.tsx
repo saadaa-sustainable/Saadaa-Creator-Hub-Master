@@ -55,7 +55,10 @@ export default function ReachOutInboundKM() {
             <KMCode>instagram.com/handle</KMCode> shape works).
           </li>
           <li>
-            <strong>Gender</strong> · required. Female / Male / Other.
+            <strong>Gender</strong> · required, <strong>manual only</strong> —
+            Female / Male / Other. It is never auto-filled or defaulted (Meta
+            gives no gender); a blank row stays flagged incomplete until you
+            pick it.
           </li>
           <li>
             <strong>Content Type</strong> · required. Maps to{" "}

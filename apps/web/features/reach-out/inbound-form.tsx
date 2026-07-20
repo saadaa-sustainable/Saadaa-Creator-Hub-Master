@@ -79,6 +79,9 @@ type RowValidationErrors = Partial<
 function newRow(prefill: Partial<InboundRowInput> = {}): RowState {
   return {
     ...makeInboundRow(prefill),
+    // Gender is manual only — never default to a guess (Meta gives no gender).
+    // Blank ("") rows are flagged incomplete until the user picks it.
+    gender: prefill.gender ?? ("" as Gender),
     id: `rin-${Math.random().toString(36).slice(2, 9)}`,
   };
 }
@@ -265,7 +268,9 @@ export function InboundForm({ campaigns }: InboundFormProps) {
           const gender = normalizeGender(result.gender);
           return {
             ...row,
-            gender: gender ?? row.gender,
+            // Gender stays whatever was entered manually (CSV / dropdown) — the
+            // lookup NEVER sets it (Meta/Instagram don't provide gender).
+            gender: row.gender,
             lookup: {
               username: result.username,
               source: result.source,
@@ -554,8 +559,11 @@ export function InboundForm({ campaigns }: InboundFormProps) {
       }
 
       const next = parsed.slice(0, 200).map((r) => {
+        // Never assume a gender — a blank stays blank so the row is flagged
+        // incomplete and the user picks it manually (Meta gives no gender).
         const gender =
-          normalizeGender(rosterValue(r, "gender", "Gender")) ?? "Female";
+          normalizeGender(rosterValue(r, "gender", "Gender")) ??
+          ("" as Gender);
         const contentCode = rosterValue(
           r,
           "contentCode",

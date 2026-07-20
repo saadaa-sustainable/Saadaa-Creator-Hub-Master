@@ -61,8 +61,11 @@ export default function ReachOutOutboundKM() {
             (avatar, follower tier, ER, verification badge) fed by the lookup.
           </li>
           <li>
-            Form auto-fills creator name, gender, followers, language from the
-            cache hit; you can override any field before submit.
+            Form auto-fills creator name, followers, language, ER and avg likes
+            from the cache hit; you can override any field before submit.{" "}
+            <strong>Gender is never auto-filled</strong> — Meta/Instagram don&apos;t
+            expose it, so it always starts blank and must be picked manually
+            (even on an existing creator).
           </li>
         </KMList>
       </KMSection>

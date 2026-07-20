@@ -78,7 +78,9 @@ export const REACHOUT_DEFAULTS: ReachOutInput = {
   instagramLink: "",
   influencerName: "",
   followers: undefined,
-  gender: "Female",
+  // Blank by default — gender is a manual choice (Meta gives no gender), so the
+  // user must pick it every time. z.enum still enforces it on submit.
+  gender: "" as ReachOutInput["gender"],
   verification: "Pending",
   contentType: "",
   contentName: "",

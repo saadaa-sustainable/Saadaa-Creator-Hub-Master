@@ -233,18 +233,13 @@ export function OutboundForm({
         setValue("influencerName", result.username ?? "", {
           shouldDirty: true,
         });
-        if (result.gender) {
-          const g = result.gender as ReachOutInput["gender"];
-          if (GENDERS.includes(g)) set("gender", g);
-        }
+        // Gender is NEVER auto-filled — Meta/Instagram don't provide it.
       } else {
         set("influencerName", result.inf_name);
         if (result.followers != null)
           set("followers", result.followers as never);
-        if (result.gender) {
-          const g = result.gender as ReachOutInput["gender"];
-          if (GENDERS.includes(g)) set("gender", g);
-        }
+        // Gender is NEVER auto-filled — Meta/Instagram don't provide it. Left
+        // blank (reset above) for the user to set manually every time.
         if (result.language) {
           const lang = result.language as ReachOutInput["language"];
           if ((LANGUAGES as readonly string[]).includes(lang))
@@ -766,10 +761,11 @@ export function OutboundForm({
             name="gender"
             render={({ field }) => (
               <div className="form-floating relative">
+                {/* Manual ONLY — Meta/Instagram never returns gender, so it is
+                    never auto-filled or locked (was wrongly carrying a stale
+                    stored value on existing creators). */}
                 <SearchableSelect
                   id="ro_gender"
-                  className={cn(isExistingCreator && "field-auto")}
-                  disabled={isExistingCreator}
                   value={field.value ?? ""}
                   onChange={field.onChange}
                   options={GENDERS.map((g) => ({ value: g, label: g }))}
@@ -779,9 +775,6 @@ export function OutboundForm({
                 <label htmlFor="ro_gender">
                   Gender <span className="req">*</span>
                 </label>
-                {isExistingCreator && (
-                  <span className="autofill-badge">AUTO</span>
-                )}
               </div>
             )}
           />
