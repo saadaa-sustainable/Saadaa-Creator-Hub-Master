@@ -53,8 +53,13 @@ export default async function LoginPage() {
 
         <div className="relative h-full flex flex-col justify-between p-8 lg:p-12 min-h-[420px]">
           <header className="flex items-center gap-3">
-            <span className="grid h-9 w-9 place-items-center rounded-md bg-accent font-emph text-base font-bold text-accent-text shadow-[0_0_0_4px_rgba(240,198,30,0.18)]">
-              SA
+            <span className="grid h-9 w-9 place-items-center overflow-hidden rounded-md bg-white shadow-[0_0_0_4px_rgba(240,198,30,0.18)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand-logo.png"
+                alt="CreatorHub logo"
+                className="h-full w-full object-contain"
+              />
             </span>
             <span className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-white/55">
               Saadaa · Internal

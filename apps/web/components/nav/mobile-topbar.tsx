@@ -97,7 +97,10 @@ export function MobileTopbar() {
         <Menu className="h-5 w-5" aria-hidden />
       </button>
       <div className="brand-text">
-        <span className="logo-badge">SA</span>
+        <span className="logo-badge">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand-logo.png" alt="CreatorHub logo" />
+        </span>
         <span className="brand-stack">
           <span className="brand-title">{sectionTitle}</span>
           <span className="brand-subtitle">Saadaa Creator Hub</span>

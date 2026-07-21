@@ -186,7 +186,10 @@ export function Sidebar({
     >
       <div className="flex items-start justify-between gap-2 px-2 mb-3">
         <div className="brand-logo">
-          <div className="logo-badge">SA</div>
+          <div className="logo-badge">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-logo.png" alt="CreatorHub logo" />
+          </div>
           <div className="logo-text">
             <div className="logo-title">CreatorHub</div>
             <div className="logo-sub">
