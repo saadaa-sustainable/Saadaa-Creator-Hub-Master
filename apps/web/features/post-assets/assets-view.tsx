@@ -100,6 +100,7 @@ export function PostAssetsView({
   const [sort, setSort] = useState<SortOrder>("newest");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [directPreviewCreatorId, setDirectPreviewCreatorId] = useState<string | null>(null);
 
   const allAssets = useMemo(() => collectAssets(campaigns), [campaigns]);
   const activeCampaign =
@@ -141,14 +142,30 @@ export function PostAssetsView({
     return [];
   }, [activeCampaign, activeCreator, searchResults, sort]);
 
+  const directPreviewItems = useMemo(() => {
+    if (!directPreviewCreatorId || !activeCampaign) return null;
+    const folder = activeCampaign.creators.find(
+      (creator) => creator.username === directPreviewCreatorId,
+    );
+    if (!folder) return null;
+    return sortAssets(
+      folder.assets.map((asset) => ({ asset, folder, campaign: activeCampaign })),
+      sort,
+    );
+  }, [activeCampaign, directPreviewCreatorId, sort]);
+
+  const drawerItems = directPreviewItems ?? currentItems;
   const selectedItem =
-    selectedIndex === null ? null : currentItems[selectedIndex] ?? null;
+    selectedIndex === null ? null : drawerItems[selectedIndex] ?? null;
   const latestDate = allAssets.reduce<string | null>((latest, item) => {
     if (!item.asset.post_date) return latest;
     return !latest || item.asset.post_date > latest ? item.asset.post_date : latest;
   }, null);
 
-  const clearSelection = () => setSelectedIndex(null);
+  const clearSelection = () => {
+    setSelectedIndex(null);
+    setDirectPreviewCreatorId(null);
+  };
   const goRoot = () => {
     setCampaignId(null);
     setCreatorId(null);
@@ -160,6 +177,14 @@ export function PostAssetsView({
     clearSelection();
   };
   const openCreator = (username: string) => {
+    const folder = activeCampaign?.creators.find(
+      (creator) => creator.username === username,
+    );
+    if (folder?.assets.length === 1) {
+      setDirectPreviewCreatorId(username);
+      setSelectedIndex(0);
+      return;
+    }
     setCreatorId(username);
     clearSelection();
   };
@@ -419,12 +444,12 @@ export function PostAssetsView({
               : undefined
           }
           onNext={
-            selectedIndex < currentItems.length - 1
+            selectedIndex < drawerItems.length - 1
               ? () => setSelectedIndex(selectedIndex + 1)
               : undefined
           }
           position={selectedIndex + 1}
-          total={currentItems.length}
+          total={drawerItems.length}
         />
       )}
     </div>
@@ -503,6 +528,7 @@ function CreatorGrid({
             assets={folder.assets.slice(0, 3)}
             label={`@${folder.username}`}
             compact
+            playVideos
           />
           <span className="assets-creator-card__body">
             <span className="assets-creator-card__topline">
@@ -539,10 +565,12 @@ function PreviewMosaic({
   assets,
   label,
   compact = false,
+  playVideos = false,
 }: {
   assets: PostAsset[];
   label: string;
   compact?: boolean;
+  playVideos?: boolean;
 }) {
   return (
     <span className={cn("assets-mosaic", compact && "assets-mosaic--compact")}>
@@ -553,7 +581,9 @@ function PreviewMosaic({
       ) : (
         assets.map((asset) => (
           <span key={asset.post_id} className="assets-mosaic__tile">
-            {asset.post_thumbnail ? (
+            {playVideos && asset.post_media ? (
+              <AssetVideoPreview asset={asset} label={assetLabel(asset)} />
+            ) : asset.post_thumbnail ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={asset.post_thumbnail} alt="" loading="lazy" />
             ) : (
@@ -599,12 +629,7 @@ function AssetResults({
   }
 
   return (
-    <div
-      className={cn(
-        "assets-media-grid",
-        items.length === 1 && "assets-media-grid--single",
-      )}
-    >
+    <div className="assets-media-grid">
       {items.map((item, index) => (
         <AssetMediaCard
           key={item.asset.post_id}
