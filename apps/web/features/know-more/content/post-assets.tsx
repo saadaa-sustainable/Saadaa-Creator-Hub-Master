@@ -41,6 +41,10 @@ export default function PostAssetsKM() {
             Inside a creator folder, switch between <strong>grid</strong> and
             <strong> list</strong> view, then sort by newest or oldest post.
           </li>
+          <li>
+            A creator with one asset gets a larger full-bleed review card so
+            the video is easy to inspect without unused columns beside it.
+          </li>
         </KMList>
       </KMSection>
 

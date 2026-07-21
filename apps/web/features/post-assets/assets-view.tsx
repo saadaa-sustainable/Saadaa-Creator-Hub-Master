@@ -599,7 +599,12 @@ function AssetResults({
   }
 
   return (
-    <div className="assets-media-grid">
+    <div
+      className={cn(
+        "assets-media-grid",
+        items.length === 1 && "assets-media-grid--single",
+      )}
+    >
       {items.map((item, index) => (
         <AssetMediaCard
           key={item.asset.post_id}
@@ -749,6 +754,7 @@ function AssetVideoPreview({
         src={asset.post_media}
         poster={asset.post_thumbnail ?? undefined}
         muted
+        autoPlay
         loop
         playsInline
         preload="metadata"
