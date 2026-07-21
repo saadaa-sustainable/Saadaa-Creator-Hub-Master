@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, useState, useEffect, useMemo } from "react";
+import { useTransition, useState, useEffect, useMemo, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -22,6 +22,7 @@ import {
   Layers,
   Users,
   Ban,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
@@ -42,6 +43,11 @@ import {
   submitReachOut,
   type CreatorLookupHit,
 } from "./actions";
+import {
+  setReachoutPin,
+  type ReachoutPins,
+  type ReachoutPinField,
+} from "./prefs-actions";
 
 interface OutboundFormProps {
   campaigns: {
@@ -56,6 +62,8 @@ interface OutboundFormProps {
   direction?: "outbound" | "inbound";
   /** Campaign to preselect after creating a campaign upstream. */
   initialCampaignId?: string;
+  /** Per-user sticky pre-selections (server-read; presence = pin ON). */
+  pins?: ReachoutPins;
 }
 
 type LookupState = "idle" | "loading" | "found";
@@ -64,6 +72,7 @@ export function OutboundForm({
   campaigns,
   direction = "outbound",
   initialCampaignId,
+  pins: initialPins,
 }: OutboundFormProps) {
   const [submitting, startSubmit] = useTransition();
   const [, startLookup] = useTransition();
@@ -73,15 +82,32 @@ export function OutboundForm({
   // toward ~95% while loading, snaps to 100% on completion.
   const [fetchPct, setFetchPct] = useState(0);
   const [verificationOverridden, setVerificationOverridden] = useState(false);
+
+  // Per-user sticky pins: presence of a field = pin ON; the value is what the
+  // form pre-selects after every submit. Mirrored in a ref so async lookup /
+  // submit continuations always read the live state.
+  const [pins, setPins] = useState<ReachoutPins>(() => ({
+    ...(initialPins ?? {}),
+  }));
+  const pinsRef = useRef(pins);
+  useEffect(() => {
+    pinsRef.current = pins;
+  }, [pins]);
+
   const defaultCampaignId =
     initialCampaignId &&
     campaigns.some((campaign) => campaign.campaign_id === initialCampaignId)
       ? initialCampaignId
-      : "";
+      : (initialPins?.campaignId ?? "");
   const formDefaults: ReachOutInput = {
     ...REACHOUT_DEFAULTS,
     reachoutDirection: direction,
     campaignId: defaultCampaignId,
+    gender: (initialPins?.gender ?? "") as ReachOutInput["gender"],
+    contentType: initialPins?.contentType ?? "",
+    contentName: initialPins?.contentType
+      ? (findContentCode(initialPins.contentType)?.name ?? "")
+      : "",
   };
 
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -108,6 +134,36 @@ export function OutboundForm({
   const selectedCampaign = campaigns.find(
     (c) => c.campaign_id === selectedCampaignId,
   );
+
+  // Tick ON requires a picked value; tick OFF just clears the pin. Saves are
+  // fire-and-forget server writes (per-user row in user_prefs).
+  const togglePin = (field: ReachoutPinField) => {
+    if (pins[field] != null) {
+      setPins((p) => {
+        const next = { ...p };
+        delete next[field];
+        return next;
+      });
+      void setReachoutPin(field, null);
+      return;
+    }
+    const cur = String(getValues(field) ?? "").trim();
+    if (!cur) {
+      toast.error("Pick a value first, then tick to keep it.");
+      return;
+    }
+    setPins((p) => ({ ...p, [field]: cur }));
+    void setReachoutPin(field, cur);
+  };
+
+  // While a field is pinned, changing its value re-points the pin (the next
+  // reach-out pre-selects the latest choice).
+  const syncPinnedValue = (field: ReachoutPinField, value: string) => {
+    const v = value.trim();
+    if (pins[field] == null || !v || pins[field] === v) return;
+    setPins((p) => ({ ...p, [field]: v }));
+    void setReachoutPin(field, v);
+  };
   const followers = watch("followers");
   const verification = watch("verification");
   const contentType = watch("contentType");
@@ -203,6 +259,14 @@ export function OutboundForm({
             shouldDirty: false,
           },
         );
+      }
+      // A pinned gender survives the auto-field wipe — the pin IS the user's
+      // manual choice (gender is never auto-filled by the lookup itself).
+      const pinnedGender = pinsRef.current.gender;
+      if (pinnedGender) {
+        setValue("gender", pinnedGender as ReachOutInput["gender"], {
+          shouldDirty: false,
+        });
       }
 
       // Now overwrite with the new lookup values. Skip nulls.
@@ -336,7 +400,18 @@ export function OutboundForm({
           }
           // post_id is now minted at onboarding (null here), so confirm by name.
           toast.success(`Reach-out logged for ${values.influencerName}`);
-          reset(formDefaults);
+          // Reset keeps the pinned selections (per-user sticky pins).
+          const p = pinsRef.current;
+          reset({
+            ...REACHOUT_DEFAULTS,
+            reachoutDirection: direction,
+            campaignId: p.campaignId ?? "",
+            gender: (p.gender ?? "") as ReachOutInput["gender"],
+            contentType: p.contentType ?? "",
+            contentName: p.contentType
+              ? (findContentCode(p.contentType)?.name ?? "")
+              : "",
+          });
           setSubmitAttempted(false);
           setHit(null);
           setLookupState("idle");
@@ -373,30 +448,42 @@ export function OutboundForm({
         </h5>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
           <div className="md:col-span-2">
-            <Controller
-              control={control}
-              name="campaignId"
-              render={({ field }) => (
-                <div className="form-floating">
-                  <SearchableSelect
-                    id="ro_campaign"
-                    value={field.value ?? ""}
-                    onChange={field.onChange}
-                    options={campaigns.map((c) => ({
-                      value: c.campaign_id,
-                      label:
-                        c.campaign_id +
-                        (c.campaign_name ? ` · ${c.campaign_name}` : ""),
-                    }))}
-                    placeholder="Select campaign…"
-                    searchPlaceholder="Search campaigns…"
-                  />
-                  <label htmlFor="ro_campaign">
-                    Campaign ID <span className="req">*</span>
-                  </label>
-                </div>
-              )}
-            />
+            <div className="flex items-stretch gap-2">
+              <div className="flex-1 min-w-0">
+                <Controller
+                  control={control}
+                  name="campaignId"
+                  render={({ field }) => (
+                    <div className="form-floating">
+                      <SearchableSelect
+                        id="ro_campaign"
+                        value={field.value ?? ""}
+                        onChange={(v) => {
+                          field.onChange(v);
+                          syncPinnedValue("campaignId", v ?? "");
+                        }}
+                        options={campaigns.map((c) => ({
+                          value: c.campaign_id,
+                          label:
+                            c.campaign_id +
+                            (c.campaign_name ? ` · ${c.campaign_name}` : ""),
+                        }))}
+                        placeholder="Select campaign…"
+                        searchPlaceholder="Search campaigns…"
+                      />
+                      <label htmlFor="ro_campaign">
+                        Campaign ID <span className="req">*</span>
+                      </label>
+                    </div>
+                  )}
+                />
+              </div>
+              <PinTick
+                on={pins.campaignId != null}
+                onToggle={() => togglePin("campaignId")}
+                label="campaign"
+              />
+            </div>
             {selectedCampaign?.brief_link ? (
               <span className="brief-chip">
                 <FileText aria-hidden />
@@ -756,28 +843,41 @@ export function OutboundForm({
           <span className="section-status-chip">Required</span>
         </h5>
         <div className="reachout-compact-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <Controller
-            control={control}
-            name="gender"
-            render={({ field }) => (
-              <div className="form-floating relative">
-                {/* Manual ONLY — Meta/Instagram never returns gender, so it is
-                    never auto-filled or locked (was wrongly carrying a stale
-                    stored value on existing creators). */}
-                <SearchableSelect
-                  id="ro_gender"
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  options={GENDERS.map((g) => ({ value: g, label: g }))}
-                  placeholder="Select gender…"
-                  searchPlaceholder="Search…"
-                />
-                <label htmlFor="ro_gender">
-                  Gender <span className="req">*</span>
-                </label>
-              </div>
-            )}
-          />
+          <div className="flex items-stretch gap-2">
+            <div className="flex-1 min-w-0">
+              <Controller
+                control={control}
+                name="gender"
+                render={({ field }) => (
+                  <div className="form-floating relative">
+                    {/* Manual ONLY — Meta/Instagram never returns gender, so it is
+                        never auto-filled or locked (was wrongly carrying a stale
+                        stored value on existing creators). A PIN is the user's own
+                        manual choice and is the only thing that pre-fills it. */}
+                    <SearchableSelect
+                      id="ro_gender"
+                      value={field.value ?? ""}
+                      onChange={(v) => {
+                        field.onChange(v);
+                        syncPinnedValue("gender", v ?? "");
+                      }}
+                      options={GENDERS.map((g) => ({ value: g, label: g }))}
+                      placeholder="Select gender…"
+                      searchPlaceholder="Search…"
+                    />
+                    <label htmlFor="ro_gender">
+                      Gender <span className="req">*</span>
+                    </label>
+                  </div>
+                )}
+              />
+            </div>
+            <PinTick
+              on={pins.gender != null}
+              onToggle={() => togglePin("gender")}
+              label="gender"
+            />
+          </div>
 
           {/* Verification — legacy parity: AUTO-DETECTED pill when found, manual toggle otherwise */}
           <Controller
@@ -895,28 +995,46 @@ export function OutboundForm({
             )}
           />
 
-          <Controller
-            control={control}
-            name="contentType"
-            render={({ field }) => (
-              <div className="form-floating">
-                <SearchableSelect
-                  id="ro_contentCode"
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  options={CONTENT_CODES.map((c) => ({
-                    value: c.code,
-                    label: `${c.code} — ${c.name}`,
-                  }))}
-                  placeholder="Select content type…"
-                  searchPlaceholder="Search content types…"
-                />
-                <label htmlFor="ro_contentCode">
-                  Content Type <span className="req">*</span>
-                </label>
-              </div>
-            )}
-          />
+          <div className="flex items-stretch gap-2">
+            <div className="flex-1 min-w-0">
+              <Controller
+                control={control}
+                name="contentType"
+                render={({ field }) => (
+                  <div className="form-floating">
+                    <SearchableSelect
+                      id="ro_contentCode"
+                      value={field.value ?? ""}
+                      onChange={(v) => {
+                        field.onChange(v);
+                        // Keep the auto-filled name in step with a changed code.
+                        setValue(
+                          "contentName",
+                          findContentCode(v ?? "")?.name ?? "",
+                          { shouldDirty: false },
+                        );
+                        syncPinnedValue("contentType", v ?? "");
+                      }}
+                      options={CONTENT_CODES.map((c) => ({
+                        value: c.code,
+                        label: `${c.code} — ${c.name}`,
+                      }))}
+                      placeholder="Select content type…"
+                      searchPlaceholder="Search content types…"
+                    />
+                    <label htmlFor="ro_contentCode">
+                      Content Type <span className="req">*</span>
+                    </label>
+                  </div>
+                )}
+              />
+            </div>
+            <PinTick
+              on={pins.contentType != null}
+              onToggle={() => togglePin("contentType")}
+              label="content type"
+            />
+          </div>
 
           <div className="form-floating">
             <input
@@ -1013,5 +1131,45 @@ export function OutboundForm({
         </div>
       </div>
     </form>
+  );
+}
+
+/**
+ * Sticky-pin tick beside Campaign / Gender / Content Type. ON = the current
+ * selection is remembered per-user and pre-selected after every submit (and on
+ * the next visit); OFF = the field resets to blank like any other. Stored
+ * server-side (user_prefs), so one member's pins never affect another's form.
+ */
+function PinTick({
+  on,
+  onToggle,
+  label,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={on}
+      aria-label={
+        on ? `Unpin ${label} pre-selection` : `Pin ${label} pre-selection`
+      }
+      title={
+        on
+          ? `Pinned — this ${label} stays selected after every submit (only for you). Click to unpin.`
+          : `Keep this ${label} selected for your next reach-outs (only for you).`
+      }
+      className={cn(
+        "self-center inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border transition-colors",
+        on
+          ? "border-[#F0C61E] bg-[#FDF6DC] text-[#8C6D00] shadow-[inset_0_0_0_1px_#F0C61E]"
+          : "border-[#E7E2D2] bg-white text-[#B5AE9E] hover:bg-[#F9F7F2] hover:text-[#6E695E]",
+      )}
+    >
+      <Check className="h-4 w-4" strokeWidth={on ? 3 : 2} aria-hidden />
+    </button>
   );
 }

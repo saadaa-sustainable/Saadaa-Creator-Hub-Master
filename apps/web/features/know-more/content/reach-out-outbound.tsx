@@ -67,6 +67,19 @@ export default function ReachOutOutboundKM() {
             expose it, so it always starts blank and must be picked manually
             (even on an existing creator).
           </li>
+          <li>
+            <strong>Sticky pins (tick buttons)</strong> — Campaign, Gender and
+            Content Type each carry a small tick beside the field. Pick a value
+            and turn the tick on: that choice is remembered <em>for you only</em>{" "}
+            and stays pre-selected after every submit and on your next visit —
+            built for members assigned to one campaign / gender / content type.
+            Changing the field while ticked re-points the pin; turning the tick
+            off makes the field reset to blank as normal. Pins are stored
+            per-user on the server, so they follow you across devices and never
+            affect another member&apos;s form. All three start OFF by default.
+            A pinned gender also survives a fresh profile fetch (it&apos;s your
+            manual choice, not an auto-fill).
+          </li>
         </KMList>
       </KMSection>
 
