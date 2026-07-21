@@ -573,7 +573,13 @@ function PreviewMosaic({
   playVideos?: boolean;
 }) {
   return (
-    <span className={cn("assets-mosaic", compact && "assets-mosaic--compact")}>
+    <span
+      className={cn(
+        "assets-mosaic",
+        compact && "assets-mosaic--compact",
+        compact && assets.length === 1 && "assets-mosaic--single",
+      )}
+    >
       {assets.length === 0 ? (
         <span className="assets-mosaic__empty">
           <Clapperboard size={22} aria-hidden />

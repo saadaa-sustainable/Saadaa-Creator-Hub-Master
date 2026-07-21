@@ -43,7 +43,9 @@ export default function PostAssetsKM() {
           </li>
           <li>
             A creator with one asset opens the detail panel directly. Creator
-            folders with multiple assets still open the folder view first.
+            folders with multiple assets still open the folder view first. The
+            single-asset card uses the full 9:16 preview so the reel never
+            leaves an empty rail beside it.
           </li>
         </KMList>
       </KMSection>
@@ -54,6 +56,10 @@ export default function PostAssetsKM() {
             Grid videos <strong>auto-play silently while on screen</strong>{" "}
             (they pause the moment they scroll out of view, so nothing keeps
             playing in the background).
+          </li>
+          <li>
+            On smaller screens, creator and media cards keep the shared
+            two-column workspace rhythm used across the app.
           </li>
           <li>
             <strong>Click a video to open the detail panel</strong> with full
