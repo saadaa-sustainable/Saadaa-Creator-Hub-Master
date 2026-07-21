@@ -56,6 +56,8 @@ export const NOTIFICATION_TYPES = {
   PENDING_ONBOARDING: "pending_onboarding",
   POSTING_PENDING: "posting_pending",
   CONTENT_REMINDER: "content_reminder",
+  /** Creator-facing nudge 2 days before posts.est_delivery (§5.5 resolved). */
+  DELIVERY_REMINDER: "delivery_reminder",
   PAYMENT_ELIGIBLE: "payment_eligible",
   PAYMENT_SLA_BREACH: "payment_sla_breach",
   /** Monthly payable-cycle digest to Accounts + Admins (12th → 15th, 27th → 30th). */

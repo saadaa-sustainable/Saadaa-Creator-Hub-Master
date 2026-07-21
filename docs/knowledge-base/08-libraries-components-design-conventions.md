@@ -20,7 +20,7 @@
 
 - **`lib/email.ts`** — Nodemailer Gmail SMTP. `getTransporter()` → `smtp.gmail.com:465` secure, `EMAIL_USER`/`EMAIL_PASS`. `sendMail` returns `{ok,messageId?,error?}`, never throws. From-name defaults "Saadaa". cc/bcc/replyTo + base64 attachments.
 - **`lib/notifications.ts`** (`server-only`, best-effort, never throws):
-  - `NOTIFICATION_TYPES` — canonical `email_type` constants: `CAMPAIGN_CREATED`, `PAYMENT_PROCESSED`, six submitter confirmations (`REACHOUT/INBOUND/ONBOARDING/CAMPAIGN/POSTING/PAYMENT_CONFIRMATION`), `SHOPIFY_VALIDATION_FAILED`, six cron/time-based (`PENDING_ONBOARDING`, `POSTING_PENDING`, `CONTENT_REMINDER`, `PAYMENT_ELIGIBLE`, `PAYMENT_SLA_BREACH`, `CAMPAIGN_ENDING`), and `USER_INVITATION`.
+  - `NOTIFICATION_TYPES` — canonical `email_type` constants: `CAMPAIGN_CREATED`, `PAYMENT_PROCESSED`, six submitter confirmations (`REACHOUT/INBOUND/ONBOARDING/CAMPAIGN/POSTING/PAYMENT_CONFIRMATION`), `SHOPIFY_VALIDATION_FAILED`, seven cron/time-based (`PENDING_ONBOARDING`, `POSTING_PENDING`, `DELIVERY_REMINDER` — creator nudge 2 days before `est_delivery`, 2026-07-21, `CONTENT_REMINDER`, `PAYMENT_ELIGIBLE`, `PAYMENT_SLA_BREACH`, `CAMPAIGN_ENDING`), and `USER_INVITATION`.
   - `wrapNotificationHtml` — shared branded wrapper (dark header `#2C2420`, gold eyebrow `#F0C61E`, ecru body `#FAF8F5`, 600px). Matches the collab email.
   - `buildConfirmationBody` — greeting → summary → key/value table (auto-drops null/empty rows) → "Thanks, Saadaa CreatorHub". HTML-escaped.
   - `sendNotification` — normalizes/de-dupes recipients, wraps body, sends per-recipient in parallel, logs each to `email_logs`. Triple-guarded against throwing.

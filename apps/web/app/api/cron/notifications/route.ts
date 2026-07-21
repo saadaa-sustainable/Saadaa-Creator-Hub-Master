@@ -17,7 +17,7 @@ import { getMetaTokenExpiry } from "@/lib/meta-token";
 /**
  * Daily TIME-BASED (cron) email notifications — Wave 7 follow-up.
  *
- * One Route Handler that runs all six idempotent checks once per day. Each
+ * One Route Handler that runs every idempotent check once per day. Each
  * check queries the rows that just crossed a threshold (and have NOT yet been
  * emailed, per their sent-flag column), sends a single branded notification via
  * sendNotification(), then STAMPS the sent-flag so a later run never re-fires
@@ -62,6 +62,11 @@ const POSTING_PENDING_WITHIN_DAYS = 2;
 /** Content Submission Reminder: nudge the creator once their onboard_date is
  *  older than this many days but they still haven't Posted. */
 const CONTENT_REMINDER_AFTER_DAYS = 7;
+
+/** Delivery Reminder: nudge the creator this many days BEFORE est_delivery.
+ *  The check uses a window (today .. today+N) so a missed cron day still sends
+ *  while the deadline hasn't passed; the sent-flag keeps it to one email. */
+const DELIVERY_REMINDER_DAYS_BEFORE = 2;
 
 /** Payment Pending / SLA breach: a Due/Partial payment is breaching SLA once
  *  its due_date is older than this many days. */
@@ -207,6 +212,7 @@ export async function GET(req: NextRequest) {
     meta_token_renewal: 0,
     pending_onboarding: 0,
     posting_pending: 0,
+    delivery_reminder: 0,
     content_reminder: 0,
     payment_eligible: 0,
     payment_sla_breach: 0,
@@ -388,6 +394,119 @@ export async function GET(req: NextRequest) {
     }
   } catch (err) {
     console.error("[cron/notifications] posting_pending check failed:", err);
+  }
+
+  // ── 2b. Delivery Reminder (creator) ─────────────────────────────────────────
+  // Onboarded, not yet Posted, est_delivery approaching (today .. today+2). →
+  // the CREATOR (post.email), a gentle pre-deadline nudge to share the reel.
+  // Fires once per post (delivery_reminder_sent_at). Deadline already passed is
+  // excluded — that case is the team-facing Posting Pending alert above.
+  try {
+    const upper = isoDateOffset(DELIVERY_REMINDER_DAYS_BEFORE);
+    const today = isoDateOffset(0);
+    const { data } = await (supabase as any)
+      .from("posts")
+      .select(
+        "post_id, collab_id, inf_id, username, email, est_delivery, workflow_status",
+      )
+      .in("workflow_status", ONBOARDED_STATUSES)
+      .not("est_delivery", "is", null)
+      .gte("est_delivery", today)
+      .lte("est_delivery", upper)
+      .is("delivery_reminder_sent_at", null);
+    const rows = (data ?? []) as PostRow[];
+
+    // Creator display names: creators.inf_name (best-effort; fallback handle).
+    const infIds = Array.from(
+      new Set(rows.map((p) => p.inf_id).filter((v): v is string => !!v)),
+    );
+    const infNameById = new Map<string, string>();
+    if (infIds.length > 0) {
+      try {
+        const { data: creators } = await (supabase as any)
+          .from("creators")
+          .select("inf_id, inf_name")
+          .in("inf_id", infIds);
+        for (const c of (creators ?? []) as Array<{
+          inf_id: string | null;
+          inf_name: string | null;
+        }>) {
+          const name = (c.inf_name ?? "").trim();
+          if (c.inf_id && name) infNameById.set(c.inf_id, name);
+        }
+      } catch {
+        // best-effort — greeting falls back to the handle.
+      }
+    }
+
+    const escText = (s: string) =>
+      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    for (const p of rows) {
+      const to = (p.email ?? "").trim();
+      if (to && to.includes("@")) {
+        const creatorName =
+          (p.inf_id ? infNameById.get(p.inf_id) : undefined) ??
+          p.username ??
+          "there";
+        const estText = p.est_delivery
+          ? new Date(`${p.est_delivery}T00:00:00Z`).toLocaleDateString("en-IN", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              timeZone: "UTC",
+            })
+          : "—";
+        const r = await sendNotification({
+          type: NOTIFICATION_TYPES.DELIVERY_REMINDER,
+          to,
+          subject:
+            `Reminder: your reel delivery date is coming up (${p.collab_id ?? p.post_id ?? ""})`.trim(),
+          title: "Your reel delivery date is coming up",
+          subtitle: p.collab_id ? `COLLAB: ${p.collab_id}` : undefined,
+          htmlBody: `<p style="margin:0 0 14px;">Hey <strong>${escText(creatorName)}</strong>! &#128075;</p>
+<p style="margin:0 0 14px;">Hope you're doing well.</p>
+<p style="margin:0 0 14px;">This is a gentle reminder that the delivery deadline for your reel is coming up soon. We'd really appreciate it if you could share the final reel with us at your earliest convenience. Receiving it in advance allows our team enough time to review the content and share any feedback, if required, before the final submission deadline.</p>
+<table style="width:100%;border-collapse:collapse;font-size:14px;margin:0 0 14px;">
+<tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;font-weight:800;width:40%;">Collab ID</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;">${escText(p.collab_id ?? "—")}</td></tr>
+<tr><td style="padding:7px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;width:40%;">Estimated Delivery Date</td><td style="padding:7px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;">${escText(estText)}</td></tr>
+</table>
+<p style="margin:0 0 14px;">If you're experiencing any delays or have any questions regarding the campaign brief or deliverables, please don't hesitate to let us know. We're happy to assist and ensure everything stays on track.</p>
+<p style="margin:0 0 16px;">We appreciate your cooperation and look forward to receiving your reel soon. Thank you! &#128522;</p>
+<p style="margin:0 0 0;font-size:12.5px;color:#9A9384;border-top:1px solid #E7E2D2;padding-top:12px;"><strong>Note:</strong> If you've already shared your reel with us for review, please feel free to disregard this message. Thank you.</p>
+<p style="margin-top:24px;margin-bottom:0;color:#6E695E;font-size:13px;">Thanks,</p>
+<p style="margin-top:4px;font-size:1.02rem;font-weight:800;color:#2C2420;letter-spacing:0.4px;">Saadaa CreatorHub</p>`,
+          plainBody: [
+            `Hey ${creatorName}! 👋`,
+            "",
+            "Hope you're doing well.",
+            "",
+            "This is a gentle reminder that the delivery deadline for your reel is coming up soon. We'd really appreciate it if you could share the final reel with us at your earliest convenience. Receiving it in advance allows our team enough time to review the content and share any feedback, if required, before the final submission deadline.",
+            "",
+            `Collab ID: ${p.collab_id ?? "—"}`,
+            `Estimated Delivery Date: ${estText}`,
+            "",
+            "If you're experiencing any delays or have any questions regarding the campaign brief or deliverables, please don't hesitate to let us know. We're happy to assist and ensure everything stays on track.",
+            "",
+            "We appreciate your cooperation and look forward to receiving your reel soon. Thank you! 😊",
+            "",
+            "Note: If you've already shared your reel with us for review, please feel free to disregard this message. Thank you.",
+            "",
+            "Thanks,",
+            "Saadaa CreatorHub",
+          ].join("\n"),
+          collabId: p.collab_id,
+          postId: p.post_id,
+        });
+        if (r.ok) sent.delivery_reminder++;
+      }
+      // Stamp regardless of recipient/send so it fires at most once per row.
+      await (supabase as any)
+        .from("posts")
+        .update({ delivery_reminder_sent_at: nowIso() })
+        .eq("post_id", p.post_id);
+    }
+  } catch (err) {
+    console.error("[cron/notifications] delivery_reminder check failed:", err);
   }
 
   // ── 3. Content Submission Reminder ───────────────────────────────────────────
