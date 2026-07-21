@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
@@ -11,7 +12,9 @@ import {
   Send,
   ChevronDown,
   AlertTriangle,
+  Search,
 } from "lucide-react";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { CalendarEvent, CalendarEventType } from "./queries";
 
 /**
@@ -32,19 +35,92 @@ const TYPE_META: Record<CalendarEventType, { label: string; bg: string; fg: stri
   posting:  { label: "Posted",        bg: "#E9F4EC", fg: "#2F7D4F", dot: "#4CAF7D", Icon: Send },
 };
 
-function monthHref(year: number, month: number) {
-  let y = year, m = month;
-  if (m < 1) { m = 12; y -= 1; }
-  if (m > 12) { m = 1; y += 1; }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return `/calendar?year=${y}&month=${m}` as any;
-}
+/** Filter keys mirrored in the URL so they survive month navigation. */
+const CAL_FILTER_KEYS = ["tm", "camp", "ctype", "etype"] as const;
+type CalFilterKey = (typeof CAL_FILTER_KEYS)[number];
 
-export function CalendarView({ year, month, events }: { year: number; month: number; events: CalendarEvent[] }) {
+export function CalendarView({ year, month, events, campaigns }: {
+  year: number; month: number; events: CalendarEvent[];
+  campaigns: { campaign_id: string; campaign_name: string | null }[];
+}) {
+  const router = useRouter();
+  const params = useSearchParams();
   const [view, setView] = useState<View>("month");
   const [viewMenu, setViewMenu] = useState(false);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // ── Filters (selects live in the URL; search is instant local state) ──
+  const [q, setQ] = useState("");
+  const tm = params.get("tm") ?? "";
+  const camp = params.get("camp") ?? "";
+  const ctype = params.get("ctype") ?? "";
+  const etype = params.get("etype") ?? "";
+
+  const setFilter = useCallback(
+    (key: CalFilterKey, value: string | undefined) => {
+      const next = new URLSearchParams(params.toString());
+      if (!value) next.delete(key);
+      else next.set(key, value);
+      router.replace(`/calendar?${next.toString()}` as never, { scroll: false });
+    },
+    [params, router],
+  );
+  const clearFilters = useCallback(() => {
+    setQ("");
+    const next = new URLSearchParams(params.toString());
+    CAL_FILTER_KEYS.forEach((k) => next.delete(k));
+    router.replace(`/calendar?${next.toString()}` as never, { scroll: false });
+  }, [params, router]);
+  const hasAnyFilter = q.trim().length > 0 || CAL_FILTER_KEYS.some((k) => params.get(k));
+
+  // Month navigation preserves the active filters (only year/month change).
+  const monthHref = useCallback(
+    (y0: number, m0: number) => {
+      let y = y0, m = m0;
+      if (m < 1) { m = 12; y -= 1; }
+      if (m > 12) { m = 1; y += 1; }
+      const next = new URLSearchParams(params.toString());
+      next.set("year", String(y));
+      next.set("month", String(m));
+      return `/calendar?${next.toString()}` as any;
+    },
+    [params],
+  );
+  const todayHref = useMemo(() => {
+    const next = new URLSearchParams(params.toString());
+    next.delete("year");
+    next.delete("month");
+    const s = next.toString();
+    return (s ? `/calendar?${s}` : "/calendar") as any;
+  }, [params]);
+
+  // Team members present in this month's events (deliveries + postings).
+  const teamMembers = useMemo(
+    () =>
+      Array.from(
+        new Set(events.map((e) => (e.owner ?? "").trim()).filter(Boolean)),
+      ).sort((a, b) => a.localeCompare(b)),
+    [events],
+  );
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return events.filter((e) => {
+      if (tm && (e.owner ?? "") !== tm) return false;
+      if (camp && (e.campaignId ?? "") !== camp) return false;
+      if (ctype && (e.collabType ?? "") !== ctype) return false;
+      if (etype === "overdue") { if (!e.overdue) return false; }
+      else if (etype && e.type !== etype) return false;
+      if (needle) {
+        const hay = [e.username, e.postId, e.collabId, e.orderId, e.campaignId]
+          .map((v) => (v ?? "").toLowerCase())
+          .join(" ");
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+  }, [events, tm, camp, ctype, etype, q]);
 
   const today = new Date();
   const todayInMonth = today.getFullYear() === year && today.getMonth() + 1 === month ? today.getDate() : null;
@@ -58,22 +134,98 @@ export function CalendarView({ year, month, events }: { year: number; month: num
   }, []);
 
   const eventsByDay = new Map<number, CalendarEvent[]>();
-  for (const e of events) {
+  for (const e of filtered) {
     if (!eventsByDay.has(e.day)) eventsByDay.set(e.day, []);
     eventsByDay.get(e.day)!.push(e);
   }
   const counts = { delivery: 0, posting: 0 };
-  for (const e of events) counts[e.type]++;
+  for (const e of filtered) counts[e.type]++;
 
   const leadingBlanks = new Date(year, month - 1, 1).getDay();
   const isToday = (d: number) => todayInMonth === d;
   const selectedEvents = selectedDay ? (eventsByDay.get(selectedDay) ?? []) : [];
 
   return (
+    <>
+    <div className="onboarding-filter-card mb-5">
+      <div className="onboarding-filter-grid">
+        <label className="onboarding-filter-field">
+          <span>Search</span>
+          <span className="relative flex items-center">
+            <Search className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-text-tertiary" aria-hidden />
+            <input
+              type="search"
+              value={q}
+              placeholder="Creator, POST ID, collab, order…"
+              onChange={(e) => setQ(e.target.value)}
+              className="onboarding-filter-select pl-7"
+            />
+          </span>
+        </label>
+        <CalFilterSelect
+          label="Event"
+          value={etype}
+          onChange={(v) => setFilter("etype", v)}
+          options={[
+            { label: "All events", value: "" },
+            { label: "Est. Delivery", value: "delivery" },
+            { label: "Posted", value: "posting" },
+            { label: "Overdue only", value: "overdue" },
+          ]}
+        />
+        <CalFilterSelect
+          label="Team Member"
+          value={tm}
+          onChange={(v) => setFilter("tm", v)}
+          options={[
+            { label: "All team members", value: "" },
+            ...teamMembers.map((m) => ({ label: m, value: m })),
+          ]}
+        />
+        <CalFilterSelect
+          label="Campaign"
+          value={camp}
+          onChange={(v) => setFilter("camp", v)}
+          options={[
+            { label: "All campaigns", value: "" },
+            ...campaigns.map((c) => ({
+              label: `${c.campaign_id}${c.campaign_name ? ` · ${c.campaign_name}` : ""}`,
+              value: c.campaign_id,
+            })),
+          ]}
+        />
+        <CalFilterSelect
+          label="Collab Type"
+          value={ctype}
+          onChange={(v) => setFilter("ctype", v)}
+          options={[
+            { label: "All collab types", value: "" },
+            { label: "Barter", value: "Barter" },
+            { label: "Barter + Paid", value: "Barter + Paid" },
+          ]}
+        />
+        <div className="onboarding-filter-actions">
+          {hasAnyFilter && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-[#E7E2D2] bg-white text-[12px] font-medium text-[#6E695E] hover:bg-[#F9F7F2]"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden /> Clear filters
+            </button>
+          )}
+        </div>
+      </div>
+      {hasAnyFilter && (
+        <p className="mt-2 text-[12px] text-[#9A9384]">
+          Showing {filtered.length} of {events.length} events this month.
+        </p>
+      )}
+    </div>
     <div className="flex flex-col lg:flex-row gap-5">
       {/* ── Left rail: mini-calendar + legend ── */}
       <aside className="hidden lg:block w-[230px] shrink-0">
-        <MiniCalendar year={year} month={month} eventsByDay={eventsByDay} todayInMonth={todayInMonth}
+        <MiniCalendar year={year} month={month} eventsByDay={eventsByDay} todayInMonth={todayInMonth} monthHref={monthHref}
           focusDay={focusDay} onPick={(d) => { setFocusDay(d); if (view !== "week") setSelectedDay((eventsByDay.get(d)?.length ?? 0) > 0 ? d : null); }} />
         <div className="mt-4 space-y-2">
           {(Object.keys(TYPE_META) as CalendarEventType[]).map((t) => (
@@ -86,7 +238,7 @@ export function CalendarView({ year, month, events }: { year: number; month: num
             <AlertTriangle size={11} className="text-danger-text" aria-hidden />
             Overdue delivery
             <span className="text-[#9A9384]">
-              ({events.filter((e) => e.overdue).length})
+              ({filtered.filter((e) => e.overdue).length})
             </span>
           </div>
         </div>
@@ -101,7 +253,7 @@ export function CalendarView({ year, month, events }: { year: number; month: num
             <Link href={monthHref(year, month + 1)} aria-label="Next month"
               className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#E7E2D2] bg-white text-[#6E695E] hover:bg-[#F9F7F2]"><ChevronRight size={16} /></Link>
             <h2 className="text-[17px] sm:text-[20px] font-semibold tracking-[-0.01em] text-[#161513] ml-1">{MONTHS[month - 1]} {year}</h2>
-            <Link href={"/calendar" as never}
+            <Link href={todayHref}
               className="ml-1 px-3 h-9 hidden sm:inline-flex items-center rounded-[10px] border border-[#E7E2D2] bg-white text-[12px] font-medium text-[#6E695E] hover:bg-[#F9F7F2]">Today</Link>
           </div>
           <div className="relative" ref={menuRef}>
@@ -131,11 +283,15 @@ export function CalendarView({ year, month, events }: { year: number; month: num
             eventsByDay={eventsByDay} isToday={isToday} setFocusDay={setFocusDay} onOpenDay={(d) => setSelectedDay(d)} />
         )}
         {view === "schedule" && (
-          <ScheduleView year={year} month={month} events={events} isToday={isToday} />
+          <ScheduleView year={year} month={month} events={filtered} isToday={isToday} />
         )}
 
-        {events.length === 0 && view !== "schedule" && (
-          <p className="mt-4 text-center text-[13px] text-[#9A9384]">No deliveries due or posts published this month.</p>
+        {filtered.length === 0 && view !== "schedule" && (
+          <p className="mt-4 text-center text-[13px] text-[#9A9384]">
+            {events.length > 0
+              ? "No events match the active filters this month."
+              : "No deliveries due or posts published this month."}
+          </p>
         )}
       </div>
 
@@ -143,11 +299,31 @@ export function CalendarView({ year, month, events }: { year: number; month: num
         <DayPopup year={year} month={month} day={selectedDay} events={selectedEvents} onClose={() => setSelectedDay(null)} />
       )}
     </div>
+    </>
   );
 }
 
-function MiniCalendar({ year, month, eventsByDay, todayInMonth, focusDay, onPick }: {
+function CalFilterSelect({ label, value, onChange, options }: {
+  label: string; value: string; onChange: (value: string | undefined) => void;
+  options: { label: string; value: string }[];
+}) {
+  return (
+    <label className="onboarding-filter-field">
+      <span>{label}</span>
+      <SearchableSelect
+        value={value}
+        onChange={(v) => onChange(v || undefined)}
+        options={options}
+        placeholder={`All ${label.toLowerCase()}s`}
+        searchPlaceholder={`Search ${label.toLowerCase()}…`}
+      />
+    </label>
+  );
+}
+
+function MiniCalendar({ year, month, eventsByDay, todayInMonth, focusDay, onPick, monthHref }: {
   year: number; month: number; eventsByDay: Map<number, CalendarEvent[]>; todayInMonth: number | null; focusDay: number; onPick: (d: number) => void;
+  monthHref: (y: number, m: number) => React.ComponentProps<typeof Link>["href"];
 }) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const leading = new Date(year, month - 1, 1).getDay();

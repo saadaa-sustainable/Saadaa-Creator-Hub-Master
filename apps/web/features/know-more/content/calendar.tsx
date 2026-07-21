@@ -52,6 +52,26 @@ export default function CalendarKM() {
         </KMList>
       </KMSection>
 
+      <KMSection tag="Filters">
+        <KMList>
+          <li>
+            The filter bar above the calendar narrows every view (month, week,
+            schedule, mini-calendar dots and legend counts):{" "}
+            <strong>Search</strong> (creator, POST ID, collab, order, campaign),{" "}
+            <strong>Event</strong> (Est. Delivery / Posted / Overdue only),{" "}
+            <strong>Team Member</strong> (who onboarded the delivery or posted
+            the deliverable — the list shows only members active in the open
+            month), <strong>Campaign</strong> and <strong>Collab Type</strong>.
+          </li>
+          <li>
+            Filter choices ride the URL, so switching months keeps them and
+            the filtered view is shareable. <strong>Clear filters</strong>{" "}
+            resets everything; a line under the bar shows how many of the
+            month&apos;s events match.
+          </li>
+        </KMList>
+      </KMSection>
+
       <KMSection tag="Access & data">
         <KMList>
           <li>Read-only; every logged-in team member can open it.</li>
