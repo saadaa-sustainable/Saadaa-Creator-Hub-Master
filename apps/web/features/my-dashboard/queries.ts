@@ -214,6 +214,29 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
     posted_by?: string | null;
   }) => norm(p.posted_by) || onboardOwner(p);
 
+  // A row belongs on MY dashboard only while I own its CURRENT stage. A
+  // reach-out I logged that someone else onboarded/posted is THEIR active /
+  // posted work now — showing it here too made the board, workload and stage
+  // mix disagree with the top KPIs + leaderboard (which already scope
+  // per-stage) and double-showed the collab on two members' dashboards.
+  const ownsCurrentStage = (p: MyPost): boolean => {
+    const s = p.workflow_status ?? "";
+    if (s === "Reach Out") return reachOwner(p) === member;
+    if ((PENDING_POST_STATUSES as readonly string[]).includes(s))
+      return onboardOwner(p) === member;
+    if ((POSTED_STATUSES as readonly string[]).includes(s))
+      return postOwner(p) === member;
+    if ((RTO_STATUSES as readonly string[]).includes(s))
+      return onboardOwner(p) === member;
+    // Unknown/legacy status — keep if the member touched any stage.
+    return (
+      reachOwner(p) === member ||
+      onboardOwner(p) === member ||
+      postOwner(p) === member
+    );
+  };
+  const ownedPosts = posts.filter(ownsCurrentStage);
+
   const { data: leaderboardRows, error: leaderboardError } = await (
     supabase as any
   )
@@ -278,7 +301,7 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   // KPI buckets stay status-based, but each bucket only counts rows the member
   // owns AT THAT STAGE (a reach-out they logged that someone else onboarded
   // counts in the other member's Pending Post, not theirs).
-  for (const p of posts) {
+  for (const p of ownedPosts) {
     const s = p.workflow_status ?? "";
     const mineReach = reachOwner(p) === member;
     const mineOnboard = onboardOwner(p) === member;
@@ -315,7 +338,7 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
 
   const pendingActions: PendingAction[] = [];
 
-  for (const p of posts) {
+  for (const p of ownedPosts) {
     // Chase list = the onboarder's job — skip rows the member only logged.
     if (onboardOwner(p) !== member) continue;
     const s = p.workflow_status ?? "";
@@ -376,21 +399,23 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   pendingActions.sort((a, b) => b.daysOverdue - a.daysOverdue);
 
   return {
-    posts,
+    posts: ownedPosts,
     kpi,
     pendingActions: pendingActions.slice(0, 15),
     filterOptions: {
       campaigns: Array.from(
-        new Set(posts.map((p) => p.campaign_id).filter(Boolean) as string[]),
+        new Set(
+          ownedPosts.map((p) => p.campaign_id).filter(Boolean) as string[],
+        ),
       ).sort(),
       statuses: Array.from(
         new Set(
-          posts.map((p) => p.workflow_status).filter(Boolean) as string[],
+          ownedPosts.map((p) => p.workflow_status).filter(Boolean) as string[],
         ),
       ).sort(),
       tiers: Array.from(
         new Set(
-          posts.map((p) => p.creator?.category).filter(Boolean) as string[],
+          ownedPosts.map((p) => p.creator?.category).filter(Boolean) as string[],
         ),
       ).sort(),
     },

@@ -76,6 +76,8 @@ const POSTS_COLS_BASE = [
   "reach_out_date",
   "onboard_date",
   "onboarded_by",
+  "logged_by",
+  "posted_by",
   "order_id",
   "tracking_id",
   "partnership_id",
@@ -576,23 +578,30 @@ export async function fetchDashboardData(
     .sort((a, b) => (b.followers ?? 0) - (a.followers ?? 0))
     .slice(0, 6);
 
-  // Team leaderboard — group by onboarded_by; count Onboarded + Posted.
+  // Team leaderboard — Onboarded credit → onboarded_by; Posted credit →
+  // posted_by (the member who submitted the posting form), falling back to
+  // the onboarder on legacy rows. Crediting the onboarder for another
+  // member's post made this board disagree with My Dashboard's leaderboard.
   const teamMap = new Map<string, { onboardings: number; posts: number }>();
-  for (const p of posts) {
-    const who = String(p.onboarded_by ?? "").trim();
-    if (!who) continue;
-    const statusLow = String(p.workflow_status ?? "").toLowerCase();
+  const bumpTeam = (who: string, field: "onboardings" | "posts") => {
+    if (!who) return;
     const cur = teamMap.get(who) ?? { onboardings: 0, posts: 0 };
+    cur[field]++;
+    teamMap.set(who, cur);
+  };
+  for (const p of posts) {
+    const statusLow = String(p.workflow_status ?? "").toLowerCase();
+    const onboarder = String(p.onboarded_by ?? "").trim();
+    const poster = String(p.posted_by ?? p.onboarded_by ?? "").trim();
     if (
       statusLow.includes("on board") ||
       statusLow.includes("posted") ||
       statusLow.includes("delivered")
     ) {
-      cur.onboardings++;
+      bumpTeam(onboarder, "onboardings");
     }
     if (statusLow.includes("posted") || statusLow.includes("delivered"))
-      cur.posts++;
-    teamMap.set(who, cur);
+      bumpTeam(poster, "posts");
   }
   const teamLeaderboard = [...teamMap.entries()]
     .map(([name, v]) => ({ name, ...v }))
@@ -699,9 +708,16 @@ export async function fetchDashboardData(
         if (typeof total === "number") return total;
         return p.commercial_amount != null ? Number(p.commercial_amount) : null;
       })(),
-      // `posts.logged_by` doesn't exist on prod yet — once it does, fall back
-      // chain becomes logged_by (for Reach Out) → onboarded_by (for OB+).
-      assignee: (p.onboarded_by as string | null) ?? null,
+      // Reach Out rows belong to whoever LOGGED them (logged_by; legacy rows
+      // fall back to onboarded_by); later stages to the onboarder.
+      assignee:
+        bucketKey === "reachOut"
+          ? ((p.logged_by as string | null) ??
+            (p.onboarded_by as string | null) ??
+            null)
+          : ((p.onboarded_by as string | null) ??
+            (p.logged_by as string | null) ??
+            null),
       assigneeLabel:
         bucketKey === "reachOut" ? "Reached out by" : "Onboarded by",
       daysStuck: daysBetween(stageDate),
