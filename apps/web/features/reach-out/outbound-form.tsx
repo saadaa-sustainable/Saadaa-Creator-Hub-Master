@@ -484,6 +484,15 @@ export function OutboundForm({
                 label="campaign"
               />
             </div>
+            <p className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-snug text-[#9A9384]">
+              <Check
+                className="h-3 w-3 shrink-0 text-[#B5AE9E]"
+                aria-hidden
+              />
+              Tick beside Campaign, Gender or Content Type = keep that
+              selection pre-filled after every submit (saved only for you).
+              Untick to go back to normal.
+            </p>
             {selectedCampaign?.brief_link ? (
               <span className="brief-chip">
                 <FileText aria-hidden />
