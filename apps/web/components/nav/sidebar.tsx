@@ -27,6 +27,7 @@ import {
   X,
   type LucideIcon,
   CalendarDays,
+  Clapperboard,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { hasPermission } from "@/lib/rbac";
@@ -113,6 +114,12 @@ const NAV: NavSection[] = [
         show: (a) => hasPermission(a, "offboarding_write"),
       },
       { label: "Calendar", href: "/calendar", icon: CalendarDays },
+    ],
+  },
+  {
+    label: "Assets",
+    items: [
+      { label: "Post Assets", href: "/post-assets", icon: Clapperboard },
     ],
   },
   {
