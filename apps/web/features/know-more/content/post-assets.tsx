@@ -5,7 +5,7 @@ export default function PostAssetsKM() {
     <>
       <KMHeader
         title="Post Assets"
-        subtitle="A folder-style library of every posted reel — browse by Campaign → Creator, preview videos right in the grid, and open any of them in the full player."
+        subtitle="A visual library of every posted reel. Browse by Campaign → Creator, search the whole archive, and open any asset in a focused detail panel."
       />
 
       <KMSection tag="Where the videos come from">
@@ -37,6 +37,10 @@ export default function PostAssetsKM() {
             <strong>Search</strong> cuts across every folder at once — creator
             name, handle, POST ID, collab or campaign ID.
           </li>
+          <li>
+            Inside a creator folder, switch between <strong>grid</strong> and
+            <strong> list</strong> view, then sort by newest or oldest post.
+          </li>
         </KMList>
       </KMSection>
 
@@ -48,9 +52,9 @@ export default function PostAssetsKM() {
             playing in the background).
           </li>
           <li>
-            <strong>Click a video to open the player popup</strong> — full
-            playback with sound and controls, plus an &quot;Open on
-            Instagram&quot; link to the live post.
+            <strong>Click a video to open the detail panel</strong> with full
+            playback, metadata, previous/next navigation, and links to
+            Instagram and the Drive copy.
           </li>
         </KMList>
       </KMSection>

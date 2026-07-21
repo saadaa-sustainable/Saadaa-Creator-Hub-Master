@@ -1,32 +1,43 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeft,
+  ArrowRight,
   ChevronRight,
   Clapperboard,
   Download,
+  ExternalLink,
   Folder,
   FolderOpen,
+  Grid2X2,
   Home,
+  Instagram,
+  LayoutList,
+  Lightbulb,
   Play,
   Search,
   Users,
+  Video,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/avatar";
-import { InstagramEmbedLightbox } from "@/components/ui/instagram-preview";
 import { extractShortcode } from "@/lib/instagram-shortcode";
 import type { CampaignFolder, CreatorFolder, PostAsset } from "./queries";
 
-/**
- * Post Assets — DAM-style folder browser (Campaign → Creator → videos).
- * Grid videos autoplay muted while in view (IntersectionObserver pauses
- * off-screen ones); clicking a card opens the shared lightbox popup, which
- * plays the durable bucket mp4 natively (Instagram embed fallback).
- */
+type ViewMode = "grid" | "list";
+type SortOrder = "newest" | "oldest";
+
+type AssetItem = {
+  asset: PostAsset;
+  folder: CreatorFolder;
+  campaign: CampaignFolder;
+};
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "Not dated";
   const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString("en-IN", {
@@ -34,6 +45,43 @@ function fmtDate(iso: string | null): string {
     month: "short",
     year: "numeric",
     timeZone: "UTC",
+  });
+}
+
+function fmtDateShort(iso: string | null): string {
+  if (!iso) return "Not dated";
+  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+}
+
+function campaignLabel(campaign: CampaignFolder): string {
+  return campaign.campaign_name ?? campaign.campaign_id;
+}
+
+function assetLabel(asset: PostAsset): string {
+  return asset.post_id_short ?? asset.post_id;
+}
+
+function collectAssets(campaigns: CampaignFolder[]): AssetItem[] {
+  return campaigns.flatMap((campaign) =>
+    campaign.creators.flatMap((folder) =>
+      folder.assets.map((asset) => ({ asset, folder, campaign })),
+    ),
+  );
+}
+
+function sortAssets(items: AssetItem[], sort: SortOrder): AssetItem[] {
+  return [...items].sort((a, b) => {
+    const aDate = a.asset.post_date ?? "";
+    const bDate = b.asset.post_date ?? "";
+    return sort === "newest"
+      ? bDate.localeCompare(aDate)
+      : aDate.localeCompare(bDate);
   });
 }
 
@@ -46,418 +94,836 @@ export function PostAssetsView({
   totalAssets: number;
   totalCreators: number;
 }) {
-  const [campId, setCampId] = useState<string | null>(null);
+  const [campaignId, setCampaignId] = useState<string | null>(null);
   const [creatorId, setCreatorId] = useState<string | null>(null);
-  const [q, setQ] = useState("");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortOrder>("newest");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
-  const campaign = campaigns.find((c) => c.campaign_id === campId) ?? null;
-  const creator =
-    campaign?.creators.find((c) => c.username === creatorId) ?? null;
+  const allAssets = useMemo(() => collectAssets(campaigns), [campaigns]);
+  const activeCampaign =
+    campaigns.find((campaign) => campaign.campaign_id === campaignId) ?? null;
+  const activeCreator =
+    activeCampaign?.creators.find((folder) => folder.username === creatorId) ??
+    null;
+  const needle = query.trim().toLowerCase();
 
-  // Search cuts across the whole tree from any level.
-  const needle = q.trim().toLowerCase();
   const searchResults = useMemo(() => {
     if (!needle) return null;
-    const out: Array<{ asset: PostAsset; folder: CreatorFolder }> = [];
-    for (const c of campaigns) {
-      for (const f of c.creators) {
-        for (const a of f.assets) {
-          const hay = [
-            f.username,
-            f.inf_name,
-            a.post_id_short ?? a.post_id,
-            a.collab_id,
-            a.campaign_id,
-          ]
-            .map((v) => String(v ?? "").toLowerCase())
-            .join(" ");
-          if (hay.includes(needle)) out.push({ asset: a, folder: f });
-        }
-      }
+    return allAssets.filter(({ asset, folder, campaign }) =>
+      [
+        folder.username,
+        folder.inf_name,
+        assetLabel(asset),
+        asset.collab_id,
+        asset.campaign_id,
+        campaign.campaign_name,
+      ]
+        .map((value) => String(value ?? "").toLowerCase())
+        .join(" ")
+        .includes(needle),
+    );
+  }, [allAssets, needle]);
+
+  const currentItems = useMemo(() => {
+    if (searchResults) return sortAssets(searchResults, sort);
+    if (activeCreator && activeCampaign) {
+      return sortAssets(
+        activeCreator.assets.map((asset) => ({
+          asset,
+          folder: activeCreator,
+          campaign: activeCampaign,
+        })),
+        sort,
+      );
     }
-    return out;
-  }, [campaigns, needle]);
+    return [];
+  }, [activeCampaign, activeCreator, searchResults, sort]);
+
+  const selectedItem =
+    selectedIndex === null ? null : currentItems[selectedIndex] ?? null;
+  const latestDate = allAssets.reduce<string | null>((latest, item) => {
+    if (!item.asset.post_date) return latest;
+    return !latest || item.asset.post_date > latest ? item.asset.post_date : latest;
+  }, null);
+
+  const clearSelection = () => setSelectedIndex(null);
+  const goRoot = () => {
+    setCampaignId(null);
+    setCreatorId(null);
+    clearSelection();
+  };
+  const openCampaign = (nextCampaignId: string) => {
+    setCampaignId(nextCampaignId);
+    setCreatorId(null);
+    clearSelection();
+  };
+  const openCreator = (username: string) => {
+    setCreatorId(username);
+    clearSelection();
+  };
+
+  const title = searchResults
+    ? "Search results"
+    : activeCreator
+      ? `@${activeCreator.username}`
+      : activeCampaign
+        ? campaignLabel(activeCampaign)
+        : "Campaign archive";
+  const description = searchResults
+    ? `${searchResults.length} matching ${searchResults.length === 1 ? "asset" : "assets"} across the library.`
+    : activeCreator
+      ? `${activeCreator.assets.length} ${activeCreator.assets.length === 1 ? "video" : "videos"} from this creator.`
+      : activeCampaign
+        ? `${activeCampaign.assetCount} ${activeCampaign.assetCount === 1 ? "video" : "videos"} from ${activeCampaign.creators.length} ${activeCampaign.creators.length === 1 ? "creator" : "creators"}.`
+        : "Choose a campaign to browse its creators and posted work.";
 
   return (
-    <div className="flex flex-col lg:flex-row gap-5">
-      {/* ── Left rail — campaign folders (DAM asset-tabs style) ── */}
-      <aside className="lg:w-[240px] shrink-0">
-        <div className="rounded-[12px] border border-[#E7E2D2] bg-white p-2 flex lg:flex-col gap-1 overflow-x-auto">
+    <div className="post-assets-stage">
+      <section className="assets-hero" aria-labelledby="post-assets-title">
+        <div className="assets-hero__wash" aria-hidden />
+        <div className="assets-hero__copy">
+          <div className="assets-hero__eyebrow">
+            <span className="assets-hero__mark" aria-hidden>
+              <Clapperboard size={16} />
+            </span>
+            <span>Post Assets</span>
+            <span className="assets-hero__live">Live library</span>
+          </div>
+          <h1 id="post-assets-title">The work is ready when you are.</h1>
+          <p>
+            Browse posted videos by campaign or creator, then move from preview
+            to Instagram or Drive without losing the context around the asset.
+          </p>
           <button
             type="button"
-            onClick={() => {
-              setCampId(null);
-              setCreatorId(null);
-            }}
-            className={cn(
-              "flex items-center gap-2 rounded-[8px] px-2.5 py-2 text-[13px] font-medium text-left shrink-0",
-              campId === null
-                ? "bg-[#2C2420] text-white"
-                : "text-[#494640] hover:bg-[#F9F7F2]",
-            )}
+            className="assets-help-button"
+            data-know-more="post-assets"
           >
-            <Home size={14} aria-hidden className="shrink-0" />
-            All campaigns
-            <span
-              className={cn(
-                "ml-auto text-[11px]",
-                campId === null ? "text-white/60" : "text-[#9A9384]",
-              )}
-            >
-              {totalAssets}
-            </span>
+            <Lightbulb size={14} aria-hidden />
+            How this library works
           </button>
-          {campaigns.map((c) => {
-            const active = campId === c.campaign_id;
-            return (
+        </div>
+        <div className="assets-hero__stats" aria-label="Library summary">
+          <HeroStat label="Posted videos" value={totalAssets} />
+          <HeroStat label="Creators" value={totalCreators} />
+          <HeroStat label="Campaigns" value={campaigns.length} />
+          <div className="assets-hero__date">
+            <span>Latest post</span>
+            <strong>{fmtDateShort(latestDate)}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="assets-toolbar" aria-label="Asset controls">
+        <nav className="assets-breadcrumb" aria-label="Folder path">
+          <button
+            type="button"
+            onClick={goRoot}
+            className={cn(!activeCampaign && "is-current")}
+          >
+            All assets
+          </button>
+          {activeCampaign && (
+            <>
+              <ChevronRight size={14} aria-hidden />
               <button
-                key={c.campaign_id}
                 type="button"
                 onClick={() => {
-                  setCampId(c.campaign_id);
                   setCreatorId(null);
+                  clearSelection();
                 }}
-                className={cn(
-                  "flex items-center gap-2 rounded-[8px] px-2.5 py-2 text-[13px] font-medium text-left shrink-0 min-w-0",
-                  active
-                    ? "bg-[#2C2420] text-white"
-                    : "text-[#494640] hover:bg-[#F9F7F2]",
-                )}
-                title={c.campaign_name ?? c.campaign_id}
+                className={cn(!activeCreator && "is-current")}
               >
-                {active ? (
-                  <FolderOpen size={14} aria-hidden className="shrink-0" />
-                ) : (
-                  <Folder size={14} aria-hidden className="shrink-0" />
-                )}
-                <span className="truncate">
-                  {c.campaign_id}
-                  {c.campaign_name ? ` · ${c.campaign_name}` : ""}
-                </span>
-                <span
-                  className={cn(
-                    "ml-auto text-[11px]",
-                    active ? "text-white/60" : "text-[#9A9384]",
-                  )}
-                >
-                  {c.assetCount}
-                </span>
+                {activeCampaign.campaign_id}
               </button>
-            );
-          })}
-        </div>
-        <p className="hidden lg:flex items-center gap-1.5 mt-3 text-[11px] text-[#9A9384] px-1">
-          <Users size={11} aria-hidden /> {totalCreators} creators ·{" "}
-          {totalAssets} videos
-        </p>
-      </aside>
-
-      {/* ── Main ── */}
-      <div className="flex-1 min-w-0">
-        {/* Breadcrumb + search */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <nav
-            aria-label="Folder path"
-            className="flex items-center gap-1 text-[13px] min-w-0"
-          >
+            </>
+          )}
+          {activeCreator && (
+            <>
+              <ChevronRight size={14} aria-hidden />
+              <span className="is-current">@{activeCreator.username}</span>
+            </>
+          )}
+        </nav>
+        <label className="assets-search">
+          <Search size={16} aria-hidden />
+          <span className="sr-only">Search assets</span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search creator, POST ID, collab or campaign"
+          />
+          {query && (
             <button
               type="button"
-              onClick={() => {
-                setCampId(null);
-                setCreatorId(null);
-              }}
-              className={cn(
-                "font-semibold",
-                campId === null
-                  ? "text-[#161513]"
-                  : "text-[#6E695E] hover:text-[#161513]",
-              )}
+              onClick={() => setQuery("")}
+              aria-label="Clear search"
             >
-              Post Assets
+              <X size={15} aria-hidden />
             </button>
-            {campaign && (
-              <>
-                <ChevronRight size={13} aria-hidden className="text-[#C9C2AE]" />
-                <button
-                  type="button"
-                  onClick={() => setCreatorId(null)}
-                  className={cn(
-                    "font-semibold truncate",
-                    creator
-                      ? "text-[#6E695E] hover:text-[#161513]"
-                      : "text-[#161513]",
-                  )}
-                >
-                  {campaign.campaign_id}
-                </button>
-              </>
-            )}
-            {creator && (
-              <>
-                <ChevronRight size={13} aria-hidden className="text-[#C9C2AE]" />
-                <span className="font-semibold text-[#161513] truncate">
-                  @{creator.username}
-                </span>
-              </>
-            )}
-          </nav>
-          <label className="relative flex items-center w-full sm:w-[260px]">
-            <Search
-              className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-[#9A9384]"
-              aria-hidden
-            />
-            <input
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search creator, POST ID…"
-              className="w-full h-9 rounded-[10px] border border-[#E7E2D2] bg-white pl-8 pr-3 text-[13px] outline-none focus:border-[#C9A882]"
-            />
-          </label>
-        </div>
+          )}
+        </label>
+      </section>
 
-        {/* Search results override the folder view */}
-        {searchResults ? (
-          searchResults.length === 0 ? (
-            <EmptyNote text="No videos match your search." />
-          ) : (
-            <VideoGrid
-              items={searchResults.map((r) => ({
-                asset: r.asset,
-                folder: r.folder,
-              }))}
-              showCreator
-            />
-          )
-        ) : campaign === null ? (
-          /* Level 1 — campaign folders */
-          campaigns.length === 0 ? (
-            <EmptyNote text="No posted videos yet — assets appear here automatically once posts are submitted." />
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {campaigns.map((c) => (
-                <button
-                  key={c.campaign_id}
-                  type="button"
-                  onClick={() => setCampId(c.campaign_id)}
-                  className="group flex items-center gap-3 rounded-[12px] border border-[#E7E2D2] bg-white p-4 text-left hover:border-[#C9A882] transition-colors"
-                >
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] bg-[#FDF6DC] text-[#8C6D00]">
-                    <Folder size={20} aria-hidden />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-[14px] font-bold text-[#161513] truncate">
-                      {c.campaign_id}
-                      {c.campaign_name ? ` · ${c.campaign_name}` : ""}
-                    </span>
-                    <span className="block text-[12px] text-[#9A9384]">
-                      {c.creators.length} creator
-                      {c.creators.length === 1 ? "" : "s"} · {c.assetCount}{" "}
-                      video{c.assetCount === 1 ? "" : "s"}
-                    </span>
-                  </span>
-                  <ChevronRight
-                    size={16}
-                    aria-hidden
-                    className="ml-auto shrink-0 text-[#C9C2AE] group-hover:text-[#8C6D00]"
-                  />
-                </button>
-              ))}
+      <div className="assets-browser">
+        <aside className="assets-rail" aria-label="Campaign folders">
+          <div className="assets-rail__head">
+            <div>
+              <span>Library</span>
+              <strong>Campaign folders</strong>
             </div>
-          )
-        ) : creator === null ? (
-          /* Level 2 — creator folders inside the campaign */
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {campaign.creators.map((f) => (
-              <button
-                key={f.username}
-                type="button"
-                onClick={() => setCreatorId(f.username)}
-                className="group flex items-center gap-3 rounded-[12px] border border-[#E7E2D2] bg-white p-4 text-left hover:border-[#C9A882] transition-colors"
-              >
-                <Avatar
-                  src={f.profile_pic}
-                  username={f.username}
-                  name={f.inf_name}
-                  size={44}
-                  interactive={false}
-                />
-                <span className="min-w-0">
-                  <span className="block text-[14px] font-bold text-[#161513] truncate">
-                    {f.inf_name ?? `@${f.username}`}
-                  </span>
-                  <span className="block text-[12px] text-[#9A9384] truncate">
-                    @{f.username} · {f.assets.length} video
-                    {f.assets.length === 1 ? "" : "s"}
-                  </span>
-                </span>
-                <ChevronRight
-                  size={16}
-                  aria-hidden
-                  className="ml-auto shrink-0 text-[#C9C2AE] group-hover:text-[#8C6D00]"
-                />
-              </button>
-            ))}
+            <span className="assets-rail__count">{campaigns.length}</span>
           </div>
-        ) : (
-          /* Level 3 — the creator's videos */
-          <VideoGrid
-            items={creator.assets.map((asset) => ({
-              asset,
-              folder: creator,
-            }))}
-          />
-        )}
+          <button
+            type="button"
+            onClick={goRoot}
+            className={cn("assets-rail__item", !activeCampaign && "is-active")}
+          >
+            <span className="assets-rail__icon">
+              <Home size={15} aria-hidden />
+            </span>
+            <span className="assets-rail__label">All campaigns</span>
+            <strong>{totalAssets}</strong>
+          </button>
+          <div className="assets-rail__list">
+            {campaigns.map((campaign) => {
+              const active = campaign.campaign_id === campaignId;
+              return (
+                <button
+                  key={campaign.campaign_id}
+                  type="button"
+                  onClick={() => openCampaign(campaign.campaign_id)}
+                  className={cn("assets-rail__item", active && "is-active")}
+                  title={campaignLabel(campaign)}
+                >
+                  <span className="assets-rail__icon">
+                    {active ? (
+                      <FolderOpen size={15} aria-hidden />
+                    ) : (
+                      <Folder size={15} aria-hidden />
+                    )}
+                  </span>
+                  <span className="assets-rail__label">
+                    {campaign.campaign_id}
+                  </span>
+                  <strong>{campaign.assetCount}</strong>
+                </button>
+              );
+            })}
+          </div>
+          <div className="assets-rail__footer">
+            <Users size={14} aria-hidden />
+            <span>{totalCreators} creators in this library</span>
+          </div>
+        </aside>
+
+        <main className="assets-main">
+          <div className="assets-main__head">
+            <div>
+              <span className="assets-main__eyebrow">
+                {searchResults ? "Across the library" : "Browse the archive"}
+              </span>
+              <h2>{title}</h2>
+              <p>{description}</p>
+            </div>
+            {(activeCreator || searchResults) && currentItems.length > 0 && (
+              <div className="assets-main__controls">
+                <label className="assets-sort">
+                  <span>Sort</span>
+                  <select
+                    value={sort}
+                    onChange={(event) =>
+                      setSort(event.target.value as SortOrder)
+                    }
+                  >
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                  </select>
+                </label>
+                <div className="assets-view-toggle" aria-label="View mode">
+                  <button
+                    type="button"
+                    className={cn(viewMode === "grid" && "is-active")}
+                    onClick={() => setViewMode("grid")}
+                    aria-label="Grid view"
+                    aria-pressed={viewMode === "grid"}
+                  >
+                    <Grid2X2 size={15} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(viewMode === "list" && "is-active")}
+                    onClick={() => setViewMode("list")}
+                    aria-label="List view"
+                    aria-pressed={viewMode === "list"}
+                  >
+                    <LayoutList size={15} aria-hidden />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {searchResults ? (
+            searchResults.length === 0 ? (
+              <EmptyState
+                title="Nothing matched that search"
+                text="Try a creator name, handle, POST ID, collab ID or campaign ID."
+                action={query ? () => setQuery("") : undefined}
+              />
+            ) : (
+              <AssetResults
+                items={currentItems}
+                viewMode={viewMode}
+                onOpen={(index) => setSelectedIndex(index)}
+                showCreator
+                showCampaign
+              />
+            )
+          ) : activeCampaign === null ? (
+            campaigns.length === 0 ? (
+              <EmptyState
+                title="Your library is waiting for its first post"
+                text="Posted and Delivered work appears here automatically after the posting flow saves a durable copy."
+              />
+            ) : (
+              <CampaignGrid campaigns={campaigns} onOpen={openCampaign} />
+            )
+          ) : activeCreator === null ? (
+            <CreatorGrid creatorFolders={activeCampaign.creators} onOpen={openCreator} />
+          ) : currentItems.length === 0 ? (
+            <EmptyState
+              title="No media in this folder"
+              text="This creator has no saved video or cover available in the selected campaign."
+            />
+          ) : (
+            <AssetResults
+              items={currentItems}
+              viewMode={viewMode}
+              onOpen={(index) => setSelectedIndex(index)}
+            />
+          )}
+        </main>
       </div>
+
+      {selectedItem && selectedIndex !== null && (
+        <AssetDetailDrawer
+          item={selectedItem}
+          onClose={clearSelection}
+          onPrevious={
+            selectedIndex > 0
+              ? () => setSelectedIndex(selectedIndex - 1)
+              : undefined
+          }
+          onNext={
+            selectedIndex < currentItems.length - 1
+              ? () => setSelectedIndex(selectedIndex + 1)
+              : undefined
+          }
+          position={selectedIndex + 1}
+          total={currentItems.length}
+        />
+      )}
     </div>
   );
 }
 
-function EmptyNote({ text }: { text: string }) {
+function HeroStat({ label, value }: { label: string; value: number }) {
   return (
-    <p className="rounded-[12px] border border-dashed border-[#E7E2D2] bg-white/60 px-4 py-10 text-center text-[13px] text-[#9A9384]">
-      {text}
-    </p>
+    <div className="assets-hero__stat">
+      <strong>{value.toLocaleString("en-IN")}</strong>
+      <span>{label}</span>
+    </div>
   );
 }
 
-function VideoGrid({
-  items,
-  showCreator = false,
+function CampaignGrid({
+  campaigns,
+  onOpen,
 }: {
-  items: Array<{ asset: PostAsset; folder: CreatorFolder }>;
-  showCreator?: boolean;
+  campaigns: CampaignFolder[];
+  onOpen: (campaignId: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-      {items.map(({ asset, folder }) => (
-        <VideoCard
-          key={asset.post_id}
-          asset={asset}
-          folder={folder}
+    <div className="assets-campaign-grid">
+      {campaigns.map((campaign, index) => (
+        <button
+          key={campaign.campaign_id}
+          type="button"
+          onClick={() => onOpen(campaign.campaign_id)}
+          className={cn(
+            "assets-campaign-card",
+            index === 0 && "assets-campaign-card--featured",
+          )}
+        >
+          <PreviewMosaic
+            assets={campaign.creators.flatMap((folder) => folder.assets).slice(0, 4)}
+            label={campaignLabel(campaign)}
+          />
+          <span className="assets-campaign-card__body">
+            <span className="assets-campaign-card__title">
+              <span>{campaign.campaign_id}</span>
+              <ChevronRight size={17} aria-hidden />
+            </span>
+            <span className="assets-campaign-card__name">
+              {campaign.campaign_name ?? "Campaign archive"}
+            </span>
+            <span className="assets-campaign-card__meta">
+              {campaign.creators.length} {campaign.creators.length === 1 ? "creator" : "creators"}
+              <span aria-hidden>/</span>
+              {campaign.assetCount} {campaign.assetCount === 1 ? "video" : "videos"}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CreatorGrid({
+  creatorFolders,
+  onOpen,
+}: {
+  creatorFolders: CreatorFolder[];
+  onOpen: (username: string) => void;
+}) {
+  return (
+    <div className="assets-creator-grid">
+      {creatorFolders.map((folder, index) => (
+        <button
+          key={folder.username}
+          type="button"
+          onClick={() => onOpen(folder.username)}
+          className="assets-creator-card"
+        >
+          <PreviewMosaic
+            assets={folder.assets.slice(0, 3)}
+            label={`@${folder.username}`}
+            compact
+          />
+          <span className="assets-creator-card__body">
+            <span className="assets-creator-card__topline">
+              <Avatar
+                src={folder.profile_pic}
+                username={folder.username}
+                name={folder.inf_name}
+                size={34}
+                interactive={false}
+              />
+              <span className="assets-creator-card__arrow" aria-hidden>
+                <ChevronRight size={15} />
+              </span>
+            </span>
+            <span className="assets-creator-card__name">
+              {folder.inf_name ?? `@${folder.username}`}
+            </span>
+            <span className="assets-creator-card__handle">
+              @{folder.username}
+            </span>
+            <span className="assets-creator-card__meta">
+              {folder.assets.length} {folder.assets.length === 1 ? "video" : "videos"}
+              <span aria-hidden>/</span>
+              {index + 1} of {creatorFolders.length}
+            </span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PreviewMosaic({
+  assets,
+  label,
+  compact = false,
+}: {
+  assets: PostAsset[];
+  label: string;
+  compact?: boolean;
+}) {
+  return (
+    <span className={cn("assets-mosaic", compact && "assets-mosaic--compact")}>
+      {assets.length === 0 ? (
+        <span className="assets-mosaic__empty">
+          <Clapperboard size={22} aria-hidden />
+        </span>
+      ) : (
+        assets.map((asset) => (
+          <span key={asset.post_id} className="assets-mosaic__tile">
+            {asset.post_thumbnail ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={asset.post_thumbnail} alt="" loading="lazy" />
+            ) : (
+              <span className="assets-mosaic__fallback" aria-hidden>
+                <Video size={18} />
+              </span>
+            )}
+          </span>
+        ))
+      )}
+      <span className="sr-only">Preview of {label}</span>
+    </span>
+  );
+}
+
+function AssetResults({
+  items,
+  viewMode,
+  onOpen,
+  showCreator = false,
+  showCampaign = false,
+}: {
+  items: AssetItem[];
+  viewMode: ViewMode;
+  onOpen: (index: number) => void;
+  showCreator?: boolean;
+  showCampaign?: boolean;
+}) {
+  if (viewMode === "list") {
+    return (
+      <div className="assets-list" role="list">
+        {items.map((item, index) => (
+          <AssetListRow
+            key={item.asset.post_id}
+            item={item}
+            onOpen={() => onOpen(index)}
+            showCreator={showCreator}
+            showCampaign={showCampaign}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="assets-media-grid">
+      {items.map((item, index) => (
+        <AssetMediaCard
+          key={item.asset.post_id}
+          item={item}
+          onOpen={() => onOpen(index)}
           showCreator={showCreator}
+          showCampaign={showCampaign}
         />
       ))}
     </div>
   );
 }
 
-function VideoCard({
-  asset,
-  folder,
+function AssetMediaCard({
+  item,
+  onOpen,
   showCreator,
+  showCampaign,
+}: {
+  item: AssetItem;
+  onOpen: () => void;
+  showCreator?: boolean;
+  showCampaign?: boolean;
+}) {
+  const { asset, folder, campaign } = item;
+  const canOpen = Boolean(asset.post_media || asset.post_thumbnail || asset.post_link);
+  return (
+    <article className="assets-media-card">
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={!canOpen}
+        className="assets-media-card__preview"
+        aria-label={`Open ${assetLabel(asset)} preview`}
+      >
+        <AssetVideoPreview asset={asset} label={assetLabel(asset)} />
+        {canOpen && (
+          <span className="assets-media-card__play" aria-hidden>
+            <Play size={15} fill="currentColor" />
+          </span>
+        )}
+      </button>
+      <div className="assets-media-card__footer">
+        <div className="assets-media-card__copy">
+          <strong>{showCreator ? `@${folder.username}` : assetLabel(asset)}</strong>
+          <span>
+            {showCampaign ? campaign.campaign_id : asset.deliverable_type ?? "Posted video"}
+            <span aria-hidden>/</span>
+            {showCreator ? assetLabel(asset) : fmtDateShort(asset.post_date)}
+          </span>
+        </div>
+        {asset.download_link && (
+          <a
+            href={asset.download_link}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => event.stopPropagation()}
+            className="assets-icon-button"
+            title="Open Drive copy"
+            aria-label={`Open Drive copy for ${assetLabel(asset)}`}
+          >
+            <Download size={14} aria-hidden />
+          </a>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function AssetListRow({
+  item,
+  onOpen,
+  showCreator,
+  showCampaign,
+}: {
+  item: AssetItem;
+  onOpen: () => void;
+  showCreator?: boolean;
+  showCampaign?: boolean;
+}) {
+  const { asset, folder, campaign } = item;
+  return (
+    <article className="assets-list-row" role="listitem">
+      <button
+        type="button"
+        className="assets-list-row__thumb"
+        onClick={onOpen}
+        aria-label={`Open ${assetLabel(asset)} preview`}
+      >
+        <AssetVideoPreview asset={asset} label={assetLabel(asset)} />
+        <span className="assets-media-card__play" aria-hidden>
+          <Play size={13} fill="currentColor" />
+        </span>
+      </button>
+      <button type="button" className="assets-list-row__identity" onClick={onOpen}>
+        <strong>{assetLabel(asset)}</strong>
+        <span>{showCreator ? `@${folder.username}` : campaign.campaign_id}</span>
+      </button>
+      <span className="assets-list-row__detail">
+        {showCampaign ? campaignLabel(campaign) : asset.deliverable_type ?? "Posted video"}
+      </span>
+      <span className="assets-list-row__detail">{fmtDate(asset.post_date)}</span>
+      {asset.download_link ? (
+        <a
+          href={asset.download_link}
+          target="_blank"
+          rel="noreferrer"
+          className="assets-icon-button"
+          title="Open Drive copy"
+          aria-label={`Open Drive copy for ${assetLabel(asset)}`}
+        >
+          <Download size={14} aria-hidden />
+        </a>
+      ) : (
+        <span className="assets-list-row__empty-action" aria-hidden />
+      )}
+    </article>
+  );
+}
+
+function AssetVideoPreview({
+  asset,
+  label,
 }: {
   asset: PostAsset;
-  folder: CreatorFolder;
-  showCreator: boolean;
+  label: string;
 }) {
-  const [open, setOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const shortcode = extractShortcode(asset.post_link ?? "");
-  const canOpen = Boolean(shortcode || asset.post_media);
-
-  // Autoplay while in view: play muted when ≥40% visible, pause off-screen.
   useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
+    const video = videoRef.current;
+    if (!video || !asset.post_media) return;
+    const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) void el.play().catch(() => {});
-        else el.pause();
+        if (entry.isIntersecting) void video.play().catch(() => {});
+        else video.pause();
       },
       { threshold: 0.4 },
     );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    observer.observe(video);
+    return () => observer.disconnect();
+  }, [asset.post_media]);
 
-  const label = `@${folder.username} · ${asset.post_id_short ?? asset.post_id}`;
-
+  if (asset.post_media) {
+    return (
+      <video
+        ref={videoRef}
+        src={asset.post_media}
+        poster={asset.post_thumbnail ?? undefined}
+        muted
+        loop
+        playsInline
+        preload="metadata"
+        aria-label={label}
+      />
+    );
+  }
+  if (asset.post_thumbnail) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={asset.post_thumbnail} alt={label} loading="lazy" />;
+  }
   return (
-    <>
-      <div className="group overflow-hidden rounded-[12px] border border-[#E7E2D2] bg-white transition-colors hover:border-[#C9A882]">
-        <button
-          type="button"
-          disabled={!canOpen}
-          onClick={() => canOpen && setOpen(true)}
-          className="relative block w-full aspect-[9/16] bg-black text-left"
-          aria-label={`Play ${label}`}
-          title={canOpen ? "Open in player" : undefined}
-        >
-          {asset.post_media ? (
-            <video
-              ref={videoRef}
-              src={asset.post_media}
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              poster={asset.post_thumbnail ?? undefined}
-              className="h-full w-full object-cover"
-            />
-          ) : asset.post_thumbnail ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={asset.post_thumbnail}
-              alt={label}
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <span className="grid h-full w-full place-items-center text-white/40">
-              <Clapperboard size={28} aria-hidden />
+    <span className="assets-media-card__fallback" aria-label={label}>
+      <Clapperboard size={24} aria-hidden />
+    </span>
+  );
+}
+
+function AssetDetailDrawer({
+  item,
+  onClose,
+  onPrevious,
+  onNext,
+  position,
+  total,
+}: {
+  item: AssetItem;
+  onClose: () => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
+  position: number;
+  total: number;
+}) {
+  const { asset, folder, campaign } = item;
+  const shortcode = extractShortcode(asset.post_link ?? "");
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowLeft") onPrevious?.();
+      if (event.key === "ArrowRight") onNext?.();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose, onNext, onPrevious]);
+
+  return createPortal(
+    <div className="assets-drawer-backdrop" onClick={onClose}>
+      <aside
+        className="assets-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Preview ${assetLabel(asset)}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="assets-drawer__head">
+          <div>
+            <span className="assets-drawer__eyebrow">
+              <Instagram size={13} aria-hidden />
+              Posted asset
             </span>
-          )}
-          {canOpen && (
-            <span className="absolute inset-0 grid place-items-center bg-black/0 transition-colors group-hover:bg-black/25">
-              <span className="grid h-10 w-10 place-items-center rounded-full bg-[#F0C61E] text-[#161513] shadow opacity-0 transition-opacity group-hover:opacity-100">
-                <Play size={18} aria-hidden fill="currentColor" className="translate-x-[1px]" />
-              </span>
-            </span>
-          )}
-          {asset.deliverable_type && (
-            <span className="absolute left-1.5 top-1.5 rounded-[6px] bg-black/55 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-              {asset.deliverable_type}
-            </span>
-          )}
-        </button>
-        <div className="flex items-center gap-1.5 p-2">
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[12px] font-bold text-[#161513]">
-              {showCreator
-                ? `@${folder.username}`
-                : (asset.post_id_short ?? asset.post_id)}
-            </p>
-            <p className="truncate text-[11px] text-[#9A9384]">
-              {showCreator
-                ? (asset.post_id_short ?? asset.post_id)
-                : fmtDate(asset.post_date)}
-              {showCreator ? ` · ${fmtDate(asset.post_date)}` : ""}
-            </p>
+            <h2>{assetLabel(asset)}</h2>
+            <p>@{folder.username}</p>
           </div>
-          {asset.download_link && (
-            <a
-              href={asset.download_link}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="grid h-7 w-7 shrink-0 place-items-center rounded-[8px] border border-[#E7E2D2] text-[#6E695E] hover:bg-[#F9F7F2] hover:text-[#161513]"
-              title="Open the Drive copy"
-              aria-label="Open the Drive copy"
-            >
-              <Download size={13} aria-hidden />
-            </a>
-          )}
+          <button type="button" className="assets-icon-button" onClick={onClose} aria-label="Close preview">
+            <X size={17} aria-hidden />
+          </button>
+        </header>
+
+        <div className="assets-drawer__body">
+          <div className="assets-drawer__media">
+            {asset.post_media ? (
+              <video
+                src={asset.post_media}
+                poster={asset.post_thumbnail ?? undefined}
+                controls
+                autoPlay
+                playsInline
+              />
+            ) : asset.post_thumbnail ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={asset.post_thumbnail} alt={assetLabel(asset)} />
+            ) : shortcode ? (
+              <iframe
+                src={`https://www.instagram.com/p/${shortcode}/embed/captioned/`}
+                title={`Instagram preview for ${assetLabel(asset)}`}
+                loading="lazy"
+                scrolling="no"
+                allow="encrypted-media; clipboard-write; picture-in-picture; fullscreen"
+                allowFullScreen
+              />
+            ) : (
+              <div className="assets-drawer__no-media">
+                <Clapperboard size={28} aria-hidden />
+                <span>No preview available</span>
+              </div>
+            )}
+          </div>
+
+          <div className="assets-drawer__actions">
+            {asset.post_link && (
+              <a href={asset.post_link} target="_blank" rel="noreferrer" className="assets-drawer__action assets-drawer__action--primary">
+                <ExternalLink size={15} aria-hidden />
+                Open Instagram
+              </a>
+            )}
+            {asset.download_link && (
+              <a href={asset.download_link} target="_blank" rel="noreferrer" className="assets-drawer__action">
+                <Download size={15} aria-hidden />
+                Open Drive copy
+              </a>
+            )}
+          </div>
+
+          <dl className="assets-drawer__details">
+            <DetailRow label="Campaign" value={campaignLabel(campaign)} />
+            <DetailRow label="Creator" value={`@${folder.username}`} />
+            <DetailRow label="Collab ID" value={asset.collab_id ?? "Not assigned"} />
+            <DetailRow label="Posted" value={fmtDate(asset.post_date)} />
+            <DetailRow label="Format" value={asset.deliverable_type ?? "Video"} />
+          </dl>
         </div>
-      </div>
-      {open && (
-        <InstagramEmbedLightbox
-          shortcode={shortcode ?? ""}
-          label={label}
-          mediaUrl={asset.post_media}
-          onClose={() => setOpen(false)}
-        />
+
+        <footer className="assets-drawer__foot">
+          <button type="button" onClick={onPrevious} disabled={!onPrevious} className="assets-drawer__nav">
+            <ArrowLeft size={15} aria-hidden />
+            Previous
+          </button>
+          <span>{position} / {total}</span>
+          <button type="button" onClick={onNext} disabled={!onNext} className="assets-drawer__nav">
+            Next
+            <ArrowRight size={15} aria-hidden />
+          </button>
+        </footer>
+      </aside>
+    </div>,
+    document.body,
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function EmptyState({
+  title,
+  text,
+  action,
+}: {
+  title: string;
+  text: string;
+  action?: () => void;
+}) {
+  return (
+    <div className="assets-empty-state">
+      <span className="assets-empty-state__icon" aria-hidden>
+        <Clapperboard size={22} />
+      </span>
+      <h3>{title}</h3>
+      <p>{text}</p>
+      {action && (
+        <button type="button" onClick={action} className="assets-empty-state__action">
+          Clear search
+        </button>
       )}
-    </>
+    </div>
   );
 }
