@@ -1,17 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { TeamRowsDrawer } from "@/features/team-rows/team-rows-drawer";
+import {
+  TeamRowsDrawer,
+  type FilterKey,
+} from "@/features/team-rows/team-rows-drawer";
+import type { TodayCounterKind } from "./today-counter";
 
 export function TodayCounterChips({
   members,
+  kind,
 }: {
   members: Array<[string, number]>;
+  kind: TodayCounterKind;
 }) {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const teams = members
     .map(([name]) => name)
     .filter((name) => name !== "Unattributed");
+  const initialStage: FilterKey =
+    kind === "onboarded" ? "onboard" : kind === "posted" ? "posted" : "reach";
 
   return (
     <>
@@ -67,6 +75,7 @@ export function TodayCounterChips({
           team={selectedMember}
           teams={teams}
           source="live"
+          initialStage={initialStage}
           onClose={() => setSelectedMember(null)}
         />
       )}

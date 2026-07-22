@@ -99,7 +99,7 @@ export async function TodayCounter({ kind }: { kind: TodayCounterKind }) {
           Nothing yet today — the board resets every morning.
         </span>
       ) : (
-        <TodayCounterChips members={members} />
+        <TodayCounterChips members={members} kind={kind} />
       )}
     </section>
   );

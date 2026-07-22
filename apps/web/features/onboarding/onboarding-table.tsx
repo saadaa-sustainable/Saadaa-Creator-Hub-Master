@@ -289,8 +289,8 @@ export function OnboardingTable({
 /** Keep the original reach-out owner visible after a handoff. */
 function attributionLabels(r: OnboardingRow): string[] {
   return [
-    r.logged_by ? `Reached out by ${r.logged_by}` : null,
-    isOnboarded(r) && r.onboarded_by ? `Onboarded by ${r.onboarded_by}` : null,
+    `Reached out by ${r.logged_by?.trim() || "—"}`,
+    isOnboarded(r) ? `Onboarded by ${r.onboarded_by?.trim() || "—"}` : null,
   ].filter((label): label is string => Boolean(label));
 }
 
@@ -846,11 +846,12 @@ function OnboardingOverviewModal({
           <section className="ob-overview-grid">
             <OverviewItem label="Post ID" value={row.post_id} mono />
             <OverviewItem label="Collab ID" value={collabIdLabel(row)} mono />
-            {row.logged_by && (
-              <OverviewItem label="Reached Out By" value={row.logged_by} />
-            )}
-            {isOnboarded(row) && row.onboarded_by && (
-              <OverviewItem label="Onboarded By" value={row.onboarded_by} />
+            <OverviewItem label="Reached Out By" value={row.logged_by ?? "—"} />
+            {isOnboarded(row) && (
+              <OverviewItem
+                label="Onboarded By"
+                value={row.onboarded_by ?? "—"}
+              />
             )}
             <OverviewItem
               label="Deliverables"
