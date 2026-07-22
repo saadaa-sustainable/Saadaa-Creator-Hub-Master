@@ -501,14 +501,24 @@ function OnboardingListRow({
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            className="campaign-list-action campaign-list-action--brief"
-            onClick={() => onOpen(r)}
-          >
-            <Send size={13} aria-hidden />
-            Submit
-          </button>
+          <>
+            <button
+              type="button"
+              className="campaign-list-action campaign-list-action--brief"
+              onClick={() => onOverview(r)}
+            >
+              <Eye size={13} aria-hidden />
+              Overview
+            </button>
+            <button
+              type="button"
+              className="campaign-list-action campaign-list-action--brief"
+              onClick={() => onOpen(r)}
+            >
+              <Send size={13} aria-hidden />
+              Submit
+            </button>
+          </>
         )}
       </div>
     </article>
@@ -732,14 +742,24 @@ function ObCard({
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            className="action-primary"
-            onClick={() => onOpen(r)}
-          >
-            <Send size={12} aria-hidden />
-            Submit
-          </button>
+          <>
+            <button
+              type="button"
+              className="action-view"
+              onClick={() => onOverview(r)}
+            >
+              <Eye size={12} aria-hidden />
+              Overview
+            </button>
+            <button
+              type="button"
+              className="action-primary"
+              onClick={() => onOpen(r)}
+            >
+              <Send size={12} aria-hidden />
+              Submit
+            </button>
+          </>
         )}
       </div>
     </div>
@@ -771,8 +791,9 @@ function OnboardingOverviewModal({
   const deliverableRows = siblings.length > 0 ? siblings : [row];
   const deliverableCount = countCollabDeliverables(row, rows);
   const isMulti = deliverableCount > 1;
+  const onboarded = isOnboarded(row);
   const canSendEmail =
-    isOnboarded(row) &&
+    onboarded &&
     !row.collab_email_sent_at &&
     !row.collab_email_skipped;
 
@@ -782,16 +803,20 @@ function OnboardingOverviewModal({
         <header className="modal-head">
           <div className="flex items-center gap-2 min-w-0">
             <Eye size={16} aria-hidden />
-            <h2 className="font-semibold">Onboarding Overview</h2>
+            <h2 className="font-semibold">
+              {onboarded ? "Onboarding Overview" : "Reach Out Overview"}
+            </h2>
             <span className="chip text-[10px] tabular">
-              {row.post_id_short ?? row.post_id}
+              {row.post_id_short ?? row.post_id ?? `Row #${row.id}`}
             </span>
-            <span
-              className="tabular text-[0.66rem] text-text-tertiary"
-              title="Collab ID — groups all deliverables of this collaboration"
-            >
-              {collabIdLabel(row)}
-            </span>
+            {onboarded && (
+              <span
+                className="tabular text-[0.66rem] text-text-tertiary"
+                title="Collab ID — groups all deliverables of this collaboration"
+              >
+                {collabIdLabel(row)}
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -821,13 +846,15 @@ function OnboardingOverviewModal({
               <WorkflowStatusPill status={row.workflow_status} />
             </div>
             <div className="ob-overview-pills">
-              <DeliverablesChip r={row} rows={rows} />
-              <span
-                className="campaign-chip tabular"
-                title="Collab ID — groups all deliverables of this collaboration"
-              >
-                {collabIdLabel(row)}
-              </span>
+              {onboarded && <DeliverablesChip r={row} rows={rows} />}
+              {onboarded && (
+                <span
+                  className="campaign-chip tabular"
+                  title="Collab ID — groups all deliverables of this collaboration"
+                >
+                  {collabIdLabel(row)}
+                </span>
+              )}
               <span className="campaign-chip">
                 {row.campaign?.campaign_id ?? "—"}
               </span>
@@ -844,6 +871,8 @@ function OnboardingOverviewModal({
             </div>
           </section>
 
+          {!onboarded && <ReachOutOverviewDetails row={row} />}
+          {onboarded && (
           <section className="ob-overview-grid">
             <OverviewItem label="Post ID" value={row.post_id} mono />
             <OverviewItem label="Collab ID" value={collabIdLabel(row)} mono />
@@ -963,8 +992,9 @@ function OnboardingOverviewModal({
               value={row.content_type ?? "—"}
             />
           </section>
+          )}
 
-          {isMulti && (
+          {onboarded && isMulti && (
             <section className="mt-3">
               <div className="mb-2 flex items-center gap-2 text-[0.78rem] text-text-secondary">
                 <Layers size={13} aria-hidden />
@@ -1046,17 +1076,15 @@ function OnboardingOverviewModal({
               View Order
             </a>
           )}
-          {isOnboarded(row) && (
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => setEditOpen(true)}
-              title="Edit this onboarding (held for admin approval)"
-            >
-              <Pencil size={14} aria-hidden />
-              Edit Onboarding
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setEditOpen(true)}
+            title={`Edit this ${onboarded ? "onboarding" : "reach-out"} (held for admin approval)`}
+          >
+            <Pencil size={14} aria-hidden />
+            {onboarded ? "Edit Onboarding" : "Edit Reach Out"}
+          </button>
           {canSendEmail && (
             <button
               type="button"
@@ -1076,12 +1104,58 @@ function OnboardingOverviewModal({
       </div>
       {editOpen && (
         <OnboardingEditModal
-          collabId={collabIdLabel(row)}
+          rowId={row.id}
           onClose={() => setEditOpen(false)}
         />
       )}
     </div>,
     document.body,
+  );
+}
+
+function ReachOutOverviewDetails({ row }: { row: OnboardingRow }) {
+  return (
+    <section className="ob-overview-grid">
+      <OverviewItem
+        label="Campaign"
+        value={
+          row.campaign?.campaign_name
+            ? `${row.campaign.campaign_id} — ${row.campaign.campaign_name}`
+            : row.campaign?.campaign_id ?? "—"
+        }
+      />
+      <OverviewItem label="Content Type" value={row.content_type ?? "—"} />
+      <OverviewItem
+        label="Reached Out By"
+        value={firstNonEmptyString(row.logged_by, row.onboarded_by) || "—"}
+      />
+      <OverviewItem label="Reach Out Date" value={formatDate(row.reach_out_date) ?? "—"} mono />
+      <OverviewItem
+        label="Direction"
+        value={row.reachout_direction ? `${row.reachout_direction[0].toUpperCase()}${row.reachout_direction.slice(1)}` : "—"}
+      />
+      <OverviewItem label="Creator ID" value={row.inf_id ?? "—"} mono />
+      <OverviewItem
+        label="Instagram"
+        value={
+          row.creator?.instagram_link ? (
+            <a className="ob-order-link" href={row.creator.instagram_link} target="_blank" rel="noopener noreferrer">
+              @{row.creator.username}
+              <ExternalLink size={11} aria-hidden />
+            </a>
+          ) : (
+            `@${row.creator?.username ?? "—"}`
+          )
+        }
+      />
+      <OverviewItem label="Followers" value={formatFollowers(row.creator?.followers)} mono />
+      <OverviewItem label="Tier" value={row.creator?.category ?? "—"} />
+      <OverviewItem label="Gender" value={row.creator?.gender ?? "—"} />
+      <OverviewItem label="Verification" value={row.creator?.verification ?? "—"} />
+      <OverviewItem label="Language" value={row.creator?.language ?? "—"} />
+      <OverviewItem label="Engagement Rate" value={row.creator?.er != null ? `${row.creator.er}%` : "—"} mono />
+      <OverviewItem label="Average Likes" value={row.creator?.avg_likes != null ? Number(row.creator.avg_likes).toLocaleString("en-IN") : "—"} mono />
+    </section>
   );
 }
 

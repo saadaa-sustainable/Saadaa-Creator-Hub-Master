@@ -102,6 +102,17 @@ export default function OnboardingKM() {
             Pencil-to-Send icon swaps once email is queued.
           </li>
           <li>
+            <strong>Overview + assignment corrections</strong> · Reach Out
+            rows expose their full details and an <KMCode>Edit Reach Out</KMCode>
+            action; submitted rows expose <KMCode>Edit Onboarding</KMCode>.
+            Campaign and Content Type corrections go through Approvals and move
+            the existing row/collab only after approval. Both edit modes require
+            a reason, shown with the Before/After diff. The normal new
+            reach-out duplicate and 30-day rules stay unchanged. Corrections
+            exclude only their own rows, so separate conflicts still block;
+            submitted moves also recheck the destination campaign cap.
+          </li>
+          <li>
             <strong>Unified Save &amp; Review Email</strong> · the form&apos;s
             single primary button saves the onboarding, then opens the collab
             email preview inline in the same modal — edit, then{" "}

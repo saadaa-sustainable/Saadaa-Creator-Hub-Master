@@ -34,6 +34,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-07-22 | **Approval-backed Reach Out and onboarding assignment corrections** — Onboarding Overview/Edit actions can change Campaign and Content Type on the existing record, with approval diffs, shared duplicate/cooldown enforcement, destination cap validation, and brief/nomenclature updates | 06, 07 |
 | 2026-07-22 | **Daily changelog made fire-once** — midnight IST remains the primary send; report-date delivery claims block duplicate cron/manual emails, while a silent 00:10 fallback retries only failed/missed attempts | 09 |
 | 2026-07-22 | **Reach-out owner attribution repaired** — moved 1,078 live Reach Out owners from the wrong `onboarded_by` column into `logged_by`, corrected the production `submit_reachout` RPC, and made Onboarding list/card labels and team options blank-safe | 04, 06, 07 |
 | 2026-07-22 | **Stage-specific attribution and click-through history** — Funnel/Internal/Dashboard/Journey/Team Rows use stage owners and event dates; counter chips open the matching Reach Out/Onboard/Posted history; Onboarding shows Reach Out By in both views | 06, 07 |

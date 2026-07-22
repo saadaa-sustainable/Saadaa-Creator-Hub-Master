@@ -5,6 +5,8 @@
  */
 
 export const EDITABLE_FIELDS = [
+  "campaign_id",
+  "content_type",
   "order_id",
   "collab_type",
   "commercial_amount",
@@ -18,6 +20,8 @@ export type OnboardingEditField = (typeof EDITABLE_FIELDS)[number];
 
 export const ONBOARDING_EDIT_FIELD_LABELS: Record<OnboardingEditField, string> =
   {
+    campaign_id: "Campaign",
+    content_type: "Content Type",
     order_id: "Order ID",
     collab_type: "Collab Type",
     commercial_amount: "Commercials (₹)",
@@ -53,13 +57,18 @@ export const EDIT_ADS_USAGE_OPTIONS = [
 ] as const;
 
 export interface OnboardingEditForm {
-  collabId: string;
+  kind: "reachout" | "onboarding";
+  rowId: number | null;
+  rowIds: number[];
+  collabId: string | null;
+  entityLabel: string;
   postId: string;
   infId: string | null;
   creatorName: string | null;
   username: string | null;
   campaignId: string | null;
   deliverables: number;
+  campaigns: Array<{ value: string; label: string }>;
   values: Record<OnboardingEditField, string>;
   pending: boolean;
 }
@@ -67,10 +76,16 @@ export interface OnboardingEditForm {
 /** A pending onboarding edit as rendered in the Approvals queue. */
 export interface OnboardingEditItem {
   id: number;
+  kind: "reachout" | "onboarding";
   collabId: string;
   creator: string | null;
   requestedBy: string | null;
   reason: string | null;
   createdAt: string | null;
-  changes: Array<{ field: string; label: string; before: string; after: string }>;
+  changes: Array<{
+    field: string;
+    label: string;
+    before: string;
+    after: string;
+  }>;
 }

@@ -969,7 +969,7 @@ function OnboardingEditCard({
       }
       toast.success(
         decision === "approve"
-          ? `${e.collabId} edit approved & applied — posting unblocked.`
+          ? `${e.collabId} edit approved and applied${e.kind === "onboarding" ? " — posting unblocked" : ""}.`
           : `${e.collabId} edit rejected.`,
       );
       router.refresh();
@@ -995,7 +995,7 @@ function OnboardingEditCard({
             </span>
           </div>
           <div className="text-[0.66rem] text-text-secondary truncate">
-            {e.creator ?? "—"}
+            {e.kind === "reachout" ? "Reach Out Edit" : "Onboarding Edit"} · {e.creator ?? "—"}
             {e.requestedBy ? ` · by ${e.requestedBy}` : ""}
           </div>
         </div>
@@ -1202,6 +1202,7 @@ function HistoryRow({ item }: { item: ApprovalHistoryItem }) {
     getApprovalHistoryDetail({
       actionType: item.actionType,
       entityId: item.entityId,
+      requestId: item.requestId,
     }).then((res) => {
       setLoading(false);
       setDetail(res.ok ? res.detail : fallbackDetail());
@@ -1380,8 +1381,10 @@ function HistoryDetailModal({
         <header className="modal-head shrink-0">
           <div className="min-w-0">
             <h2 className="font-semibold">
-              {detail.kind === "onboarding_edit"
-                ? "Onboarding Edit"
+              {detail.kind === "reachout_edit"
+                ? "Reach Out Edit"
+                : detail.kind === "onboarding_edit"
+                  ? "Onboarding Edit"
                 : detail.kind === "campaign_edit"
                   ? "Campaign Edit"
                   : detail.kind === "budget"

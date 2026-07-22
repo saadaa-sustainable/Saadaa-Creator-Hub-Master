@@ -4,12 +4,15 @@ import { after } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { assertPermission } from "@/lib/rbac.server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { isOnboardedActive } from "@/lib/workflow";
 import {
   NOTIFICATION_TYPES,
   resolveGlobalAdminEmails,
   sendNotification,
   wrapNotificationHtml,
 } from "@/lib/notifications";
+import { checkReachoutAllowed } from "@/features/reach-out/guards";
+import { CONTENT_CODES } from "@/features/reach-out/content-codes";
 import {
   EDITABLE_FIELDS,
   ONBOARDING_EDIT_DIFF_LABELS,
@@ -30,58 +33,131 @@ import {
  * discarded. Field constants + types live in ./edit-fields (client-safe).
  */
 
+type EditTarget = { collabId?: string; rowId?: number };
+
+const reachoutRequestKey = (rowId: number) => `reachout:${rowId}`;
+const legacyOnboardingRequestKey = (rowId: number) => `legacy:${rowId}`;
+
 export async function getOnboardingEditForm(
-  collabId: string,
-): Promise<{ ok: true; form: OnboardingEditForm } | { ok: false; error: string }> {
+  target: EditTarget,
+): Promise<
+  { ok: true; form: OnboardingEditForm } | { ok: false; error: string }
+> {
   await assertPermission("onboarding_write");
-  const cid = collabId.trim();
-  if (!cid) return { ok: false, error: "Collab ID missing" };
+  const cid = (target.collabId ?? "").trim();
+  const rowId = Number(target.rowId ?? 0);
+  if (rowId <= 0 && !cid)
+    return { ok: false, error: "Collab ID missing" };
 
   const supabase = createServiceClient();
-  const { data: rows, error } = await (supabase as any)
+  const columns =
+    "id, post_id, inf_id, username, campaign_id, content_type, workflow_status, order_id, collab_type, commercial_amount, ads_usage_rights, est_delivery, bank_name, bank_number, ifsc, collab_id, collab_number";
+  let seed: Record<string, any> | null = null;
+  if (rowId > 0) {
+    const { data, error } = await (supabase as any)
+      .from("posts")
+      .select(columns)
+      .eq("id", rowId)
+      .maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    seed = data;
+    if (!seed)
+      return { ok: false, error: `Onboarding row ${rowId} not found` };
+  }
+  const kind = seed?.workflow_status === "Reach Out" ? "reachout" : "onboarding";
+  let rowsQuery = (supabase as any)
     .from("posts")
-    .select(
-      "post_id, inf_id, username, campaign_id, order_id, collab_type, commercial_amount, ads_usage_rights, est_delivery, bank_name, bank_number, ifsc, collab_id, collab_number",
-    )
-    .eq("collab_id", cid)
-    .order("post_id", { ascending: true });
+    .select(columns);
+  if (kind === "reachout") rowsQuery = rowsQuery.eq("id", rowId);
+  else if (seed?.collab_id) rowsQuery = rowsQuery.eq("collab_id", seed.collab_id);
+  else if (seed?.inf_id && seed.collab_number != null)
+    rowsQuery = rowsQuery
+      .eq("inf_id", seed.inf_id)
+      .eq("collab_number", seed.collab_number)
+      .is("collab_id", null);
+  else if (seed) rowsQuery = rowsQuery.eq("id", seed.id);
+  else rowsQuery = rowsQuery.eq("collab_id", cid);
+  rowsQuery = rowsQuery.order("post_id", { ascending: true });
+  const { data: rows, error } = await rowsQuery;
   if (error) return { ok: false, error: error.message };
   const list = (rows ?? []) as Array<Record<string, any>>;
-  if (!list.length) return { ok: false, error: `Collab ${cid} not found` };
+  if (!list.length)
+    return {
+      ok: false,
+      error:
+        kind === "reachout"
+          ? `Reach-out row ${rowId} not found`
+          : `Onboarding ${cid || rowId} not found`,
+    };
   const rep = list[0];
+  if (kind === "reachout" && rep.workflow_status !== "Reach Out") {
+    return { ok: false, error: "This row has already been onboarded." };
+  }
+  const requestKey =
+    kind === "reachout"
+      ? reachoutRequestKey(rep.id)
+      : rep.collab_id || legacyOnboardingRequestKey(rep.id);
+  const entityLabel =
+    kind === "reachout"
+      ? `Reach Out #${rep.id}`
+      : rep.collab_id ||
+        (rep.inf_id && rep.collab_number != null
+          ? `${rep.inf_id}-C${rep.collab_number}`
+          : rep.post_id || `Onboarding #${rep.id}`);
 
-  const [{ data: creator }, { data: pendingReq }] = await Promise.all([
-    rep.inf_id
-      ? (supabase as any)
-          .from("creators")
-          .select("inf_name, username")
-          .eq("inf_id", rep.inf_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    (supabase as any)
-      .from("onboarding_edit_requests")
-      .select("id")
-      .eq("collab_id", cid)
-      .eq("status", "Pending Approval")
-      .maybeSingle(),
-  ]);
+  const [{ data: creator }, { data: pendingReq }, { data: campaigns }] =
+    await Promise.all([
+      rep.inf_id
+        ? (supabase as any)
+            .from("creators")
+            .select("inf_name, username")
+            .eq("inf_id", rep.inf_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      (supabase as any)
+        .from("onboarding_edit_requests")
+        .select("id")
+        .eq("collab_id", requestKey)
+        .eq("status", "Pending Approval")
+        .maybeSingle(),
+      (supabase as any)
+        .from("campaigns")
+        .select("campaign_id, campaign_name, status")
+        .order("campaign_id", { ascending: false }),
+    ]);
 
-  const total = list.reduce(
-    (s, r) => s + Number(r.commercial_amount ?? 0),
-    0,
-  );
+  const total = list.reduce((s, r) => s + Number(r.commercial_amount ?? 0), 0);
 
   return {
     ok: true,
     form: {
-      collabId: cid,
+      kind,
+      rowId: rep.id,
+      rowIds: list.map((row) => Number(row.id)).filter((id) => id > 0),
+      collabId: kind === "onboarding" ? rep.collab_id : null,
+      entityLabel,
       postId: String(rep.post_id ?? ""),
       infId: rep.inf_id ?? null,
       creatorName: creator?.inf_name ?? null,
       username: rep.username ?? creator?.username ?? null,
       campaignId: rep.campaign_id ?? null,
       deliverables: list.length,
+      campaigns: ((campaigns ?? []) as Array<Record<string, unknown>>)
+        .filter(
+          (campaign) =>
+            String(campaign.status ?? "").toLowerCase() === "active" ||
+            campaign.campaign_id === rep.campaign_id,
+        )
+        .map((campaign) => ({
+          value: String(campaign.campaign_id ?? ""),
+          label: campaign.campaign_name
+            ? `${campaign.campaign_id} — ${campaign.campaign_name}`
+            : String(campaign.campaign_id ?? ""),
+        }))
+        .filter((campaign) => campaign.value),
       values: {
+        campaign_id: String(rep.campaign_id ?? ""),
+        content_type: String(rep.content_type ?? ""),
         order_id: String(rep.order_id ?? ""),
         collab_type: String(rep.collab_type ?? ""),
         commercial_amount: String(total),
@@ -111,7 +187,9 @@ export interface EditOrderPreview {
 /** Fetch a Shopify order's details for the Edit modal's Fetch button preview. */
 export async function fetchOrderForEdit(
   orderId: string,
-): Promise<{ ok: true; order: EditOrderPreview } | { ok: false; error: string }> {
+): Promise<
+  { ok: true; order: EditOrderPreview } | { ok: false; error: string }
+> {
   await assertPermission("onboarding_write");
   const id = orderId.trim();
   if (!id) return { ok: false, error: "Enter an order id" };
@@ -145,24 +223,111 @@ export async function fetchOrderForEdit(
   };
 }
 
+async function validateAssignmentChange(
+  supabase: any,
+  form: OnboardingEditForm,
+  nextCampaignId: string,
+): Promise<string | null> {
+  if (nextCampaignId === form.values.campaign_id) return null;
+
+  const { data: campaign, error: campaignError } = await supabase
+    .from("campaigns")
+    .select("status")
+    .eq("campaign_id", nextCampaignId)
+    .maybeSingle();
+  if (campaignError)
+    return "Campaign eligibility could not be verified. Try again.";
+  if (String(campaign?.status ?? "").toLowerCase() !== "active") {
+    return `Campaign ${nextCampaignId} is not active. Select an approved active campaign.`;
+  }
+
+  const { data: targetRows, error: targetError } = await supabase
+    .from("posts")
+    .select("id, username")
+    .in("id", form.rowIds);
+  if (targetError || !targetRows?.length)
+    return "The record could not be verified. Refresh and try again.";
+
+  const username = String(targetRows[0]?.username ?? form.username ?? "")
+    .trim()
+    .toLowerCase();
+  if (!username) return "Creator identity could not be verified.";
+
+  const duplicate = await checkReachoutAllowed(
+    supabase,
+    username,
+    nextCampaignId,
+    {
+      excludeRowIds: targetRows.map((row: { id: number }) => row.id),
+    },
+  );
+  if (duplicate) return duplicate.error;
+
+  if (form.kind === "reachout") return null;
+
+  const [capRes, onboardedRes] = await Promise.all([
+    supabase
+      .from("campaign_budget")
+      .select("num_influencers")
+      .eq("campaign_id", nextCampaignId),
+    supabase
+      .from("posts")
+      .select("username, workflow_status")
+      .eq("campaign_id", nextCampaignId)
+      .limit(10_000),
+  ]);
+  if (capRes.error || onboardedRes.error)
+    return "Campaign capacity could not be verified. Try again.";
+
+  const cap = (
+    (capRes.data ?? []) as Array<{ num_influencers: number | null }>
+  ).reduce((sum, row) => sum + (Number(row.num_influencers ?? 0) || 0), 0);
+  if (cap <= 0) return null;
+
+  const onboarded = new Set(
+    (
+      (onboardedRes.data ?? []) as Array<{
+        username: string | null;
+        workflow_status: string | null;
+      }>
+    )
+      .filter((row) => isOnboardedActive(row.workflow_status))
+      .map((row) =>
+        String(row.username ?? "")
+          .trim()
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+  if (!onboarded.has(username) && onboarded.size >= cap) {
+    return `Campaign ${nextCampaignId} is at its onboarding cap (${onboarded.size}/${cap}). Raise its allocation or free a slot before approving this move.`;
+  }
+  return null;
+}
+
 export async function submitOnboardingEdit(input: {
-  collabId: string;
+  collabId?: string;
+  rowId?: number;
   reason: string;
   values: Partial<Record<OnboardingEditField, string>>;
 }): Promise<{ ok: boolean; error?: string }> {
   const actor = await assertPermission("onboarding_write");
   const cid = (input.collabId ?? "").trim();
-  if (!cid) return { ok: false, error: "Collab ID missing" };
+  const rowId = Number(input.rowId ?? 0);
+  if (!cid && rowId <= 0) return { ok: false, error: "Edit target missing" };
   const reason = (input.reason ?? "").trim();
   if (reason.length < 5)
-    return { ok: false, error: "Add a short reason for the edit (min 5 chars)." };
+    return {
+      ok: false,
+      error: "Add a short reason for the edit (min 5 chars).",
+    };
 
-  const cur = await getOnboardingEditForm(cid);
+  const cur = await getOnboardingEditForm({ collabId: cid, rowId });
   if (!cur.ok) return { ok: false, error: cur.error };
   if (cur.form.pending)
     return {
       ok: false,
-      error: "This collab already has an edit awaiting approval.",
+      error: "This record already has an edit awaiting approval.",
     };
 
   const before = cur.form.values;
@@ -173,14 +338,35 @@ export async function submitOnboardingEdit(input: {
     afterVals[f] = nv;
     if (nv !== String(before[f] ?? "").trim()) changed.push(f);
   }
-  if (changed.length === 0) return { ok: false, error: "No changes to submit." };
+  if (changed.length === 0)
+    return { ok: false, error: "No changes to submit." };
+  if (!afterVals.campaign_id)
+    return { ok: false, error: "Campaign is required." };
+  if (!afterVals.content_type)
+    return { ok: false, error: "Content type is required." };
+  if (
+    afterVals.content_type !== before.content_type &&
+    !CONTENT_CODES.some((content) => content.code === afterVals.content_type)
+  )
+    return { ok: false, error: "Select a valid content type." };
 
   const supabase = createServiceClient();
+  const assignmentError = await validateAssignmentChange(
+    supabase,
+    cur.form,
+    afterVals.campaign_id,
+  );
+  if (assignmentError) return { ok: false, error: assignmentError };
+
+  const requestKey =
+    cur.form.kind === "reachout"
+      ? reachoutRequestKey(cur.form.rowId!)
+      : cur.form.collabId ?? legacyOnboardingRequestKey(cur.form.rowId!);
   const { error } = await (supabase as any)
     .from("onboarding_edit_requests")
     .insert({
-      collab_id: cid,
-      post_id: cur.form.postId,
+      collab_id: requestKey,
+      post_id: cur.form.postId || null,
       inf_id: cur.form.infId,
       requested_by: actor.email ?? null,
       requested_by_name: actor.name ?? actor.email ?? null,
@@ -196,18 +382,25 @@ export async function submitOnboardingEdit(input: {
     return {
       ok: false,
       error: dup
-        ? "This collab already has an edit awaiting approval."
+        ? "This record already has an edit awaiting approval."
         : error.message,
     };
   }
 
-  revalidatePath("/approvals");  revalidateTag("approvals-count");
+  revalidatePath("/approvals");
+  revalidateTag("approvals-count");
   revalidatePath("/onboarding");
 
   // Notify global admins (best-effort, after the response).
   const summary = {
-    collabId: cid,
-    creator: cur.form.creatorName ?? cur.form.username ?? cur.form.infId ?? cid,
+    kind: cur.form.kind,
+    requestKey,
+    entityLabel: cur.form.entityLabel,
+    creator:
+      cur.form.creatorName ??
+      cur.form.username ??
+      cur.form.infId ??
+      cur.form.entityLabel,
     requester: actor.name ?? actor.email ?? "a team member",
     reason,
     changed: changed.map((f) => ({
@@ -230,9 +423,9 @@ export async function submitOnboardingEdit(input: {
       )
       .join("");
     const bodyHtml = `
-      <p style="margin:0 0 12px;">An onboarding edit needs your approval before it applies. Posting for this collab is blocked until you decide.</p>
+      <p style="margin:0 0 12px;">A ${summary.kind === "reachout" ? "reach-out" : "onboarding"} edit needs your approval before it applies.${summary.kind === "onboarding" ? " Posting for this collab is blocked until you decide." : ""}</p>
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin:0 0 12px;">
-        <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;font-weight:800;width:34%;">Collab ID</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;" colspan="2">${esc(summary.collabId)}</td></tr>
+        <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;font-weight:800;width:34%;">Record</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;" colspan="2">${esc(summary.entityLabel)}</td></tr>
         <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">Creator</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;" colspan="2">${esc(summary.creator)}</td></tr>
         <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">Requested by</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;" colspan="2">${esc(summary.requester)}</td></tr>
         <tr><td style="padding:6px 10px;background:#F5F1EC;border:1px solid #E7E2D2;border-top:0;font-weight:800;">Reason</td><td style="padding:6px 10px;border:1px solid #E7E2D2;border-left:0;border-top:0;" colspan="2">${esc(summary.reason)}</td></tr>
@@ -245,144 +438,27 @@ export async function submitOnboardingEdit(input: {
     await sendNotification({
       type: NOTIFICATION_TYPES.CAMPAIGN_CREATED,
       to: admins,
-      subject: `Onboarding edit needs approval — ${summary.collabId}`,
-      title: "Onboarding Edit — Approval Needed",
-      subtitle: `Collab ID: ${summary.collabId}`,
+      subject: `${summary.kind === "reachout" ? "Reach-out" : "Onboarding"} edit needs approval — ${summary.entityLabel}`,
+      title: `${summary.kind === "reachout" ? "Reach-out" : "Onboarding"} Edit — Approval Needed`,
+      subtitle: summary.entityLabel,
       htmlBody: wrapNotificationHtml({
-        title: "Onboarding Edit — Approval Needed",
-        subtitle: `Collab ID: ${summary.collabId}`,
+        title: `${summary.kind === "reachout" ? "Reach-out" : "Onboarding"} Edit — Approval Needed`,
+        subtitle: summary.entityLabel,
         bodyHtml,
       }),
       wrap: false,
-      collabId: summary.collabId,
+      collabId: summary.kind === "onboarding" ? summary.requestKey : null,
     });
   });
 
   return { ok: true };
 }
 
-async function applyOnboardingEdit(
-  supabase: any,
-  req: Record<string, any>,
-): Promise<void> {
-  const cid = String(req.collab_id);
-  const after = (req.after ?? {}) as Record<string, string>;
-  const before = (req.before ?? {}) as Record<string, string>;
-
-  const { data: sibs } = await supabase
-    .from("posts")
-    .select("post_id")
-    .eq("collab_id", cid);
-  const sibList = (sibs ?? []) as Array<{ post_id: string }>;
-  const count = sibList.length || 1;
-  const total = Number(after.commercial_amount ?? 0);
-  const split = count > 0 ? total / count : total;
-
-  // Collab-level fields — applied to EVERY deliverable of the collab.
-  const patch: Record<string, unknown> = {
-    order_id: after.order_id || null,
-    collab_type: after.collab_type || null,
-    ads_usage_rights: after.ads_usage_rights || null,
-    est_delivery: after.est_delivery || null,
-    bank_name: after.bank_name || null,
-    bank_number: after.bank_number || null,
-    ifsc: after.ifsc || null,
-    commercial_amount: split,
-  };
-
-  // If the order id changed, re-derive ALL order details from the new order and
-  // apply them to every deliverable (email, tracking, products, state/city).
-  if (after.order_id && after.order_id !== (before.order_id ?? "")) {
-    let { data: ord } = await supabase
-      .from("shopify_orders")
-      .select("email, tracking_id, garments_sent, address, fulfillment")
-      .eq("order_id", after.order_id)
-      .maybeSingle();
-    // Fresh order the 3-hr bulk sync hasn't picked up yet → pull it live
-    // (same on-demand path the onboarding submit uses). Without this the
-    // edit would apply with no order data and the Expected budget would
-    // count ₹0 order value for the collab until the next cron.
-    if (
-      !ord &&
-      process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.SUPABASE_SERVICE_KEY
-    ) {
-      try {
-        await fetch(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/sync-shopify-orders?order_id=${encodeURIComponent(after.order_id)}`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`,
-              apikey: process.env.SUPABASE_SERVICE_KEY,
-              "Content-Type": "application/json",
-            },
-          },
-        );
-        const retry = await supabase
-          .from("shopify_orders")
-          .select("email, tracking_id, garments_sent, address, fulfillment")
-          .eq("order_id", after.order_id)
-          .maybeSingle();
-        ord = retry.data;
-      } catch (err) {
-        console.error("[onboarding-edit] on-demand Shopify pull failed:", err);
-      }
-    }
-    if (ord) {
-      if (ord.email != null) patch.email = ord.email;
-      if (ord.tracking_id != null) patch.tracking_id = ord.tracking_id;
-      if (ord.garments_sent != null) patch.garments_sent = ord.garments_sent;
-      if (ord.fulfillment != null) patch.order_status = ord.fulfillment;
-      const parsed = deriveStateCity(String(ord.address ?? ""));
-      if (parsed.state) patch.state = parsed.state;
-      if (parsed.city) patch.city = parsed.city;
-
-      // Capture the ORDER-LEVEL impact into the request's before/after so the
-      // approval card + history popup show everything the new order changed on
-      // the posts row — not just the Order ID itself.
-      const { data: repRow } = await supabase
-        .from("posts")
-        .select("email, tracking_id, garments_sent, order_status, state, city")
-        .eq("collab_id", cid)
-        .limit(1)
-        .maybeSingle();
-      const prev = (repRow ?? {}) as Record<string, unknown>;
-      const derivedKeys = [
-        "order_status",
-        "tracking_id",
-        "garments_sent",
-        "email",
-        "state",
-        "city",
-      ] as const;
-      const beforePlus: Record<string, string> = { ...before };
-      const afterPlus: Record<string, string> = { ...after };
-      let derivedChanged = false;
-      for (const k of derivedKeys) {
-        const prevV = String(prev[k] ?? "").trim();
-        const nextV =
-          k in patch && patch[k] != null ? String(patch[k]).trim() : prevV;
-        if (prevV !== nextV) {
-          beforePlus[k] = prevV;
-          afterPlus[k] = nextV;
-          derivedChanged = true;
-        }
-      }
-      if (derivedChanged && req.id != null) {
-        await supabase
-          .from("onboarding_edit_requests")
-          .update({ before: beforePlus, after: afterPlus })
-          .eq("id", req.id);
-      }
-    }
-  }
-
-  await supabase.from("posts").update(patch).eq("collab_id", cid);
-}
-
 /** Light state/city extraction from a Shopify India address tail "…, City, State, Pincode, Country". */
-function deriveStateCity(addr: string): { state: string | null; city: string | null } {
+function deriveStateCity(addr: string): {
+  state: string | null;
+  city: string | null;
+} {
   const parts = addr
     .split(",")
     .map((p) => p.trim())
@@ -414,30 +490,68 @@ export async function decideOnboardingEdit(
   if (!req)
     return { ok: false, error: "Request not found or already decided." };
 
-  if (decision === "approve") {
-    await applyOnboardingEdit(supabase, req);
+  const derivedBefore: Record<string, string> = {};
+  const derivedAfter: Record<string, string> = {};
+  const before = (req.before ?? {}) as Record<string, string>;
+  const afterValues = (req.after ?? {}) as Record<string, string>;
+  if (
+    decision === "approve" &&
+    !String(req.collab_id).startsWith("reachout:") &&
+    afterValues.order_id &&
+    afterValues.order_id !== before.order_id
+  ) {
+    const [{ data: order }, { data: current }] = await Promise.all([
+      (supabase as any)
+        .from("shopify_orders")
+        .select("email, tracking_id, garments_sent, address, fulfillment")
+        .eq("order_id", afterValues.order_id)
+        .maybeSingle(),
+      (supabase as any)
+        .from("posts")
+        .select("email, tracking_id, garments_sent, order_status, state, city")
+        .eq("post_id", req.post_id)
+        .maybeSingle(),
+    ]);
+    if (!order)
+      return {
+        ok: false,
+        error: `Order ${afterValues.order_id} is no longer available in synced Shopify orders.`,
+      };
+    const parsed = deriveStateCity(String(order.address ?? ""));
+    const next = {
+      email: order.email,
+      tracking_id: order.tracking_id,
+      garments_sent: order.garments_sent,
+      order_status: order.fulfillment,
+      state: parsed.state,
+      city: parsed.city,
+    };
+    for (const [key, value] of Object.entries(next)) {
+      const previous = String(current?.[key] ?? "").trim();
+      const incoming = String(value ?? "").trim();
+      if (previous !== incoming) {
+        derivedBefore[key] = previous;
+        derivedAfter[key] = incoming;
+      }
+    }
   }
 
-  await (supabase as any)
-    .from("onboarding_edit_requests")
-    .update({
-      status: decision === "approve" ? "Approved" : "Rejected",
-      decided_by: actor.email ?? null,
-      decided_by_name: actor.name ?? actor.email ?? null,
-      decided_at: new Date().toISOString(),
-    })
-    .eq("id", id);
+  const { error: decisionError } = await (supabase as any).rpc(
+    "decide_onboarding_edit_request",
+    {
+      p_request_id: id,
+      p_decision: decision,
+      p_admin_email: actor.email ?? null,
+      p_admin_name: actor.name ?? actor.email ?? null,
+      p_note: note?.trim() || null,
+      p_derived_before: derivedBefore,
+      p_derived_after: derivedAfter,
+    },
+  );
+  if (decisionError) return { ok: false, error: decisionError.message };
 
-  await (supabase as any).from("approval_logs").insert({
-    action_type: "onboarding_edit",
-    action: decision === "approve" ? "Approved" : "Rejected",
-    entity_id: String(req.collab_id),
-    admin_email: actor.email ?? null,
-    admin_name: actor.name ?? actor.email ?? null,
-    notes: note?.trim() || req.reason || null,
-  });
-
-  revalidatePath("/approvals");  revalidateTag("approvals-count");
+  revalidatePath("/approvals");
+  revalidateTag("approvals-count");
   revalidatePath("/onboarding");
   revalidateTag("posts");
   // Commercial / order-id edits move the Expected budget the moment they're
@@ -445,5 +559,9 @@ export async function decideOnboardingEdit(
   revalidatePath("/budget");
   revalidatePath("/cost-analytics");
   revalidatePath("/dashboard");
+  revalidatePath("/campaigns");
+  revalidatePath("/journey");
+  revalidatePath("/reach-out/outbound");
+  revalidatePath("/reach-out/inbound");
   return { ok: true };
 }

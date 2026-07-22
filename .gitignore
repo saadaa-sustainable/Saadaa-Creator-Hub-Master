@@ -36,6 +36,7 @@ coverage/
 
 # Cache
 .cache/
+supabase/.temp/
 
 # one-off PII export (creator emails) — never commit
 historic_posted_no_order_*.csv

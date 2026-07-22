@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { CONTENT_CODES } from "@/features/reach-out/content-codes";
 import {
   fetchOrderForEdit,
   getOnboardingEditForm,
@@ -44,15 +45,19 @@ import {
  */
 export function OnboardingEditModal({
   collabId,
+  rowId,
   onClose,
 }: {
-  collabId: string;
+  collabId?: string;
+  rowId?: number;
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
   const [form, setForm] = useState<OnboardingEditForm | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [values, setValues] = useState<Record<OnboardingEditField, string>>({
+    campaign_id: "",
+    content_type: "",
     order_id: "",
     collab_type: "",
     commercial_amount: "",
@@ -78,7 +83,7 @@ export function OnboardingEditModal({
   }, [onClose]);
   useEffect(() => {
     let alive = true;
-    getOnboardingEditForm(collabId).then((res) => {
+    getOnboardingEditForm({ collabId, rowId }).then((res) => {
       if (!alive) return;
       if (!res.ok) {
         setLoadErr(res.error);
@@ -90,7 +95,7 @@ export function OnboardingEditModal({
     return () => {
       alive = false;
     };
-  }, [collabId]);
+  }, [collabId, rowId]);
 
   const set = (k: OnboardingEditField, v: string) =>
     setValues((prev) => ({ ...prev, [k]: v }));
@@ -133,7 +138,7 @@ export function OnboardingEditModal({
       return;
     }
     setSaving(true);
-    submitOnboardingEdit({ collabId, reason, values }).then((res) => {
+    submitOnboardingEdit({ collabId, rowId, reason, values }).then((res) => {
       setSaving(false);
       if (!res.ok) {
         toast.error(res.error ?? "Could not submit the edit");
@@ -151,7 +156,7 @@ export function OnboardingEditModal({
       className="modal-backdrop modal-backdrop--onboarding"
       role="dialog"
       aria-modal="true"
-      aria-label="Edit onboarding"
+      aria-label="Edit assignment"
       onClick={onClose}
     >
       <div
@@ -162,9 +167,11 @@ export function OnboardingEditModal({
           <div className="flex items-center gap-2 min-w-0">
             <Pencil size={16} aria-hidden />
             <div className="min-w-0">
-              <h2 className="font-semibold">Edit Onboarding</h2>
+              <h2 className="font-semibold">
+                {form?.kind === "reachout" ? "Edit Reach Out" : "Edit Onboarding"}
+              </h2>
               <p className="text-[0.62rem] text-text-secondary truncate">
-                {collabId}
+                {form?.entityLabel ?? collabId ?? `Onboarding row #${rowId}`}
                 {form?.creatorName ? ` · ${form.creatorName}` : ""}
               </p>
             </div>
@@ -188,7 +195,7 @@ export function OnboardingEditModal({
           ) : !form ? (
             <div className="flex flex-col items-center justify-center py-10 gap-2 text-text-secondary">
               <Loader2 size={22} className="animate-spin" aria-hidden />
-              <span className="text-sm">Loading onboarding…</span>
+              <span className="text-sm">Loading assignment…</span>
             </div>
           ) : (
             <>
@@ -209,20 +216,58 @@ export function OnboardingEditModal({
               >
                 {form.pending ? (
                   <>
-                    <AlertTriangle size={14} /> This collab already has an edit
+                    <AlertTriangle size={14} /> This record already has an edit
                     awaiting approval. Resolve it in Approvals first.
                   </>
                 ) : (
                   <>
-                    <ShieldCheck size={14} /> Changes are held for admin
-                    approval and applied to all {form.deliverables} deliverable
-                    {form.deliverables === 1 ? "" : "s"} on approve. Posting
-                    stays blocked until then. Changing the Order ID re-pulls
-                    every order detail.
+                    <ShieldCheck size={14} /> Changes are held for admin approval.
+                    {form.kind === "onboarding"
+                      ? ` They apply to all ${form.deliverables} deliverable${form.deliverables === 1 ? "" : "s"}; posting stays blocked until approval.`
+                      : " The selected Reach Out assignment changes only after approval."}
                   </>
                 )}
               </div>
 
+              <section className="ob-form-section">
+                <h5 className="section-title">
+                  <Pencil size={13} className="inline mr-2" />
+                  Assignment
+                </h5>
+                <div className="form-grid">
+                  <div className="form-floating relative">
+                    <SearchableSelect
+                      id="obe_campaign"
+                      value={values.campaign_id}
+                      onChange={(value) => set("campaign_id", value)}
+                      options={form.campaigns}
+                      placeholder="Select campaign…"
+                      searchPlaceholder="Search campaigns…"
+                    />
+                    <label htmlFor="obe_campaign">
+                      Campaign <span className="req">*</span>
+                    </label>
+                  </div>
+                  <div className="form-floating relative">
+                    <SearchableSelect
+                      id="obe_content_type"
+                      value={values.content_type}
+                      onChange={(value) => set("content_type", value)}
+                      options={CONTENT_CODES.map((content) => ({
+                        value: content.code,
+                        label: `${content.code} — ${content.name}`,
+                      }))}
+                      placeholder="Select content type…"
+                      searchPlaceholder="Search content types…"
+                    />
+                    <label htmlFor="obe_content_type">
+                      Content Type <span className="req">*</span>
+                    </label>
+                  </div>
+                </div>
+              </section>
+
+              {form.kind === "onboarding" && <>
               {/* ── Collaboration ── */}
               <section className="ob-form-section">
                 <h5 className="section-title">
@@ -474,6 +519,7 @@ export function OnboardingEditModal({
                   </div>
                 </section>
               )}
+              </>}
 
               {/* ── Reason ── */}
               <section className="ob-form-section">
@@ -488,6 +534,8 @@ export function OnboardingEditModal({
                       id="obe_reason"
                       placeholder=" "
                       rows={2}
+                      required
+                      minLength={5}
                       style={{ minHeight: "4.6rem" }}
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}

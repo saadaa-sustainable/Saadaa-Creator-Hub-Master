@@ -15,7 +15,12 @@ import { buildCampaignChanges } from "./campaign-diff";
  * admin decided on. Opened by clicking the history row.
  */
 export interface ApprovalHistoryDetail {
-  kind: "onboarding_edit" | "campaign_edit" | "budget" | "log_entry";
+  kind:
+    | "reachout_edit"
+    | "onboarding_edit"
+    | "campaign_edit"
+    | "budget"
+    | "log_entry";
   entityId: string;
   status: string | null;
   requestedBy: string | null;
@@ -28,6 +33,7 @@ export interface ApprovalHistoryDetail {
 export async function getApprovalHistoryDetail(input: {
   actionType: string;
   entityId: string;
+  requestId?: string | null;
 }): Promise<
   { ok: true; detail: ApprovalHistoryDetail } | { ok: false; error: string }
 > {
@@ -38,16 +44,23 @@ export async function getApprovalHistoryDetail(input: {
 
   const supabase = createServiceClient() as any;
 
-  if (type.includes("onboarding")) {
-    const { data, error } = await supabase
+  if (type.includes("onboarding") || type.includes("reachout")) {
+    const requestKey = entityId.startsWith("Reach Out #")
+      ? `reachout:${entityId.slice("Reach Out #".length)}`
+      : entityId;
+    let requestQuery = supabase
       .from("onboarding_edit_requests")
       .select(
         "collab_id, status, requested_by_name, requested_by, decided_by_name, decided_by, reason, before, after",
-      )
-      .eq("collab_id", entityId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      );
+    const requestId = Number(input.requestId ?? 0);
+    requestQuery = requestId > 0
+      ? requestQuery.eq("id", requestId)
+      : requestQuery
+          .eq("collab_id", requestKey)
+          .order("created_at", { ascending: false })
+          .limit(1);
+    const { data, error } = await requestQuery.maybeSingle();
     if (error) return { ok: false, error: error.message };
     if (!data)
       return { ok: false, error: "No stored edit found for this collab." };
@@ -65,7 +78,7 @@ export async function getApprovalHistoryDetail(input: {
     return {
       ok: true,
       detail: {
-        kind: "onboarding_edit",
+        kind: type.includes("reachout") ? "reachout_edit" : "onboarding_edit",
         entityId,
         status: data.status ?? null,
         requestedBy: data.requested_by_name ?? data.requested_by ?? null,

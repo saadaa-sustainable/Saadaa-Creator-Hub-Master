@@ -81,6 +81,7 @@ export type ApprovalHistoryStatus =
 
 export interface ApprovalHistoryItem {
   id: string;
+  requestId: string | null;
   actionType: string;
   action: string;
   entityId: string;
@@ -155,7 +156,7 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
     svc
       .from("approval_logs")
       .select(
-        "id, action_type, action, entity_id, admin_email, admin_name, notes, timestamp",
+        "id, action_type, action, entity_id, version_id, admin_email, admin_name, notes, timestamp",
       )
       .order("timestamp", { ascending: false })
       .limit(100),
@@ -358,9 +359,19 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
       }))
       .filter((c) => c.before !== c.after);
     const infId = asString(r.inf_id);
+    const requestKey = String(r.collab_id ?? "");
+    const kind = requestKey.startsWith("reachout:")
+      ? "reachout"
+      : "onboarding";
     return {
       id: asNumber(r.id) ?? 0,
-      collabId: String(r.collab_id ?? ""),
+      kind,
+      collabId:
+        kind === "reachout"
+          ? `Reach Out #${requestKey.slice("reachout:".length)}`
+          : requestKey.startsWith("legacy:")
+            ? `Onboarding #${requestKey.slice("legacy:".length)}`
+            : requestKey,
       creator: (infId && nameByInf.get(infId)) || infId || null,
       requestedBy:
         asString(r.requested_by_name) ?? asString(r.requested_by),
@@ -373,11 +384,15 @@ export async function fetchApprovalQueue(): Promise<ApprovalQueueData> {
   const history: ApprovalHistoryItem[] = ((logs.data ?? []) as Raw[]).map(
     (r) => {
       const action = String(r.action ?? "Changed");
+      const rawEntityId = String(r.entity_id ?? "");
       return {
         id: String(r.id ?? ""),
+        requestId: asString(r.version_id),
         actionType: String(r.action_type ?? "Approval"),
         action,
-        entityId: String(r.entity_id ?? ""),
+        entityId: rawEntityId.startsWith("reachout:")
+          ? `Reach Out #${rawEntityId.slice("reachout:".length)}`
+          : rawEntityId,
         actor:
           asString(r.admin_name) ??
           asString(r.admin_email) ??

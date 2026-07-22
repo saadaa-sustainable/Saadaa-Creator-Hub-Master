@@ -29,8 +29,8 @@ export default function ApprovalsKM() {
             A campaign card stays <strong>locked</strong> (&quot;Approve the
             budget first&quot;) until its V0 budget is approved; rejecting a V0
             rejects the campaign with it. All other approvals (campaign,
-            campaign edits, onboarding edits) belong to the Admins — Global
-            Admins can do those too.
+            campaign edits, Reach Out edits, onboarding edits) belong to the
+            Admins — Global Admins can do those too.
           </li>
         </KMList>
       </KMSection>
@@ -62,16 +62,16 @@ export default function ApprovalsKM() {
             the Campaigns page — and the queue refreshes when you save.
           </li>
           <li>
-            <strong>Edit-request cards</strong> (campaign edits and onboarding
-            edits) — show a <strong>Field / Before / After</strong> table of
-            exactly what changes, so you can decide without opening anything
-            else. Approving applies the new values; rejecting leaves the
-            original untouched.
+            <strong>Edit-request cards</strong> (campaign, Reach Out and
+            onboarding edits) — show a <strong>Field / Before / After</strong>
+            table of exactly what changes, so you can decide without opening
+            anything else. Approving applies the new values; rejecting leaves
+            the original untouched.
           </li>
           <li>
             <strong>Approval History</strong> — every past decision. Clicking a
-            campaign-edit or onboarding-edit row opens a popup with the same
-            Before/After breakdown that was decided on.
+            campaign-edit, Reach-Out-edit or onboarding-edit row opens a popup
+            with the same Before/After breakdown that was decided on.
           </li>
         </KMList>
       </KMSection>

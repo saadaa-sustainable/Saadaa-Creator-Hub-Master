@@ -1,10 +1,5 @@
 import "server-only";
-import { isVoidedStatus } from "@/lib/workflow";
-
-/** A prior collab blocks only while its reach-out is still active. */
-function isActiveReachout(status: string | null): boolean {
-  return String(status ?? "") !== "Cancelled" && !isVoidedStatus(status);
-}
+import { reachoutConflict, type ReachoutEligibilityRow } from "./eligibility";
 
 /** Reach-out cooldown: at most one active reach-out per creator per N days. */
 export const REACHOUT_COOLDOWN_DAYS = 30;
@@ -34,6 +29,7 @@ export async function checkReachoutAllowed(
   supabase: any,
   username: string,
   campaignId: string,
+  options?: { excludeRowIds?: number[] },
 ): Promise<ReachoutBlock | null> {
   // Creator-level terminal rule. This is checked again at submission time so
   // client state, stale lookup results, and direct server-action calls cannot
@@ -63,25 +59,28 @@ export async function checkReachoutAllowed(
     .slice(0, 10);
   // One read covers both rules: rows in THIS campaign (any date) OR any campaign
   // within the cooldown window. `username ilike X AND (same-campaign OR recent)`.
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("posts")
-    .select("workflow_status, reach_out_date, campaign_id")
+    .select("id, workflow_status, reach_out_date, campaign_id")
     .ilike("username", username)
     .or(`campaign_id.eq.${campaignId},reach_out_date.gte.${since}`)
     .limit(50);
-  const rows = (data ?? []) as Array<{
-    workflow_status: string | null;
-    reach_out_date: string | null;
-    campaign_id: string | null;
-  }>;
+  if (error) {
+    console.error("[reach-out] eligibility lookup failed:", error.message);
+    return {
+      error: "Creator eligibility could not be verified. Try again.",
+      hint: "Could not verify creator eligibility",
+    };
+  }
+  const conflict = reachoutConflict(
+    (data ?? []) as ReachoutEligibilityRow[],
+    campaignId,
+    since,
+    options?.excludeRowIds,
+  );
 
   // Campaign rule — already mapped to this campaign (active).
-  if (
-    rows.some(
-      (p) =>
-        p.campaign_id === campaignId && isActiveReachout(p.workflow_status),
-    )
-  ) {
+  if (conflict === "same-campaign") {
     return {
       error: "This creator is already in this campaign.",
       hint: "Already reached out in this campaign",
@@ -89,14 +88,7 @@ export async function checkReachoutAllowed(
   }
 
   // Cooldown rule — reached out (any campaign) within the last N days.
-  if (
-    rows.some(
-      (p) =>
-        isActiveReachout(p.workflow_status) &&
-        p.reach_out_date != null &&
-        p.reach_out_date >= since,
-    )
-  ) {
+  if (conflict === "cooldown") {
     return {
       error: `This creator was reached out in the last ${REACHOUT_COOLDOWN_DAYS} days. One reach-out per creator per ${REACHOUT_COOLDOWN_DAYS} days — wait out the cooldown, or map them to a different campaign next cycle.`,
       hint: `Reached out in the last ${REACHOUT_COOLDOWN_DAYS} days`,
