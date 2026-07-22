@@ -17,6 +17,7 @@ const DOC_ID = "1NddIh6AZvpAhWs4JEUwTrmfpfHH4og7eExAW_dyXUI8";
 const TAB_ID = "t.h63gsqoddfya";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const IMPERSONATE = "website@saadaa.in";
+const DOC_READ_TIMEOUT_MS = 40_000;
 
 export interface ChangelogRow {
   /** Normalized ISO yyyy-MM-dd (rows store "2026-07-16" or "16 Jul 2026"). */
@@ -117,13 +118,19 @@ function cellText(cell: unknown): string {
 export async function fetchChangelogRows(): Promise<ChangelogRow[]> {
   const token = await getDocsToken();
   if (!token) return [];
-  const res = await fetch(
-    `https://docs.googleapis.com/v1/documents/${DOC_ID}?includeTabsContent=true`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(15000),
-    },
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://docs.googleapis.com/v1/documents/${DOC_ID}?includeTabsContent=true`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(DOC_READ_TIMEOUT_MS),
+      },
+    );
+  } catch (err) {
+    console.error("[gdoc-changelog] doc read timed out/failed:", err);
+    return [];
+  }
   if (!res.ok) {
     console.error("[gdoc-changelog] doc read failed:", res.status);
     return [];
