@@ -33,6 +33,7 @@ import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { useLiveSearch } from "@/lib/live-search";
 import { shopifyOrderAdminUrl } from "@/lib/shopify";
+import { firstNonEmptyString } from "@/lib/attribution";
 import {
   DeliverablesChip,
   EmailStatusCell,
@@ -289,7 +290,7 @@ export function OnboardingTable({
 /** Keep the original reach-out owner visible after a handoff. */
 function attributionLabels(r: OnboardingRow): string[] {
   return [
-    `Reached out by ${r.logged_by?.trim() || "—"}`,
+    `Reached out by ${firstNonEmptyString(r.logged_by, r.onboarded_by) || "—"}`,
     isOnboarded(r) ? `Onboarded by ${r.onboarded_by?.trim() || "—"}` : null,
   ].filter((label): label is string => Boolean(label));
 }
@@ -846,7 +847,10 @@ function OnboardingOverviewModal({
           <section className="ob-overview-grid">
             <OverviewItem label="Post ID" value={row.post_id} mono />
             <OverviewItem label="Collab ID" value={collabIdLabel(row)} mono />
-            <OverviewItem label="Reached Out By" value={row.logged_by ?? "—"} />
+            <OverviewItem
+              label="Reached Out By"
+              value={firstNonEmptyString(row.logged_by, row.onboarded_by) || "—"}
+            />
             {isOnboarded(row) && (
               <OverviewItem
                 label="Onboarded By"

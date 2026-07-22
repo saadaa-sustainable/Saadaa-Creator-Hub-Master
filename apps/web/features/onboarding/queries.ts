@@ -300,7 +300,7 @@ export const fetchOnboardingFilterOptions = unstable_cache(
       supabase.from("creators").select("state, category").limit(2000),
       (supabase as any)
         .from("posts")
-        .select("logged_by, content_type")
+        .select("logged_by, onboarded_by, content_type")
         .limit(20000),
     ]);
 
@@ -311,12 +311,16 @@ export const fetchOnboardingFilterOptions = unstable_cache(
       if (c.state) regions.add(c.state);
     });
 
-    // Team members who logged reach-outs + content types in play.
+    // Union both owner columns so legacy reach-out rows and submitted rows are
+    // available to the same picker; the selected submission view decides which
+    // column is used for filtering.
     const teamMembers = new Set<string>();
     const contentTypes = new Set<string>();
     ((posts.data ?? []) as any[]).forEach((p) => {
-      const lb = (p.logged_by ?? "").trim();
-      if (lb) teamMembers.add(lb);
+      for (const owner of [p.logged_by, p.onboarded_by]) {
+        const name = String(owner ?? "").trim();
+        if (name) teamMembers.add(name);
+      }
       const ct = (p.content_type ?? "").trim();
       if (ct) contentTypes.add(ct);
     });

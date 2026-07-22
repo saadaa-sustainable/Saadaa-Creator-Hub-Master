@@ -32,6 +32,8 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-07-22 | **Reach-out owner attribution repaired** — moved 1,078 live Reach Out owners from the wrong `onboarded_by` column into `logged_by`, corrected the production `submit_reachout` RPC, and made Onboarding list/card labels and team options blank-safe | 04, 06, 07 |
+| 2026-07-22 | **Stage-specific attribution and click-through history** — Funnel/Internal/Dashboard/Journey/Team Rows use stage owners and event dates; counter chips open the matching Reach Out/Onboard/Posted history; Onboarding shows Reach Out By in both views | 06, 07 |
 | 2026-07-10 | **Payment Pending definition corrected everywhere** — collab enters payment only after every posting form is complete and creator partnership is accepted; fail-closed Accounts Hub gates, transactional collab locks, immutable installment history, and stale pending cleanup | 06, 07 |
 | 2026-06-15 | **`historic_creator_data` table** — read-only archive of legacy Influencer Tracker sheet (Creator Data tab, cols A–AV minus AM + CB = 48 text cols); populated by the sheet's "Supabase Sync" menu | 04 |
 | 2026-06-11 | **Fix: new Instagram-cache rows stuck "pending"** — scraper starvation (refresh churn + username ordering); backlog gate + `scraped_at` NULLS FIRST (fn v12) | 05 |
