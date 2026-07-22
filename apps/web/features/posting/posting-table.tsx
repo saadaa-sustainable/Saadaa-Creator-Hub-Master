@@ -23,6 +23,7 @@ import {
   workflowStatusLabel,
 } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import { firstNonEmptyString } from "@/lib/attribution";
 import { useLiveSearch } from "@/lib/live-search";
 import { isPastDue } from "@/lib/workflow";
 import {
@@ -261,10 +262,11 @@ export function PostingTable({
  *  rows predating the posted_by stamp), queue rows show who onboarded. */
 function postingAttributionLabel(r: PostingRow): string | null {
   if (isPosted(r)) {
-    const who = r.posted_by ?? r.onboarded_by;
+    const who = firstNonEmptyString(r.posted_by, r.onboarded_by, r.logged_by);
     return who ? `Posted by ${who}` : null;
   }
-  return r.onboarded_by ? `Onboarded by ${r.onboarded_by}` : null;
+  const who = firstNonEmptyString(r.onboarded_by, r.logged_by);
+  return who ? `Onboarded by ${who}` : null;
 }
 
 function postingDaysAgo(iso: string | null | undefined): number | null {

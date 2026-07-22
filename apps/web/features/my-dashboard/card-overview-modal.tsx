@@ -3,6 +3,7 @@
 import { createPortal } from "react-dom";
 import { ExternalLink, X } from "lucide-react";
 import { Avatar } from "@/components/ui";
+import { firstNonEmptyString } from "@/lib/attribution";
 import {
   formatDate,
   formatFollowers,
@@ -203,7 +204,7 @@ export function MyCardOverviewModal({
             <Row label="Content type" value={post.content_type} />
             <Row
               label="Reached out by"
-              value={post.logged_by ?? post.onboarded_by}
+                value={firstNonEmptyString(post.logged_by, post.onboarded_by)}
             />
           </Section>
 
@@ -274,7 +275,11 @@ export function MyCardOverviewModal({
               ))}
               <Row
                 label="Posted by"
-                value={post.posted_by ?? post.onboarded_by}
+                value={firstNonEmptyString(
+                  post.posted_by,
+                  post.onboarded_by,
+                  post.logged_by,
+                )}
               />
             </Section>
           )}

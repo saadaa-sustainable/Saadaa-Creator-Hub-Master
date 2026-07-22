@@ -39,7 +39,7 @@ export interface FunnelData {
   totals: FunnelMetrics;
   byMonth: FunnelPeriodBucket[]; // sorted DESC (most recent first)
   byWeek: FunnelPeriodBucket[]; // sorted DESC
-  teams: string[]; // distinct onboarded_by values
+  teams: string[]; // distinct lifecycle owners across logged/onboarded/posted_by
   byMonthTeam: Record<string, Record<string, FunnelMetrics>>;
   byWeekTeam: Record<string, Record<string, FunnelMetrics>>;
   generatedAt: string;

@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { firstNonEmptyString } from "@/lib/attribution";
 import { isContentLink, isPastDue, isVoidedStatus } from "@/lib/workflow";
 import type { FunnelMetrics, FunnelPeriodBucket } from "@/features/funnel/types";
 import type { InternalDashboardData } from "./types";
@@ -11,6 +12,7 @@ import type { InternalDashboardData } from "./types";
 
 const POSTS_SELECT = [
   "reach_out_date",
+  "onboard_date",
   "post_date",
   "post_link",
   "workflow_status",
@@ -25,7 +27,6 @@ const POSTS_SELECT = [
 ].join(",");
 
 const MIN_DATE = new Date("2020-01-01").getTime();
-const OVERDUE_DAYS = 15;
 const DAY_MS = 86_400_000;
 
 function emptyMetrics(): FunnelMetrics {
@@ -133,23 +134,25 @@ export async function fetchInternalDashboardData(
     const status = statusKey(row.workflow_status);
     const collab = statusKey(row.collab_type);
     const orderStatus = statusKey(row.order_status);
-    // Attribution (2026-07-16 rule): the reach-out AND onboarding credit stay
-    // with the row's original owner (sheet CALLOUT BY = logged_by, set on
-    // every row; onboarded_by is the fallback for legacy rows that only
-    // recorded the onboarder). ONLY the Posted metric follows posted_by — the
-    // person who actually submitted the post (historic backlog fill stamps
-    // it) — falling back to the row owner when never stamped.
-    const team = String(row.logged_by ?? row.onboarded_by ?? "").trim();
-    const postTeam = String(
-      row.posted_by ?? row.logged_by ?? row.onboarded_by ?? "",
-    ).trim();
+    // Stage ownership is explicit: reach-outs belong to logged_by, onboarding
+    // work belongs to onboarded_by, and posted work belongs to posted_by.
+    // Fallbacks preserve legacy rows where the newer stage owner is blank.
+    const reachTeam = firstNonEmptyString(row.logged_by, row.onboarded_by);
+    const onboardTeam = firstNonEmptyString(row.onboarded_by, row.logged_by);
+    const postTeam = firstNonEmptyString(
+      row.posted_by,
+      row.onboarded_by,
+      row.logged_by,
+    );
     const campaign = String(row.campaign_id ?? "").trim();
     const isParent =
       row.deliverable_index == null || Number(row.deliverable_index) === 1;
-    if (team) teamsSet.add(team);
+    if (reachTeam) teamsSet.add(reachTeam);
+    if (onboardTeam) teamsSet.add(onboardTeam);
     if (postTeam) teamsSet.add(postTeam);
 
     const reachDate = parseDate(row.reach_out_date);
+    const onboardDate = parseDate(row.onboard_date);
     const postDate = parseDate(row.post_date);
     // "Posted" = a real LINK TO POST exists (http/IG/YouTube URL) OR the
     // workflow reached Posted/Delivered — a bare non-URL string ("Ghosted",
@@ -174,8 +177,7 @@ export async function fetchInternalDashboardData(
       // without one fall back to >15 days since reach-out (lib/workflow).
       const isOverdue = isPend && isPastDue(row.est_delivery, row.reach_out_date, now);
 
-      const delta: Partial<FunnelMetrics> = {
-        r: 1,
+      const lifecycleDelta: Partial<FunnelMetrics> = {
         ...(isOnboarded ? { o: 1 } : null),
         ...(isBarter ? { b: 1 } : null),
         ...(isDelivered ? { d: 1 } : null),
@@ -183,6 +185,7 @@ export async function fetchInternalDashboardData(
         ...(isPend ? { pend: 1 } : null),
         ...(isOverdue ? { overdue: 1 } : null),
       };
+      const delta: Partial<FunnelMetrics> = { r: 1, ...lifecycleDelta };
       addMetrics(totals, delta);
 
       const mKey = monthKey(reachDate);
@@ -192,9 +195,14 @@ export async function fetchInternalDashboardData(
       addMetrics(byMonth.get(mKey)!, delta);
       addMetrics(byWeek.get(wKey)!, delta);
 
-      if (team) {
-        bumpTeam(byMonthTeam, mKey, team, delta);
-        bumpTeam(byWeekTeam, wKey, team, delta);
+      if (reachTeam) {
+        bumpTeam(byMonthTeam, mKey, reachTeam, { r: 1 });
+        bumpTeam(byWeekTeam, wKey, reachTeam, { r: 1 });
+      }
+      const lifecycleDate = onboardDate ?? reachDate;
+      if (onboardTeam && lifecycleDate && Object.keys(lifecycleDelta).length > 0) {
+        bumpTeam(byMonthTeam, monthKey(lifecycleDate), onboardTeam, lifecycleDelta);
+        bumpTeam(byWeekTeam, isoWeekKey(lifecycleDate), onboardTeam, lifecycleDelta);
       }
       if (campaign) {
         bumpTeam(byMonthCampaign, mKey, campaign, delta);

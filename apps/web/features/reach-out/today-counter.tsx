@@ -1,5 +1,6 @@
 import { Flame } from "lucide-react";
 import { createServiceClient } from "@/lib/supabase/server";
+import { TodayCounterChips } from "./today-counter-chips";
 
 /**
  * Team scoreboard for TODAY — "Tanvi · 10" chips under the stage header.
@@ -98,28 +99,7 @@ export async function TodayCounter({ kind }: { kind: TodayCounterKind }) {
           Nothing yet today — the board resets every morning.
         </span>
       ) : (
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {members.map(([name, n]) => (
-            <span
-              key={name}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-surface py-0.5 pl-1 pr-2.5 text-[clamp(0.68rem,0.62rem+0.2vw,0.76rem)] font-semibold text-text-primary"
-              title={`${name} — ${n} ${cfg.unit}${n === 1 ? "" : "s"} today`}
-            >
-              <span
-                aria-hidden
-                className="inline-grid h-5 w-5 place-items-center rounded-full bg-[#2C2420] text-[0.58rem] font-extrabold text-accent"
-              >
-                {name
-                  .split(/\s+/)
-                  .slice(0, 2)
-                  .map((p) => p[0]?.toUpperCase() ?? "")
-                  .join("")}
-              </span>
-              {name}
-              <b className="tabular-nums">{n}</b>
-            </span>
-          ))}
-        </div>
+        <TodayCounterChips members={members} />
       )}
     </section>
   );

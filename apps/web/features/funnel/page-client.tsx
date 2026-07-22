@@ -58,6 +58,7 @@ export function FunnelBody({
   const [refreshing, setRefreshing] = useState(false);
   const [rowsOpen, setRowsOpen] = useState(false);
   const [drawerStage, setDrawerStage] = useState<FilterKey>("all");
+  const [drawerTeam, setDrawerTeam] = useState<string | null>(null);
 
   const buckets = mode === "month" ? data.byMonth : data.byWeek;
   const teamBuckets = mode === "month" ? data.byMonthTeam : data.byWeekTeam;
@@ -89,14 +90,14 @@ export function FunnelBody({
     return acc;
   }, [team, data.totals, filteredBuckets]);
 
-  // Today's activity by team — same-day reach_out_date / post_date hits.
-  // Mirrors legacy `byMonthTeam[currentMonth]` slice.
-  const todayKey =
+  // This month’s activity by team — the existing monthly reach_out_date /
+  // post_date slice. Keep the label honest; stage pages use true today counts.
+  const currentMonthKey =
     mode === "month"
       ? new Date().toLocaleString("en-US", { month: "short", year: "numeric" })
       : "";
-  const todayByTeam: Record<string, FunnelMetrics> | undefined =
-    mode === "month" ? data.byMonthTeam[todayKey] : undefined;
+  const currentMonthByTeam: Record<string, FunnelMetrics> | undefined =
+    mode === "month" ? data.byMonthTeam[currentMonthKey] : undefined;
 
   return (
     <div className="flex min-w-0 max-w-full flex-col gap-3 overflow-hidden sm:gap-5">
@@ -108,6 +109,7 @@ export function FunnelBody({
         onTeamChange={setTeam}
         onViewRows={() => {
           setDrawerStage("all");
+          setDrawerTeam(null);
           setRowsOpen(true);
         }}
         onRefresh={() => {
@@ -119,11 +121,14 @@ export function FunnelBody({
       />
       {rowsOpen && (
         <TeamRowsDrawer
-          team={team}
+          team={drawerTeam ?? team}
           teams={data.teams}
           source={source}
           initialStage={drawerStage}
-          onClose={() => setRowsOpen(false)}
+          onClose={() => {
+            setRowsOpen(false);
+            setDrawerTeam(null);
+          }}
         />
       )}
 
@@ -131,6 +136,7 @@ export function FunnelBody({
         totals={totals}
         onSelect={(stage) => {
           setDrawerStage(stage);
+          setDrawerTeam(null);
           setRowsOpen(true);
         }}
       />
@@ -143,8 +149,15 @@ export function FunnelBody({
         generatedAt={data.generatedAt}
       />
 
-      {todayByTeam && Object.keys(todayByTeam).length > 0 && (
-        <TodayActivity entries={todayByTeam} />
+      {currentMonthByTeam && Object.keys(currentMonthByTeam).length > 0 && (
+        <TodayActivity
+          entries={currentMonthByTeam}
+          onSelectTeam={(member) => {
+            setDrawerStage("all");
+            setDrawerTeam(member);
+            setRowsOpen(true);
+          }}
+        />
       )}
     </div>
   );
@@ -489,8 +502,10 @@ function NumCell({
 
 function TodayActivity({
   entries,
+  onSelectTeam,
 }: {
   entries: Record<string, FunnelMetrics>;
+  onSelectTeam: (member: string) => void;
 }) {
   const rows = Object.entries(entries)
     .map(([user, m]) => ({ user, ...m }))
@@ -500,9 +515,9 @@ function TodayActivity({
       <header className="flex items-baseline justify-between gap-2 flex-wrap">
         <span className="inline-flex items-center gap-1.5">
           <h2 className="text-[0.7rem] sm:text-[0.8rem] font-extrabold uppercase tracking-[0.06em] text-text-primary">
-            Today's Activity by Team Member
+            This Month&apos;s Activity by Team Member
           </h2>
-          <InfoDot text="Current-month team breakdown — per-member reach-outs, onboards, barters, posts and ghosted counts. Sorted by combined activity." />
+          <InfoDot text="Current-month team breakdown — per-member reach-outs, onboards, barters, posts and ghosted counts. Select a member to open their full lifecycle history." />
         </span>
         <span className="text-[0.55rem] sm:text-[0.6rem] text-text-tertiary">
           {rows.length} contributors this month
@@ -527,7 +542,14 @@ function TodayActivity({
                 className="border-t border-border hover:bg-bg-muted/40 transition-colors"
               >
                 <td className="py-1.5 px-1.5 text-center font-extrabold text-text-primary truncate">
-                  {r.user}
+                  <button
+                    type="button"
+                    className="font-extrabold underline decoration-border underline-offset-2 transition-colors hover:text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[--accent]"
+                    onClick={() => onSelectTeam(r.user)}
+                    title={`Open ${r.user}'s full reach-out, onboarding and posted history`}
+                  >
+                    {r.user}
+                  </button>
                 </td>
                 <NumCell value={r.r} tone="reach" />
                 <NumCell value={r.o} tone="onboard" />

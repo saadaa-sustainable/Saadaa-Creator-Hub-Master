@@ -167,7 +167,7 @@ export interface DashboardData {
     profilePic: string | null;
     postCount: number;
   }>;
-  /** Onboardings per team member (logged_by). */
+  /** Onboardings per team member (onboarded_by). */
   teamLeaderboard: Array<{ name: string; onboardings: number; posts: number }>;
   /** 4-column mini board — latest 10 cards per stage for managerial scan. */
   stageBoard: {
@@ -199,7 +199,7 @@ export interface StageCard {
   campaign: string | null;
   date: string | null;
   amount: number | null;
-  /** Who handled this stage — onboarded_by for OB+ stages, logged_by for Reach Out. */
+  /** Who handled this stage — logged_by, onboarded_by, or posted_by by stage. */
   assignee: string | null;
   /** Tooltip text shown over the assignee roundel ("Onboarded by …" / "Reached out by …"). */
   assigneeLabel: string;

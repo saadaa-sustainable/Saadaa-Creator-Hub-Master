@@ -75,6 +75,7 @@ export async function fetchPostingTable(
       collab_number,
       collab_id,
       inf_id,
+      logged_by,
       onboarded_by,
       posted_by,
       bank_number,

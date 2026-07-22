@@ -193,12 +193,9 @@ export function JourneyCardModal({
             {card.inf_id && (
               <OverviewItem label="Creator ID" value={card.inf_id} mono />
             )}
-            {(card.onboarded_by ?? card.logged_by) && (
-              <OverviewItem
-                label="Team Member"
-                value={card.onboarded_by ?? card.logged_by}
-              />
-            )}
+            <OverviewItem label="Reached Out By" value={card.logged_by ?? "—"} />
+            <OverviewItem label="Onboarded By" value={card.onboarded_by ?? "—"} />
+            <OverviewItem label="Posted By" value={card.posted_by ?? "—"} />
             {card.creator?.state && (
               <OverviewItem label="Region" value={card.creator.state} />
             )}

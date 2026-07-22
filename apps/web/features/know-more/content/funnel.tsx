@@ -75,6 +75,14 @@ export default function FunnelKM() {
             deliverable_index (parent-only counts so multi-deliverable collabs
             don&apos;t inflate the cohort).
           </li>
+          <li>
+            <strong>Stage ownership</strong> · Reach Out uses{" "}
+            <KMCode>logged_by</KMCode>, Onboarded uses{" "}
+            <KMCode>onboarded_by</KMCode>, and Posted uses{" "}
+            <KMCode>posted_by</KMCode>. Older rows fall back to the next available
+            owner. Click a team member in the activity table to open their full
+            Reach Out, Onboarding, and Posted history.
+          </li>
         </KMList>
       </KMSection>
 

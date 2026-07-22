@@ -33,11 +33,12 @@ export default function InternalDashboardKM() {
 
       <KMSection tag="Attribution logic">
         <p>
-          Each post is attributed to the team member stored in{" "}
-          <KMCode>posts.onboarded_by</KMCode> (set when the operator submits
-          the onboarding form). Reach Out-only rows that have not yet been
-          onboarded surface as &quot;Unassigned&quot; — there is no separate
-          reach-out attribution column on prod today.
+          Attribution is stage-specific: Reach Out uses{" "}
+          <KMCode>posts.logged_by</KMCode>, Onboarding uses{" "}
+          <KMCode>posts.onboarded_by</KMCode>, and Posted uses{" "}
+          <KMCode>posts.posted_by</KMCode>. Older rows fall back to the next
+          available owner. A member can therefore appear on more than one row
+          for the same collab when work was handed off between stages.
         </p>
       </KMSection>
 
@@ -46,17 +47,17 @@ export default function InternalDashboardKM() {
           <li>
             <strong>RO Count</strong> ·{" "}
             <KMCode>count(posts)</KMCode> where reach_out_date in period
-            AND onboarded_by = this member.
+            AND logged_by = this member (falling back to onboarded_by).
           </li>
           <li>
             <strong>Onboard Count</strong> ·{" "}
             <KMCode>count(posts)</KMCode> where onboard_date in period AND
-            onboarded_by = this member.
+            onboarded_by = this member (falling back to logged_by).
           </li>
           <li>
             <strong>Post Count</strong> ·{" "}
             <KMCode>count(posts)</KMCode> where post_date in period AND
-            onboarded_by = this member.
+            posted_by = this member (falling back to onboarded_by/logged_by).
           </li>
           <li>
             <strong>Delivery Rate</strong> ·{" "}
@@ -98,9 +99,9 @@ export default function InternalDashboardKM() {
       <KMSection tag="Data sources">
         <KMList>
           <li>
-            <strong>posts</strong> · onboarded_by, reach_out_date, onboard_date,
-            post_date, workflow_status, campaign_id, deliverable_index,
-            collab_number.
+            <strong>posts</strong> · logged_by, onboarded_by, posted_by,
+            reach_out_date, onboard_date, post_date, workflow_status, campaign_id,
+            deliverable_index, collab_number.
           </li>
           <li>
             <strong>user_access</strong> · member display names + role.
@@ -109,10 +110,8 @@ export default function InternalDashboardKM() {
       </KMSection>
 
       <KMCallout tone="info">
-        Attribution accuracy depends on team members logging in before
-        onboarding any collab so <KMCode>posts.onboarded_by</KMCode> populates
-        correctly. Rows authored by a service account or where login was
-        absent surface as Unassigned.
+        The Team Member activity rows are clickable and open the full lifecycle
+        history. Rows with no usable stage owner surface as Unassigned.
       </KMCallout>
     </>
   );

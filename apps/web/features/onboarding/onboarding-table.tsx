@@ -286,13 +286,12 @@ export function OnboardingTable({
   );
 }
 
-/** Contextual attribution: onboarded rows show who onboarded, queue rows who
- *  reached out. Null when the field is empty. */
-function attributionLabel(r: OnboardingRow): string | null {
-  if (isOnboarded(r)) {
-    return r.onboarded_by ? `Onboarded by ${r.onboarded_by}` : null;
-  }
-  return r.logged_by ? `Reached out by ${r.logged_by}` : null;
+/** Keep the original reach-out owner visible after a handoff. */
+function attributionLabels(r: OnboardingRow): string[] {
+  return [
+    r.logged_by ? `Reached out by ${r.logged_by}` : null,
+    isOnboarded(r) && r.onboarded_by ? `Onboarded by ${r.onboarded_by}` : null,
+  ].filter((label): label is string => Boolean(label));
 }
 
 function daysAgo(iso: string | null | undefined): number | null {
@@ -401,10 +400,10 @@ function OnboardingListRow({
             @{r.creator?.username ?? "—"} · {r.post_id_short ?? r.post_id} ·{" "}
             {collabIdLabel(r)}
           </p>
-          {(attributionLabel(r) || ageLabel(r)) && (
+          {(attributionLabels(r).length > 0 || ageLabel(r)) && (
             <p>
-              {attributionLabel(r)}
-              {attributionLabel(r) && ageLabel(r) ? " · " : ""}
+              {attributionLabels(r).join(" · ")}
+              {attributionLabels(r).length > 0 && ageLabel(r) ? " · " : ""}
               {ageLabel(r)}
             </p>
           )}
@@ -586,9 +585,11 @@ function ObCard({
             {r.nomenclature ?? r.content_type}
           </span>
         )}
-        {attributionLabel(r) && (
-          <span className="pill pill--muted">{attributionLabel(r)}</span>
-        )}
+        {attributionLabels(r).map((label) => (
+          <span key={label} className="pill pill--muted">
+            {label}
+          </span>
+        ))}
         {ageLabel(r) && (
           <span className="pill pill--muted">{ageLabel(r)}</span>
         )}

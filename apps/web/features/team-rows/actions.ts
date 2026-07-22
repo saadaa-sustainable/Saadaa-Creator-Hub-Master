@@ -92,9 +92,9 @@ const LIVE_COLS = [
 ].join(",");
 
 /**
- * Fetch every row owned by `team` (matches the dashboards' team keying:
- * `logged_by ?? onboarded_by`), newest first — or EVERY row when `team` is
- * empty (the drawer opens on "All team" by default and filters in-modal).
+ * Fetch every row touched by `team` across logged_by, onboarded_by, and
+ * posted_by, newest first — or EVERY row when `team` is empty (the drawer
+ * opens on "All team" by default and filters in-modal).
  * `source`:
  *   - "historic" → the denormalised `historic_posts` archive (Historic Analytics).
  *   - "live"     → the live `posts` pipeline (main Dashboard) + a `creators` join
@@ -126,13 +126,13 @@ export async function fetchTeamRowsPage(
   const supabase = createServiceClient();
   const table = source === "historic" ? "historic_posts" : "posts";
   const cols = source === "historic" ? HISTORIC_COLS : LIVE_COLS;
-  // logged_by = team, OR (logged_by null AND onboarded_by = team) — mirrors the
-  // `logged_by ?? onboarded_by` bucket rule so the drawer set matches the KPIs.
+  // A team-member row is a full lifecycle history: the member may own the
+  // reach-out, onboarding, or posting stage independently.
   // Empty team → no owner filter (all rows).
   // posted_by matches too: a member who back-filled another member's row sees
   // it in their set (their Posted KPI credits it).
   const orFilter = t
-    ? `logged_by.eq.${t},and(logged_by.is.null,onboarded_by.eq.${t}),posted_by.eq.${t}`
+    ? `logged_by.eq.${t},onboarded_by.eq.${t},posted_by.eq.${t}`
     : null;
 
   // Exact count sizes the parallel fan-out (and gives the drawer its total).

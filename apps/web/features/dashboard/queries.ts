@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
+import { firstNonEmptyString } from "@/lib/attribution";
 import { isPaymentPendingStatus } from "@/lib/payment-eligibility";
 import { isOnboardedActive, isVoidedStatus } from "@/lib/workflow";
 import type {
@@ -591,8 +592,12 @@ export async function fetchDashboardData(
   };
   for (const p of posts) {
     const statusLow = String(p.workflow_status ?? "").toLowerCase();
-    const onboarder = String(p.onboarded_by ?? "").trim();
-    const poster = String(p.posted_by ?? p.onboarded_by ?? "").trim();
+    const onboarder = firstNonEmptyString(p.onboarded_by, p.logged_by);
+    const poster = firstNonEmptyString(
+      p.posted_by,
+      p.onboarded_by,
+      p.logged_by,
+    );
     if (
       statusLow.includes("on board") ||
       statusLow.includes("posted") ||
@@ -708,18 +713,21 @@ export async function fetchDashboardData(
         if (typeof total === "number") return total;
         return p.commercial_amount != null ? Number(p.commercial_amount) : null;
       })(),
-      // Reach Out rows belong to whoever LOGGED them (logged_by; legacy rows
-      // fall back to onboarded_by); later stages to the onboarder.
+      // Keep attribution stage-specific: reach-out → logged_by, onboarding →
+      // onboarded_by, posted → posted_by. Legacy rows use the prior stage
+      // owner as a fallback.
       assignee:
         bucketKey === "reachOut"
-          ? ((p.logged_by as string | null) ??
-            (p.onboarded_by as string | null) ??
-            null)
-          : ((p.onboarded_by as string | null) ??
-            (p.logged_by as string | null) ??
-            null),
+          ? firstNonEmptyString(p.logged_by, p.onboarded_by) || null
+          : bucketKey === "posted"
+            ? firstNonEmptyString(p.posted_by, p.onboarded_by, p.logged_by) || null
+            : firstNonEmptyString(p.onboarded_by, p.logged_by) || null,
       assigneeLabel:
-        bucketKey === "reachOut" ? "Reached out by" : "Onboarded by",
+        bucketKey === "reachOut"
+          ? "Reached out by"
+          : bucketKey === "posted"
+            ? "Posted by"
+            : "Onboarded by",
       daysStuck: daysBetween(stageDate),
       stuckLabel,
     };

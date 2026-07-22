@@ -93,6 +93,12 @@ export default function JourneyKM() {
             card is in (see stage descriptions above).
           </li>
           <li>
+            <strong>Stage owner</strong> — Reach Out shows <KMCode>logged_by</KMCode>,
+            On Board shows <KMCode>onboarded_by</KMCode>, and Posted shows{" "}
+            <KMCode>posted_by</KMCode>, with legacy fallbacks when a stage owner
+            is blank.
+          </li>
+          <li>
             <strong>Order ID + status chip</strong> — Shown only when an order exists.
             Green = Delivered, red = RTO / Cancelled, amber = in transit.
           </li>

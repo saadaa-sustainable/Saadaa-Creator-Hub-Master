@@ -9,6 +9,7 @@ export interface PostingRow {
   post_id_short: PostsRow["post_id_short"];
   workflow_status: PostsRow["workflow_status"];
   /** Who onboarded / who submitted the posting — row + overview attribution. */
+  logged_by?: string | null;
   onboarded_by?: string | null;
   posted_by?: string | null;
   content_type?: PostsRow["content_type"];

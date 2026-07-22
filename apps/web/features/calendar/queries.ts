@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { firstNonEmptyString } from "@/lib/attribution";
 import { isPastDue } from "@/lib/workflow";
 
 /**
@@ -67,7 +68,7 @@ export async function getCalendarData(
     (supabase as any)
       .from("posts")
       .select(
-        "post_id, post_id_short, collab_id, username, campaign_id, collab_type, order_id, posted_by, onboarded_by, post_date, workflow_status, is_test",
+        "post_id, post_id_short, collab_id, username, campaign_id, collab_type, order_id, posted_by, onboarded_by, logged_by, post_date, workflow_status, is_test",
       )
       .in("workflow_status", ["Posted", "Delivered"])
       .gte("post_date", first)
@@ -115,9 +116,7 @@ export async function getCalendarData(
       collabType: (r.collab_type as string | null) ?? null,
       orderId: (r.order_id as string | null) ?? null,
       owner:
-        (r.posted_by as string | null) ??
-        (r.onboarded_by as string | null) ??
-        null,
+        firstNonEmptyString(r.posted_by, r.onboarded_by, r.logged_by) || null,
     });
   }
 

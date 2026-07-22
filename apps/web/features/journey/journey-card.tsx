@@ -6,6 +6,7 @@ import {
 import { formatDate, formatFollowers } from "@/lib/formatters";
 import type { JourneyCard as JourneyCardType, JourneyColumnId } from "./types";
 import { cn } from "@/lib/cn";
+import { firstNonEmptyString } from "@/lib/attribution";
 import { isPaymentPendingStatus } from "@/lib/payment-eligibility";
 import { journeyCollabId } from "./collab-id";
 
@@ -110,6 +111,25 @@ export function JourneyCardItem({
 
   const payChip = colId === "payment" ? paymentChip(card.payment_status) : null;
   const collabId = journeyCollabId(card);
+  const owner =
+    colId === "reach-out"
+      ? {
+          label: "Reached out by",
+          value: firstNonEmptyString(card.logged_by, card.onboarded_by),
+        }
+      : colId === "posted"
+        ? {
+            label: "Posted by",
+            value: firstNonEmptyString(
+              card.posted_by,
+              card.onboarded_by,
+              card.logged_by,
+            ),
+          }
+        : {
+            label: "Onboarded by",
+            value: firstNonEmptyString(card.onboarded_by, card.logged_by),
+          };
 
   return (
     <article
@@ -228,9 +248,9 @@ export function JourneyCardItem({
         )}
       </dl>
 
-      {(card.onboarded_by ?? card.logged_by) ? (
+      {owner.value ? (
         <footer className="pt-1.5 border-t border-border text-[0.62rem] font-semibold text-text-secondary truncate">
-          {card.onboarded_by ?? card.logged_by}
+          {owner.label} {owner.value}
         </footer>
       ) : null}
     </article>

@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { firstNonEmptyString } from "@/lib/attribution";
 import {
   daysOverdue,
   isOffboardingCandidateRow,
@@ -92,7 +93,7 @@ function candidateFromRows(
   const collabIds = uniqueValues(rows, (row) => row.collab_id ?? row.post_id);
   const teamMembers = uniqueValues(
     rows,
-    (row) => row.onboarded_by ?? row.logged_by,
+    (row) => firstNonEmptyString(row.onboarded_by, row.logged_by),
   );
   const username = String(creator.username ?? rows[0]?.username ?? "").trim();
   const oldestDeadline = deadlines[0] ?? null;

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
+import { firstNonEmptyString } from "@/lib/attribution";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { extractShortcode, postDateFromUrl } from "@/lib/instagram-shortcode";
 import { isPastDue } from "@/lib/workflow";
@@ -124,25 +125,43 @@ function kpiIsOverdue(r: TeamRow): boolean {
   // lib/workflow rule the KPI tiles use.
   return pend && isPastDue(r.est_delivery, r.reach_out_date);
 }
-function matchesFilter(r: TeamRow, f: FilterKey): boolean {
+function matchesFilter(r: TeamRow, f: FilterKey, member = ""): boolean {
   if (f === "all" || f === "issues") return true; // "issues" handled by _issue flag
   if (f === "posted_no_order") {
     const st = stageOf(r);
-    return (st === "posted" || st === "delivered") && !hasOrder(r);
+    return (
+      (st === "posted" || st === "delivered") &&
+      !hasOrder(r) &&
+      ownerMatches(r, f, member)
+    );
   }
   // Onboarded (On Board / Order Sent) but the post hasn't landed → content due.
-  if (f === "due") return stageOf(r) === "onboard";
+  if (f === "due") return stageOf(r) === "onboard" && ownerMatches(r, f, member);
   // KPI-parity buckets — parent rows only (one collab = 1), same as the tiles.
   if (f === "onboarded")
-    return isParentRow(r) && !!r.reach_out_date && kpiIsOnboarded(r);
+    return isParentRow(r) && !!r.reach_out_date && kpiIsOnboarded(r) && ownerMatches(r, f, member);
   if (f === "barter")
     return (
       isParentRow(r) &&
       !!r.reach_out_date &&
-      String(r.collab_type ?? "").trim().toLowerCase() === "barter"
+      String(r.collab_type ?? "").trim().toLowerCase() === "barter" &&
+      ownerMatches(r, f, member)
     );
-  if (f === "overdue") return kpiIsOverdue(r);
-  return stageOf(r) === f;
+  if (f === "overdue") return kpiIsOverdue(r) && ownerMatches(r, f, member);
+  return stageOf(r) === f && ownerMatches(r, f, member);
+}
+
+function ownerMatches(r: TeamRow, f: FilterKey, member: string): boolean {
+  if (!member) return true;
+  if (f === "reach") {
+    return firstNonEmptyString(r.logged_by, r.onboarded_by) === member;
+  }
+  if (f === "posted" || f === "posted_no_order") {
+    return (
+      firstNonEmptyString(r.posted_by, r.onboarded_by, r.logged_by) === member
+    );
+  }
+  return firstNonEmptyString(r.onboarded_by, r.logged_by) === member;
 }
 
 // Data-quality flags surfaced in the drawer.
@@ -900,7 +919,7 @@ export function TeamRowsDrawer({
     return flagged.filter((r) => {
       if (stage === "issues") {
         if (!r._issue) return false;
-      } else if (!matchesFilter(r, stage)) return false;
+      } else if (!matchesFilter(r, stage, member)) return false;
       if (!ql) return true;
       return (
         (r.username ?? "").toLowerCase().includes(ql) ||
@@ -909,7 +928,7 @@ export function TeamRowsDrawer({
         (r.order_id ?? "").toLowerCase().includes(ql)
       );
     });
-  }, [flagged, q, stage]);
+  }, [flagged, member, q, stage]);
 
   if (!mounted || typeof document === "undefined") return null;
   const visibleRows = filtered.slice(0, visible);
