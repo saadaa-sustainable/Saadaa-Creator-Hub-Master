@@ -17,7 +17,9 @@ const DOC_ID = "1NddIh6AZvpAhWs4JEUwTrmfpfHH4og7eExAW_dyXUI8";
 const TAB_ID = "t.h63gsqoddfya";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const IMPERSONATE = "website@saadaa.in";
-const DOC_READ_TIMEOUT_MS = 40_000;
+const DOC_READ_TIMEOUT_MS = 30_000;
+const DOC_FIELDS =
+  "tabs(tabProperties(tabId),childTabs(tabProperties(tabId),documentTab(body(content(table(tableRows(tableCells(content(paragraph(elements(textRun(content))))))))))),documentTab(body(content(table(tableRows(tableCells(content(paragraph(elements(textRun(content))))))))))";
 
 export interface ChangelogRow {
   /** Normalized ISO yyyy-MM-dd (rows store "2026-07-16" or "16 Jul 2026"). */
@@ -120,13 +122,13 @@ export async function fetchChangelogRows(): Promise<ChangelogRow[]> {
   if (!token) return [];
   let res: Response;
   try {
-    res = await fetch(
-      `https://docs.googleapis.com/v1/documents/${DOC_ID}?includeTabsContent=true`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(DOC_READ_TIMEOUT_MS),
-      },
-    );
+    const url = new URL(`https://docs.googleapis.com/v1/documents/${DOC_ID}`);
+    url.searchParams.set("includeTabsContent", "true");
+    url.searchParams.set("fields", DOC_FIELDS);
+    res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(DOC_READ_TIMEOUT_MS),
+    });
   } catch (err) {
     console.error("[gdoc-changelog] doc read timed out/failed:", err);
     return [];
@@ -135,7 +137,13 @@ export async function fetchChangelogRows(): Promise<ChangelogRow[]> {
     console.error("[gdoc-changelog] doc read failed:", res.status);
     return [];
   }
-  const doc = (await res.json()) as { tabs?: DocTab[] };
+  let doc: { tabs?: DocTab[] };
+  try {
+    doc = (await res.json()) as { tabs?: DocTab[] };
+  } catch (err) {
+    console.error("[gdoc-changelog] doc response parse failed:", err);
+    return [];
+  }
   const tab = findTab(doc.tabs);
   const content = (tab?.documentTab?.body?.content ?? []) as Array<
     Record<string, unknown>
