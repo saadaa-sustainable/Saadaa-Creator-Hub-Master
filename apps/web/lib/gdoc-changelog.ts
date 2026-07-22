@@ -18,8 +18,9 @@ const TAB_ID = "t.h63gsqoddfya";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const IMPERSONATE = "website@saadaa.in";
 const DOC_READ_TIMEOUT_MS = 30_000;
-const DOC_FIELDS =
-  "tabs(tabProperties(tabId),childTabs(tabProperties(tabId),documentTab(body(content(table(tableRows(tableCells(content(paragraph(elements(textRun(content))))))))))),documentTab(body(content(table(tableRows(tableCells(content(paragraph(elements(textRun(content))))))))))";
+const DOC_TAB_FIELDS =
+  "documentTab(body(content(table(tableRows(tableCells(content(paragraph(elements(textRun(content)))))))))";
+const DOC_FIELDS = `tabs(tabProperties(tabId),childTabs(tabProperties(tabId),${DOC_TAB_FIELDS}),${DOC_TAB_FIELDS})`;
 
 export interface ChangelogRow {
   /** Normalized ISO yyyy-MM-dd (rows store "2026-07-16" or "16 Jul 2026"). */
