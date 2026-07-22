@@ -62,6 +62,7 @@ export const NOTIFICATION_TYPES = {
   PAYMENT_SLA_BREACH: "payment_sla_breach",
   /** Monthly payable-cycle digest to Accounts + Admins (12th → 15th, 27th → 30th). */
   ACCOUNTS_PAYABLE_DIGEST: "accounts_payable_digest",
+  DAILY_CHANGELOG: "daily_changelog",
   CAMPAIGN_ENDING: "campaign_ending",
   USER_INVITATION: "user_invitation",
   /** Daily countdown to Global Admins over the last 3 days of the Meta

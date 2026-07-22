@@ -1052,6 +1052,7 @@ The canonical `email_type` values are centralized in `NOTIFICATION_TYPES` (`lib/
 | `CONTENT_REMINDER` | `content_reminder` | Daily cron | The creator (`posts.email`) |
 | `PAYMENT_ELIGIBLE` | `payment_eligible` | Daily cron | Accounts team |
 | `PAYMENT_SLA_BREACH` | `payment_sla_breach` | Daily cron | Accounts team |
+| `DAILY_CHANGELOG` | `daily_changelog` | Midnight IST cron | Active Admins + Global Admins |
 | `CAMPAIGN_ENDING` | `campaign_ending` | Daily cron | Campaign owner (`campaigns.created_by`), Admins fallback |
 
 ### 9.5 Event-driven emails (Server Actions)
@@ -1098,6 +1099,12 @@ Assigned-user resolution: `posts.onboarded_by` is used as an email if it contain
 **Auto-close step (7).** After the notifications, campaigns whose `end_date` is in the past and not already closed (`auto_closed_at` null, status not `closed`) are flipped to `status='Closed'` with `auto_closed_at` stamped (one-shot — a reopened campaign keeps `auto_closed_at` set so it never re-closes). The owner-facing "ending soon" notice in check 6 already warned them.
 
 The route returns `{ ran: true, sent: { pending_onboarding, posting_pending, content_reminder, payment_eligible, payment_sla_breach, campaign_ending, campaign_closed } }` with per-check counts.
+
+### 9.7 Consolidated daily changelog — `app/api/cron/daily-changelog/route.ts`
+
+`vercel.json` schedules the primary request at `18:30 UTC` (`00:00 IST`) and a fallback at `18:40 UTC` (`00:10 IST`). The route reads the Google Doc changelog source, selects every row from the IST day that just ended, and sends one email plus PDF to active Admins and Global Admins. Individual code changes never send this email. A date with no rows sends no email and creates no delivery claim.
+
+Before SMTP, the route atomically claims the report date in `email_logs` using `email_type='daily_changelog'`; a partial unique index permits only one claim per date. A sent or active claim makes later cron/manual requests no-op, while an explicitly failed claim can retry at `00:10`. An indeterminate `sending` claim is never reclaimed automatically, preventing a second email after SMTP success if final audit persistence was interrupted. The final SMTP result is written back as `sent` or `failed` for audit.
 
 ---
 Key file paths (all under `/Users/saadaa/Documents/Influencer Project/New Influencer Project/apps/web`): `lib/email.ts`, `lib/notifications.ts`, `lib/env.server.ts`, `app/api/cron/notifications/route.ts`, `vercel.json`, and the six feature action files listed in §9.5.

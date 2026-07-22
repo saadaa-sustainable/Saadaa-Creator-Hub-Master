@@ -7,16 +7,20 @@ import {
   normalizeChangelogDate,
 } from "@/lib/gdoc-changelog";
 import { buildChangelogPdf } from "@/lib/changelog-pdf";
-import { resolveGlobalAdminEmails } from "@/lib/notifications";
+import {
+  NOTIFICATION_TYPES,
+  resolveGlobalAdminEmails,
+} from "@/lib/notifications";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Daily change-log report — runs at 18:30 UTC (= 00:00 IST, "12 AM") via
- * vercel.json and emails a 1-pager of everything shipped that day (the day
- * that just ended in IST) to the project owner, with an interactive PDF
- * attached (clickable commit refs → GitHub).
+ * Daily change-log report — primary run at 18:30 UTC (= 00:00 IST, "12 AM"),
+ * with a no-duplicate fallback at 18:40 UTC. Emails a 1-pager of everything
+ * shipped that day (the day that just ended in IST) to the project owner, with
+ * an interactive PDF attached (clickable commit refs → GitHub).
  *
  * Source of truth: the Google Doc Change Log table ("Workflow & Tools Master"
  * › "Influencer - Technical Design") — the standing registry every shippable
@@ -80,6 +84,14 @@ export async function GET(req: NextRequest) {
     // The GDoc table inserts newest below the header — reverse so the email
     // reads in shipping order.
     .reverse();
+  if (entries.length === 0) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      date: targetIso,
+      reason: "no changelog entries for this date",
+    });
+  }
 
   const dateLabel = prettyDate(targetIso);
   const generatedAt = new Date().toLocaleString("en-IN", {
@@ -135,10 +147,71 @@ export async function GET(req: NextRequest) {
   // All active Admins + Global Admins (resolveGlobalAdminEmails covers both).
   const admins = await resolveGlobalAdminEmails();
   const recipients = admins.length > 0 ? admins : [FALLBACK_RECIPIENT];
+  const subject = `CreatorHub change log — ${dateLabel} (${entries.length} change${entries.length === 1 ? "" : "s"})`;
+  const supabase = createServiceClient();
+  let { data: claim, error: claimError } = await (supabase as any)
+    .from("email_logs")
+    .insert({
+      post_id: targetIso,
+      collab_id: targetIso,
+      sent_to: recipients.join(", "),
+      subject,
+      email_type: NOTIFICATION_TYPES.DAILY_CHANGELOG,
+      status: "sending",
+      error: null,
+    })
+    .select("id")
+    .single();
+
+  if (claimError?.code === "23505") {
+    const { data: existing } = await (supabase as any)
+      .from("email_logs")
+      .select("id, status")
+      .eq("post_id", targetIso)
+      .eq("email_type", NOTIFICATION_TYPES.DAILY_CHANGELOG)
+      .single();
+    if (!existing) {
+      return NextResponse.json(
+        { ok: false, error: "Daily report delivery claim could not be read" },
+        { status: 503 },
+      );
+    }
+    // At-most-once by design: never auto-reclaim an indeterminate `sending`
+    // claim, because SMTP may have succeeded before the audit update failed.
+    if (existing.status !== "failed") {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        date: targetIso,
+        reason: "daily report already sent or in progress",
+      });
+    }
+
+    const retry = await (supabase as any)
+      .from("email_logs")
+      .update({
+        status: "sending",
+        error: null,
+        created_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .eq("status", existing.status)
+      .select("id")
+      .maybeSingle();
+    claim = retry.data;
+    claimError = retry.error;
+  }
+
+  if (claimError || !claim) {
+    return NextResponse.json(
+      { ok: false, error: "Daily report delivery could not be claimed" },
+      { status: 503 },
+    );
+  }
 
   const result = await sendMail({
     to: recipients,
-    subject: `CreatorHub change log — ${dateLabel} (${entries.length} change${entries.length === 1 ? "" : "s"})`,
+    subject,
     htmlBody: html,
     attachments: [
       {
@@ -147,6 +220,38 @@ export async function GET(req: NextRequest) {
         base64: pdf.toString("base64"),
       },
     ],
+  });
+
+  const { error: finalizationError } = await (supabase as any)
+    .from("email_logs")
+    .update({
+      sent_to: recipients.join(", "),
+      subject,
+      status: result.ok ? "sent" : "failed",
+      error: result.ok ? null : (result.error ?? "unknown"),
+    })
+    .eq("id", claim.id);
+
+  if (finalizationError) {
+    console.error(
+      "[cron/daily-changelog] delivery finalization failed:",
+      finalizationError.message,
+    );
+    return NextResponse.json(
+      {
+        ok: false,
+        date: targetIso,
+        error: "Delivery audit could not be finalized",
+      },
+      { status: 500 },
+    );
+  }
+
+  console.info("[cron/daily-changelog]", {
+    date: targetIso,
+    entries: entries.length,
+    recipients: recipients.length,
+    ok: result.ok,
   });
 
   return NextResponse.json(

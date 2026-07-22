@@ -26,12 +26,15 @@ Plus the standing engineering rules:
 - Never set/echo secrets (SMTP creds, `CRON_SECRET`, Shopify/Apify edge secrets are the user's to set in Vercel / Supabase).
 - Run `npx tsc --noEmit` before committing.
 
+The email digest is deliberately **not event-driven**. Each shipped change only appends its changelog row. Vercel invokes `/api/cron/daily-changelog` at `18:30 UTC` (`00:00 IST`), which sends one consolidated report for the IST day that just ended. A unique `email_logs` delivery claim keyed by report date prevents retries or manual requests from sending that date twice. A silent `00:10 IST` fallback retries only when the first attempt failed or never reached SMTP; it no-ops after a successful midnight send. Dates with no entries send no email and create no claim.
+
 ## Recent milestone digest (2026-06)
 
 Newest first. Full detail is in the external changelog + the chapter each touches.
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-07-22 | **Daily changelog made fire-once** — midnight IST remains the primary send; report-date delivery claims block duplicate cron/manual emails, while a silent 00:10 fallback retries only failed/missed attempts | 09 |
 | 2026-07-22 | **Reach-out owner attribution repaired** — moved 1,078 live Reach Out owners from the wrong `onboarded_by` column into `logged_by`, corrected the production `submit_reachout` RPC, and made Onboarding list/card labels and team options blank-safe | 04, 06, 07 |
 | 2026-07-22 | **Stage-specific attribution and click-through history** — Funnel/Internal/Dashboard/Journey/Team Rows use stage owners and event dates; counter chips open the matching Reach Out/Onboard/Posted history; Onboarding shows Reach Out By in both views | 06, 07 |
 | 2026-07-10 | **Payment Pending definition corrected everywhere** — collab enters payment only after every posting form is complete and creator partnership is accepted; fail-closed Accounts Hub gates, transactional collab locks, immutable installment history, and stale pending cleanup | 06, 07 |
