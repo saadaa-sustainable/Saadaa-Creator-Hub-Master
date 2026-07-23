@@ -140,6 +140,8 @@ export interface DashboardData {
   contentBreakdown: BreakdownSlice[];
   /** Donut slices for creator tier (Nano/Micro/...) distribution. */
   categoryBreakdown: BreakdownSlice[];
+  /** Global all-time applied edit/correction counts; intentionally filter-independent. */
+  reworkBreakdown: BreakdownSlice[];
   /** 3-line horizontal funnel: Reach Out → On Board → Posted, with rate %. */
   workflowFunnel: {
     reachOut: number;

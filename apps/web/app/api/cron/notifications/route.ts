@@ -12,6 +12,7 @@ import {
   resolveGlobalAdminEmails,
   sendNotification,
 } from "@/lib/notifications";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { getMetaTokenExpiry } from "@/lib/meta-token";
 
 /**
@@ -26,9 +27,7 @@ import { getMetaTokenExpiry } from "@/lib/meta-token";
  *
  * Schedule: see vercel.json crons — daily at 04:00 UTC ("0 4 * * *").
  *
- * AUTH: Vercel Cron requests carry `Authorization: Bearer ${CRON_SECRET}` (when
- * CRON_SECRET is set) and/or the `x-vercel-cron` header. We accept either; any
- * other request is 401. This stops the public internet from triggering sends.
+ * AUTH: every invocation must carry `Authorization: Bearer ${CRON_SECRET}`.
  *
  * SMTP: EMAIL_USER / EMAIL_PASS / EMAIL_FROM_NAME are set in Vercel prod, so
  * sendMail() delivers (every attempt is still logged to email_logs). Flags are
@@ -80,6 +79,7 @@ const CAMPAIGN_ENDING_WITHIN_DAYS = 7;
  *  data uses 'On Board'; 'Order Sent' is included defensively for forward
  *  compatibility with the order-status stage. */
 const ONBOARDED_STATUSES = ["On Board", "Order Sent"];
+const DELIVERY_REMINDER_CLAIM = "delivery_reminder_claim";
 
 // ─── Date helpers (date-only, UTC) ────────────────────────────────────────────
 
@@ -99,15 +99,11 @@ const nowIso = () => new Date().toISOString();
 
 // ─── Auth guard ───────────────────────────────────────────────────────────────
 
-function isAuthorized(req: NextRequest): boolean {
-  // Vercel Cron sets this header on every scheduled invocation.
-  if (req.headers.get("x-vercel-cron")) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    if (auth === `Bearer ${secret}`) return true;
-  }
-  return false;
+function hasCronSecret(req: NextRequest): boolean {
+  const secret = process.env.CRON_SECRET?.trim();
+  return Boolean(
+    secret && req.headers.get("authorization") === `Bearer ${secret}`,
+  );
 }
 
 // ─── Types for the rows we read (only the columns we use) ─────────────────────
@@ -123,6 +119,7 @@ interface PostRow {
   onboard_date: string | null;
   est_delivery: string | null;
   workflow_status: string | null;
+  deliverable_index: number | null;
 }
 
 interface PaymentRow {
@@ -141,6 +138,20 @@ interface CampaignRow {
   campaign_name: string | null;
   end_date: string | null;
   created_by: string | null;
+}
+
+interface PayableDigestRow {
+  post_id: string;
+  collab_id: string | null;
+  inf_id: string | null;
+  creator_name: string | null;
+  username: string | null;
+  outstanding: number | string;
+  status: string | null;
+  due_date: string | null;
+  bank_name: string | null;
+  bank_number: string | null;
+  ifsc: string | null;
 }
 
 // ─── Recipient resolution ─────────────────────────────────────────────────────
@@ -191,7 +202,7 @@ async function buildNameToEmailMap(
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  if (!isAuthorized(req)) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -228,6 +239,84 @@ export async function GET(req: NextRequest) {
     resolveGlobalAdminEmails(),
     buildNameToEmailMap(supabase),
   ]);
+
+  const claimDelivery = async (
+    emailType: string,
+    key: string,
+    recipients: string[],
+    subject: string,
+  ): Promise<number | null> => {
+    const { data, error } = await (supabase as any)
+      .from("email_logs")
+      .insert({
+        post_id: key,
+        collab_id: key,
+        sent_to: recipients.join(", "),
+        subject,
+        email_type: emailType,
+        status: "sending",
+        error: null,
+      })
+      .select("id")
+      .single();
+    if (error?.code !== "23505") {
+      if (error) console.error("[cron/notifications] delivery claim failed:", error.message);
+      return data?.id ?? null;
+    }
+
+    const existing = await (supabase as any)
+      .from("email_logs")
+      .select("id, status")
+      .eq("post_id", key)
+      .eq("email_type", emailType)
+      .single();
+    if (!existing.data || existing.data.status !== "failed") return null;
+
+    const retry = await (supabase as any)
+      .from("email_logs")
+      .update({ status: "sending", error: null, created_at: nowIso() })
+      .eq("id", existing.data.id)
+      .eq("status", "failed")
+      .select("id")
+      .maybeSingle();
+    if (retry.error) {
+      console.error("[cron/notifications] delivery retry claim failed:", retry.error.message);
+    }
+    return retry.data?.id ?? null;
+  };
+
+  const finalizeDelivery = async (
+    id: number,
+    ok: boolean,
+    error?: string | null,
+  ) => {
+    const result = await (supabase as any)
+      .from("email_logs")
+      .update({
+        status: ok ? "sent" : "failed",
+        error: error ?? (ok ? null : "SMTP delivery failed"),
+      })
+      .eq("id", id);
+    if (result.error) {
+      console.error("[cron/notifications] delivery finalization failed:", result.error.message);
+    }
+  };
+
+  const requestedJob = req.nextUrl.searchParams.get("job");
+  if (requestedJob && !hasCronSecret(req)) {
+    return NextResponse.json({ ran: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (requestedJob && !["delivery_reminder", "accounts_payable_digest"].includes(requestedJob)) {
+    return NextResponse.json({ ran: false, error: "Unknown notification job" }, { status: 400 });
+  }
+  if (requestedJob === "delivery_reminder") {
+    await sendDeliveryReminders();
+    return NextResponse.json({ ran: true, sent });
+  }
+  if (requestedJob === "accounts_payable_digest") {
+    await sendAccountsPayableDigest();
+    return NextResponse.json({ ran: true, sent });
+  }
 
   // ── 0. Meta token renewal countdown ────────────────────────────────────────
   // One email per day to the Global Admins across the LAST THREE DAYS of the
@@ -305,6 +394,11 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("[cron] meta_token_renewal failed:", err);
   }
+
+  // Deadline and payout emails must run before historical staff backlogs can
+  // consume the route's runtime budget.
+  await sendDeliveryReminders();
+  await sendAccountsPayableDigest();
 
   // ── 1. Pending Onboarding ───────────────────────────────────────────────────
   // Reach Out posts whose reach_out_date is older than the window AND not yet
@@ -401,13 +495,14 @@ export async function GET(req: NextRequest) {
   // the CREATOR (post.email), a gentle pre-deadline nudge to share the reel.
   // Fires once per post (delivery_reminder_sent_at). Deadline already passed is
   // excluded — that case is the team-facing Posting Pending alert above.
-  try {
-    const upper = isoDateOffset(DELIVERY_REMINDER_DAYS_BEFORE);
+  async function sendDeliveryReminders() {
+    try {
+      const upper = isoDateOffset(DELIVERY_REMINDER_DAYS_BEFORE);
     const today = isoDateOffset(0);
     const { data } = await (supabase as any)
       .from("posts")
       .select(
-        "post_id, collab_id, inf_id, username, email, est_delivery, workflow_status",
+        "post_id, collab_id, inf_id, username, email, onboarded_by, est_delivery, workflow_status, deliverable_index",
       )
       .in("workflow_status", ONBOARDED_STATUSES)
       .not("est_delivery", "is", null)
@@ -415,10 +510,18 @@ export async function GET(req: NextRequest) {
       .lte("est_delivery", upper)
       .is("delivery_reminder_sent_at", null);
     const rows = (data ?? []) as PostRow[];
+    const byCollab = new Map<string, PostRow>();
+    for (const row of rows) {
+      const key = row.collab_id ?? row.post_id;
+      if (!key) continue;
+      const current = byCollab.get(key);
+      if (!current || Number(row.deliverable_index) === 1) byCollab.set(key, row);
+    }
+    const reminders = Array.from(byCollab.values());
 
     // Creator display names: creators.inf_name (best-effort; fallback handle).
     const infIds = Array.from(
-      new Set(rows.map((p) => p.inf_id).filter((v): v is string => !!v)),
+      new Set(reminders.map((p) => p.inf_id).filter((v): v is string => !!v)),
     );
     const infNameById = new Map<string, string>();
     if (infIds.length > 0) {
@@ -441,9 +544,10 @@ export async function GET(req: NextRequest) {
 
     const escText = (s: string) =>
       s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    for (const p of rows) {
+    for (const p of reminders) {
       const to = (p.email ?? "").trim();
       if (to && to.includes("@")) {
+        const onboarder = resolveAssignedUserEmail(p.onboarded_by, nameToEmail);
         const creatorName =
           (p.inf_id ? infNameById.get(p.inf_id) : undefined) ??
           p.username ??
@@ -456,11 +560,23 @@ export async function GET(req: NextRequest) {
               timeZone: "UTC",
             })
           : "—";
+        const subject =
+          `Reminder: your reel delivery date is coming up (${p.collab_id ?? p.post_id ?? ""})`.trim();
+        const bcc = [onboarder, ...globalAdmins].filter(
+          (email): email is string => Boolean(email),
+        );
+        const claimId = await claimDelivery(
+          DELIVERY_REMINDER_CLAIM,
+          `edd:${p.collab_id ?? p.post_id}`,
+          [to, ...bcc],
+          subject,
+        );
+        if (!claimId) continue;
         const r = await sendNotification({
           type: NOTIFICATION_TYPES.DELIVERY_REMINDER,
           to,
-          subject:
-            `Reminder: your reel delivery date is coming up (${p.collab_id ?? p.post_id ?? ""})`.trim(),
+          bcc,
+          subject,
           title: "Your reel delivery date is coming up",
           subtitle: p.collab_id ? `COLLAB: ${p.collab_id}` : undefined,
           htmlBody: `<p style="margin:0 0 14px;">Hey <strong>${escText(creatorName)}</strong>! &#128075;</p>
@@ -497,16 +613,33 @@ export async function GET(req: NextRequest) {
           collabId: p.collab_id,
           postId: p.post_id,
         });
-        if (r.ok) sent.delivery_reminder++;
+        if (!r.ok) {
+          await finalizeDelivery(claimId, false, r.error);
+          continue;
+        }
+
+        let stampQuery = (supabase as any)
+          .from("posts")
+          .update({ delivery_reminder_sent_at: nowIso() })
+          .is("delivery_reminder_sent_at", null);
+        stampQuery = p.collab_id
+          ? stampQuery.eq("collab_id", p.collab_id)
+          : stampQuery.eq("post_id", p.post_id);
+        const stamp = await stampQuery;
+        if (stamp.error) {
+          console.error("[cron/notifications] delivery reminder stamp failed:", stamp.error.message);
+        }
+        sent.delivery_reminder++;
+        await finalizeDelivery(
+          claimId,
+          true,
+          stamp.error ? `Email sent; calendar stamp failed: ${stamp.error.message}` : null,
+        );
       }
-      // Stamp regardless of recipient/send so it fires at most once per row.
-      await (supabase as any)
-        .from("posts")
-        .update({ delivery_reminder_sent_at: nowIso() })
-        .eq("post_id", p.post_id);
     }
-  } catch (err) {
-    console.error("[cron/notifications] delivery_reminder check failed:", err);
+    } catch (err) {
+      console.error("[cron/notifications] delivery_reminder check failed:", err);
+    }
   }
 
   // ── 3. Content Submission Reminder ───────────────────────────────────────────
@@ -724,10 +857,12 @@ export async function GET(req: NextRequest) {
   // (full payable sheet incl. bank details) to the Accounts team + Global Admins.
   // Idempotent: a digest for the day fires at most once (guarded via email_logs).
   // Voided/offboarded collabs are excluded — their balance is no longer payable.
-  try {
-    const today = todayUtc();
-    const dom = today.getUTCDate();
-    if (dom === 13 || dom === 28) {
+  async function sendAccountsPayableDigest() {
+    try {
+      const today = todayUtc();
+      const dom = today.getUTCDate();
+      if (dom !== 13 && dom !== 28) return;
+
       const cycleDay = dom === 13 ? 15 : 30;
       const y = today.getUTCFullYear();
       const mo = today.getUTCMonth();
@@ -735,128 +870,82 @@ export async function GET(req: NextRequest) {
       const clamped = Math.min(cycleDay, lastDay);
       const cycleIso = `${y}-${String(mo + 1).padStart(2, "0")}-${String(clamped).padStart(2, "0")}`;
       const recipients = Array.from(new Set([...accountsTeam, ...globalAdmins]));
+      if (recipients.length === 0) return;
 
-      // Fire-once guard: skip if any digest already logged today.
-      const { data: already } = await (supabase as any)
-        .from("email_logs")
-        .select("id")
-        .eq("email_type", NOTIFICATION_TYPES.ACCOUNTS_PAYABLE_DIGEST)
-        .gte("created_at", `${isoDateOffset(0)}T00:00:00.000Z`)
-        .limit(1);
+      const { data: paysRaw, error: paysError } = await (supabase as any).rpc(
+        "accounts_payable_digest_rows",
+        { p_cycle_date: cycleIso },
+      );
+      if (paysError) throw paysError;
+      const pays = (paysRaw ?? []) as PayableDigestRow[];
+      if (pays.length === 0) return;
 
-      if (recipients.length > 0 && !(already && already.length > 0)) {
-        const { data: paysRaw } = await (supabase as any)
-          .from("payments")
-          .select(
-            "post_id, collab_id, inf_id, username, amount, status, due_date, estimated_payable_date, bank_name, bank_number, ifsc",
-          )
-          .eq("estimated_payable_date", cycleIso)
-          .in("status", ["Due", "Not Due", "Partial"]);
-        let pays = (paysRaw ?? []) as Array<{
-          post_id: string | null;
-          collab_id: string | null;
-          inf_id: string | null;
-          username: string | null;
-          amount: number | null;
-          status: string | null;
-          due_date: string | null;
-          bank_name: string | null;
-          bank_number: string | null;
-          ifsc: string | null;
-        }>;
-
-        // Drop voided/offboarded collabs — their remaining balance is unpayable.
-        const dPostIds = pays.map((p) => p.post_id).filter((v): v is string => !!v);
-        if (dPostIds.length > 0) {
-          const { data: posts } = await (supabase as any)
-            .from("posts")
-            .select("post_id, workflow_status")
-            .in("post_id", dPostIds);
-          const voided = new Set(
-            ((posts ?? []) as Array<{ post_id: string; workflow_status: string | null }>)
-              .filter((p) => p.workflow_status === "Offboarded" || p.workflow_status === "Offboarding")
-              .map((p) => p.post_id),
-          );
-          pays = pays.filter((p) => !p.post_id || !voided.has(p.post_id));
-        }
-
-        if (pays.length > 0) {
-          // Resolve creator name + handle for each row.
-          const infIds = Array.from(
-            new Set(pays.map((p) => p.inf_id).filter((v): v is string => !!v)),
-          );
-          const creatorByInf = new Map<string, { inf_name: string | null; username: string | null }>();
-          if (infIds.length > 0) {
-            const { data: cr } = await (supabase as any)
-              .from("creators")
-              .select("inf_id, inf_name, username")
-              .in("inf_id", infIds);
-            for (const c of (cr ?? []) as Array<{ inf_id: string; inf_name: string | null; username: string | null }>) {
-              creatorByInf.set(c.inf_id, { inf_name: c.inf_name, username: c.username });
-            }
-          }
-
-          const esc = (s: unknown) =>
-            String(s ?? "")
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;");
-          const inr = (n: number | null) =>
-            n == null ? "—" : `₹${Number(n).toLocaleString("en-IN")}`;
-
-          const built = pays.map((p) => {
-            const c = p.inf_id ? creatorByInf.get(p.inf_id) : undefined;
-            const handle = (c?.username ?? p.username ?? "").replace(/^@/, "");
-            return {
-              name: c?.inf_name ?? handle ?? p.inf_id ?? "—",
-              handle,
-              profile: handle ? `https://www.instagram.com/${handle}/` : "—",
-              collab: p.collab_id ?? "—",
-              amount: Number(p.amount ?? 0),
-              due: p.due_date ?? "—",
-              status: p.status ?? "—",
-              bankName: p.bank_name ?? "—",
-              bankNum: p.bank_number ?? "—",
-              ifsc: p.ifsc ?? "—",
-            };
-          });
-          const total = built.reduce((s, r) => s + r.amount, 0);
-
-          const th = (t: string) =>
-            `<th style="text-align:left;padding:6px 8px;border-bottom:2px solid #E7E2D2;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:#6E695E;">${t}</th>`;
-          const tdc = (v: string) =>
-            `<td style="padding:6px 8px;border-bottom:1px solid #EFEAE0;font-size:12px;color:#161513;">${v}</td>`;
-          const bodyRows = built
-            .map(
-              (r) =>
-                `<tr>${tdc(esc(r.name))}${tdc(r.handle ? `<a href="${r.profile}" style="color:#3B6FD4;">@${esc(r.handle)}</a>` : "—")}${tdc(esc(r.collab))}${tdc(`<strong>${inr(r.amount)}</strong>`)}${tdc(esc(r.due))}${tdc(esc(r.status))}${tdc(esc(r.bankName))}${tdc(esc(r.bankNum))}${tdc(esc(r.ifsc))}</tr>`,
-            )
-            .join("");
-
-          const html = `<p style="margin:0 0 12px;">The following <strong>${built.length}</strong> collab payment${built.length === 1 ? "" : "s"} fall in the <strong>${cycleIso}</strong> payout cycle and still owe money. Please process them on or before the cycle date.</p>
+      const esc = (s: unknown) =>
+        String(s ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      const inr = (n: number | null) =>
+        n == null ? "—" : `₹${Number(n).toLocaleString("en-IN")}`;
+      const built = pays.map((p) => {
+        const handle = (p.username ?? "").replace(/^@/, "");
+        return {
+          name: p.creator_name || handle || p.inf_id || "—",
+          handle,
+          profile: handle ? `https://www.instagram.com/${handle}/` : "—",
+          collab: p.collab_id ?? "—",
+          amount: Number(p.outstanding ?? 0),
+          due: p.due_date ?? "—",
+          status: p.status ?? "—",
+          bankName: p.bank_name ?? "—",
+          bankNum: p.bank_number ?? "—",
+          ifsc: p.ifsc ?? "—",
+        };
+      });
+      const total = built.reduce((sum, row) => sum + row.amount, 0);
+      const th = (text: string) =>
+        `<th style="text-align:left;padding:6px 8px;border-bottom:2px solid #E7E2D2;font-size:11px;text-transform:uppercase;letter-spacing:0.4px;color:#6E695E;">${text}</th>`;
+      const tdc = (value: string) =>
+        `<td style="padding:6px 8px;border-bottom:1px solid #EFEAE0;font-size:12px;color:#161513;">${value}</td>`;
+      const bodyRows = built
+        .map(
+          (row) =>
+            `<tr>${tdc(esc(row.name))}${tdc(row.handle ? `<a href="${row.profile}" style="color:#3B6FD4;">@${esc(row.handle)}</a>` : "—")}${tdc(esc(row.collab))}${tdc(`<strong>${inr(row.amount)}</strong>`)}${tdc(esc(row.due))}${tdc(esc(row.status))}${tdc(esc(row.bankName))}${tdc(esc(row.bankNum))}${tdc(esc(row.ifsc))}</tr>`,
+        )
+        .join("");
+      const html = `<p style="margin:0 0 12px;">The following <strong>${built.length}</strong> collab payment${built.length === 1 ? "" : "s"} fall in the <strong>${cycleIso}</strong> payout cycle and still owe money. Please process them on or before the cycle date.</p>
 <div style="overflow-x:auto;">
 <table style="width:100%;border-collapse:collapse;margin:0 0 12px;">
-<thead><tr>${th("Creator")}${th("Handle")}${th("Collab ID")}${th("Amount")}${th("Due")}${th("Status")}${th("Bank")}${th("A/C No.")}${th("IFSC")}</tr></thead>
+<thead><tr>${th("Creator")}${th("Handle")}${th("Collab ID")}${th("Outstanding")}${th("Due")}${th("Status")}${th("Bank")}${th("A/C No.")}${th("IFSC")}</tr></thead>
 <tbody>${bodyRows}</tbody>
 </table>
 </div>
 <p style="margin:0 0 4px;font-size:14px;"><strong>Total payable this cycle: ${inr(total)}</strong></p>
 <p style="margin:0;font-size:12px;color:#9A9384;">Bank details are included for processing. Open the Accounts Hub to update each payment once paid.</p>`;
+      const subject = `Payments due ${cycleIso} — ${built.length} creator${built.length === 1 ? "" : "s"}, ${inr(total)}`;
+      const claimId = await claimDelivery(
+        NOTIFICATION_TYPES.ACCOUNTS_PAYABLE_DIGEST,
+        `accounts:${cycleIso}`,
+        recipients,
+        subject,
+      );
+      if (!claimId) return;
 
-          const r = await sendNotification({
-            type: NOTIFICATION_TYPES.ACCOUNTS_PAYABLE_DIGEST,
-            to: recipients,
-            subject: `Payments due ${cycleIso} — ${built.length} creator${built.length === 1 ? "" : "s"}, ${inr(total)}`,
-            title: `Upcoming payout cycle — ${cycleIso}`,
-            subtitle: `${built.length} payable collab${built.length === 1 ? "" : "s"}`,
-            htmlBody: html,
-          });
-          if (r.ok) sent.accounts_payable_digest = built.length;
-        }
-      }
+      const to = accountsTeam[0] ?? recipients[0];
+      const r = await sendNotification({
+        type: NOTIFICATION_TYPES.ACCOUNTS_PAYABLE_DIGEST,
+        to,
+        bcc: recipients.filter((email) => email !== to),
+        subject,
+        title: `Upcoming payout cycle — ${cycleIso}`,
+        subtitle: `${built.length} payable collab${built.length === 1 ? "" : "s"}`,
+        htmlBody: html,
+      });
+      await finalizeDelivery(claimId, r.ok, r.error);
+      if (r.ok) sent.accounts_payable_digest = built.length;
+    } catch (err) {
+      console.error("[cron/notifications] payable_digest check failed:", err);
     }
-  } catch (err) {
-    console.error("[cron/notifications] payable_digest check failed:", err);
   }
 
   // ── 9. Auto-close campaigns whose full creator allocation has posted ─────────

@@ -93,6 +93,8 @@ export interface SendNotificationInput {
   plainBody?: string;
   /** Reply-to address (D16 reply-to flow). Defaults to the SMTP sender. */
   replyTo?: string;
+  /** Hidden recipients. De-duped and excluded from the visible To list. */
+  bcc?: string | string[];
   postId?: string | null;
   collabId?: string | null;
   /** Set false if htmlBody is already a full document. Default true. */
@@ -211,8 +213,8 @@ ${footnoteHtml}
 <p style="margin-top:4px;font-size:1.02rem;font-weight:800;color:#2C2420;letter-spacing:0.4px;">Saadaa CreatorHub</p>`;
 }
 
-function normalizeRecipients(to: string | string[]): string[] {
-  const arr = Array.isArray(to) ? to : [to];
+function normalizeRecipients(to?: string | string[]): string[] {
+  const arr = Array.isArray(to) ? to : to ? [to] : [];
   return Array.from(
     new Set(
       arr
@@ -233,6 +235,10 @@ export async function sendNotification(
 ): Promise<SendNotificationResult> {
   try {
     const recipients = normalizeRecipients(input.to);
+    const visible = new Set(recipients);
+    const bcc = normalizeRecipients(input.bcc).filter(
+      (email) => !visible.has(email),
+    );
     if (recipients.length === 0) {
       return { ok: true, sent: 0, skipped: true };
     }
@@ -255,11 +261,12 @@ export async function sendNotification(
 
     let sent = 0;
     await Promise.all(
-      recipients.map(async (to) => {
+      recipients.map(async (to, index) => {
         let res: { ok: boolean; error?: string };
         try {
           res = await sendMail({
             to,
+            bcc: index === 0 ? bcc : undefined,
             subject: input.subject,
             htmlBody,
             plainBody: input.plainBody,

@@ -197,12 +197,15 @@ export async function fetchDashboardData(
     return ext;
   };
 
-  const [postsRes, creatorsRes] = await Promise.all([
+  const [postsRes, creatorsRes, reworkRes] = await Promise.all([
     fetchPosts(),
     (supabase as any)
       .from("creators")
       .select("username, inf_name, category, followers, profile_pic")
       .limit(50000),
+    tableName === "posts"
+      ? (supabase as any).rpc("dashboard_rework_metrics")
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (postsRes.error) {
@@ -215,6 +218,16 @@ export async function fetchDashboardData(
     (postsRes.data ?? []) as Array<Record<string, unknown>>
   ).filter((p) => !isVoidedStatus(p.workflow_status as string | null));
   const creators = (creatorsRes.data ?? []) as Array<Record<string, unknown>>;
+  if (reworkRes.error) {
+    console.warn("[dashboard] rework metrics unavailable:", reworkRes.error.message);
+  }
+  const reworkBreakdown: BreakdownSlice[] = (
+    (reworkRes.data ?? []) as Array<{ label: string; value: number | string; color: string }>
+  ).map((row) => ({
+    label: row.label,
+    value: Number(row.value) || 0,
+    color: row.color,
+  }));
 
   const categoryByUser = new Map<string, string>();
   for (const c of creators) {
@@ -901,6 +914,7 @@ export async function fetchDashboardData(
     channels,
     contentBreakdown,
     categoryBreakdown,
+    reworkBreakdown,
     workflowFunnel: {
       reachOut: reachOutCount,
       onboarded: onboardedCount,

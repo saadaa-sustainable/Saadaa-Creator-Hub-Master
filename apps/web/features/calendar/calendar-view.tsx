@@ -12,10 +12,12 @@ import {
   Send,
   ChevronDown,
   AlertTriangle,
+  MailCheck,
   Search,
 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { CalendarEvent, CalendarEventType } from "./queries";
+import { CALENDAR_LEGEND, calendarEventPalette } from "./palette";
 
 /**
  * Content Calendar — direct port of the Workflow Optimizer CalendarView
@@ -30,9 +32,9 @@ const WEEKDAYS_MINI = ["S", "M", "T", "W", "T", "F", "S"];
 type View = "month" | "week" | "schedule";
 const VIEW_LABEL: Record<View, string> = { month: "Month", week: "Week", schedule: "Schedule" };
 
-const TYPE_META: Record<CalendarEventType, { label: string; bg: string; fg: string; dot: string; Icon: typeof Send }> = {
-  delivery: { label: "Est. Delivery", bg: "#FAF1DC", fg: "#8C5A2B", dot: "#E8A020", Icon: PackageCheck },
-  posting:  { label: "Posted",        bg: "#E9F4EC", fg: "#2F7D4F", dot: "#4CAF7D", Icon: Send },
+const TYPE_ICON: Record<CalendarEventType, typeof Send> = {
+  delivery: PackageCheck,
+  posting: Send,
 };
 
 /** Filter keys mirrored in the URL so they survive month navigation. */
@@ -111,6 +113,7 @@ export function CalendarView({ year, month, events, campaigns }: {
       if (camp && (e.campaignId ?? "") !== camp) return false;
       if (ctype && (e.collabType ?? "") !== ctype) return false;
       if (etype === "overdue") { if (!e.overdue) return false; }
+      else if (etype === "reminder_sent") { if (!e.reminderSentAt) return false; }
       else if (etype && e.type !== etype) return false;
       if (needle) {
         const hay = [e.username, e.postId, e.collabId, e.orderId, e.campaignId]
@@ -171,6 +174,7 @@ export function CalendarView({ year, month, events, campaigns }: {
             { label: "Est. Delivery", value: "delivery" },
             { label: "Posted", value: "posting" },
             { label: "Overdue only", value: "overdue" },
+            { label: "EDD reminder sent", value: "reminder_sent" },
           ]}
         />
         <CalFilterSelect
@@ -222,25 +226,16 @@ export function CalendarView({ year, month, events, campaigns }: {
         </p>
       )}
     </div>
+    <div className="mb-4 rounded-[12px] border border-[#E7E2D2] bg-white p-3 lg:hidden">
+      <CalendarLegend counts={counts} events={filtered} />
+    </div>
     <div className="flex flex-col lg:flex-row gap-5">
       {/* ── Left rail: mini-calendar + legend ── */}
       <aside className="hidden lg:block w-[230px] shrink-0">
         <MiniCalendar year={year} month={month} eventsByDay={eventsByDay} todayInMonth={todayInMonth} monthHref={monthHref}
           focusDay={focusDay} onPick={(d) => { setFocusDay(d); if (view !== "week") setSelectedDay((eventsByDay.get(d)?.length ?? 0) > 0 ? d : null); }} />
-        <div className="mt-4 space-y-2">
-          {(Object.keys(TYPE_META) as CalendarEventType[]).map((t) => (
-            <div key={t} className="flex items-center gap-2 text-[12px] text-[#6E695E]">
-              <span className="h-2.5 w-2.5 rounded-full" style={{ background: TYPE_META[t].dot }} />
-              {TYPE_META[t].label}<span className="text-[#9A9384]">({counts[t]})</span>
-            </div>
-          ))}
-          <div className="flex items-center gap-2 text-[12px] text-[#6E695E]">
-            <AlertTriangle size={11} className="text-danger-text" aria-hidden />
-            Overdue delivery
-            <span className="text-[#9A9384]">
-              ({filtered.filter((e) => e.overdue).length})
-            </span>
-          </div>
+        <div className="mt-4">
+          <CalendarLegend counts={counts} events={filtered} />
         </div>
       </aside>
 
@@ -302,7 +297,6 @@ export function CalendarView({ year, month, events, campaigns }: {
     </>
   );
 }
-
 function CalFilterSelect({ label, value, onChange, options }: {
   label: string; value: string; onChange: (value: string | undefined) => void;
   options: { label: string; value: string }[];
@@ -341,7 +335,11 @@ function MiniCalendar({ year, month, eventsByDay, todayInMonth, focusDay, onPick
         {WEEKDAYS_MINI.map((w, i) => <span key={i} className="text-[10px] font-semibold text-[#9A9384]">{w}</span>)}
         {cells.map((d, i) => {
           if (d === null) return <span key={`b${i}`} />;
-          const has = (eventsByDay.get(d)?.length ?? 0) > 0;
+          const dayEvents = eventsByDay.get(d) ?? [];
+          const marker = dayEvents.find((event) => event.overdue)
+            ?? dayEvents.find((event) => event.type === "posting")
+            ?? dayEvents[0];
+          const has = dayEvents.length > 0;
           const isFocus = d === focusDay;
           const isTod = d === todayInMonth;
           return (
@@ -349,7 +347,7 @@ function MiniCalendar({ year, month, eventsByDay, todayInMonth, focusDay, onPick
               className="relative mx-auto h-7 w-7 rounded-full text-[11px] flex items-center justify-center transition-colors"
               style={isTod ? { background: "#2C2420", color: "#fff" } : isFocus ? { background: "#F0EAD6", color: "#2C2420" } : { color: "#494640" }}>
               {d}
-              {has && !isTod && <span className="absolute bottom-0.5 h-1 w-1 rounded-full" style={{ background: "#E8A020" }} />}
+              {has && !isTod && <span className="absolute bottom-0.5 h-1 w-1 rounded-full" style={{ background: calendarEventPalette(marker).dot }} />}
             </button>
           );
         })}
@@ -359,18 +357,19 @@ function MiniCalendar({ year, month, eventsByDay, todayInMonth, focusDay, onPick
 }
 
 function EventChip({ e, onClick }: { e: CalendarEvent; onClick?: () => void }) {
-  const m = TYPE_META[e.type];
+  const m = calendarEventPalette(e);
   const El: "button" | "div" = onClick ? "button" : "div";
   return (
     <El
       {...(onClick ? { type: "button" as const, onClick } : {})}
-      className="w-full flex items-center gap-1 rounded-[5px] px-1 py-0.5 text-[10px] leading-tight text-left"
-      style={{ background: m.bg, color: m.fg }}
+      className="w-full flex items-center gap-1 rounded-[5px] border px-1 py-0.5 text-[10px] leading-tight text-left"
+      style={{ background: m.bg, borderColor: m.border, color: m.fg }}
       title={`${m.label}: ${e.label}${e.overdue ? " (overdue)" : ""}`}
     >
       <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: m.dot }} />
       {e.overdue && <AlertTriangle size={9} className="shrink-0 text-danger-text" aria-hidden />}
       <span className="truncate">{e.label}</span>
+      {e.reminderSentAt && <MailCheck size={9} className="ml-auto shrink-0 text-[#3B6FD4]" aria-label="EDD reminder sent" />}
     </El>
   );
 }
@@ -400,7 +399,7 @@ function MonthGrid({ daysInMonth, leadingBlanks, eventsByDay, isToday, onOpenDay
               </div>
               {dayEvents.length > 0 && (
                 <div className="flex sm:hidden flex-wrap gap-1 mt-0.5">
-                  {dayEvents.slice(0, 6).map((e, idx) => <span key={idx} className="h-1.5 w-1.5 rounded-full" style={{ background: TYPE_META[e.type].dot }} />)}
+                  {dayEvents.slice(0, 6).map((e, idx) => <span key={idx} className="h-1.5 w-1.5 rounded-full" style={{ background: calendarEventPalette(e).dot }} />)}
                 </div>
               )}
             </button>
@@ -465,12 +464,14 @@ function ScheduleView({ year, month, events, isToday }: { year: number; month: n
           </div>
           <div className="flex-1 min-w-0 space-y-1.5 border-l border-[#EFE7D8] pl-3 py-1">
             {byDay.get(day)!.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type)).map((e, idx) => {
-              const m = TYPE_META[e.type];
+              const m = calendarEventPalette(e);
+              const Icon = TYPE_ICON[e.type];
               return (
-                <div key={idx} className="flex items-center gap-2 rounded-[8px] border border-[#EFE7D8] bg-white px-2.5 py-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold shrink-0" style={{ background: m.bg, color: m.fg }}><m.Icon size={11} /> {m.label}</span>
+                <div key={idx} className="flex items-center gap-2 rounded-[8px] border px-2.5 py-1.5" style={{ background: m.bg, borderColor: m.border }}>
+                  <span className="inline-flex items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold shrink-0" style={{ color: m.fg }}><Icon size={11} /> {m.label}</span>
                   {e.overdue && <AlertTriangle size={11} className="text-danger-text shrink-0" aria-hidden />}
                   <span className="text-[12px] font-medium text-[#161513] truncate flex-1">{e.label}</span>
+                  {e.reminderSentAt && <span className="inline-flex shrink-0 items-center gap-1 text-[10px] font-semibold text-[#3B6FD4]"><MailCheck size={11} aria-hidden /> EDD sent</span>}
                   <span className="text-[11px] font-mono text-[#9A9384] shrink-0 hidden sm:block">{e.campaignId ?? e.collabId}</span>
                 </div>
               );
@@ -505,16 +506,18 @@ function DayPopup({ year, month, day, events, onClose }: { year: number; month: 
         </div>
         <div className="p-3 space-y-2">
           {events.map((e, idx) => {
-            const m = TYPE_META[e.type];
+            const m = calendarEventPalette(e);
+            const Icon = TYPE_ICON[e.type];
             return (
-              <div key={idx} className="rounded-[10px] border border-[#E7E2D2] p-2.5">
+              <div key={idx} className="rounded-[10px] border p-2.5" style={{ background: m.bg, borderColor: m.border }}>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="inline-flex items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: m.bg, color: m.fg }}><m.Icon size={11} /> {m.label}</span>
+                  <span className="inline-flex items-center gap-1 rounded-[5px] px-1.5 py-0.5 text-[10px] font-semibold" style={{ color: m.fg }}><Icon size={11} /> {m.label}</span>
                   {e.overdue && (
                     <span className="overdue-pill overdue-pill--tiny">
                       <AlertTriangle size={7} aria-hidden /> Overdue
                     </span>
                   )}
+                  {e.reminderSentAt && <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF3FC] px-2 py-0.5 text-[9px] font-semibold text-[#3B6FD4]"><MailCheck size={9} aria-hidden /> EDD reminder sent</span>}
                   <span className="text-[12px] font-mono text-[#6E695E] truncate">{e.postId}</span>
                 </div>
                 <p className="text-[12px] font-medium text-[#161513] truncate">@{e.username ?? "—"}</p>
@@ -532,5 +535,33 @@ function DayPopup({ year, month, day, events, onClose }: { year: number; month: 
       </div>
     </div>,
     document.body,
+  );
+}
+
+function CalendarLegend({ counts, events }: {
+  counts: Record<CalendarEventType, number>;
+  events: CalendarEvent[];
+}) {
+  const overdue = events.filter((event) => event.overdue).length;
+  const reminders = events.filter((event) => event.reminderSentAt).length;
+  const values = [
+    events.filter((event) => event.type === "delivery" && !event.overdue).length,
+    counts.posting,
+    overdue,
+  ];
+  return (
+    <div className="space-y-2" aria-label="Calendar colour legend">
+      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#9A9384]">Legend</p>
+      {CALENDAR_LEGEND.map((item, index) => (
+        <div key={item.tone} className="flex items-center gap-2 text-[12px] text-[#6E695E]">
+          <span className="h-3 w-5 rounded-[4px] border" style={{ background: item.bg, borderColor: item.border }} aria-hidden />
+          {item.label}<span className="text-[#9A9384]">({values[index]})</span>
+        </div>
+      ))}
+      <div className="flex items-center gap-2 text-[12px] text-[#6E695E]">
+        <MailCheck size={15} className="text-[#3B6FD4]" aria-hidden />
+        EDD reminder sent<span className="text-[#9A9384]">({reminders})</span>
+      </div>
+    </div>
   );
 }

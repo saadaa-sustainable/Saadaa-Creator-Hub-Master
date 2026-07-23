@@ -23,7 +23,7 @@
   - `NOTIFICATION_TYPES` — canonical `email_type` constants: `CAMPAIGN_CREATED`, `PAYMENT_PROCESSED`, six submitter confirmations (`REACHOUT/INBOUND/ONBOARDING/CAMPAIGN/POSTING/PAYMENT_CONFIRMATION`), `SHOPIFY_VALIDATION_FAILED`, seven cron/time-based (`PENDING_ONBOARDING`, `POSTING_PENDING`, `DELIVERY_REMINDER` — creator nudge 2 days before `est_delivery`, 2026-07-21, `CONTENT_REMINDER`, `PAYMENT_ELIGIBLE`, `PAYMENT_SLA_BREACH`, `CAMPAIGN_ENDING`), and `USER_INVITATION`.
   - `wrapNotificationHtml` — shared branded wrapper (dark header `#2C2420`, gold eyebrow `#F0C61E`, ecru body `#FAF8F5`, 600px). Matches the collab email.
   - `buildConfirmationBody` — greeting → summary → key/value table (auto-drops null/empty rows) → "Thanks, Saadaa CreatorHub". HTML-escaped.
-  - `sendNotification` — normalizes/de-dupes recipients, wraps body, sends per-recipient in parallel, logs each to `email_logs`. Triple-guarded against throwing.
+  - `sendNotification` — normalizes/de-dupes visible and BCC recipients, keeps BCC hidden/excluded from To, wraps body, sends per-recipient in parallel, and logs each visible send to `email_logs`. Triple-guarded against throwing.
   - `notifyActorConfirmation` — emails the logged-in actor a submit confirmation; safe inside `after()`.
   - **All emails reference Collab ID (`SIF-N-Cn`) as the primary id (2026-06-10):** reach-out / onboarding / posting confirmations + the creator-facing payment-processed email lead with COLLAB ID (the per-deliverable post id, if shown, is a secondary "(deliverable)" row). The collab brief email + cron notifications already used it. Exception: the internal `SHOPIFY_VALIDATION_FAILED` alert keeps Post ID (deliverable-level order failure).
   - `resolveGlobalAdminEmails()` / `resolveAccountsTeamEmails()` — query `user_access` (active, role-filtered).
@@ -139,6 +139,8 @@ All `mirrorToSheet()` calls removed 2026-05-21. `sheet-mirror.ts` remains but is
 
 - Submitter confirmations → the logged-in actor.
 - Payment eligibility / SLA breach → Accounts Team.
+- Creator EDD reminder → one email per collab, creator in To; the row's onboarder plus active Global Admin / Owner / Admin recipients in BCC. A unique `email_logs` claim prevents concurrent duplicate sends; only a successful SMTP handoff stamps every deliverable's `delivery_reminder_sent_at`.
+- Payable-cycle digest → Accounts Team + Global Admins on the 13th / 28th for the 15th / 30th cycles. One concurrency-safe claim covers the cycle, and the data RPC returns one outstanding balance per collab (not raw installment rows). Both this digest and creator EDD reminders execute before bulk notification queues.
 - Campaign Ending / admin alerts → Global Admins.
 - Shopify Validation Failed → the assigned user / submitter.
 - User Invitation → the invitee (links to `/login`; Google-OAuth-only).

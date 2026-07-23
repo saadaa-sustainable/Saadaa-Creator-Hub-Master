@@ -1,4 +1,4 @@
-import { Activity, Image as ImageIcon, Layers } from "lucide-react";
+import { Activity, Image as ImageIcon, Layers, RefreshCw } from "lucide-react";
 import { DashboardActionStrip } from "./action-strip";
 import { DashboardCampaignKpis } from "./campaign-kpis";
 import { DashboardPipelineKpis } from "./pipeline-kpis";
@@ -25,7 +25,7 @@ import type { DashboardData } from "./types";
  *   Row C  | Stage Snapshot — 4 mini kanban columns (full row)
  *   Row D  | Action Strip (8) · Posting Goal Radial (4)
  *   Row E  | Workflow Funnel (5) · Monthly Trend (7)
- *   Row F  | Content Donut (6) · Tier Donut (6)
+ *   Row F  | Rework Donut (4) · Content Donut (4) · Tier Donut (4)
  *   Row G  | Pipeline KPIs (full row, 6 equal)
  *   Row H  | Top Creators (6) · Team Leaderboard (6)
  *   Row I  | Spends per Campaign (full row)
@@ -184,7 +184,23 @@ export function DashboardBento({
       </div>
 
       {/* Row F */}
-      <div className="lg:col-span-6">
+      {!archival && (
+        <div className="lg:col-span-4">
+          <DonutTile
+            icon={<RefreshCw size={13} aria-hidden />}
+            title="Rework Metrics · All Time"
+            info="All applied corrections across Campaign, Reach Out, Onboarding, Budget, Sheet View and other edit audit trails. Pending or rejected requests and normal workflow approvals are excluded. This all-time chart is global and does not change with the dashboard filters."
+            segs={data.reworkBreakdown.map((s) => ({
+              name: s.label,
+              value: s.value,
+              color: s.color,
+            }))}
+            centreLabel="reworks"
+            emptyHint="No applied reworks yet"
+          />
+        </div>
+      )}
+      <div className={archival ? "lg:col-span-6" : "lg:col-span-4"}>
         <DonutTile
           icon={<ImageIcon size={13} aria-hidden />}
           title="Content Type Split"
@@ -198,7 +214,7 @@ export function DashboardBento({
           emptyHint="No content types tagged yet"
         />
       </div>
-      <div className="lg:col-span-6">
+      <div className={archival ? "lg:col-span-6" : "lg:col-span-4"}>
         <DonutTile
           icon={<Layers size={13} aria-hidden />}
           title="Creator Tier Split"

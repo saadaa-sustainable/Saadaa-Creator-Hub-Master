@@ -131,9 +131,14 @@ export default function DashboardKM() {
             bucket. Respects the dashboard filters (campaign / date / tier).
           </li>
           <li>
-            <strong>9. Row F — Content Type donut + Creator Tier donut</strong>{" "}
-            · 6/6. Inline SVG donuts with center total + legend (brand colour
-            palette).
+            <strong>
+              9. Row F — Rework + Content Type + Creator Tier donuts
+            </strong>{" "}
+            · 4/4/4. Rework is the all-time global count of applied campaign,
+            Reach Out, onboarding, budget, Sheet View, and other audited edits;
+            pending/rejected requests and normal first approvals are excluded.
+            Content Type and Creator Tier continue to follow the active
+            Dashboard filters.
           </li>
           <li>
             <strong>10. Row G — Pipeline KPIs</strong> · 6-card strip (Reach

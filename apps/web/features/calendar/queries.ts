@@ -27,6 +27,8 @@ export interface CalendarEvent {
   owner: string | null; // onboarded_by for deliveries, posted_by for postings
   /** delivery events only — promised date passed with no post yet. */
   overdue?: boolean;
+  /** delivery events only — creator-facing EDD reminder was sent. */
+  reminderSentAt?: string | null;
 }
 
 export interface CalendarData {
@@ -57,7 +59,7 @@ export async function getCalendarData(
     (supabase as any)
       .from("posts")
       .select(
-        "post_id, post_id_short, collab_id, username, campaign_id, collab_type, order_id, onboarded_by, est_delivery, reach_out_date, workflow_status, deliverable_index, is_test",
+        "post_id, post_id_short, collab_id, username, campaign_id, collab_type, order_id, onboarded_by, est_delivery, delivery_reminder_sent_at, reach_out_date, workflow_status, deliverable_index, is_test",
       )
       .in("workflow_status", ["On Board", "Order Sent"])
       .gte("est_delivery", first)
@@ -98,6 +100,7 @@ export async function getCalendarData(
       orderId: (r.order_id as string | null) ?? null,
       owner: (r.onboarded_by as string | null) ?? null,
       overdue: isPastDue(r.est_delivery, r.reach_out_date),
+      reminderSentAt: (r.delivery_reminder_sent_at as string | null) ?? null,
     });
   }
 

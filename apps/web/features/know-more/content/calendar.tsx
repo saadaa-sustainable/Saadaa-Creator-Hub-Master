@@ -13,9 +13,11 @@ export default function CalendarKM() {
           <li>
             <strong>Est. Delivery (amber)</strong> — one event per ONBOARDED
             collab (On Board / Order Sent) on its promised delivery date from
-            the onboarding form. A red warning marks <strong>overdue</strong>{" "}
-            deliveries: the promised date passed and nothing was posted (same
-            rule as the Overdue KPIs — day after est. delivery).
+            the onboarding form. Once the creator email is successfully sent,
+            a blue <strong>EDD reminder sent</strong> envelope appears on the
+            event. <strong>Overdue deliveries become red</strong>: the promised
+            date passed and nothing was posted (same rule as the Overdue KPIs —
+            day after est. delivery).
           </li>
           <li>
             <strong>Posted (green)</strong> — one event per posted deliverable
@@ -45,9 +47,11 @@ export default function CalendarKM() {
             month, deliveries before posts within a day.
           </li>
           <li>
-            The left rail's mini-calendar jumps between days (dots mark days
-            with events) and the legend shows this month's counts. Arrows /
-            "Today" move between months via the URL (shareable).
+            The left rail's mini-calendar jumps between days (status-coloured
+            dots mark days with events) and the legend shows this month&apos;s
+            amber EDD, green Posted, red Overdue, and EDD-reminder-sent counts.
+            The same legend is visible above the grid on mobile. Arrows /
+            &quot;Today&quot; move between months via the URL (shareable).
           </li>
         </KMList>
       </KMSection>
@@ -58,7 +62,8 @@ export default function CalendarKM() {
             The filter bar above the calendar narrows every view (month, week,
             schedule, mini-calendar dots and legend counts):{" "}
             <strong>Search</strong> (creator, POST ID, collab, order, campaign),{" "}
-            <strong>Event</strong> (Est. Delivery / Posted / Overdue only),{" "}
+            <strong>Event</strong> (Est. Delivery / Posted / Overdue only / EDD
+            reminder sent),{" "}
             <strong>Team Member</strong> (who onboarded the delivery or posted
             the deliverable — the list shows only members active in the open
             month), <strong>Campaign</strong> and <strong>Collab Type</strong>.

@@ -293,13 +293,17 @@ export default function AccountsHubKM() {
           </li>
           <li>
             <strong>Monthly payable digest</strong> — the daily cron also sends
-            a single branded digest on the <strong>12th</strong> (this
-            month&apos;s 15th payout cycle) and the <strong>27th</strong> (the
-            30th cycle) to the <strong>Accounts Team + Global Admins</strong>.
+            a single branded digest two days before each payout: on the{" "}
+            <strong>13th</strong> for the 15th cycle and the{" "}
+            <strong>28th</strong> for the 30th cycle, to the{" "}
+            <strong>Accounts Team + Global Admins</strong>.
             It lists every still-owed collab in that cycle with creator, handle,
             Collab ID, amount, due date, status, and full{" "}
             <strong>bank name / account / IFSC</strong> for processing. Fires at
-            most once per day; voided (offboarded) collabs are excluded.
+            most once per day; voided (offboarded) collabs are excluded. This
+            priority digest runs before long notification backlogs. Partial
+            payments are collapsed to one collab row and show only the
+            outstanding balance.
           </li>
           <li>
             <strong>recomputePaymentStates</strong> runs inside the 3-hr cron
