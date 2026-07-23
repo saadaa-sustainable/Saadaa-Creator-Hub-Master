@@ -6,6 +6,7 @@
  */
 
 export interface MyPost {
+  id: number;
   post_id: string | null;
   post_id_short?: string | null;
   collab_id?: string | null;

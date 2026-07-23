@@ -19,6 +19,7 @@ const RTO_STATUSES = [
 ] as const;
 
 const POSTS_SELECT = [
+  "id",
   "post_id",
   "post_id_short",
   "collab_id",

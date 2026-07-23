@@ -975,9 +975,7 @@ export function MyDashboardWorkloadBoard({
                         .slice(0, visibleFor(stage.key))
                         .map((post) => (
                           <WorkloadCard
-                            key={
-                              post.post_id ?? `${post.username}-${stage.key}`
-                            }
+                            key={post.post_id ?? post.id}
                             post={post}
                             stage={stage}
                             onSubmit={handleSubmit}
@@ -1008,11 +1006,16 @@ export function MyDashboardWorkloadBoard({
         </div>
       </article>
 
-      {onboardingPost?.post_id && (
+      {onboardingPost && (
         <OrderCreationModal
           open
-          postId={onboardingPost.post_id}
-          postIdShort={compactId(onboardingPost)}
+          id={onboardingPost.id}
+          postId={onboardingPost.post_id ?? undefined}
+          postIdShort={
+            onboardingPost.post_id_short ??
+            onboardingPost.post_id ??
+            undefined
+          }
           creatorName={creatorName(onboardingPost)}
           username={onboardingPost.username}
           initial={{
