@@ -1,8 +1,5 @@
 "use client";
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { AlertCircle } from "lucide-react";
+import { AppErrorState } from "@/components/ui/app-error-state";
 
 export default function DashboardError({
   error,
@@ -11,17 +8,11 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    // TODO: forward to Sentry once wired
-    console.error(error);
-  }, [error]);
-
   return (
-    <EmptyState
-      icon={AlertCircle}
+    <AppErrorState
+      error={error}
+      reset={reset}
       title="Couldn't load the dashboard"
-      description={error.message}
-      action={<Button onClick={reset}>Retry</Button>}
     />
   );
 }

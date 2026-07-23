@@ -1,8 +1,5 @@
 "use client";
-import { useEffect } from "react";
-import { AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
+import { AppErrorState } from "@/components/ui/app-error-state";
 
 export default function PostingError({
   error,
@@ -11,16 +8,11 @@ export default function PostingError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
-
   return (
-    <EmptyState
-      icon={AlertCircle}
+    <AppErrorState
+      error={error}
+      reset={reset}
       title="Couldn't load posting"
-      description={error.message}
-      action={<Button onClick={reset}>Retry</Button>}
     />
   );
 }
