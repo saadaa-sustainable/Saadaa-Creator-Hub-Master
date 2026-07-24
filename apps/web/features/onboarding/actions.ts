@@ -23,6 +23,7 @@ import {
   parseShopifyAddress,
   buildLegacyNomenclature,
 } from "@/lib/onboarding-helpers";
+import { summarizeCollabEmailRows } from "./collab-email-data";
 
 export type OnboardingResult =
   | { ok: true; postId: string; childrenSpawned: number }
@@ -839,41 +840,74 @@ export async function getCollabEmailPreview(
   const infId = post.inf_id as string | null;
   const orderId = post.order_id as string | null;
   const campaignId = (post.campaign_id as string | null) ?? null;
+  const collabId = (post.collab_id as string | null) ?? null;
+  const collabNumber = (post.collab_number as number | null) ?? null;
+  let collabRowsLookup: Promise<{
+    data: Record<string, unknown>[] | null;
+    error: { message: string } | null;
+  }>;
+  let collabRowsQuery = (supabase as any)
+    .from("posts")
+    .select("reels, static_posts, stories, commercial_amount, garment_qty");
+  if (collabId) {
+    collabRowsQuery = collabRowsQuery.eq("collab_id", collabId);
+    collabRowsLookup = collabRowsQuery;
+  } else if (infId && collabNumber != null) {
+    collabRowsQuery = collabRowsQuery
+      .eq("inf_id", infId)
+      .eq("collab_number", collabNumber);
+    collabRowsLookup = collabRowsQuery;
+  } else if (infId && orderId) {
+    collabRowsQuery = collabRowsQuery
+      .eq("inf_id", infId)
+      .eq("order_id", orderId);
+    collabRowsLookup = collabRowsQuery;
+  } else {
+    collabRowsLookup = Promise.resolve({ data: [post], error: null });
+  }
 
   // Run all independent lookups in parallel.
-  const [creatorRaw, campaignRaw, orderRaw, termsFile] = await Promise.all([
-    infId
-      ? (supabase as any)
-          .from("creators")
-          .select("inf_name, email")
-          .eq("inf_id", infId)
-          .maybeSingle()
-          .then(
-            (r: { data: unknown }) => r.data as Record<string, unknown> | null,
-          )
+  const [creatorRaw, campaignRaw, orderRaw, termsFile, collabRowsResult] =
+    await Promise.all([
+      infId
+        ? (supabase as any)
+            .from("creators")
+            .select("inf_name, email")
+            .eq("inf_id", infId)
+            .maybeSingle()
+            .then(
+              (r: { data: unknown }) =>
+                r.data as Record<string, unknown> | null,
+            )
+        : Promise.resolve(null),
+      campaignId
+        ? (supabase as any)
+            .from("campaigns")
+            .select("brief_link, internal_brief_link, campaign_name")
+            .eq("campaign_id", campaignId)
+            .maybeSingle()
+            .then(
+              (r: { data: unknown }) =>
+                r.data as Record<string, unknown> | null,
+            )
+        : Promise.resolve(null),
+      orderId
+        ? (supabase as any)
+            .from("shopify_orders")
+            .select("email")
+            .eq("order_id", orderId)
+            .maybeSingle()
+            .then(
+              (r: { data: unknown }) =>
+                r.data as Record<string, unknown> | null,
+            )
       : Promise.resolve(null),
-    campaignId
-      ? (supabase as any)
-          .from("campaigns")
-          .select("brief_link, internal_brief_link, campaign_name")
-          .eq("campaign_id", campaignId)
-          .maybeSingle()
-          .then(
-            (r: { data: unknown }) => r.data as Record<string, unknown> | null,
-          )
-      : Promise.resolve(null),
-    orderId && !(post.email as string | null)
-      ? (supabase as any)
-          .from("shopify_orders")
-          .select("email")
-          .eq("order_id", orderId)
-          .maybeSingle()
-          .then(
-            (r: { data: unknown }) => r.data as Record<string, unknown> | null,
-          )
-      : Promise.resolve(null),
-    readTermsAttachmentFile(),
-  ]);
+      readTermsAttachmentFile(),
+      collabRowsLookup,
+    ]);
+  if (collabRowsResult.error) {
+    return { ok: false, error: collabRowsResult.error.message };
+  }
 
   const creatorName = (creatorRaw?.inf_name as string | null) ?? "";
   const creatorEmail = (creatorRaw?.email as string | null) ?? "";
@@ -883,9 +917,12 @@ export async function getCollabEmailPreview(
     (orderRaw?.email as string | null) ??
     "";
 
-  const reels = (post.reels as number | null) ?? 0;
-  const staticPosts = (post.static_posts as number | null) ?? 0;
-  const stories = (post.stories as number | null) ?? 0;
+  const collabRows =
+    collabRowsResult.data && collabRowsResult.data.length > 0
+      ? collabRowsResult.data
+      : [post];
+  const collabSummary = summarizeCollabEmailRows(collabRows);
+  const { reels, staticPosts, stories } = collabSummary;
   const deliverables: string[] = [];
   if (reels > 0)
     deliverables.push(`${reels} Collaboration Reel${reels > 1 ? "s" : ""}`);
@@ -898,10 +935,10 @@ export async function getCollabEmailPreview(
 
   const collabType = (post.collab_type as string | null) ?? "";
   const isPureBarter = collabType.toLowerCase() === "barter";
-  const commercials = String((post.commercial_amount as number | null) ?? 0);
+  const commercials = String(collabSummary.commercialAmount);
   // Barter value is now the GARMENT QUANTITY (number of products), for BOTH
   // Barter and Barter + Paid. Passed through the `barterAmount` field.
-  const garmentQty = String((post.garment_qty as string | null) ?? "").trim();
+  const garmentQty = collabSummary.productQuantity;
 
   // Only use campaign's brief_link / brief_pdf_url.
   // Never fall back to post.creator_brief_link — that field holds the internal
@@ -955,7 +992,7 @@ export async function getCollabEmailPreview(
     },
     {
       // Fixed brand asset, resolved server-side from Drive at send time (not from
-      // the client) — no driveId here so it never enters attachmentDriveIds.
+      // the client).
       kind: "voiceNote",
       label: "Pronunciation Voice Note",
       fileName: PRONUNCIATION_ATTACHMENT.fileName,
@@ -969,7 +1006,7 @@ export async function getCollabEmailPreview(
   // (SIF-N-P{n}). Prefer the stamped collab_id; fall back to inf_id-C{collab_number}
   // for legacy rows, and only then to post_id.
   const collabDisplayId =
-    (post.collab_id as string | null) ||
+    collabId ||
     (infId ? `${infId}-C${Number(post.collab_number ?? 1)}` : null) ||
     (post.post_id as string);
 
@@ -1036,8 +1073,8 @@ function buildCollabEmailHtml(opts: {
     ? `<li><strong>${adsUsageRights}</strong> of Ads Usage Rights for ads/whitelisting and brand platforms</li>`
     : `<li>Ads Usage Rights for ads/whitelisting and brand platforms</li>`;
   const commercialsHtml = isPureBarter
-    ? `<li>Barter Quantity: <strong>${barterText}</strong></li>`
-    : `<li>Total Agreed Amount: <strong>₹${agreedAmount}</strong></li><li>Barter Quantity: <strong>${barterText}</strong></li>`;
+    ? `<li>Product Quantity: <strong>${barterText}</strong></li>`
+    : `<li>Total Agreed Amount: <strong>₹${agreedAmount}</strong></li><li>Product Quantity: <strong>${barterText}</strong></li>`;
 
   const H3 =
     "color:#2C2420;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.7px;border-bottom:1px solid #E7E2D2;padding-bottom:7px;margin:22px 0 10px;";
@@ -1101,16 +1138,7 @@ async function fetchDriveFileAsAttachment(driveId: string): Promise<{
 
 export async function sendCollabEmail(payload: {
   postId: string;
-  collabId: string;
-  campaignName?: string | null;
   emailTo: string;
-  creatorName: string;
-  agreedAmount: string;
-  barterAmount: string;
-  deliverables: string[];
-  adsUsageRights: string;
-  collabType: string;
-  attachmentDriveIds?: string[];
 }): Promise<SendCollabEmailResult> {
   const actor = await assertPermission("onboarding_write");
 
@@ -1118,10 +1146,26 @@ export async function sendCollabEmail(payload: {
   if (!emailTo || !emailTo.includes("@")) {
     return { ok: false, error: "Invalid email address" };
   }
+  const preview = await getCollabEmailPreview(payload.postId);
+  if (!preview.ok) return preview;
+  if (!(Number(preview.barterAmount) > 0)) {
+    const reason = `Email to ${emailTo} blocked — Shopify product quantity is missing. No email sent to the creator.`;
+    await logSystemError({
+      type: "collab_email_blocked",
+      key: payload.postId,
+      message: reason,
+      source: "sendCollabEmail",
+    });
+    revalidatePath("/errors");
+    return { ok: false, error: reason };
+  }
 
   // The person sending the mail is CC'd; tanvi@saadaa.in is always BCC'd.
   const senderCc = (actor.email ?? "").trim();
   const COLLAB_EMAIL_BCC = "tanvi@saadaa.in";
+  const campaignBriefDriveId = preview.attachments.find(
+    (attachment) => attachment.kind === "campaignBrief",
+  )?.driveId;
 
   // HARD GATE — the creator must never receive an incomplete email. Resolve the
   // two REQUIRED attachments (campaign brief + T&C) up front and confirm the
@@ -1130,8 +1174,8 @@ export async function sendCollabEmail(payload: {
   // The pronunciation voice note is a best-effort brand asset — it does NOT gate.
   const [termsFile, briefFile, voiceRaw] = await Promise.all([
     readTermsAttachmentFile(),
-    payload.attachmentDriveIds?.[0]
-      ? fetchDriveFileAsAttachment(payload.attachmentDriveIds[0])
+    campaignBriefDriveId
+      ? fetchDriveFileAsAttachment(campaignBriefDriveId)
       : Promise.resolve(null),
     PRONUNCIATION_DRIVE_FILE_ID
       ? fetchDriveFileAsAttachment(PRONUNCIATION_DRIVE_FILE_ID)
@@ -1168,14 +1212,14 @@ export async function sendCollabEmail(payload: {
   );
 
   const htmlBody = buildCollabEmailHtml({
-    collabId: payload.collabId,
-    campaignName: payload.campaignName ?? null,
-    creatorName: payload.creatorName,
-    agreedAmount: payload.agreedAmount,
-    barterAmount: payload.barterAmount,
-    deliverables: payload.deliverables,
-    adsUsageRights: payload.adsUsageRights,
-    collabType: payload.collabType,
+    collabId: preview.collabId,
+    campaignName: preview.campaignName,
+    creatorName: preview.creatorName,
+    agreedAmount: preview.agreedAmount,
+    barterAmount: preview.barterAmount,
+    deliverables: preview.deliverables,
+    adsUsageRights: preview.adsUsageRights,
+    collabType: preview.collabType,
   });
 
   const supabase = createServiceClient();
@@ -1190,7 +1234,13 @@ export async function sendCollabEmail(payload: {
   revalidatePath("/onboarding");
 
   // Send email + log after response is returned (non-blocking via after()).
-  const sendPayload = { ...payload, htmlBody, attachments };
+  const sendPayload = {
+    postId: payload.postId,
+    collabId: preview.collabId,
+    emailTo,
+    htmlBody,
+    attachments,
+  };
   after(async () => {
     const result = await sendMail({
       to: sendPayload.emailTo,

@@ -9,7 +9,6 @@ import {
   FileText,
   Loader2,
   Mail,
-  Plus,
   Send,
   X,
 } from "lucide-react";
@@ -51,13 +50,7 @@ type Preview = Extract<CollabEmailPreviewResult, { ok: true }>;
 type Attachment = Preview["attachments"][number];
 
 export interface CollabEmailDraft {
-  creatorName?: string;
   emailTo?: string;
-  deliverables?: string[];
-  agreedAmount?: string;
-  barterAmount?: string;
-  collabType?: string;
-  adsUsageRights?: string;
 }
 
 function esc(s: string): string {
@@ -94,8 +87,8 @@ function buildPreviewHtml(opts: {
       ? `<li><strong>${esc(opts.adsUsageRights)}</strong> of Ads Usage Rights for ads/whitelisting and brand platforms</li>`
       : `<li>Ads Usage Rights for ads/whitelisting and brand platforms</li>`);
   const commercialsHtml = isPureBarter
-    ? `<li>Barter Quantity: <strong>${esc(barterText)}</strong></li>`
-    : `<li>Total Agreed Amount: <strong>₹${esc(opts.agreedAmount)}</strong></li><li>Barter Quantity: <strong>${esc(barterText)}</strong></li>`;
+    ? `<li>Product Quantity: <strong>${esc(barterText)}</strong></li>`
+    : `<li>Total Agreed Amount: <strong>₹${esc(opts.agreedAmount)}</strong></li><li>Product Quantity: <strong>${esc(barterText)}</strong></li>`;
 
   const H =
     "font-weight:800;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.08em;border-bottom:1px solid #E7E2D2;padding-bottom:7px;color:#2C2420;margin:18px 0 8px;";
@@ -156,11 +149,6 @@ export function CollabEmailPane({
   const [sendErr, setSendErr] = useState<string | null>(null);
 
   const [emailTo, setEmailTo] = useState("");
-  const [creatorName, setCreatorName] = useState("");
-  const [agreedAmount, setAgreedAmount] = useState("0");
-  const [barterAmount, setBarterAmount] = useState("0");
-  const [deliverables, setDeliverables] = useState<string[]>([]);
-  const [newDeliv, setNewDeliv] = useState("");
 
   useEffect(() => {
     if (!postId) return;
@@ -168,11 +156,6 @@ export function CollabEmailPane({
     setLoadErr(null);
     setSendErr(null);
     setEmailTo("");
-    setCreatorName("");
-    setAgreedAmount("0");
-    setBarterAmount("0");
-    setDeliverables([]);
-    setNewDeliv("");
     startLoad(async () => {
       const res = await getCollabEmailPreview(postId);
       if (!res.ok) {
@@ -181,24 +164,8 @@ export function CollabEmailPane({
       }
       setPreview(res);
       setEmailTo(draft?.emailTo ?? res.emailTo);
-      setCreatorName(draft?.creatorName ?? res.creatorName);
-      setAgreedAmount(draft?.agreedAmount ?? res.agreedAmount);
-      setBarterAmount(draft?.barterAmount ?? res.barterAmount);
-      setDeliverables(draft?.deliverables ?? res.deliverables);
     });
   }, [draft, postId]);
-
-  const addDeliverable = () => {
-    const val = newDeliv.trim();
-    if (!val) return;
-    setDeliverables((d) => [...d, val]);
-    setNewDeliv("");
-  };
-
-  const attachmentDriveIds =
-    preview?.attachments
-      .map((attachment) => attachment.driveId)
-      .filter((driveId): driveId is string => Boolean(driveId)) ?? [];
 
   const handleSend = () => {
     if (!preview) return;
@@ -212,16 +179,7 @@ export function CollabEmailPane({
     setSendErr(null);
     const sendArgs = {
       postId,
-      collabId: preview.collabId,
-      campaignName: preview.campaignName,
       emailTo: to,
-      creatorName,
-      agreedAmount,
-      barterAmount,
-      deliverables,
-      adsUsageRights: draft?.adsUsageRights ?? preview.adsUsageRights,
-      collabType: draft?.collabType ?? preview.collabType,
-      attachmentDriveIds,
     };
 
     if (inline) {
@@ -276,12 +234,12 @@ export function CollabEmailPane({
     ? buildPreviewHtml({
         collabId: preview.collabId,
         campaignName: preview.campaignName,
-        creatorName,
-        agreedAmount,
-        barterAmount,
-        deliverables,
-        adsUsageRights: draft?.adsUsageRights ?? preview.adsUsageRights,
-        collabType: draft?.collabType ?? preview.collabType,
+        creatorName: preview.creatorName,
+        agreedAmount: preview.agreedAmount,
+        barterAmount: preview.barterAmount,
+        deliverables: preview.deliverables,
+        adsUsageRights: preview.adsUsageRights,
+        collabType: preview.collabType,
       })
     : "";
 
@@ -336,19 +294,18 @@ export function CollabEmailPane({
             >
               <div className="collab-email-overview__header">
                 <span>Overview</span>
-                <span className="chip chip--info">
-                  {draft?.collabType ?? preview.collabType}
-                </span>
+                <span className="chip chip--info">{preview.collabType}</span>
               </div>
 
               {/* TO */}
               <div className="collab-email-field collab-email-field--full">
-                <label className="ob-form-label">
+                <label className="ob-form-label" htmlFor="collab-email-to">
                   TO (Influencer Email){" "}
                   <span style={{ color: "var(--color-danger-text)" }}>*</span>
                 </label>
                 <input
                   type="email"
+                  id="collab-email-to"
                   className="ob-input"
                   placeholder="influencer@email.com"
                   value={emailTo}
@@ -367,9 +324,12 @@ export function CollabEmailPane({
 
               {/* Subject */}
               <div className="collab-email-field collab-email-field--full">
-                <label className="ob-form-label">SUBJECT</label>
+                <label className="ob-form-label" htmlFor="collab-email-subject">
+                  SUBJECT
+                </label>
                 <input
                   type="text"
+                  id="collab-email-subject"
                   className="ob-input"
                   value={`Collaboration Confirmation | Collab ID: ${preview.collabId}`}
                   readOnly
@@ -379,40 +339,52 @@ export function CollabEmailPane({
               {/* Creator name + Amounts */}
               <div className="collab-email-field">
                 <div>
-                  <label className="ob-form-label">CREATOR NAME</label>
+                  <label
+                    className="ob-form-label"
+                    htmlFor="collab-email-creator"
+                  >
+                    CREATOR NAME
+                  </label>
                   <input
                     type="text"
+                    id="collab-email-creator"
                     className="ob-input"
-                    value={creatorName}
-                    onChange={(e) => setCreatorName(e.target.value)}
+                    value={preview.creatorName}
+                    readOnly
                   />
                 </div>
               </div>
               <div className="collab-email-field">
                 <div>
-                  <label className="ob-form-label">TOTAL AGREED AMOUNT (₹)</label>
+                  <label
+                    className="ob-form-label"
+                    htmlFor="collab-email-amount"
+                  >
+                    TOTAL AGREED AMOUNT (₹)
+                  </label>
                   <input
                     type="text"
+                    id="collab-email-amount"
                     className="ob-input"
-                    value={agreedAmount}
-                    onChange={(e) => setAgreedAmount(e.target.value)}
-                    disabled={
-                      (
-                        draft?.collabType ?? preview.collabType
-                      ).toLowerCase() === "barter"
-                    }
+                    value={preview.agreedAmount}
+                    readOnly
                   />
                 </div>
               </div>
               <div className="collab-email-field">
                 <div>
-                  <label className="ob-form-label">BARTER (No. of Products)</label>
+                  <label
+                    className="ob-form-label"
+                    htmlFor="collab-email-product-quantity"
+                  >
+                    PRODUCT QUANTITY
+                  </label>
                   <input
                     type="text"
+                    id="collab-email-product-quantity"
                     className="ob-input"
-                    inputMode="numeric"
-                    value={barterAmount}
-                    onChange={(e) => setBarterAmount(e.target.value)}
+                    value={preview.barterAmount}
+                    readOnly
                   />
                 </div>
               </div>
@@ -427,7 +399,7 @@ export function CollabEmailPane({
                 <span>Deliverables</span>
               </div>
               <div className="flex flex-wrap gap-2 mb-2">
-                {deliverables.map((d, i) => (
+                {preview.deliverables.map((d, i) => (
                   <span
                     key={i}
                     className="pill"
@@ -444,51 +416,8 @@ export function CollabEmailPane({
                     }}
                   >
                     {d}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDeliverables((prev) =>
-                          prev.filter((_, idx) => idx !== i),
-                        )
-                      }
-                      style={{
-                        background: "none",
-                        border: "none",
-                        padding: "0 0 0 2px",
-                        cursor: "pointer",
-                        color: "var(--color-text-secondary)",
-                        fontSize: "0.85rem",
-                        lineHeight: 1,
-                      }}
-                      aria-label={`Remove ${d}`}
-                    >
-                      ×
-                    </button>
                   </span>
                 ))}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  className="ob-input"
-                  placeholder="e.g. 2 Reels"
-                  value={newDeliv}
-                  onChange={(e) => setNewDeliv(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addDeliverable();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  className="action-btn"
-                  onClick={addDeliverable}
-                >
-                  <Plus size={11} aria-hidden />
-                  Add
-                </button>
               </div>
             </section>
 

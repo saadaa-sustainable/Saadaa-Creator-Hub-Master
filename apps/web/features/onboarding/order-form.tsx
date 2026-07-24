@@ -145,7 +145,6 @@ export function OrderCreationModal({
     register,
     handleSubmit,
     watch,
-    getValues,
     setValue,
     control,
     formState: { errors },
@@ -346,7 +345,7 @@ export function OrderCreationModal({
       // inline collab-email review pane in this same modal. The onboarding is
       // already persisted — sending the email is now an optional follow-up.
       router.refresh();
-      setEmailDraft(buildCollabEmailDraft());
+      setEmailDraft({ emailTo: preview?.email ?? undefined });
     });
   };
 
@@ -356,33 +355,6 @@ export function OrderCreationModal({
     setEmailDraft(null);
     onClose();
     router.refresh();
-  };
-
-  const buildCollabEmailDraft = (): CollabEmailDraft => {
-    const values = getValues();
-    const deliverables: string[] = [];
-    const reels = Number(values.reels) || 0;
-    const posts = Number(values.posts) || 0;
-    const stories = Number(values.stories) || 0;
-
-    if (reels > 0) deliverables.push(`${reels} Reel${reels > 1 ? "s" : ""}`);
-    if (posts > 0)
-      deliverables.push(`${posts} Static Post${posts > 1 ? "s" : ""}`);
-    if (stories > 0)
-      deliverables.push(`${stories} Stor${stories > 1 ? "ies" : "y"}`);
-
-    const commercials = String(values.commercials ?? 0);
-    const isBarter = values.collabType === "Barter";
-
-    return {
-      creatorName: creatorName ?? username ?? preview?.customer_name ?? "",
-      emailTo: preview?.email ?? undefined,
-      deliverables,
-      agreedAmount: isBarter ? "0" : commercials,
-      barterAmount: "0",
-      collabType: values.collabType,
-      adsUsageRights: values.adsUsageRights,
-    };
   };
 
   if (!open || !mounted) return null;

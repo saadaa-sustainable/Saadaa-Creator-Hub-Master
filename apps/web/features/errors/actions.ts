@@ -27,22 +27,9 @@ export async function resendBlockedCollabEmail(
     return { ok: false, error: preview.error };
   }
 
-  const attachmentDriveIds = preview.attachments
-    .map((a) => a.driveId)
-    .filter((d): d is string => Boolean(d));
-
   const result = await sendCollabEmail({
     postId: id,
-    collabId: preview.collabId,
-    campaignName: preview.campaignName,
     emailTo: preview.emailTo,
-    creatorName: preview.creatorName,
-    agreedAmount: preview.agreedAmount,
-    barterAmount: preview.barterAmount,
-    deliverables: preview.deliverables,
-    adsUsageRights: preview.adsUsageRights,
-    collabType: preview.collabType,
-    attachmentDriveIds,
   });
 
   revalidatePath("/errors");
