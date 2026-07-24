@@ -24,10 +24,10 @@ export default function MyDashboardKM() {
           This is a <strong>standalone section above Attention</strong>, not
           part of the Kanban. Switch between Today and Yesterday, then choose{" "}
           <strong>Download PNG</strong> for a full, share-ready activity sheet.
-          The KPI strip shows counts only; every creator appears in the detail
-          rows below with their SIF ID, stage reference, campaign and content
-          type. Very active days download as numbered PNG pages so no row is
-          omitted.
+          The KPI strip shows counts only. Open{" "}
+          <strong>Activity details</strong> to view every creator with their SIF
+          ID, stage reference, campaign and content type. Very active days
+          download as numbered PNG pages so no row is omitted.
         </p>
         <KMList>
           <li>

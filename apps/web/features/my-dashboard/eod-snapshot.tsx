@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   Download,
   Send,
   UserCheck,
@@ -366,9 +367,9 @@ export function EodSnapshot({
             {memberLabel}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <div
-            className="flex rounded-xl border border-border bg-bg-white p-1"
+            className="flex shrink-0 rounded-xl border border-border bg-bg-white p-1"
             aria-label="Snapshot day"
           >
             {snapshots.map((item, index) => (
@@ -389,12 +390,12 @@ export function EodSnapshot({
           </div>
           <button
             type="button"
-            className="btn btn-secondary min-h-10 gap-2 px-3 text-xs"
+            className="btn-primary-cta min-h-10 flex-1 whitespace-nowrap px-4 py-2 text-xs sm:flex-none"
             disabled={downloading}
             onClick={download}
           >
-            <Download size={14} aria-hidden />
-            {downloading ? "Preparing…" : "Download PNG"}
+            <Download size={15} aria-hidden />
+            {downloading ? "Creating PNG…" : "Download PNG"}
           </button>
         </div>
       </header>
@@ -433,90 +434,99 @@ export function EodSnapshot({
         })}
       </div>
 
-      <div className="border-t border-border bg-bg-white p-3 sm:p-4">
-        <div className="mb-3 flex items-end justify-between gap-3">
+      <details className="group border-t border-border bg-bg-white">
+        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 transition-colors hover:bg-bg-surface/55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent [&::-webkit-details-marker]:hidden sm:px-4">
           <div>
-            <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-text-tertiary">
-              Activity detail
+            <p className="text-xs font-bold text-text-primary">
+              Activity details
             </p>
-            <p className="mt-0.5 text-xs text-text-secondary">
-              Every creator entry for the selected day
+            <p className="mt-0.5 text-[0.68rem] text-text-secondary">
+              View every creator entry for the selected day
             </p>
           </div>
-          <span className="shrink-0 text-xs font-semibold tabular-nums text-text-secondary">
-            {rows.length} rows
-          </span>
-        </div>
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="min-w-[900px] w-full text-[0.72rem]">
-            <thead>
-              <tr className="border-b border-border bg-text-primary text-left text-[0.6rem] uppercase tracking-[0.06em] text-bg-white">
-                <th className="px-3 py-2.5 font-bold">Stage</th>
-                <th className="px-3 py-2.5 font-bold">Creator</th>
-                <th className="px-3 py-2.5 font-bold">SIF ID</th>
-                <th className="px-3 py-2.5 font-bold">Stage reference</th>
-                <th className="px-3 py-2.5 font-bold">Campaign</th>
-                <th className="px-3 py-2.5 font-bold">Content</th>
-                <th className="px-3 py-2.5 font-bold">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-3 py-8 text-center text-text-tertiary"
-                  >
-                    No activity recorded
-                  </td>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="rounded-full bg-bg-surface px-2.5 py-1 text-[0.68rem] font-semibold tabular-nums text-text-secondary">
+              {rows.length} rows
+            </span>
+            <ChevronDown
+              size={17}
+              className="text-text-tertiary transition-transform duration-200 group-open:rotate-180"
+              aria-hidden
+            />
+          </div>
+        </summary>
+        <div className="border-t border-border p-3 sm:p-4">
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="min-w-[900px] w-full text-[0.72rem]">
+              <thead>
+                <tr className="border-b border-border bg-text-primary text-left text-[0.6rem] uppercase tracking-[0.06em] text-bg-white">
+                  <th className="px-3 py-2.5 font-bold">Stage</th>
+                  <th className="px-3 py-2.5 font-bold">Creator</th>
+                  <th className="px-3 py-2.5 font-bold">SIF ID</th>
+                  <th className="px-3 py-2.5 font-bold">Stage reference</th>
+                  <th className="px-3 py-2.5 font-bold">Campaign</th>
+                  <th className="px-3 py-2.5 font-bold">Content</th>
+                  <th className="px-3 py-2.5 font-bold">Date</th>
                 </tr>
-              ) : (
-                rows.map(({ key, metric, item }) => (
-                  <tr
-                    key={key}
-                    className="border-b border-border last:border-0 odd:bg-bg-white even:bg-bg-surface/45"
-                  >
-                    <td className="px-3 py-2.5">
-                      <span
-                        className="inline-flex rounded-full px-2 py-1 text-[0.62rem] font-bold"
-                        style={{
-                          color: metric.color,
-                          backgroundColor: `color-mix(in srgb, ${metric.color} 11%, white)`,
-                        }}
-                      >
-                        {metric.label}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <p className="max-w-[260px] break-words font-semibold text-text-primary">
-                        {item.creatorName}
-                      </p>
-                      <p className="max-w-[260px] break-all text-[0.65rem] text-text-tertiary">
-                        {item.username ? `@${item.username}` : "—"}
-                      </p>
-                    </td>
-                    <td className="px-3 py-2.5 font-semibold text-text-primary">
-                      {item.infId ?? "—"}
-                    </td>
-                    <td className="px-3 py-2.5 font-semibold text-text-primary">
-                      {stageReference(metric.key, item)}
-                    </td>
-                    <td className="px-3 py-2.5 text-text-secondary">
-                      {item.campaignId ?? "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-text-secondary">
-                      {item.contentType ?? "—"}
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap text-text-secondary">
-                      {formatDate(snapshot.date)}
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-3 py-8 text-center text-text-tertiary"
+                    >
+                      No activity recorded
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  rows.map(({ key, metric, item }) => (
+                    <tr
+                      key={key}
+                      className="border-b border-border last:border-0 odd:bg-bg-white even:bg-bg-surface/45"
+                    >
+                      <td className="px-3 py-2.5">
+                        <span
+                          className="inline-flex rounded-full px-2 py-1 text-[0.62rem] font-bold"
+                          style={{
+                            color: metric.color,
+                            backgroundColor: `color-mix(in srgb, ${metric.color} 11%, white)`,
+                          }}
+                        >
+                          {metric.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="max-w-[260px] break-words font-semibold text-text-primary">
+                          {item.creatorName}
+                        </p>
+                        <p className="max-w-[260px] break-all text-[0.65rem] text-text-tertiary">
+                          {item.username ? `@${item.username}` : "—"}
+                        </p>
+                      </td>
+                      <td className="px-3 py-2.5 font-semibold text-text-primary">
+                        {item.infId ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5 font-semibold text-text-primary">
+                        {stageReference(metric.key, item)}
+                      </td>
+                      <td className="px-3 py-2.5 text-text-secondary">
+                        {item.campaignId ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-text-secondary">
+                        {item.contentType ?? "—"}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-text-secondary">
+                        {formatDate(snapshot.date)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      </details>
     </section>
   );
 }
