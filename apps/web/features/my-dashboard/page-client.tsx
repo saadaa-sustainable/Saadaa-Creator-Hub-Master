@@ -13,6 +13,8 @@ import type {
 } from "./types";
 import { MyDashboardKpiStrip } from "./kpi-strip";
 import { PendingActionsSection } from "./pending-actions";
+import { EodSnapshot } from "./eod-snapshot";
+import type { DailySnapshot } from "./eod-snapshot-data";
 import { MyDashboardWorkloadBoard } from "./workload-board";
 
 /** Inclusive date-range test on an ISO date string (compares the YYYY-MM-DD
@@ -26,10 +28,11 @@ function inRange(d: string | null, from: string, to: string): boolean {
   return true;
 }
 
-
 export interface MyDashboardBodyProps {
   kpi: MyDashboardKpi;
   pendingActions: PendingAction[];
+  snapshots: DailySnapshot[];
+  memberLabel: string;
   posts: MyPost[];
   filterOptions: MyDashboardFilterOptions;
   leaderboard: TeamLeaderboardEntry[];
@@ -42,6 +45,8 @@ export interface MyDashboardBodyProps {
 export function MyDashboardBody({
   kpi,
   pendingActions,
+  snapshots,
+  memberLabel,
   posts,
   filterOptions,
   leaderboard,
@@ -220,7 +225,8 @@ export function MyDashboardBody({
           )}
         </section>
         <MyDashboardKpiStrip kpi={kpi} />
-        <PendingActionsSection actions={pendingActions} />
+        <EodSnapshot snapshots={snapshots} memberLabel={memberLabel} />
+        <PendingActionsSection actions={pendingActions} allPosts={posts} />
       </div>
       <MyDashboardWorkloadBoard
         posts={filteredPosts}

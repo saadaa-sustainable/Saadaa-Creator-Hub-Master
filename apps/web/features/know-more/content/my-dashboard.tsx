@@ -5,16 +5,49 @@ export default function MyDashboardKM() {
     <>
       <KMHeader
         title="My Dashboard"
-        subtitle="Personal workload view scoped to your account. Shows every post where you are the onboarding owner — nothing from other team members."
+        subtitle="Your current-stage workload, daily activity snapshot, overdue follow-ups and posting actions in one personal workspace."
       />
 
       <KMSection tag="Scope">
         <p>
-          All data is filtered to rows where{" "}
-          <KMCode>onboarded_by = your login email</KMCode>. The query reads up
-          to 500 posts ordered by <KMCode>reach_out_date DESC</KMCode>. You
-          cannot see collabs assigned to other team members here. For the full
-          team view use the main Dashboard or Internal Dashboard.
+          The Kanban follows the owner of each current stage: Reach Out uses{" "}
+          <KMCode>logged_by</KMCode>, Onboard uses <KMCode>onboarded_by</KMCode>
+          , and Posted uses <KMCode>posted_by</KMCode> with legacy fallbacks. A
+          handed-off collab therefore appears on only one member&apos;s current
+          workload. Global Admins can use View as to open another member&apos;s
+          dashboard.
+        </p>
+      </KMSection>
+
+      <KMSection tag="Today / Yesterday EOD Snapshot">
+        <p>
+          This is a <strong>standalone section above Attention</strong>, not
+          part of the Kanban. Switch between Today and Yesterday, then choose{" "}
+          <strong>Download PNG</strong> for a 1600×900 image ready to share in
+          Slack.
+        </p>
+        <KMList>
+          <li>
+            <strong>Reach-outs</strong> · one per collab, credited to the
+            original <KMCode>logged_by</KMCode> even after handoff.
+          </li>
+          <li>
+            <strong>Onboarded</strong> · one per collab, credited to{" "}
+            <KMCode>onboarded_by</KMCode>.
+          </li>
+          <li>
+            <strong>Posted</strong> · one per posted deliverable, credited to{" "}
+            <KMCode>posted_by</KMCode>.
+          </li>
+          <li>
+            <strong>EDD due</strong> · one per promised deliverable. Three posts
+            promised for the selected day show EDD = 3.
+          </li>
+        </KMList>
+        <p>
+          The report uses IST dates and excludes test rows. It reads the full
+          activity history you touched, so work still appears in that day&apos;s
+          snapshot after it moves to another stage.
         </p>
       </KMSection>
 
@@ -45,9 +78,9 @@ export default function MyDashboardKM() {
 
       <KMSection tag="View as team member (Global Admins)">
         <p>
-          Global Admins see a <strong>View as team member</strong> control
-          under the page header. Picking a member switches the whole dashboard
-          to <em>their</em> pipeline — and, until you exit, every reach-out,
+          Global Admins see a <strong>View as team member</strong> control under
+          the page header. Picking a member switches the whole dashboard to{" "}
+          <em>their</em> pipeline — and, until you exit, every reach-out,
           onboarding and posting form you submit anywhere in CreatorHub is
           recorded under that member (<KMCode>logged_by</KMCode> /{" "}
           <KMCode>onboarded_by</KMCode> / <KMCode>posted_by</KMCode>).
@@ -135,9 +168,13 @@ export default function MyDashboardKM() {
         </p>
       </KMSection>
 
-      <KMSection tag="Needs Attention">
+      <KMSection tag="Attention">
         <p>
-          The Needs Attention section surfaces two categories of overdue work:
+          Attention uses detailed cards so the person chasing the creator can
+          see the creator, POST ID, EDD, campaign, promised deliverables, order
+          and order status, onboarder, content type and workflow status without
+          opening another page. <strong>Overview</strong> opens the complete
+          creator and collab record.
         </p>
         <KMList>
           <li>
@@ -152,9 +189,9 @@ export default function MyDashboardKM() {
           </li>
         </KMList>
         <p>
-          Rows are sorted by days overdue descending (most overdue first). A
-          maximum of 15 rows are shown. When everything is on track the section
-          shows &quot;All caught up.&quot;
+          Cards are sorted by days overdue descending (most overdue first). A
+          maximum of 15 are shown. When everything is on track the section says
+          &quot;All caught up.&quot;
         </p>
       </KMSection>
 
@@ -187,17 +224,17 @@ export default function MyDashboardKM() {
 
       <KMSection tag="Info controls">
         <p>
-          Every KPI, workload summary, stage chart, leaderboard, kanban, Needs
-          Attention table, and My Posts table has an info icon. Open it for a
+          Every KPI, workload summary, stage chart, leaderboard, kanban,
+          Attention section, and My Posts table has an info icon. Open it for a
           plain-language explanation of what is counted and how filters affect
           the result.
         </p>
       </KMSection>
 
       <KMCallout tone="info">
-        This page shows only YOUR collabs (filtered by{" "}
-        <KMCode>onboarded_by</KMCode>). If a collab was onboarded by a colleague
-        it will not appear here even if you later worked on it.
+        The Kanban shows only the current stage you own; the EOD Snapshot keeps
+        your correctly attributed work for that calendar day even after a
+        teammate moves the collab forward.
       </KMCallout>
     </>
   );

@@ -1,205 +1,240 @@
-import { TriangleAlert } from "lucide-react";
-import { formatDate, workflowStatusLabel } from "@/lib/formatters";
-import { cn } from "@/lib/cn";
+"use client";
+
+import { useState } from "react";
+import {
+  Box,
+  CalendarClock,
+  Eye,
+  Hash,
+  PackageCheck,
+  TriangleAlert,
+  UserCheck,
+} from "lucide-react";
+import { Avatar } from "@/components/ui";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import type { PendingAction } from "./types";
+import { cn } from "@/lib/cn";
+import { formatDate, workflowStatusLabel } from "@/lib/formatters";
+import { MyCardOverviewModal } from "./card-overview-modal";
+import type { MyPost, PendingAction } from "./types";
 
 export function PendingActionsSection({
   actions,
+  allPosts,
 }: {
   actions: PendingAction[];
+  allPosts: MyPost[];
 }) {
+  const [selectedPost, setSelectedPost] = useState<MyPost | null>(null);
+  const overdueCount = actions.filter(
+    (action) => action.label === "Overdue delivery",
+  ).length;
+
   return (
-    <section aria-labelledby="pending-actions-heading">
-      <div className="flex items-center gap-2 mb-3 mt-6">
-        <TriangleAlert
-          size={15}
-          className="text-[--warning-text] shrink-0"
-          aria-hidden
-        />
-        <h2
-          id="pending-actions-heading"
-          className="text-[0.875rem] font-semibold text-[--text-primary]"
-        >
-          Needs Attention
-        </h2>
-        <InfoTooltip
-          title="Needs Attention"
-          content="My assigned collabs that need follow-up, including overdue delivery dates and other pending workflow actions. Days overdue starts after the estimated delivery date passes."
-          side="bottom"
-          align="start"
-        />
-        {actions.length > 0 && (
-          <span className="ml-1 inline-flex items-center justify-center rounded-full bg-[--danger-bg] text-[--danger-text] text-[0.7rem] font-bold px-2 py-0.5 tabular-nums">
-            {actions.length}
-          </span>
-        )}
-      </div>
-
-      {actions.length === 0 ? (
-        <div className="text-center py-8 text-sm text-[--text-tertiary]">
-          All caught up
-        </div>
-      ) : (
-        <>
-          {/* Desktop table */}
-          <div className="bento-tile hidden sm:block overflow-x-auto rounded-[var(--radius)] border border-[--border] bg-[--bg-white]">
-            <table className="w-full text-[0.8rem]">
-              <thead>
-                <tr className="border-b border-[--border] bg-[--bg-surface]">
-                  <th className="px-3 py-2 text-left font-semibold text-[--text-secondary] w-[180px]">
-                    Creator
-                  </th>
-                  <th className="px-3 py-2 text-left font-semibold text-[--text-secondary]">
-                    Campaign
-                  </th>
-                  <th className="px-3 py-2 text-left font-semibold text-[--text-secondary]">
-                    Status
-                  </th>
-                  <th className="px-3 py-2 text-left font-semibold text-[--text-secondary]">
-                    Flag
-                  </th>
-                  <th className="px-3 py-2 text-right font-semibold text-[--text-secondary]">
-                    Days Overdue
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bento-stagger">
-                {actions.map((a, i) => (
-                  <PendingRow key={a.post_id ?? i} action={a} />
-                ))}
-              </tbody>
-            </table>
+    <>
+      <section
+        className="bento-tile overflow-hidden rounded-2xl border border-border bg-bg-white"
+        aria-labelledby="pending-actions-heading"
+      >
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-danger-bg/35 px-3 py-3 sm:px-4">
+          <div className="flex items-start gap-2.5">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-danger-bg text-danger-text">
+              <TriangleAlert size={15} aria-hidden />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2
+                  id="pending-actions-heading"
+                  className="text-[0.9rem] font-bold text-text-primary"
+                >
+                  Attention
+                </h2>
+                <InfoTooltip
+                  title="Attention"
+                  content="Your assigned collabs whose estimated delivery date has passed, plus delivered orders that still need a post."
+                  side="bottom"
+                  align="start"
+                />
+              </div>
+              <p className="text-[0.68rem] text-text-secondary">
+                Complete delivery context for immediate follow-up
+              </p>
+            </div>
           </div>
-
-          {/* Mobile cards */}
-          <div className="sm:hidden space-y-2 bento-stagger">
-            {actions.map((a, i) => (
-              <PendingCard key={a.post_id ?? i} action={a} />
-            ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
-function statusChipClass(status: string | null): string {
-  const s = status ?? "";
-  if (["Posted", "Delivered"].includes(s))
-    return "bg-[--success-bg] text-[--success-text]";
-  if (["On Board", "Order Sent"].includes(s))
-    return "bg-[--warning-bg] text-[--warning-text]";
-  if (
-    ["RTO", "Cancelled", "RTO - Reverse Picked", "RTO - Delivered"].includes(s)
-  )
-    return "bg-[--danger-bg] text-[--danger-text]";
-  return "bg-[--bg-surface] text-[--text-secondary]";
-}
-
-function PendingRow({ action: a }: { action: PendingAction }) {
-  const isOverdue = a.label === "Overdue delivery";
-  return (
-    <tr className="border-b border-[--border] last:border-0 hover:bg-[--bg-surface] transition-colors duration-150">
-      <td className="px-3 py-2">
-        <div className="font-medium text-[--text-primary] leading-tight truncate max-w-[160px]">
-          {a.inf_name ?? "—"}
-        </div>
-        {a.username && (
-          <div className="text-[0.72rem] text-[--text-tertiary]">
-            @{a.username}
-          </div>
-        )}
-      </td>
-      <td className="px-3 py-2 text-[--text-secondary] tabular">
-        {a.campaign_id ?? "—"}
-      </td>
-      <td className="px-3 py-2">
-        <span
-          className={cn(
-            "inline-flex items-center rounded-[6px] px-2 py-0.5 text-[0.7rem] font-medium",
-            isOverdue
-              ? "bg-[--danger-bg] text-[--danger-text]"
-              : statusChipClass(a.workflow_status),
-          )}
-        >
-          {workflowStatusLabel(a.workflow_status)}
-        </span>
-      </td>
-      <td className="px-3 py-2">
-        <span
-          className={cn(
-            "inline-flex items-center rounded-[6px] px-2 py-0.5 text-[0.7rem] font-medium",
-            isOverdue
-              ? "bg-[--danger-bg] text-[--danger-text]"
-              : "bg-[--warning-bg] text-[--warning-text]",
-          )}
-        >
-          {a.label}
-        </span>
-      </td>
-      <td className="px-3 py-2 text-right tabular text-[--text-secondary]">
-        {a.daysOverdue > 0 ? (
-          <span className="text-[--danger-text] font-semibold">
-            {a.daysOverdue}d
-          </span>
-        ) : (
-          <span className="text-[--text-tertiary]">today</span>
-        )}
-      </td>
-    </tr>
-  );
-}
-
-function PendingCard({ action: a }: { action: PendingAction }) {
-  const isOverdue = a.label === "Overdue delivery";
-  return (
-    <div
-      className={cn(
-        "rounded-[var(--radius)] border px-3 py-2.5 bg-[--bg-white]",
-        "transition-[transform,background-color] duration-150 hover:bg-[--bg-surface] motion-safe:hover:translate-x-0.5",
-        isOverdue ? "border-[--danger-bg]" : "border-[--warning-bg]",
-      )}
-    >
-      <div className="flex items-start justify-between gap-2 mb-1.5">
-        <div className="min-w-0">
-          <div className="font-semibold text-[0.82rem] text-[--text-primary] truncate">
-            {a.inf_name ?? "—"}
-          </div>
-          {a.username && (
-            <div className="text-[0.72rem] text-[--text-tertiary]">
-              @{a.username}
+          {actions.length > 0 && (
+            <div className="flex items-center gap-2 text-[0.68rem] font-semibold">
+              <span className="rounded-full bg-danger-bg px-2.5 py-1 text-danger-text">
+                {overdueCount} overdue
+              </span>
+              {actions.length > overdueCount && (
+                <span className="rounded-full bg-warning-bg px-2.5 py-1 text-warning-text">
+                  {actions.length - overdueCount} awaiting post
+                </span>
+              )}
             </div>
           )}
+        </header>
+
+        {actions.length === 0 ? (
+          <div className="flex min-h-32 flex-col items-center justify-center px-4 py-8 text-center">
+            <PackageCheck size={24} className="mb-2 text-success" aria-hidden />
+            <p className="text-sm font-semibold text-text-primary">
+              All caught up
+            </p>
+            <p className="text-[0.7rem] text-text-tertiary">
+              No overdue deliveries or missing posts.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-2.5 p-2.5 md:grid-cols-2 sm:p-3">
+            {actions.map((action, index) => (
+              <AttentionCard
+                key={action.post.id ?? index}
+                action={action}
+                onOverview={() => setSelectedPost(action.post)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {selectedPost && (
+        <MyCardOverviewModal
+          post={selectedPost}
+          allPosts={allPosts}
+          onClose={() => setSelectedPost(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function Detail({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof CalendarClock;
+  label: string;
+  value: string | null | undefined;
+}) {
+  return (
+    <div className="min-w-0 rounded-xl border border-border bg-bg-surface/45 px-2.5 py-2">
+      <div className="mb-1 flex items-center gap-1 text-[0.55rem] font-bold uppercase tracking-[0.06em] text-text-tertiary">
+        <Icon size={10} aria-hidden />
+        {label}
+      </div>
+      <p className="truncate text-[0.7rem] font-semibold text-text-primary">
+        {value || "—"}
+      </p>
+    </div>
+  );
+}
+
+function deliverables(post: MyPost): string {
+  const parts = [
+    post.reels ? `${post.reels}R` : "",
+    post.static_posts ? `${post.static_posts}P` : "",
+    post.stories ? `${post.stories}S` : "",
+  ].filter(Boolean);
+  return parts.join(" · ") || post.deliverable_type || "—";
+}
+
+function AttentionCard({
+  action,
+  onOverview,
+}: {
+  action: PendingAction;
+  onOverview: () => void;
+}) {
+  const post = action.post;
+  const isOverdue = action.label === "Overdue delivery";
+  const creatorName =
+    post.creator?.inf_name ??
+    post.inf_name ??
+    post.username ??
+    "Unnamed creator";
+
+  return (
+    <article
+      className={cn(
+        "relative min-w-0 overflow-hidden rounded-2xl border bg-bg-white p-3",
+        isOverdue ? "border-danger/25" : "border-warning/30",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute inset-y-0 left-0 w-1",
+          isOverdue ? "bg-danger" : "bg-warning",
+        )}
+        aria-hidden
+      />
+      <div className="mb-3 flex items-start justify-between gap-3 pl-1">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Avatar
+            src={post.creator?.profile_pic ?? null}
+            username={post.username}
+            name={creatorName}
+            size={36}
+          />
+          <div className="min-w-0">
+            <h3 className="truncate text-[0.8rem] font-bold text-text-primary">
+              {creatorName}
+            </h3>
+            <p className="truncate text-[0.65rem] text-text-tertiary">
+              @{post.username ?? "—"} ·{" "}
+              {post.post_id_short ?? post.post_id ?? "No post ID"}
+            </p>
+          </div>
         </div>
         <span
           className={cn(
-            "shrink-0 inline-flex items-center rounded-[6px] px-2 py-0.5 text-[0.7rem] font-medium",
+            "shrink-0 rounded-full px-2.5 py-1 text-[0.62rem] font-bold",
             isOverdue
-              ? "bg-[--danger-bg] text-[--danger-text]"
-              : "bg-[--warning-bg] text-[--warning-text]",
+              ? "bg-danger-bg text-danger-text"
+              : "bg-warning-bg text-warning-text",
           )}
         >
-          {a.label}
+          {action.daysOverdue > 0
+            ? `${action.daysOverdue}d overdue`
+            : action.label}
         </span>
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[0.75rem] text-[--text-secondary]">
-        <span>
-          Campaign:{" "}
-          <span className="font-medium tabular">{a.campaign_id ?? "—"}</span>
-        </span>
-        <span>
-          Est. delivery:{" "}
-          <span className="font-medium tabular">
-            {formatDate(a.est_delivery)}
-          </span>
-        </span>
-        {a.daysOverdue > 0 && (
-          <span className="text-[--danger-text] font-semibold">
-            {a.daysOverdue}d overdue
-          </span>
-        )}
+
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+        <Detail
+          icon={CalendarClock}
+          label="EDD"
+          value={formatDate(post.est_delivery)}
+        />
+        <Detail icon={Hash} label="Campaign" value={post.campaign_id} />
+        <Detail icon={Box} label="Deliverables" value={deliverables(post)} />
+        <Detail icon={PackageCheck} label="Order" value={post.order_id} />
+        <Detail
+          icon={PackageCheck}
+          label="Order status"
+          value={post.order_status}
+        />
+        <Detail
+          icon={UserCheck}
+          label="Onboarded by"
+          value={post.onboarded_by}
+        />
       </div>
-    </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2 pl-1">
+        <p className="truncate text-[0.63rem] text-text-tertiary">
+          {post.content_type ?? "Content type not set"} ·{" "}
+          {workflowStatusLabel(post.workflow_status)}
+        </p>
+        <button
+          type="button"
+          className="btn btn-secondary min-h-8 shrink-0 gap-1.5 px-2.5 text-[0.68rem]"
+          onClick={onOverview}
+        >
+          <Eye size={12} aria-hidden />
+          Overview
+        </button>
+      </div>
+    </article>
   );
 }

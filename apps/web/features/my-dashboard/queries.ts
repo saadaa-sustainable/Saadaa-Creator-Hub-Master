@@ -1,5 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
+import { todayIstIso } from "@/lib/payable-cycle";
 import { isVoidedStatus } from "@/lib/workflow";
+import { buildDailySnapshots, type DailySnapshot } from "./eod-snapshot-data";
 import type {
   MyDashboardFilterOptions,
   MyDashboardKpi,
@@ -54,6 +56,7 @@ const POSTS_SELECT = [
   "stories",
   "payment_status",
   "partnership_id",
+  "is_test",
 ].join(",");
 
 const CREATORS_SELECT = [
@@ -77,6 +80,7 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   posts: MyPost[];
   kpi: MyDashboardKpi;
   pendingActions: PendingAction[];
+  snapshots: DailySnapshot[];
   filterOptions: MyDashboardFilterOptions;
   leaderboard: TeamLeaderboardEntry[];
 }> {
@@ -242,7 +246,9 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
     supabase as any
   )
     .from("posts")
-    .select("onboarded_by, logged_by, posted_by, workflow_status, payment_status")
+    .select(
+      "onboarded_by, logged_by, posted_by, workflow_status, payment_status",
+    )
     .limit(10_000);
 
   if (leaderboardError) {
@@ -250,10 +256,7 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   }
 
   const leaderboardMap = new Map<string, TeamLeaderboardEntry>();
-  const bump = (
-    name: string,
-    field: "active" | "posted" | "paid",
-  ): void => {
+  const bump = (name: string, field: "active" | "posted" | "paid"): void => {
     if (!name) return;
     const entry =
       leaderboardMap.get(name) ??
@@ -277,7 +280,10 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   }>) {
     const status = row.workflow_status ?? "";
     if ((ACTIVE_STATUSES as readonly string[]).includes(status)) {
-      bump(status === "Reach Out" ? reachOwner(row) : onboardOwner(row), "active");
+      bump(
+        status === "Reach Out" ? reachOwner(row) : onboardOwner(row),
+        "active",
+      );
     }
     if ((POSTED_STATUSES as readonly string[]).includes(status)) {
       bump(postOwner(row), "posted");
@@ -312,7 +318,10 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
       kpi.myActive++;
       kpi.totalReachouts++;
     }
-    if ((PENDING_POST_STATUSES as readonly string[]).includes(s) && mineOnboard) {
+    if (
+      (PENDING_POST_STATUSES as readonly string[]).includes(s) &&
+      mineOnboard
+    ) {
       kpi.myActive++;
       kpi.pendingPost++;
     }
@@ -334,8 +343,7 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   kpi.activeCampaigns = activeCampaignSet.size;
 
   // Compute pending actions
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = todayIstIso();
 
   const pendingActions: PendingAction[] = [];
 
@@ -349,20 +357,15 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
       (PENDING_POST_STATUSES as readonly string[]).includes(s) &&
       p.est_delivery
     ) {
-      const delivery = new Date(p.est_delivery);
-      delivery.setHours(0, 0, 0, 0);
+      const delivery = String(p.est_delivery).slice(0, 10);
       if (delivery < today) {
         const daysOverdue = Math.floor(
-          (today.getTime() - delivery.getTime()) / 86400000,
+          (Date.parse(`${today}T00:00:00Z`) -
+            Date.parse(`${delivery}T00:00:00Z`)) /
+            86400000,
         );
         pendingActions.push({
-          post_id: p.post_id,
-          inf_name: null,
-          username: p.username,
-          campaign_id: p.campaign_id,
-          workflow_status: p.workflow_status,
-          est_delivery: p.est_delivery,
-          post_date: p.post_date,
+          post: p,
           label: "Overdue delivery",
           daysOverdue,
         });
@@ -374,22 +377,17 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
       // Days overdue: use est_delivery if available, else 0
       let daysOverdue = 0;
       if (p.est_delivery) {
-        const delivery = new Date(p.est_delivery);
-        delivery.setHours(0, 0, 0, 0);
+        const delivery = String(p.est_delivery).slice(0, 10);
         if (delivery < today) {
           daysOverdue = Math.floor(
-            (today.getTime() - delivery.getTime()) / 86400000,
+            (Date.parse(`${today}T00:00:00Z`) -
+              Date.parse(`${delivery}T00:00:00Z`)) /
+              86400000,
           );
         }
       }
       pendingActions.push({
-        post_id: p.post_id,
-        inf_name: null,
-        username: p.username,
-        campaign_id: p.campaign_id,
-        workflow_status: p.workflow_status,
-        est_delivery: p.est_delivery,
-        post_date: p.post_date,
+        post: p,
         label: "Awaiting post",
         daysOverdue,
       });
@@ -403,6 +401,7 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
     posts: ownedPosts,
     kpi,
     pendingActions: pendingActions.slice(0, 15),
+    snapshots: buildDailySnapshots(posts, member, today),
     filterOptions: {
       campaigns: Array.from(
         new Set(
@@ -416,7 +415,9 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
       ).sort(),
       tiers: Array.from(
         new Set(
-          ownedPosts.map((p) => p.creator?.category).filter(Boolean) as string[],
+          ownedPosts
+            .map((p) => p.creator?.category)
+            .filter(Boolean) as string[],
         ),
       ).sort(),
     },

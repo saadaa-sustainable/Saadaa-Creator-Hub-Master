@@ -34,6 +34,7 @@ Newest first. Full detail is in the external changelog + the chapter each touche
 
 | Date | Milestone | KB chapter |
 |------|-----------|------------|
+| 2026-07-24 | **My Dashboard EOD reporting and actionable Attention cards** — standalone Today/Yesterday stage snapshot with Slack-ready PNG export and stage-correct attribution; EDD counts promised deliverables; overdue work now shows complete operational context with Overview | 07 |
 | 2026-07-23 | **Rework analytics, calendar status clarity, and priority notification delivery** — Dashboard Overview adds an all-time applied-rework donut; Calendar uses red/green/amber status cards with mobile legend and EDD-sent filtering; creator EDD reminders now BCC the onboarder/admins, retry failed sends, and run before bulk queues; Accounts payout digests receive the same priority | 07, 08 |
 | 2026-07-22 | **Approval-backed Reach Out and onboarding assignment corrections** — Onboarding Overview/Edit actions can change Campaign and Content Type on the existing record, with approval diffs, shared duplicate/cooldown enforcement, destination cap validation, and brief/nomenclature updates | 06, 07 |
 | 2026-07-22 | **Daily changelog made fire-once** — midnight IST remains the primary send; report-date delivery claims block duplicate cron/manual emails, while a silent 00:10 fallback retries only failed/missed attempts | 09 |

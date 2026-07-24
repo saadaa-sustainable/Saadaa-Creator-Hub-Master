@@ -8,8 +8,8 @@ import {
 /**
  * Mirrors the loaded My Dashboard anatomy (page.tsx → MyDashboardBody):
  * PageHeader → filter card (4 fields) → KPI row 1 (4 HeroKpi) → KPI row 2
- * (3 HeroKpi) → 2-col insight tiles (workload summary + leaderboard) →
- * 4-lane workload kanban. Same `.onboarding-stage my-dashboard-stage`
+ * (3 HeroKpi) → standalone EOD snapshot → detailed Attention cards →
+ * insight tiles → 4-lane workload kanban. Same `.my-dashboard-stage`
  * wrapper so the grid rhythm/gap matches the page.
  */
 export default function Loading() {
@@ -43,15 +43,46 @@ export default function Loading() {
         </div>
       </section>
 
-      {/* Needs Attention — heading + action table */}
-      <section className="space-y-2">
-        <Skeleton className="h-4 w-36" />
-        <div className="rounded-2xl border border-border bg-bg-white p-3 space-y-2">
+      {/* Standalone EOD snapshot */}
+      <section className="overflow-hidden rounded-2xl border border-border bg-bg-white">
+        <div className="flex items-center justify-between border-b border-border bg-bg-surface/50 p-3 sm:px-4">
+          <div className="space-y-2">
+            <Skeleton className="h-2.5 w-24" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <Skeleton className="h-9 w-48 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-2 gap-px bg-border lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <Skeleton className="h-7 w-7 rounded-full" />
-              <Skeleton className="h-3 flex-1" />
-              <Skeleton className="h-6 w-20 rounded-[9px]" />
+            <div key={i} className="space-y-3 bg-bg-white p-3 sm:p-4">
+              <Skeleton className="h-2.5 w-20" />
+              <Skeleton className="h-7 w-10" />
+              <Skeleton className="h-2.5 w-full" />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Attention — detailed overdue cards */}
+      <section className="overflow-hidden rounded-2xl border border-border bg-bg-white">
+        <div className="border-b border-border bg-danger-bg/35 p-3 sm:px-4">
+          <Skeleton className="h-4 w-28" />
+        </div>
+        <div className="grid grid-cols-1 gap-2.5 p-2.5 md:grid-cols-2 sm:p-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="space-y-3 rounded-2xl border border-border p-3"
+            >
+              <div className="flex items-center gap-2.5">
+                <Skeleton className="h-9 w-9 rounded-full" />
+                <Skeleton className="h-3 flex-1" />
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {Array.from({ length: 6 }).map((__, j) => (
+                  <Skeleton key={j} className="h-12 rounded-xl" />
+                ))}
+              </div>
             </div>
           ))}
         </div>

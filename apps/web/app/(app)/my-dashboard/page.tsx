@@ -65,13 +65,15 @@ async function MyDashboardData({
 }: {
   actorIdentifier: string;
 }) {
-  const { posts, kpi, pendingActions, filterOptions, leaderboard } =
+  const { posts, kpi, pendingActions, snapshots, filterOptions, leaderboard } =
     await fetchMyDashboardData(actorIdentifier);
 
   return (
     <MyDashboardBody
       kpi={kpi}
       pendingActions={pendingActions}
+      snapshots={snapshots}
+      memberLabel={actorIdentifier}
       posts={posts}
       filterOptions={filterOptions}
       leaderboard={leaderboard}

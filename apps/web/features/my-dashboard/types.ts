@@ -47,6 +47,7 @@ export interface MyPost {
   stories?: number | null;
   payment_status?: string | null;
   partnership_id?: string | null;
+  is_test?: boolean | null;
   creator?: {
     inf_id?: string | null;
     inf_name: string | null;
@@ -82,13 +83,7 @@ export interface MyDashboardKpi {
 }
 
 export interface PendingAction {
-  post_id: string | null;
-  inf_name: string | null;
-  username: string | null;
-  campaign_id: string | null;
-  workflow_status: string | null;
-  est_delivery: string | null;
-  post_date: string | null;
+  post: MyPost;
   /** "Overdue delivery" | "Awaiting post" */
   label: "Overdue delivery" | "Awaiting post";
   /** Days overdue (positive = overdue, 0 = today) */
