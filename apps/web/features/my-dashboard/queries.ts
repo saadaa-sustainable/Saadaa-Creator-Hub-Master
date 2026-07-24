@@ -1,7 +1,11 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { todayIstIso } from "@/lib/payable-cycle";
 import { isVoidedStatus } from "@/lib/workflow";
-import { buildDailySnapshots, type DailySnapshot } from "./eod-snapshot-data";
+import {
+  buildDailySnapshots,
+  isOverdueDelivery,
+  type DailySnapshot,
+} from "./eod-snapshot-data";
 import type {
   MyDashboardFilterOptions,
   MyDashboardKpi,
@@ -348,28 +352,24 @@ export async function fetchMyDashboardData(userEmail: string): Promise<{
   const pendingActions: PendingAction[] = [];
 
   for (const p of ownedPosts) {
+    if (p.is_test) continue;
     // Chase list = the onboarder's job — skip rows the member only logged.
     if (onboardOwner(p) !== member) continue;
     const s = p.workflow_status ?? "";
 
     // Overdue delivery: On Board or Order Sent + est_delivery is set + est_delivery < today
-    if (
-      (PENDING_POST_STATUSES as readonly string[]).includes(s) &&
-      p.est_delivery
-    ) {
+    if (isOverdueDelivery(p, today)) {
       const delivery = String(p.est_delivery).slice(0, 10);
-      if (delivery < today) {
-        const daysOverdue = Math.floor(
-          (Date.parse(`${today}T00:00:00Z`) -
-            Date.parse(`${delivery}T00:00:00Z`)) /
-            86400000,
-        );
-        pendingActions.push({
-          post: p,
-          label: "Overdue delivery",
-          daysOverdue,
-        });
-      }
+      const daysOverdue = Math.floor(
+        (Date.parse(`${today}T00:00:00Z`) -
+          Date.parse(`${delivery}T00:00:00Z`)) /
+          86400000,
+      );
+      pendingActions.push({
+        post: p,
+        label: "Overdue delivery",
+        daysOverdue,
+      });
     }
 
     // Awaiting post: Delivered + no post_date

@@ -20,13 +20,16 @@ import type { MyPost, PendingAction } from "./types";
 export function PendingActionsSection({
   actions,
   allPosts,
+  overdueTotal,
 }: {
   actions: PendingAction[];
   allPosts: MyPost[];
+  overdueTotal: number;
 }) {
   const [selectedPost, setSelectedPost] = useState<MyPost | null>(null);
-  const overdueCount = actions.filter(
-    (action) => action.label === "Overdue delivery",
+  const overdueCount = overdueTotal;
+  const awaitingCount = actions.filter(
+    (action) => action.label === "Awaiting post",
   ).length;
 
   return (
@@ -65,9 +68,9 @@ export function PendingActionsSection({
               <span className="rounded-full bg-danger-bg px-2.5 py-1 text-danger-text">
                 {overdueCount} overdue
               </span>
-              {actions.length > overdueCount && (
+              {awaitingCount > 0 && (
                 <span className="rounded-full bg-warning-bg px-2.5 py-1 text-warning-text">
-                  {actions.length - overdueCount} awaiting post
+                  {awaitingCount} awaiting post
                 </span>
               )}
             </div>

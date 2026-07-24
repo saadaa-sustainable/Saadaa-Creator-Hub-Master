@@ -18,11 +18,23 @@ export interface DailySnapshot {
   onboarded: DailySnapshotItem[];
   posted: DailySnapshotItem[];
   edd: DailySnapshotItem[];
+  overdue: DailySnapshotItem[];
 }
 
 const norm = (value: unknown) => String(value ?? "").trim();
 const dateKey = (value: string | null | undefined) =>
   String(value ?? "").slice(0, 10);
+const OVERDUE_DELIVERY_STATUSES = ["On Board", "Order Sent"] as const;
+
+export function isOverdueDelivery(post: MyPost, date: string): boolean {
+  return (
+    (OVERDUE_DELIVERY_STATUSES as readonly string[]).includes(
+      post.workflow_status ?? "",
+    ) &&
+    Boolean(post.est_delivery) &&
+    dateKey(post.est_delivery) < date
+  );
+}
 
 function previousIsoDate(date: string): string {
   const [year, month, day] = date.split("-").map(Number);
@@ -98,6 +110,10 @@ export function buildDailySnapshots(
     norm(post.onboarded_by) || norm(post.logged_by);
   const postOwner = (post: MyPost) =>
     norm(post.posted_by) || onboardOwner(post);
+  const overdue = livePosts.filter(
+    (post) =>
+      onboardOwner(post) === member && isOverdueDelivery(post, today),
+  );
 
   return [today, previousIsoDate(today)].map((date) => {
     const reachouts = uniqueByCollab(
@@ -119,13 +135,13 @@ export function buildDailySnapshots(
       (post) =>
         onboardOwner(post) === member && dateKey(post.est_delivery) === date,
     );
-
     return {
       date,
       reachouts: reachouts.map(toItem),
       onboarded: onboarded.map(toItem),
       posted: posted.map(toItem),
       edd: edd.map(toItem),
+      overdue: overdue.map(toItem),
     };
   });
 }

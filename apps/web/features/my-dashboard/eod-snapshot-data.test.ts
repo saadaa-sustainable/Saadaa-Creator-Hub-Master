@@ -86,6 +86,42 @@ describe("buildDailySnapshots", () => {
           },
         }),
         row({
+          id: 8,
+          post_id: "SIF-8-P1",
+          collab_id: "SIF-8-C1",
+          onboarded_by: "Tanvi",
+          workflow_status: "Order Sent",
+          est_delivery: "2026-07-22",
+        }),
+        row({
+          id: 9,
+          post_id: "SIF-9-P1",
+          collab_id: "SIF-9-C1",
+          onboarded_by: "Tanvi",
+          workflow_status: "Delivered",
+          est_delivery: "2026-07-22",
+        }),
+        row({
+          id: 10,
+          post_id: "SIF-10-P1",
+          collab_id: "SIF-10-C1",
+          onboarded_by: "Tanvi",
+          posted_by: "Tanvi",
+          workflow_status: "Posted",
+          onboard_date: "2026-07-20",
+          post_date: "2026-07-24",
+          est_delivery: "2026-07-22",
+        }),
+        row({
+          id: 11,
+          post_id: "SIF-11-P1",
+          collab_id: "SIF-11-C1",
+          onboarded_by: "Tanvi",
+          workflow_status: "Order Sent",
+          onboard_date: "2026-07-24",
+          est_delivery: "2026-07-22",
+        }),
+        row({
           id: 6,
           post_id: "TEST-P1",
           posted_by: "Tanvi",
@@ -100,14 +136,28 @@ describe("buildDailySnapshots", () => {
     expect(snapshots[0]).toMatchObject({
       date: "2026-07-24",
       reachouts: [{ infId: "SIF-1", collabId: "SIF-1-C1" }],
-      onboarded: [{ infId: "SIF-7", collabId: "SIF-7-C2" }],
-      posted: [{ postId: "SIF-2-P1" }],
+      onboarded: [
+        { infId: "SIF-7", collabId: "SIF-7-C2" },
+        { postId: "SIF-11-P1", collabId: "SIF-11-C1" },
+      ],
+      posted: [{ postId: "SIF-2-P1" }, { postId: "SIF-10-P1" }],
       edd: [{ postId: "SIF-2-P1" }, { postId: "SIF-2-P2" }],
+      overdue: [
+        { postId: "SIF-8-P1", estDelivery: "2026-07-22" },
+        { postId: "SIF-11-P1", estDelivery: "2026-07-22" },
+      ],
     });
     expect(snapshots[1]).toMatchObject({
       date: "2026-07-23",
       reachouts: [{ collabId: "SIF-3-C1" }],
+      overdue: [
+        { postId: "SIF-8-P1", estDelivery: "2026-07-22" },
+        { postId: "SIF-11-P1", estDelivery: "2026-07-22" },
+      ],
     });
+    expect(
+      snapshots[0].overdue.some((item) => item.estDelivery === "2026-07-24"),
+    ).toBe(false);
     expect(
       buildDailySnapshots(
         [

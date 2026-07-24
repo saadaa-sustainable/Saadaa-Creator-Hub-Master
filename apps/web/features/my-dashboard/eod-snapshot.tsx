@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Download,
   Send,
+  TriangleAlert,
   UserCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -42,6 +43,13 @@ const METRICS = [
     color: "#B57514",
     icon: CalendarClock,
   },
+  {
+    key: "overdue",
+    label: "Overdue till now",
+    note: "Past promised deliverables",
+    color: "#C0392B",
+    icon: TriangleAlert,
+  },
 ] as const;
 
 type Metric = (typeof METRICS)[number];
@@ -67,6 +75,16 @@ function stageReference(key: MetricKey, item: DailySnapshotItem): string {
   if (key === "reachouts") return item.infId ?? item.postId ?? "—";
   if (key === "onboarded") return item.collabId ?? item.infId ?? "—";
   return item.postId ?? item.collabId ?? item.infId ?? "—";
+}
+
+function activityDate(
+  key: MetricKey,
+  item: DailySnapshotItem,
+  snapshotDate: string,
+): string {
+  return key === "overdue" && item.estDelivery
+    ? item.estDelivery
+    : snapshotDate;
 }
 
 function drawRoundedRect(
@@ -147,9 +165,11 @@ function renderSnapshotCanvas(
 
   METRICS.forEach((metric, index) => {
     const items = snapshot[metric.key];
-    const x = 70 + index * 410;
+    const gap = 16;
+    const width = (1580 - gap * (METRICS.length - 1)) / METRICS.length;
+    const x = 70 + index * (width + gap);
     const y = 190;
-    drawRoundedRect(context, x, y, 380, 156, 22, "#FFFFFF", "#E7E2D2");
+    drawRoundedRect(context, x, y, width, 156, 22, "#FFFFFF", "#E7E2D2");
     context.fillStyle = metric.color;
     context.fillRect(x, y, 7, 156);
     context.fillStyle = "#161513";
@@ -254,7 +274,11 @@ function renderSnapshotCanvas(
         1294,
         y + 35,
       );
-      context.fillText(formatDate(snapshot.date), 1484, y + 35);
+      context.fillText(
+        formatDate(activityDate(metric.key, item, snapshot.date)),
+        1484,
+        y + 35,
+      );
     });
   }
 
@@ -400,7 +424,7 @@ export function EodSnapshot({
         </div>
       </header>
 
-      <div className="grid grid-cols-2 gap-px bg-border lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-px bg-border md:grid-cols-3 lg:grid-cols-5">
         {METRICS.map((metric) => {
           const items = snapshot[metric.key];
           const Icon = metric.icon;
@@ -517,7 +541,9 @@ export function EodSnapshot({
                         {item.contentType ?? "—"}
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap text-text-secondary">
-                        {formatDate(snapshot.date)}
+                        {formatDate(
+                          activityDate(metric.key, item, snapshot.date),
+                        )}
                       </td>
                     </tr>
                   ))

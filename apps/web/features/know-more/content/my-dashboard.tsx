@@ -46,6 +46,12 @@ export default function MyDashboardKM() {
             <strong>EDD due</strong> · one per promised deliverable. Three posts
             promised for the selected day show EDD = 3.
           </li>
+          <li>
+            <strong>Overdue till now</strong> · your current On Board or Order
+            Sent deliverables with an EDD before today. This live backlog uses
+            the same rule as Attention and stays current while you switch the
+            activity day.
+          </li>
         </KMList>
         <p>
           The report uses IST dates and excludes test rows. It reads the full
@@ -192,9 +198,10 @@ export default function MyDashboardKM() {
           </li>
         </KMList>
         <p>
-          Cards are sorted by days overdue descending (most overdue first). A
-          maximum of 15 are shown. When everything is on track the section says
-          &quot;All caught up.&quot;
+          The overdue badge shows the full current backlog. Cards are sorted by
+          days overdue descending (most overdue first), with a maximum of 15
+          shown. When everything is on track the section says &quot;All caught
+          up.&quot;
         </p>
       </KMSection>
 

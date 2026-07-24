@@ -226,7 +226,11 @@ export function MyDashboardBody({
         </section>
         <MyDashboardKpiStrip kpi={kpi} />
         <EodSnapshot snapshots={snapshots} memberLabel={memberLabel} />
-        <PendingActionsSection actions={pendingActions} allPosts={posts} />
+        <PendingActionsSection
+          actions={pendingActions}
+          allPosts={posts}
+          overdueTotal={snapshots[0]?.overdue.length ?? 0}
+        />
       </div>
       <MyDashboardWorkloadBoard
         posts={filteredPosts}
