@@ -2,6 +2,7 @@ import type { MyPost } from "./types";
 
 export interface DailySnapshotItem {
   id: number;
+  infId: string | null;
   postId: string | null;
   collabId: string | null;
   creatorName: string;
@@ -42,10 +43,16 @@ function collabKey(post: MyPost): string {
 }
 
 function toItem(post: MyPost): DailySnapshotItem {
+  const infId = post.inf_id ?? post.creator?.inf_id ?? null;
   return {
     id: post.id,
+    infId,
     postId: post.post_id_short ?? post.post_id ?? null,
-    collabId: post.collab_id ?? null,
+    collabId:
+      post.collab_id ??
+      (infId && post.collab_number != null
+        ? `${infId}-C${Number(post.collab_number)}`
+        : null),
     creatorName:
       post.creator?.inf_name ??
       post.inf_name ??

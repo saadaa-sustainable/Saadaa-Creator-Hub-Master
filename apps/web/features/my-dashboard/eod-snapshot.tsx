@@ -43,8 +43,29 @@ const METRICS = [
   },
 ] as const;
 
-function itemLabel(item: DailySnapshotItem): string {
-  return `${item.creatorName}${item.campaignId ? ` · ${item.campaignId}` : ""}`;
+type Metric = (typeof METRICS)[number];
+type MetricKey = Metric["key"];
+
+interface ActivityRow {
+  key: string;
+  metric: Metric;
+  item: DailySnapshotItem;
+}
+
+function activityRows(snapshot: DailySnapshot): ActivityRow[] {
+  return METRICS.flatMap((metric) =>
+    snapshot[metric.key].map((item) => ({
+      key: `${metric.key}-${item.id}`,
+      metric,
+      item,
+    })),
+  );
+}
+
+function stageReference(key: MetricKey, item: DailySnapshotItem): string {
+  if (key === "reachouts") return item.infId ?? item.postId ?? "—";
+  if (key === "onboarded") return item.collabId ?? item.infId ?? "—";
+  return item.postId ?? item.collabId ?? item.infId ?? "—";
 }
 
 function drawRoundedRect(
@@ -68,104 +89,227 @@ function drawRoundedRect(
   }
 }
 
-function clipped(text: string, max = 38): string {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+function fitText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string {
+  if (context.measureText(text).width <= maxWidth) return text;
+  let value = text;
+  while (
+    value.length > 1 &&
+    context.measureText(`${value}…`).width > maxWidth
+  ) {
+    value = value.slice(0, -1);
+  }
+  return `${value}…`;
 }
 
-async function downloadSnapshotPng(
+function renderSnapshotCanvas(
   snapshot: DailySnapshot,
   memberLabel: string,
-) {
+  rows: ActivityRow[],
+  totalRows: number,
+  page: number,
+  pageCount: number,
+): HTMLCanvasElement {
+  const rowHeight = 58;
+  const tableTop = 430;
+  const tableHeaderHeight = 52;
+  const footerHeight = 72;
   const canvas = document.createElement("canvas");
-  canvas.width = 1600;
-  canvas.height = 900;
+  canvas.width = 1720;
+  canvas.height =
+    tableTop +
+    tableHeaderHeight +
+    Math.max(rows.length, 1) * rowHeight +
+    footerHeight;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Image export is unavailable");
 
   context.fillStyle = "#FAF8F5";
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "#161513";
-  context.font = "700 54px Inter, Arial, sans-serif";
-  context.fillText("EOD WORK SNAPSHOT", 80, 100);
+  context.font = "700 52px Inter, Arial, sans-serif";
+  context.fillText("EOD WORK SNAPSHOT", 70, 92);
   context.fillStyle = "#6E695E";
   context.font = "500 28px Inter, Arial, sans-serif";
-  context.fillText(`${memberLabel} · ${formatDate(snapshot.date)}`, 80, 148);
+  context.fillText(`${memberLabel} · ${formatDate(snapshot.date)}`, 70, 140);
 
-  const total =
-    snapshot.reachouts.length +
-    snapshot.onboarded.length +
-    snapshot.posted.length;
-  drawRoundedRect(context, 1240, 64, 280, 90, 22, "#F0EAD6");
+  drawRoundedRect(context, 1345, 55, 305, 92, 22, "#F0EAD6");
   context.fillStyle = "#161513";
   context.font = "700 34px Inter, Arial, sans-serif";
-  context.fillText(String(total), 1280, 112);
+  context.fillText(String(totalRows), 1382, 110);
   context.fillStyle = "#6E695E";
   context.font = "600 17px Inter, Arial, sans-serif";
-  context.fillText("STAGE UPDATES", 1345, 111);
+  context.fillText("ACTIVITY ROWS", 1450, 109);
 
   METRICS.forEach((metric, index) => {
     const items = snapshot[metric.key];
-    const x = 80 + index * 380;
-    const y = 220;
-    drawRoundedRect(context, x, y, 340, 590, 28, "#FFFFFF", "#E7E2D2");
+    const x = 70 + index * 410;
+    const y = 190;
+    drawRoundedRect(context, x, y, 380, 156, 22, "#FFFFFF", "#E7E2D2");
     context.fillStyle = metric.color;
-    context.fillRect(x, y, 8, 590);
+    context.fillRect(x, y, 7, 156);
     context.fillStyle = "#161513";
-    context.font = "700 64px Inter, Arial, sans-serif";
-    context.fillText(String(items.length), x + 36, y + 100);
-    context.font = "700 25px Inter, Arial, sans-serif";
-    context.fillText(metric.label, x + 36, y + 146);
+    context.font = "700 52px Inter, Arial, sans-serif";
+    context.fillText(String(items.length), x + 34, y + 70);
+    context.font = "700 23px Inter, Arial, sans-serif";
+    context.fillText(metric.label, x + 34, y + 108);
+    context.fillStyle = "#9A9384";
+    context.font = "500 17px Inter, Arial, sans-serif";
+    context.fillText(metric.note, x + 34, y + 135);
+  });
+
+  context.fillStyle = "#161513";
+  context.font = "700 25px Inter, Arial, sans-serif";
+  context.fillText("Activity detail", 70, 402);
+  context.fillStyle = "#6E695E";
+  context.font = "500 17px Inter, Arial, sans-serif";
+  context.fillText(
+    pageCount > 1
+      ? `Every creator entry · Page ${page} of ${pageCount}`
+      : "Every creator entry for the selected day",
+    252,
+    402,
+  );
+
+  const columns = [
+    { label: "Stage", x: 70, width: 180 },
+    { label: "Creator", x: 250, width: 430 },
+    { label: "SIF ID", x: 680, width: 180 },
+    { label: "Stage reference", x: 860, width: 250 },
+    { label: "Campaign", x: 1110, width: 170 },
+    { label: "Content", x: 1280, width: 190 },
+    { label: "Date", x: 1470, width: 180 },
+  ];
+  drawRoundedRect(
+    context,
+    70,
+    tableTop,
+    1580,
+    tableHeaderHeight,
+    14,
+    "#2C2420",
+  );
+  context.fillStyle = "#FFFCF8";
+  context.font = "700 15px Inter, Arial, sans-serif";
+  columns.forEach((column) =>
+    context.fillText(column.label.toUpperCase(), column.x + 14, tableTop + 33),
+  );
+
+  if (rows.length === 0) {
+    drawRoundedRect(
+      context,
+      70,
+      tableTop + tableHeaderHeight,
+      1580,
+      rowHeight,
+      0,
+      "#FFFFFF",
+      "#E7E2D2",
+    );
     context.fillStyle = "#9A9384";
     context.font = "500 18px Inter, Arial, sans-serif";
-    context.fillText(metric.note, x + 36, y + 178);
-
-    context.strokeStyle = "#E7E2D2";
-    context.beginPath();
-    context.moveTo(x + 36, y + 210);
-    context.lineTo(x + 304, y + 210);
-    context.stroke();
-
-    if (items.length === 0) {
-      context.fillStyle = "#9A9384";
-      context.font = "500 19px Inter, Arial, sans-serif";
-      context.fillText("No entries", x + 36, y + 260);
-      return;
-    }
-
-    items.slice(0, 7).forEach((item, itemIndex) => {
-      const itemY = y + 258 + itemIndex * 43;
-      context.fillStyle = metric.color;
+    context.fillText("No activity recorded", 84, tableTop + 89);
+  } else {
+    rows.forEach(({ metric, item }, index) => {
+      const y = tableTop + tableHeaderHeight + index * rowHeight;
+      context.fillStyle = index % 2 === 0 ? "#FFFFFF" : "#F8F5F0";
+      context.fillRect(70, y, 1580, rowHeight);
+      context.strokeStyle = "#E7E2D2";
       context.beginPath();
-      context.arc(x + 42, itemY - 6, 5, 0, Math.PI * 2);
-      context.fill();
+      context.moveTo(70, y + rowHeight);
+      context.lineTo(1650, y + rowHeight);
+      context.stroke();
+
+      drawRoundedRect(context, 84, y + 14, 138, 30, 15, `${metric.color}18`);
+      context.fillStyle = metric.color;
+      context.font = "700 14px Inter, Arial, sans-serif";
+      context.fillText(metric.label, 99, y + 34);
+
       context.fillStyle = "#161513";
-      context.font = "600 18px Inter, Arial, sans-serif";
-      context.fillText(clipped(itemLabel(item)), x + 58, itemY);
-    });
-    if (items.length > 7) {
-      context.fillStyle = "#6E695E";
       context.font = "600 17px Inter, Arial, sans-serif";
-      context.fillText(`+${items.length - 7} more`, x + 36, y + 575);
-    }
-  });
+      context.fillText(fitText(context, item.creatorName, 390), 264, y + 25);
+      context.fillStyle = "#6E695E";
+      context.font = "500 14px Inter, Arial, sans-serif";
+      context.fillText(
+        fitText(context, item.username ? `@${item.username}` : "—", 390),
+        264,
+        y + 46,
+      );
+
+      context.fillStyle = "#161513";
+      context.font = "600 16px Inter, Arial, sans-serif";
+      context.fillText(item.infId ?? "—", 694, y + 35);
+      context.fillText(
+        fitText(context, stageReference(metric.key, item), 220),
+        874,
+        y + 35,
+      );
+      context.fillText(item.campaignId ?? "—", 1124, y + 35);
+      context.fillText(
+        fitText(context, item.contentType ?? "—", 160),
+        1294,
+        y + 35,
+      );
+      context.fillText(formatDate(snapshot.date), 1484, y + 35);
+    });
+  }
 
   context.fillStyle = "#9A9384";
   context.font = "500 17px Inter, Arial, sans-serif";
-  context.fillText("CreatorHub · Generated from live team entries", 80, 864);
+  context.fillText(
+    "CreatorHub · Generated from live team entries",
+    70,
+    canvas.height - 28,
+  );
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (value) =>
-        value ? resolve(value) : reject(new Error("Could not create PNG")),
-      "image/png",
+  return canvas;
+}
+
+async function downloadSnapshotPng(
+  snapshot: DailySnapshot,
+  memberLabel: string,
+): Promise<number> {
+  const allRows = activityRows(snapshot);
+  const pageSize = 120;
+  const pages: ActivityRow[][] =
+    allRows.length === 0
+      ? [[]]
+      : Array.from(
+          { length: Math.ceil(allRows.length / pageSize) },
+          (_, index) => allRows.slice(index * pageSize, (index + 1) * pageSize),
+        );
+
+  for (const [index, rows] of pages.entries()) {
+    const canvas = renderSnapshotCanvas(
+      snapshot,
+      memberLabel,
+      rows,
+      allRows.length,
+      index + 1,
+      pages.length,
     );
-  });
-  const href = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = href;
-  link.download = `creatorhub-eod-${snapshot.date}.png`;
-  link.click();
-  URL.revokeObjectURL(href);
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (value) =>
+          value ? resolve(value) : reject(new Error("Could not create PNG")),
+        "image/png",
+      );
+    });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download =
+      pages.length === 1
+        ? `creatorhub-eod-${snapshot.date}.png`
+        : `creatorhub-eod-${snapshot.date}-${index + 1}-of-${pages.length}.png`;
+    link.click();
+    URL.revokeObjectURL(href);
+  }
+
+  return pages.length;
 }
 
 export function EodSnapshot({
@@ -181,12 +325,17 @@ export function EodSnapshot({
     snapshots.find((item) => item.date === selectedDate) ?? snapshots[0];
 
   if (!snapshot) return null;
+  const rows = activityRows(snapshot);
 
   const download = async () => {
     setDownloading(true);
     try {
-      await downloadSnapshotPng(snapshot, memberLabel);
-      toast.success(`${formatDate(snapshot.date)} snapshot downloaded`);
+      const pageCount = await downloadSnapshotPng(snapshot, memberLabel);
+      toast.success(
+        pageCount === 1
+          ? `${formatDate(snapshot.date)} snapshot downloaded`
+          : `${pageCount} snapshot pages downloaded`,
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Could not download snapshot",
@@ -278,34 +427,95 @@ export function EodSnapshot({
                   <Icon size={15} aria-hidden />
                 </span>
               </div>
-              <div className="space-y-1.5">
-                {items.length === 0 ? (
-                  <p className="text-[0.68rem] text-text-tertiary">
-                    No entries
-                  </p>
-                ) : (
-                  items.slice(0, 3).map((item) => (
-                    <p
-                      key={`${metric.key}-${item.id}`}
-                      className="truncate text-[0.68rem] text-text-secondary"
-                      title={itemLabel(item)}
-                    >
-                      <span className="font-semibold text-text-primary">
-                        {item.creatorName}
-                      </span>
-                      {item.campaignId ? ` · ${item.campaignId}` : ""}
-                    </p>
-                  ))
-                )}
-                {items.length > 3 && (
-                  <p className="text-[0.65rem] font-semibold text-text-tertiary">
-                    +{items.length - 3} more
-                  </p>
-                )}
-              </div>
+              <p className="text-[0.68rem] text-text-tertiary">{metric.note}</p>
             </article>
           );
         })}
+      </div>
+
+      <div className="border-t border-border bg-bg-white p-3 sm:p-4">
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <div>
+            <p className="text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-text-tertiary">
+              Activity detail
+            </p>
+            <p className="mt-0.5 text-xs text-text-secondary">
+              Every creator entry for the selected day
+            </p>
+          </div>
+          <span className="shrink-0 text-xs font-semibold tabular-nums text-text-secondary">
+            {rows.length} rows
+          </span>
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="min-w-[900px] w-full text-[0.72rem]">
+            <thead>
+              <tr className="border-b border-border bg-text-primary text-left text-[0.6rem] uppercase tracking-[0.06em] text-bg-white">
+                <th className="px-3 py-2.5 font-bold">Stage</th>
+                <th className="px-3 py-2.5 font-bold">Creator</th>
+                <th className="px-3 py-2.5 font-bold">SIF ID</th>
+                <th className="px-3 py-2.5 font-bold">Stage reference</th>
+                <th className="px-3 py-2.5 font-bold">Campaign</th>
+                <th className="px-3 py-2.5 font-bold">Content</th>
+                <th className="px-3 py-2.5 font-bold">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-3 py-8 text-center text-text-tertiary"
+                  >
+                    No activity recorded
+                  </td>
+                </tr>
+              ) : (
+                rows.map(({ key, metric, item }) => (
+                  <tr
+                    key={key}
+                    className="border-b border-border last:border-0 odd:bg-bg-white even:bg-bg-surface/45"
+                  >
+                    <td className="px-3 py-2.5">
+                      <span
+                        className="inline-flex rounded-full px-2 py-1 text-[0.62rem] font-bold"
+                        style={{
+                          color: metric.color,
+                          backgroundColor: `color-mix(in srgb, ${metric.color} 11%, white)`,
+                        }}
+                      >
+                        {metric.label}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <p className="max-w-[260px] break-words font-semibold text-text-primary">
+                        {item.creatorName}
+                      </p>
+                      <p className="max-w-[260px] break-all text-[0.65rem] text-text-tertiary">
+                        {item.username ? `@${item.username}` : "—"}
+                      </p>
+                    </td>
+                    <td className="px-3 py-2.5 font-semibold text-text-primary">
+                      {item.infId ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5 font-semibold text-text-primary">
+                      {stageReference(metric.key, item)}
+                    </td>
+                    <td className="px-3 py-2.5 text-text-secondary">
+                      {item.campaignId ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5 text-text-secondary">
+                      {item.contentType ?? "—"}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-text-secondary">
+                      {formatDate(snapshot.date)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
   );

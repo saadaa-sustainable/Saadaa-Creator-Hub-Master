@@ -25,6 +25,7 @@ describe("buildDailySnapshots", () => {
       [
         row({
           id: 1,
+          inf_id: "SIF-1",
           collab_id: "SIF-1-C1",
           logged_by: "Tanvi",
           onboarded_by: "Krati",
@@ -34,6 +35,7 @@ describe("buildDailySnapshots", () => {
         }),
         row({
           id: 2,
+          inf_id: "SIF-1",
           post_id: "SIF-1-P2",
           collab_id: "SIF-1-C1",
           logged_by: null,
@@ -44,6 +46,7 @@ describe("buildDailySnapshots", () => {
         }),
         row({
           id: 3,
+          inf_id: "SIF-2",
           post_id: "SIF-2-P1",
           collab_id: "SIF-2-C1",
           onboarded_by: "Tanvi",
@@ -53,6 +56,7 @@ describe("buildDailySnapshots", () => {
         }),
         row({
           id: 4,
+          inf_id: "SIF-3",
           post_id: "SIF-3-P1",
           collab_id: "SIF-3-C1",
           logged_by: "Tanvi",
@@ -60,10 +64,26 @@ describe("buildDailySnapshots", () => {
         }),
         row({
           id: 5,
+          inf_id: "SIF-2",
           post_id: "SIF-2-P2",
           collab_id: "SIF-2-C1",
           onboarded_by: "Tanvi",
           est_delivery: "2026-07-24",
+        }),
+        row({
+          id: 7,
+          post_id: "SIF-7-P1",
+          collab_id: null,
+          collab_number: 2,
+          onboarded_by: "Tanvi",
+          onboard_date: "2026-07-24",
+          creator: {
+            inf_id: "SIF-7",
+            inf_name: "Legacy creator",
+            profile_pic: null,
+            category: null,
+            followers: null,
+          },
         }),
         row({
           id: 6,
@@ -79,8 +99,8 @@ describe("buildDailySnapshots", () => {
 
     expect(snapshots[0]).toMatchObject({
       date: "2026-07-24",
-      reachouts: [{ collabId: "SIF-1-C1" }],
-      onboarded: [],
+      reachouts: [{ infId: "SIF-1", collabId: "SIF-1-C1" }],
+      onboarded: [{ infId: "SIF-7", collabId: "SIF-7-C2" }],
       posted: [{ postId: "SIF-2-P1" }],
       edd: [{ postId: "SIF-2-P1" }, { postId: "SIF-2-P2" }],
     });
